@@ -1,0 +1,26 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace]
+resolver = "2"
+members = [
+    "./spire",
+    "./spire-*",
+    "./tower-*",
+    "./examples/*",
+]
+
+default-members = [
+    "./spire-*",
+    "./tower-*",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+readme = "./README.md"
+license = "MIT"
+
+authors = ["Oleh Martsokha <o.martsokha@gmail.com>"]
+repository = "https://github.com/xwde/scrapyard"
+homepage = "https://github.com/xwde/scrapyard"
+documentation = "https://docs.rs/scrapyard"

@@ -1,0 +1,14 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "example-browser"
+publish = false
+
+version = { workspace = true }
+edition = { workspace = true }
+
+[[bin]]
+name = "browser"
+path = "./main.rs"
+
+[dependencies]

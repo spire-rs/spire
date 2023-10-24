@@ -1,0 +1,40 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "spire"
+
+version = { workspace = true }
+edition = { workspace = true }
+readme = { workspace = true }
+license =  { workspace = true }
+
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+
+categories = ["asynchronous", "web-programming"]
+keywords = ["crawler", "scraper", "web", "framework"]
+description = """
+The flexible scraper framework powered by tokio and tower.
+"""
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = []
+full = []
+
+macros = ["dep:spire-macros"]
+tracing = ["dep:tracing"]
+util = []
+
+[dependencies]
+spire-core = { path = "../spire-core", features = [] }
+spire-macros = { path = "../spire-macros", optional = true }
+tracing = { version = "0.1.40", default-features = false, optional = true }

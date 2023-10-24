@@ -1,0 +1,14 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "example-client"
+publish = false
+
+version = { workspace = true }
+edition = { workspace = true }
+
+[[bin]]
+name = "client"
+path = "./main.rs"
+
+[dependencies]

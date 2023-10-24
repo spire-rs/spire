@@ -1,0 +1,30 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "spire-macros"
+
+version = { workspace = true }
+edition = { workspace = true }
+readme = { workspace = true }
+license =  { workspace = true }
+
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+
+categories = ["asynchronous", "web-programming"]
+keywords = ["crawler", "scraper", "web", "framework"]
+description = """
+Macros for spire.
+"""
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+spire-core = { path = "../spire-core" }
