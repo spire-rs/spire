@@ -6,7 +6,7 @@ name = "spire-core"
 version = { workspace = true }
 edition = { workspace = true }
 readme = { workspace = true }
-license =  { workspace = true }
+license = { workspace = true }
 
 authors = { workspace = true }
 repository = { workspace = true }
@@ -16,7 +16,7 @@ documentation = { workspace = true }
 categories = ["asynchronous", "web-programming"]
 keywords = ["crawler", "scraper", "web", "framework"]
 description = """
-Core types and traits for spire.
+Core types and traits for Spire.
 """
 
 [package.metadata.docs.rs]
@@ -27,4 +27,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 path = "lib.rs"
 
 [dependencies]
-async-trait = { version = "0.1.73" }
+tower-service = { version = "0.3.2" }
+tower-layer = { version = "0.3.2" }
+
+http = { version = "1.0.0" }
+async-trait = { version = "0.1.77" }
+thiserror = { version = "1.0.56" }

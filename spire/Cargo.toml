@@ -6,7 +6,7 @@ name = "spire"
 version = { workspace = true }
 edition = { workspace = true }
 readme = { workspace = true }
-license =  { workspace = true }
+license = { workspace = true }
 
 authors = { workspace = true }
 repository = { workspace = true }
@@ -30,11 +30,26 @@ path = "lib.rs"
 default = []
 full = []
 
+client-hyper = []
+client-reqwest = []
+webdriver = []
+
 macros = ["dep:spire-macros"]
 tracing = ["dep:tracing"]
 util = []
 
 [dependencies]
-spire-core = { path = "../spire-core", features = [] }
-spire-macros = { path = "../spire-macros", optional = true }
+spire-core = { workspace = true }
+spire-macros = { workspace = true, optional = true }
+
+serde = { version = "1.0.196", features = ["derive"] }
+serde_json = { version = "1.0.113" }
+
+tower = { version = "0.4.13", features = ["util"] }
+#tower-service = { version = "0.3.2" }
+#tower-layer = { version = "0.3.2" }
+futures-util = { version = "0.3.30" }
+
 tracing = { version = "0.1.40", default-features = false, optional = true }
+thiserror = { version = "1.0.56", default-features = false, features = [] }
+async-trait = { version = "0.1.77", default-features = false, features = [] }

@@ -6,7 +6,7 @@ name = "spire-macros"
 version = { workspace = true }
 edition = { workspace = true }
 readme = { workspace = true }
-license =  { workspace = true }
+license = { workspace = true }
 
 authors = { workspace = true }
 repository = { workspace = true }
@@ -16,7 +16,7 @@ documentation = { workspace = true }
 categories = ["asynchronous", "web-programming"]
 keywords = ["crawler", "scraper", "web", "framework"]
 description = """
-Macros for spire.
+Macros for Spire.
 """
 
 [package.metadata.docs.rs]
@@ -27,4 +27,4 @@ rustdoc-args = ["--cfg", "docsrs"]
 path = "lib.rs"
 
 [dependencies]
-spire-core = { path = "../spire-core" }
+spire-core = { workspace = true }

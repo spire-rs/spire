@@ -2,13 +2,21 @@
 
 [package]
 name = "example-browser"
-publish = false
-
 version = { workspace = true }
 edition = { workspace = true }
+publish = false
 
 [[bin]]
 name = "browser"
 path = "./main.rs"
 
 [dependencies]
+clap = { version = "4.4.14", features = ["derive"] }
+tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }
+spire = { workspace = true, features = [] }
+
+tracing = { version = "0.1.40", features = [] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tower = { version = "0.4.13", features = [] }
+serde = { version = "1.0.196", features = ["derive"] }
+anyhow = { version = "1.0.79", features = [] }
