@@ -4,9 +4,7 @@ use std::sync::Mutex;
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
-use spire_core::collect::HandlerContext;
-
-use crate::handler::{ControlFlow, Handler, IntoFlow};
+use crate::handler::{ControlFlow, HandlerContext, IntoControlFlow};
 
 pub struct Route<E = Infallible> {
     srv: Mutex<BoxCloneService<HandlerContext, ControlFlow, E>>,
@@ -16,14 +14,14 @@ impl<E> Route<E> {
     pub(crate) fn new<T>(svc: T) -> Self
     where
         T: Service<HandlerContext, Error = E> + Clone + Send + 'static,
-        T::Response: IntoFlow + 'static,
+        T::Response: IntoControlFlow + 'static,
         T::Future: Send + 'static,
     {
-        let svc = BoxCloneService::new(svc.map_response(IntoFlow::into_flow));
+        let srv = Mutex::new(BoxCloneService::new(
+            svc.map_response(IntoControlFlow::into_control_flow),
+        ));
 
-        Self {
-            srv: Mutex::new(svc),
-        }
+        Self { srv }
     }
 }
 

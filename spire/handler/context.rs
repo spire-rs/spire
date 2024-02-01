@@ -1,12 +1,12 @@
 #[derive(Debug, Clone)]
-pub struct CollectContext {
+pub struct HandlerContext {
     // Request
     // Response
     // TaskQueue
     // DataQueue xS
 }
 
-impl CollectContext {
+impl HandlerContext {
     pub fn new(req: (), resp: ()) -> Self {
         todo!()
     }

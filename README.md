@@ -9,7 +9,7 @@ https://crates.io/crates/persy
 https://developer.mozilla.org/en-US/docs/Web/API/Request https://pola.rs/
 https://docs.rs/hyper/latest/hyper/struct.Request.html
 
-- user -> queue -> 
-- request -> middlewares -> collector -> 
+- user -> queue ->
+- request -> middlewares -> collector ->
 - response -> middlewares -> router -> handler ->
 - queue -> user ->

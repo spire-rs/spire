@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
-#[derive(Debug, Default)]
-pub struct Label(pub String);
+use spire_core::collect::Label;
 
 pub struct PathRouter<S> {
     // Vec<Route>

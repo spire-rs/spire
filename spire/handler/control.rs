@@ -1,30 +1,39 @@
 use std::convert::Infallible;
 
+use crate::Label;
+
 ///
 ///
 /// [`ControlFlow`]: std::ops::ControlFlow
 #[derive(Debug, Default, Clone)]
 pub enum ControlFlow {
+    /// Wait
+    Wait(),
+    /// Repeat
+    Repeat(),
+
     /// Break
-    Break,
+    Break(),
+    /// Break
+    BreakOne(Label),
 
     /// Continue
     #[default]
     Continue,
 }
 
-pub trait IntoFlow {
-    fn into_flow(self) -> ControlFlow;
+pub trait IntoControlFlow {
+    fn into_control_flow(self) -> ControlFlow;
 }
 
-impl IntoFlow for () {
-    fn into_flow(self) -> ControlFlow {
-        ControlFlow::default()
+impl IntoControlFlow for () {
+    fn into_control_flow(self) -> ControlFlow {
+        ControlFlow::Continue
     }
 }
 
-impl IntoFlow for Infallible {
-    fn into_flow(self) -> ControlFlow {
-        ControlFlow::default()
+impl IntoControlFlow for Infallible {
+    fn into_control_flow(self) -> ControlFlow {
+        ControlFlow::Continue
     }
 }

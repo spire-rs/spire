@@ -2,12 +2,13 @@ use std::future::Future;
 use std::pin::Pin;
 
 use spire_core::all_the_tuples;
-use spire_core::collect::HandlerContext;
 
-use crate::extract::{FromContext, FromContextParts};
-pub use crate::handler::control::{ControlFlow, IntoFlow};
+pub use crate::extract::{FromContext, FromContextParts};
+pub use crate::handler::context::HandlerContext;
+pub use crate::handler::control::{ControlFlow, IntoControlFlow};
 pub use crate::handler::service::HandlerService;
 
+mod context;
 mod control;
 mod service;
 
@@ -29,12 +30,12 @@ impl<S, F, Fut, Ret> Handler<((),), S> for F
 where
     F: FnOnce() -> Fut + Clone + Send + 'static,
     Fut: Future<Output = Ret> + Send,
-    Ret: IntoFlow,
+    Ret: IntoControlFlow,
 {
     type Future = Pin<Box<dyn Future<Output = ControlFlow> + Send>>;
 
     fn call(self, _cx: HandlerContext, _state: S) -> Self::Future {
-        Box::pin(async move { self().await.into_flow() })
+        Box::pin(async move { self().await.into_control_flow() })
     }
 }
 
@@ -50,7 +51,7 @@ macro_rules! impl_handler {
             S: Send + Sync + 'static,
             F: FnOnce($($ty,)* $last,) -> Fut + Clone + Send + 'static,
             Fut: Future<Output = Ret> + Send,
-            Ret: IntoFlow,
+            Ret: IntoControlFlow,
             $( $ty: FromContextParts<S> + Send, )*
             $last: FromContext<S, M> + Send,
         {
@@ -61,17 +62,17 @@ macro_rules! impl_handler {
                     $(
                         let $ty = match $ty::from_context_parts(&cx, &state).await {
                             Ok(value) => value,
-                            Err(rejection) => return rejection.into_flow(),
+                            Err(rejection) => return rejection.into_control_flow(),
                         };
                     )*
 
                     let $last = match $last::from_context(cx, &state).await {
                         Ok(value) => value,
-                        Err(rejection) => return rejection.into_flow(),
+                        Err(rejection) => return rejection.into_control_flow(),
                     };
 
                     let res = self($($ty,)* $last,).await;
-                    res.into_flow()
+                    res.into_control_flow()
                 })
             }
         }

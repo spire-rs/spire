@@ -1,9 +1,8 @@
 use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
-use spire_core::collect::HandlerContext;
-
 use crate::extract::{FromContext, FromContextParts};
+use crate::handler::HandlerContext;
 
 pub trait FromRef<T> {
     fn from_ref(input: &T) -> Self;

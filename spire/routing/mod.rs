@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+pub use spire_core::collect::Label;
+
 use crate::handler::Handler;
 use crate::routing::fallback::Fallback;
-pub use crate::routing::path_router::Label;
 use crate::routing::path_router::PathRouter;
 
 mod fallback;

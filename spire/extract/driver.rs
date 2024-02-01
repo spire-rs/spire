@@ -2,9 +2,8 @@ use core::fmt;
 use std::convert::Infallible;
 use std::marker::PhantomData;
 
-use spire_core::collect::HandlerContext;
-
 use crate::extract::FromContextParts;
+use crate::handler::HandlerContext;
 
 pub trait WebDriver {}
 
@@ -20,9 +19,14 @@ pub struct Safari {}
 
 impl WebDriver for Safari {}
 
-
 pub struct BrowserHandler<T> {
     marker: PhantomData<T>,
+}
+
+impl<T> fmt::Debug for BrowserHandler<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
 }
 
 pub struct Browser<T = Chrome>(pub BrowserHandler<T>);

@@ -6,10 +6,8 @@ use std::task::{Context, Poll};
 use futures_util::future::Map;
 use tower::Service;
 
-use spire_core::collect::HandlerContext;
-
 use crate::handler::control::ControlFlow;
-use crate::handler::Handler;
+use crate::handler::{Handler, HandlerContext};
 
 /// TODO: Make opaque.
 pub type HandlerFuture<F> = Map<F, fn(ControlFlow) -> Result<ControlFlow, Infallible>>;

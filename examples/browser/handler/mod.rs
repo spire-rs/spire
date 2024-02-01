@@ -1,8 +1,7 @@
 use spire::extract::driver::{Browser, Firefox};
-use spire::extract::queue::TaskQueue;
-use spire::extract::State;
+use spire::extract::{State, TaskQueue};
 
-// #[tracing::instrument]
+#[tracing::instrument]
 pub async fn home_pagination(
     queue: TaskQueue,
     Browser(browser): Browser<Firefox>,
@@ -10,7 +9,7 @@ pub async fn home_pagination(
 ) {
 }
 
-// #[tracing::instrument]
+#[tracing::instrument]
 pub async fn individual_page(
     queue: TaskQueue,
     Browser(browser): Browser<Firefox>,

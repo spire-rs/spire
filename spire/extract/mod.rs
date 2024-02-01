@@ -1,13 +1,14 @@
 use std::convert::Infallible;
 
-pub use client::{Body, Json, Text};
+pub use client::Client;
+pub use content::{Body, Json, Text};
 pub use queue::TaskQueue;
-use spire_core::collect::HandlerContext;
 pub use state::{FromRef, State};
 
-use crate::handler::IntoFlow;
+use crate::handler::{HandlerContext, IntoControlFlow};
 
 mod client;
+mod content;
 pub mod driver;
 pub mod queue;
 mod state;
@@ -22,36 +23,36 @@ mod private {
 
 #[async_trait::async_trait]
 pub trait FromContextParts<S>: Sized {
-    type Rejection: IntoFlow;
+    type Rejection: IntoControlFlow;
 
     async fn from_context_parts(cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection>;
 }
 
 #[async_trait::async_trait]
 pub trait FromContext<S, V = private::ViaRequest>: Sized {
-    type Rejection: IntoFlow;
+    type Rejection: IntoControlFlow;
 
     async fn from_context(cx: HandlerContext, state: &S) -> Result<Self, Self::Rejection>;
 }
 
 #[async_trait::async_trait]
 impl<S, T> FromContext<S, private::ViaParts> for T
-where
-    S: Send + Sync,
-    T: FromContextParts<S>,
+    where
+        S: Send + Sync,
+        T: FromContextParts<S>,
 {
     type Rejection = <Self as FromContextParts<S>>::Rejection;
 
     async fn from_context(cx: HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
-        Self::from_context_parts(&cx, &state).await
+        Self::from_context_parts(&cx, state).await
     }
 }
 
 #[async_trait::async_trait]
 impl<S, T> FromContextParts<S> for Option<T>
-where
-    S: Send + Sync,
-    T: FromContextParts<S>,
+    where
+        S: Send + Sync,
+        T: FromContextParts<S>,
 {
     type Rejection = Infallible;
 
@@ -62,9 +63,9 @@ where
 
 #[async_trait::async_trait]
 impl<S, T> FromContext<S> for Option<T>
-where
-    S: Send + Sync,
-    T: FromContext<S>,
+    where
+        S: Send + Sync,
+        T: FromContext<S>,
 {
     type Rejection = Infallible;
 
@@ -75,9 +76,9 @@ where
 
 #[async_trait::async_trait]
 impl<S, T> FromContextParts<S> for Result<T, T::Rejection>
-where
-    S: Send + Sync,
-    T: FromContextParts<S>,
+    where
+        S: Send + Sync,
+        T: FromContextParts<S>,
 {
     type Rejection = Infallible;
 
@@ -88,9 +89,9 @@ where
 
 #[async_trait::async_trait]
 impl<S, T> FromContext<S> for Result<T, T::Rejection>
-where
-    S: Send + Sync,
-    T: FromContext<S>,
+    where
+        S: Send + Sync,
+        T: FromContext<S>,
 {
     type Rejection = Infallible;
 
