@@ -1,15 +1,12 @@
 use std::fmt;
 use std::net::SocketAddr;
 
-use crate::{Build, DriverProcess};
+use crate::{Build, CommonSettings, DriverProcess};
 use crate::{Handler, Result};
 
 pub struct SafariDriver(Handler);
 
-#[derive(Debug, Default)]
-pub struct SafariBuilder {}
-
-impl Build<SafariDriver> for SafariBuilder {
+impl Build<SafariDriver> for CommonSettings {
     fn build(self) -> SafariDriver {
         todo!()
     }
@@ -17,7 +14,7 @@ impl Build<SafariDriver> for SafariBuilder {
 
 #[async_trait::async_trait]
 impl DriverProcess for SafariDriver {
-    type Builder = SafariBuilder;
+    type Builder = CommonSettings;
 
     async fn run(&self) -> Result<()> {
         self.0.run().await
@@ -44,14 +41,14 @@ mod test {
 
     #[tokio::test]
     async fn run() -> Result<()> {
-        let driver = SafariDriver::builder().build();
+        let driver: SafariDriver = SafariDriver::builder().build();
         driver.run().await?;
         driver.close().await
     }
 
     #[tokio::test]
     async fn addr() -> Result<()> {
-        let driver = SafariDriver::builder().build();
+        let driver: SafariDriver = SafariDriver::builder().build();
         driver.run().await?;
         let _ = driver.addr().await?;
         driver.close().await

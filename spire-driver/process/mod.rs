@@ -20,6 +20,11 @@ mod msedgedriver;
 #[cfg(feature = "safaridriver")]
 mod safaridriver;
 
+#[derive(Debug, Default)]
+pub struct CommonSettings {
+    port: Option<u16>,
+}
+
 // TODO: ProcessBuilder
 pub trait Build<T: DriverProcess>: Default {
     fn build(self) -> T;

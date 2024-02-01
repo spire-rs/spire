@@ -1,4 +1,4 @@
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::ops::DerefMut;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -18,7 +18,7 @@ enum HandlerInner {
 pub(crate) struct Handler(Arc<Mutex<HandlerInner>>);
 
 impl Handler {
-    pub fn new(exec: &OsStr, args: &[&str]) -> Self {
+    pub fn new(exec: &OsStr, args: &[OsString]) -> Self {
         let mut command = Command::new(exec);
         command.args(args).kill_on_drop(true);
 

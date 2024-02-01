@@ -1,15 +1,12 @@
 use std::fmt;
 use std::net::SocketAddr;
 
-use crate::{Build, DriverProcess};
+use crate::{Build, CommonSettings, DriverProcess};
 use crate::{Handler, Result};
 
 pub struct ChromeDriver(Handler);
 
-#[derive(Debug, Default)]
-pub struct ChromeBuilder {}
-
-impl Build<ChromeDriver> for ChromeBuilder {
+impl Build<ChromeDriver> for CommonSettings {
     fn build(self) -> ChromeDriver {
         todo!()
     }
@@ -17,7 +14,7 @@ impl Build<ChromeDriver> for ChromeBuilder {
 
 #[async_trait::async_trait]
 impl DriverProcess for ChromeDriver {
-    type Builder = ChromeBuilder;
+    type Builder = CommonSettings;
 
     async fn run(&self) -> Result<()> {
         self.0.run().await
@@ -44,14 +41,14 @@ mod test {
 
     #[tokio::test]
     async fn run() -> Result<()> {
-        let driver = ChromeDriver::builder().build();
+        let driver: ChromeDriver = ChromeDriver::builder().build();
         driver.run().await?;
         driver.close().await
     }
 
     #[tokio::test]
     async fn addr() -> Result<()> {
-        let driver = ChromeDriver::builder().build();
+        let driver: ChromeDriver = ChromeDriver::builder().build();
         driver.run().await?;
         let _ = driver.addr().await?;
         driver.close().await

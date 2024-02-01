@@ -1,15 +1,12 @@
 use std::fmt;
 use std::net::SocketAddr;
 
-use crate::{Build, DriverProcess};
+use crate::{Build, CommonSettings, DriverProcess};
 use crate::{Handler, Result};
 
 pub struct EdgeDriver(Handler);
 
-#[derive(Debug, Default)]
-pub struct EdgeBuilder {}
-
-impl Build<EdgeDriver> for EdgeBuilder {
+impl Build<EdgeDriver> for CommonSettings {
     fn build(self) -> EdgeDriver {
         todo!()
     }
@@ -17,7 +14,7 @@ impl Build<EdgeDriver> for EdgeBuilder {
 
 #[async_trait::async_trait]
 impl DriverProcess for EdgeDriver {
-    type Builder = EdgeBuilder;
+    type Builder = CommonSettings;
 
     async fn run(&self) -> Result<()> {
         self.0.run().await
@@ -44,14 +41,14 @@ mod test {
 
     #[tokio::test]
     async fn run() -> Result<()> {
-        let driver = EdgeDriver::builder().build();
+        let driver: EdgeDriver = EdgeDriver::builder().build();
         driver.run().await?;
         driver.close().await
     }
 
     #[tokio::test]
     async fn addr() -> Result<()> {
-        let driver = EdgeDriver::builder().build();
+        let driver: EdgeDriver = EdgeDriver::builder().build();
         driver.run().await?;
         let _ = driver.addr().await?;
         driver.close().await
