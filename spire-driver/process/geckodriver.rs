@@ -2,18 +2,33 @@ use std::ffi::OsString;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use crate::{Build, CommonSettings, DriverProcess};
-use crate::{Handler, Result};
+use crate::{Handler, Process, Result};
 
 pub struct GeckoDriver {
     handler: Handler,
     addr: SocketAddr,
 }
 
-impl Build<GeckoDriver> for CommonSettings {
-    fn build(self) -> GeckoDriver {
+#[derive(Debug, Default, Clone)]
+pub struct GeckoBuilder {
+    port: Option<u16>,
+}
+
+impl GeckoBuilder {
+    pub fn port(mut self, port: u16) -> Self {
+        self.port = Some(port);
+        self
+    }
+
+    pub fn build(self) -> GeckoDriver {
+        GeckoDriver::new(self)
+    }
+}
+
+impl GeckoDriver {
+    pub fn new(settings: GeckoBuilder) -> Self {
         let mut args = Vec::default();
-        if let Some(port) = self.port {
+        if let Some(port) = settings.port {
             args.push("--port".into());
             args.push(port.to_string().into());
         }
@@ -22,17 +37,25 @@ impl Build<GeckoDriver> for CommonSettings {
         let handler = Handler::new(&exec, &args);
 
         let ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-        let port = self.port.unwrap_or(4444);
+        let port = settings.port.unwrap_or(4444);
         let addr = SocketAddr::new(ip, port);
 
-        GeckoDriver { handler, addr }
+        Self { handler, addr }
+    }
+
+    pub fn builder() -> GeckoBuilder {
+        GeckoBuilder::default()
+    }
+}
+
+impl Default for GeckoDriver {
+    fn default() -> Self {
+        Self::builder().build()
     }
 }
 
 #[async_trait::async_trait]
-impl DriverProcess for GeckoDriver {
-    type Builder = CommonSettings;
-
+impl Process for GeckoDriver {
     async fn run(&self) -> Result<()> {
         self.handler.run().await
     }
@@ -58,14 +81,7 @@ mod test {
 
     #[tokio::test]
     async fn run() -> Result<()> {
-        let driver: GeckoDriver = GeckoDriver::builder().build();
-        driver.run().await?;
-        driver.close().await
-    }
-
-    #[tokio::test]
-    async fn addr() -> Result<()> {
-        let driver: GeckoDriver = GeckoDriver::builder().build();
+        let driver: GeckoDriver = GeckoDriver::default();
         driver.run().await?;
         let _ = driver.addr().await?;
         driver.close().await

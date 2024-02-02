@@ -1,23 +1,33 @@
+use std::ffi::OsString;
 use std::fmt;
 use std::net::SocketAddr;
 
-use crate::{Build, CommonSettings, DriverProcess};
-use crate::{Handler, Result};
+use crate::{Handler, Process, Result};
 
-pub struct SafariDriver(Handler);
+// TODO.
+pub struct SafariDriver {
+    handler: Handler,
+}
 
-impl Build<SafariDriver> for CommonSettings {
-    fn build(self) -> SafariDriver {
-        todo!()
+impl SafariDriver {
+    pub fn new() -> Self {
+        let args = Vec::default();
+        let exec = OsString::from("safaridriver");
+        let handler = Handler::new(&exec, &args);
+        Self { handler }
+    }
+}
+
+impl Default for SafariDriver {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 #[async_trait::async_trait]
-impl DriverProcess for SafariDriver {
-    type Builder = CommonSettings;
-
+impl Process for SafariDriver {
     async fn run(&self) -> Result<()> {
-        self.0.run().await
+        self.handler.run().await
     }
 
     async fn addr(&self) -> Result<SocketAddr> {
@@ -25,7 +35,7 @@ impl DriverProcess for SafariDriver {
     }
 
     async fn close(self) -> Result<()> {
-        self.0.close().await
+        self.handler.close().await
     }
 }
 
@@ -41,14 +51,7 @@ mod test {
 
     #[tokio::test]
     async fn run() -> Result<()> {
-        let driver: SafariDriver = SafariDriver::builder().build();
-        driver.run().await?;
-        driver.close().await
-    }
-
-    #[tokio::test]
-    async fn addr() -> Result<()> {
-        let driver: SafariDriver = SafariDriver::builder().build();
+        let driver: SafariDriver = SafariDriver::new();
         driver.run().await?;
         let _ = driver.addr().await?;
         driver.close().await

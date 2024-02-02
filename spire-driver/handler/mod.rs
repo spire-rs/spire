@@ -39,31 +39,20 @@ impl Handler {
         let mut guard = self.0.lock().await;
         match guard.deref_mut() {
             HandlerInner::Created(x) => {
-                let child = x.spawn()?;
+                let child = x.spawn().map_err(Error::FailedToSpawn)?;
                 *guard = HandlerInner::Spawned(child);
                 Ok(())
             }
-            HandlerInner::Spawned(_) => Err(Error::FailedToStart),
+            HandlerInner::Spawned(_) => Err(Error::AlreadySpawned),
         }
     }
 
     pub async fn close(self) -> Result<()> {
         let mut guard = self.0.lock().await;
         if let HandlerInner::Spawned(ref mut x) = guard.deref_mut() {
-            x.kill().await?;
+            x.kill().await.map_err(Error::FailedToAbort)?;
         }
 
         Ok(())
     }
 }
-
-// pub enum DriverKind {
-//     #[cfg(feature = "chromedriver")]
-//     ChromeDriver,
-//     #[cfg(feature = "geckodriver")]
-//     GeckoDriver,
-//     #[cfg(feature = "msedgedriver")]
-//     MsEdgeDriver,
-//     #[cfg(feature = "safaridriver")]
-//     SafariDriver,
-// }
