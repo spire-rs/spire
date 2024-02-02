@@ -1,10 +1,10 @@
 version: 2
 updates:
 
-  - package-ecosystem: cargo
-    directory: /
+  - package-ecosystem: "cargo"
+    directory: "/"
     schedule:
-      interval: weekly
-      timezone: Europe/Warsaw
-      day: friday
-      time: 18:00
+      interval: "weekly"
+      timezone: "Europe/Warsaw"
+      day: "friday"
+      time: "18:00"
