@@ -2,7 +2,7 @@ use clap::Parser;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
 
-use spire::{Label, Router};
+use spire::{Collector, Label, Router};
 
 mod handler;
 mod service;
@@ -35,6 +35,10 @@ async fn main() -> anyhow::Result<()> {
         .route(Label::default(), handler::home_pagination)
         .route(Label::default(), handler::individual_page)
         .with_state(state);
+
+    // Execute.
+    let collector = Collector::builder().build();
+    collector.run().await?;
 
     Ok(())
 }
