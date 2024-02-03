@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::net::SocketAddr;
 
-use crate::{Driver, Handler, Result};
+use crate::driver::process::{Driver, Handler, Result};
 
 // TODO.
 pub struct ChromeDriver {

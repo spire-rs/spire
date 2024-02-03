@@ -6,7 +6,10 @@
 // pub use collector::{Error, Result};
 
 mod collect;
+
+#[cfg(feature = "client")]
+pub mod client;
+#[cfg(feature = "driver")]
+pub mod driver;
 pub mod macros;
 mod router;
-mod worker;
-mod driver;

@@ -28,5 +28,4 @@ documentation = "https://docs.rs/spire"
 [workspace.dependencies]
 spire = { path = "./spire", version = "0.1.0" }
 spire-core = { path = "./spire-core", version = "0.1.0" }
-spire-driver = { path = "./spire-driver", version = "0.1.0" }
 spire-macros = { path = "./spire-macros", version = "0.1.0" }

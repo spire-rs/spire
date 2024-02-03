@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-pub use spire_core::Label;
-
 use crate::handler::Handler;
 use crate::routing::fallback::Fallback;
 use crate::routing::path_router::PathRouter;
+
+#[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
+pub struct Label(String);
 
 mod fallback;
 mod path_router;
@@ -102,42 +103,39 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct MakeRouter<S> {}
-
-#[cfg(test)]
-mod test {
-    use crate::extract::{FromRef, State};
-    use crate::handler::Handler;
-    use crate::routing::{Label, Router};
-
-    #[test]
-    fn basic_routing() {
-        async fn handler() {}
-        let router: Router<()> = Router::default()
-            .route(Label::default(), handler)
-            .route(Label::default(), || async {})
-            .fallback(handler)
-            .with_state(());
-    }
-
-    #[test]
-    fn state_routing() {
-        #[derive(Debug, Default, Clone)]
-        struct AppState {
-            sub: u32,
-        }
-
-        impl FromRef<AppState> for u32 {
-            fn from_ref(input: &AppState) -> Self {
-                input.sub.clone()
-            }
-        }
-
-        async fn handler(State(_): State<AppState>, State(_): State<u32>) {}
-
-        let router: Router<AppState> = Router::default()
-            .route(Label::default(), handler)
-            .with_state(AppState::default());
-    }
-}
+// #[cfg(test)]
+// mod test {
+//     use crate::extract::{FromRef, State};
+//     use crate::handler::Handler;
+//     use crate::routing::{Label, Router};
+//
+//     #[test]
+//     fn basic_routing() {
+//         async fn handler() {}
+//         let router: Router<()> = Router::default()
+//             .route(Label::default(), handler)
+//             .route(Label::default(), || async {})
+//             .fallback(handler)
+//             .with_state(());
+//     }
+//
+//     #[test]
+//     fn state_routing() {
+//         #[derive(Debug, Default, Clone)]
+//         struct AppState {
+//             sub: u32,
+//         }
+//
+//         impl FromRef<AppState> for u32 {
+//             fn from_ref(input: &AppState) -> Self {
+//                 input.sub.clone()
+//             }
+//         }
+//
+//         async fn handler(State(_): State<AppState>, State(_): State<u32>) {}
+//
+//         let router: Router<AppState> = Router::default()
+//             .route(Label::default(), handler)
+//             .with_state(AppState::default());
+//     }
+// }

@@ -1,7 +1,9 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use spire_core::Label;
+use crate::Label;
+
+// use spire_core::Label;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct RouteId(u32);

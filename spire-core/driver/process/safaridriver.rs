@@ -2,29 +2,30 @@ use std::ffi::OsString;
 use std::fmt;
 use std::net::SocketAddr;
 
-use crate::{Driver, Handler, Result};
+use crate::driver::process::{Driver, Handler, Result};
 
 // TODO.
-pub struct MsEdgeDriver {
+pub struct SafariDriver {
     handler: Handler,
 }
 
-impl MsEdgeDriver {
+impl SafariDriver {
     pub fn new() -> Self {
         let args = Vec::default();
-        let exec = OsString::from("msedgedriver");
+        let exec = OsString::from("safaridriver");
         let handler = Handler::new(&exec, &args);
         Self { handler }
     }
 }
-impl Default for MsEdgeDriver {
+
+impl Default for SafariDriver {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[async_trait::async_trait]
-impl Driver for MsEdgeDriver {
+impl Driver for SafariDriver {
     async fn run(&self) -> Result<()> {
         self.handler.run().await
     }
@@ -38,9 +39,9 @@ impl Driver for MsEdgeDriver {
     }
 }
 
-impl fmt::Debug for MsEdgeDriver {
+impl fmt::Debug for SafariDriver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("EdgeDriver").finish_non_exhaustive()
+        f.debug_struct("SafariDriver").finish_non_exhaustive()
     }
 }
 
@@ -50,7 +51,7 @@ mod test {
 
     #[tokio::test]
     async fn run() -> Result<()> {
-        let driver: MsEdgeDriver = MsEdgeDriver::new();
+        let driver: SafariDriver = SafariDriver::new();
         driver.run().await?;
         let _ = driver.addr()?;
         driver.close().await

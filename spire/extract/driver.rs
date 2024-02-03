@@ -1,30 +1,75 @@
 use core::fmt;
 use std::convert::Infallible;
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
+
+use deadpool::managed::Object;
+use fantoccini::Client;
+
+use spire_core::driver::DriverManager;
 
 use crate::extract::FromContextParts;
 use crate::handler::HandlerContext;
 
-// TODO: Version, name, stats.
-pub trait WebDriver {}
+mod sealed {
+    use spire_core::driver::Browser;
 
-pub struct Chrome {}
+    use super::{Chrome, Edge, Firefox, Safari};
 
-impl WebDriver for Chrome {}
+    // TODO: Version, name, stats?
+    pub trait Marker {
+        fn browser() -> Browser;
+    }
 
-pub struct Firefox {}
+    impl Marker for Chrome {
+        fn browser() -> Browser {
+            Browser::Chrome
+        }
+    }
 
-impl WebDriver for Firefox {}
+    impl Marker for Edge {
+        fn browser() -> Browser {
+            todo!()
+        }
+    }
 
-pub struct Safari {}
+    impl Marker for Firefox {
+        fn browser() -> Browser {
+            Browser::Firebox
+        }
+    }
 
-impl WebDriver for Safari {}
-
-pub struct BrowserHandler<T> {
-    marker: PhantomData<T>,
+    impl Marker for Safari {
+        fn browser() -> Browser {
+            Browser::Safari
+        }
+    }
 }
 
-impl<T> BrowserHandler<T> {}
+pub struct Chrome;
+pub struct Edge;
+pub struct Firefox;
+pub struct Safari;
+
+/// Implements [`Deref`] and [`DerefMut`] traits with a [`Client`] target.
+pub struct BrowserHandler<T> {
+    marker: PhantomData<T>,
+    client: Object<DriverManager>,
+}
+
+impl<T> Deref for BrowserHandler<T> {
+    type Target = Client;
+
+    fn deref(&self) -> &Self::Target {
+        self.client.deref()
+    }
+}
+
+impl<T> DerefMut for BrowserHandler<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.client.deref_mut()
+    }
+}
 
 impl<T> fmt::Debug for BrowserHandler<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

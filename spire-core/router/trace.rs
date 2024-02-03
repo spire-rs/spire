@@ -43,9 +43,11 @@ where
     }
 }
 
-pub struct TraceRouterLayer {}
+pub struct TraceRouterLayer<T> {
+    marker: PhantomData<T>,
+}
 
-impl<T, S> Layer<S> for TraceRouterLayer {
+impl<T, S> Layer<S> for TraceRouterLayer<T> {
     type Service = TraceRouter<T, S>;
 
     fn layer(&self, inner: S) -> Self::Service {

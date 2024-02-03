@@ -1,11 +1,11 @@
 use std::convert::Infallible;
 use std::sync::atomic::AtomicBool;
 
-use tokio::sync::mpsc::{Receiver, Sender, unbounded_channel};
+use tokio::sync::mpsc::{unbounded_channel, Receiver, Sender};
 use tower_service::Service;
 
-use crate::collect::{Result, Signal};
 use crate::collect::{Context, Metrics, Request, Response};
+use crate::collect::{Result, Signal};
 
 // struct Daemon<B> {
 //     rx: Receiver<Request<B>>
@@ -22,16 +22,12 @@ pub struct CollectorInner<C, R, B = ()> {
 impl<C, R, B> CollectorInner<C, R, B> {
     pub fn new(worker: C, router: R) -> Self {
         let (tx, rx) = unbounded_channel::<Request<B>>();
-        // Self {
-        //     task_rx: rx,
-        //     task_tx: tx,
-        //     worker,
-        //     router,
-        // }
+        todo!()
     }
 
     pub async fn add(&self, task: Request<B>) {
-        self.task_queue_tx.send(task).await.expect("should not be closed");
+        let fut = self.task_queue_tx.send(task).await;
+        fut.expect("should not be closed");
     }
 }
 
@@ -42,7 +38,6 @@ where
     CT: Service<Request<B>, Response = Response<B>, Error = Signal>,
     RT: Service<Context<B>, Response = Signal, Error = Infallible>,
 {
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
     pub async fn run(&self) -> Result<Metrics> {
         todo!()
     }

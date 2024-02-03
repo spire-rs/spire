@@ -27,12 +27,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 path = "./lib.rs"
 
 [features]
-default = []
-full = []
+default = ["client", "driver"]
+full = ["client", "driver", "tracing", "util"]
 
-client-hyper = []
-client-reqwest = []
-webdriver = []
+client = ["spire-core/client"]
+driver = ["spire-core/driver", "dep:fantoccini", "dep:deadpool"]
+
+#tls-native = []
+#tls-rustls = []
 
 macros = ["dep:spire-macros"]
 tracing = ["dep:tracing"]
@@ -41,6 +43,9 @@ util = []
 [dependencies]
 spire-core = { workspace = true }
 spire-macros = { workspace = true, optional = true }
+
+fantoccini = { version = "0.20.0-rc.7", optional = true, features = [] }
+deadpool = { version = "0.10.0", optional = true, features = ["managed"] }
 
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = { version = "1.0.113" }

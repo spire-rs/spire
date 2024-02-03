@@ -1,13 +1,15 @@
 use std::convert::Infallible;
 
 pub use content::{Body, Html, Json, Text};
-pub use queue::TaskQueue;
+pub use queue::{DataQueue, TaskQueue};
 pub use state::{FromRef, State};
 
 use crate::handler::{HandlerContext, IntoControlFlow};
 
+#[cfg(feature = "client")]
 pub mod client;
 mod content;
+#[cfg(feature = "driver")]
 pub mod driver;
 mod queue;
 mod state;

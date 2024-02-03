@@ -1,5 +1,8 @@
 use std::marker::PhantomData;
 
+#[cfg(feature = "driver")]
+use crate::driver::DriverPool;
+
 #[derive(Debug, Clone, Default)]
 pub struct Label(pub String);
 
@@ -23,6 +26,8 @@ pub struct Response<T> {
 }
 
 pub struct Context<T, U = T> {
+    #[cfg(feature = "driver")]
+    drivers: DriverPool,
     request: Request<T>,
     response: Response<U>,
 }

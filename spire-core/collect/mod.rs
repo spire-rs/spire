@@ -8,8 +8,10 @@ pub use error::{Error, Result, Signal};
 use inner::CollectorInner;
 pub use types::{Context, Metrics, Request, Response};
 
+mod data_queue;
 mod error;
 mod inner;
+mod task_queue;
 mod types;
 
 pub struct Collector<C, R, B>(Arc<CollectorInner<C, R, B>>);
@@ -59,6 +61,7 @@ where
     CT: Service<Request<B>, Response = Response<B>, Error = Signal>,
     RT: Service<Context<B>, Response = Signal, Error = Infallible>,
 {
+    #[cfg_attr(feature = "tracing", tracing::instrument)]
     pub async fn run(&self) -> Result<Metrics> {
         todo!()
     }

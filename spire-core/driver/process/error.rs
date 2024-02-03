@@ -1,16 +1,3 @@
-#![forbid(unsafe_code)]
-#![cfg_attr(docsrs, feature(doc_cfg))]
-#![doc = include_str!("./README.md")]
-
-pub(crate) use crate::handler::*;
-pub use crate::process::*;
-
-mod handler;
-mod process;
-
-// TODO: Download.
-// TODO: Install.
-
 /// Unrecoverable failure during [`Driver`] execution.
 ///
 /// This may be extended in the future so exhaustive matching is discouraged.

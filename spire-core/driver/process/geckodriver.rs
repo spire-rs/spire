@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use crate::{Driver, Handler, Result};
+use crate::driver::process::{Driver, Handler, Result};
 
 pub struct GeckoDriver {
     handler: Handler,
