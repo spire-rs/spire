@@ -108,12 +108,15 @@ pub struct WriteOnly;
 pub struct TaskQueue {}
 
 impl TaskQueue {
-    pub async fn add<T>(&self, task: T) where T: Into<()> {
+    pub async fn add<T>(&self, task: T)
+    where
+        T: Into<()>,
+    {
         todo!()
     }
 }
 
 pub struct DataQueue<T, A = WriteOnly> {
     types: PhantomData<T>,
-    marker: PhantomData<A>
+    marker: PhantomData<A>,
 }

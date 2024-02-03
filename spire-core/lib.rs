@@ -2,8 +2,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
 
-// pub use collect::{Builder, Collector, CollectorContext, Label};
-// pub use collector::{Error, Result};
+pub use collect::{Collector, Error, IntoSignal, Result, Signal};
+pub use collect::{Context, Metrics, Request, Response};
 
 mod collect;
 

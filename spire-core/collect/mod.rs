@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use tower_service::Service;
 
-pub use error::{Error, Result, Signal};
+pub use error::{Error, IntoSignal, Result, Signal};
 use inner::CollectorInner;
 pub use types::{Context, Metrics, Request, Response};
 

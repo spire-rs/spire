@@ -2,9 +2,10 @@ use std::convert::Infallible;
 
 pub use content::{Body, Html, Json, Text};
 pub use queue::{DataQueue, TaskQueue};
+use spire_core::IntoSignal;
 pub use state::{FromRef, State};
 
-use crate::handler::{HandlerContext, IntoControlFlow};
+use crate::handler::HandlerContext;
 
 #[cfg(feature = "client")]
 pub mod client;
@@ -25,14 +26,14 @@ mod private {
 
 #[async_trait::async_trait]
 pub trait FromContextParts<S>: Sized {
-    type Rejection: IntoControlFlow;
+    type Rejection: IntoSignal;
 
     async fn from_context_parts(cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection>;
 }
 
 #[async_trait::async_trait]
 pub trait FromContext<S, V = private::ViaRequest>: Sized {
-    type Rejection: IntoControlFlow;
+    type Rejection: IntoSignal;
 
     async fn from_context(cx: HandlerContext, state: &S) -> Result<Self, Self::Rejection>;
 }

@@ -20,6 +20,8 @@ pub enum Error {
 /// [`Spire`]: crate
 pub type Result<T> = std::result::Result<T, Error>;
 
+///
+/// [`ControlFlow`]: std::ops::ControlFlow
 #[derive(Debug, Default, Clone)]
 pub enum Signal {
     /// Task handled successfully, immediately proceed with another task.

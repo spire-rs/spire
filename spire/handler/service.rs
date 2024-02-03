@@ -6,11 +6,12 @@ use std::task::{Context, Poll};
 use futures_util::future::Map;
 use tower::Service;
 
-use crate::handler::control::ControlFlow;
+use spire_core::Signal;
+
 use crate::handler::{Handler, HandlerContext};
 
 /// TODO: Make opaque.
-pub type HandlerFuture<F> = Map<F, fn(ControlFlow) -> Result<ControlFlow, Infallible>>;
+pub type HandlerFuture<F> = Map<F, fn(Signal) -> Result<Signal, Infallible>>;
 
 /// An adapter that makes a [`Handler`] into a [`Service`].
 pub struct HandlerService<H, T, S> {
@@ -64,7 +65,7 @@ where
     H: Handler<T, S> + Clone + Send + 'static,
     S: Clone + Send + Sync,
 {
-    type Response = ControlFlow;
+    type Response = Signal;
     type Error = Infallible;
     type Future = HandlerFuture<<H as Handler<T, S>>::Future>;
 

@@ -1,19 +1,17 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use spire_core::all_the_tuples;
+use spire_core::{all_the_tuples, IntoSignal, Signal};
 
 pub use crate::extract::{FromContext, FromContextParts};
 pub use crate::handler::context::HandlerContext;
-pub use crate::handler::control::{ControlFlow, IntoControlFlow};
 pub use crate::handler::service::HandlerService;
 
 mod context;
-mod control;
 mod service;
 
 pub trait Handler<T, S>: Clone + Send + Sized + 'static {
-    type Future: Future<Output = ControlFlow>;
+    type Future: Future<Output = Signal>;
 
     /// Call the handler with the given context.
     fn call(self, cx: HandlerContext, state: S) -> Self::Future;
@@ -30,12 +28,12 @@ impl<S, F, Fut, Ret> Handler<((),), S> for F
 where
     F: FnOnce() -> Fut + Clone + Send + 'static,
     Fut: Future<Output = Ret> + Send,
-    Ret: IntoControlFlow,
+    Ret: IntoSignal,
 {
-    type Future = Pin<Box<dyn Future<Output = ControlFlow> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = Signal> + Send>>;
 
     fn call(self, _cx: HandlerContext, _state: S) -> Self::Future {
-        Box::pin(async move { self().await.into_control_flow() })
+        Box::pin(async move { self().await.into_signal() })
     }
 }
 
@@ -51,28 +49,28 @@ macro_rules! impl_handler {
             S: Send + Sync + 'static,
             F: FnOnce($($ty,)* $last,) -> Fut + Clone + Send + 'static,
             Fut: Future<Output = Ret> + Send,
-            Ret: IntoControlFlow,
+            Ret: IntoSignal,
             $( $ty: FromContextParts<S> + Send, )*
             $last: FromContext<S, M> + Send,
         {
-            type Future = Pin<Box<dyn Future<Output = ControlFlow> + Send>>;
+            type Future = Pin<Box<dyn Future<Output = Signal> + Send>>;
 
             fn call(self, cx: HandlerContext, state: S) -> Self::Future {
                 Box::pin(async move {
                     $(
                         let $ty = match $ty::from_context_parts(&cx, &state).await {
                             Ok(value) => value,
-                            Err(rejection) => return rejection.into_control_flow(),
+                            Err(rejection) => return rejection.into_signal(),
                         };
                     )*
 
                     let $last = match $last::from_context(cx, &state).await {
                         Ok(value) => value,
-                        Err(rejection) => return rejection.into_control_flow(),
+                        Err(rejection) => return rejection.into_signal(),
                     };
 
                     let res = self($($ty,)* $last,).await;
-                    res.into_control_flow()
+                    res.into_signal()
                 })
             }
         }

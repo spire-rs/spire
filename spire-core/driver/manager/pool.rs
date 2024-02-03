@@ -5,7 +5,9 @@ use deadpool::managed::{Manager, Metrics, Object, Pool, RecycleResult};
 use fantoccini::Client;
 
 use crate::driver::manager::Browser;
-use crate::driver::process::{ChromeDriver, Driver, GeckoDriver, MsEdgeDriver, Process, SafariDriver};
+use crate::driver::process::{
+    ChromeDriver, Driver, GeckoDriver, MsEdgeDriver, Process, SafariDriver,
+};
 
 pub struct DriverManager2<T>
 where
@@ -95,13 +97,12 @@ impl DriverPool {
     where
         T: Into<SocketAddr>,
     {
-        let address  = address.into();
+        let address = address.into();
         todo!()
     }
 
     pub async fn get(&self, browser: Browser) -> Object<DriverManager2<ChromeDriver>> {
         let manager = self.manager.get().await.unwrap();
-
 
         match browser {
             Browser::Chrome => {}
