@@ -5,8 +5,6 @@ resolver = "2"
 members = [
     "./spire",
     "./spire-*",
-    "./bindings/*",
-    "./examples/*",
 ]
 
 default-members = [
@@ -29,3 +27,15 @@ documentation = "https://docs.rs/spire"
 spire = { path = "./spire", version = "0.1.0" }
 spire-core = { path = "./spire-core", version = "0.1.0" }
 spire-macros = { path = "./spire-macros", version = "0.1.0" }
+
+http = { version = "1.1.0" }
+http-body = { version = "1.0.0" }
+bytes = { version = "1.5.0" }
+futures = { version = "0.3.30" }
+tower = { version = "0.4.13" }
+
+async-trait = { version = "0.1.77" }
+pin-project-lite = { version = "0.2.13" }
+thiserror = { version = "1.0.57" }
+serde = { version = "1.0.197" }
+serde_json = { version = "1.0.114" }

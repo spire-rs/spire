@@ -1,141 +1,196 @@
-use std::sync::Arc;
+use std::convert::Infallible;
+use std::fmt;
+use std::task::{Context, Poll};
+
+use tower::{Layer, Service};
+
+use spire_core::backend::Backend;
+use spire_core::context::{Context as Cx, Tag};
+use spire_core::process::{IntoSignal, Signal};
 
 use crate::handler::Handler;
-use crate::routing::fallback::Fallback;
-use crate::routing::path_router::PathRouter;
+use crate::routing::endpoint::Endpoint;
+pub use crate::routing::future::RouteFuture;
+use crate::routing::make_route::MakeRoute;
+pub use crate::routing::route::Route;
+use crate::routing::tag_router::TagRouter;
 
-#[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
-pub struct Label(String);
-
-mod fallback;
-mod path_router;
+mod endpoint;
+mod future;
+mod make_route;
 mod route;
+mod tag_router;
 
-#[must_use]
-pub struct Router<S = ()> {
-    inner: Arc<RouterInner<S>>,
+pub struct Router<B = (), S = ()> {
+    inner: TagRouter<B, S>,
 }
 
-struct RouterInner<S> {
-    routes: PathRouter<S>,
-    fallback: Fallback<S>,
-}
+impl<B, S> Router<B, S> {
+    /// Creates a new [`Router`] with a given [`Backend`].
+    pub fn new() -> Self
+    where
+        B: Backend,
+    {
+        let inner = TagRouter::<B, S>::new();
+        Self { inner }
+    }
 
-impl<S> Router<S>
-where
-    S: Clone + Send + Sync + 'static,
-{
-    pub fn new() -> Self {
-        let inner = RouterInner {
-            routes: PathRouter::default(),
-            fallback: Fallback::default(),
-        };
+    pub fn route<H, V>(mut self, tag: impl Into<Tag>, handler: H) -> Self
+    where
+        B: Backend,
+        S: Send + Clone + 'static,
+        H: Handler<B, V, S>,
+        H::Future: Send + 'static,
+        V: Send + 'static,
+    {
+        let endpoint = Endpoint::from_handler(handler);
+        self.inner.route(tag.into(), endpoint);
+        self
+    }
 
+    pub fn route_service<H>(mut self, tag: impl Into<Tag>, service: H) -> Self
+    where
+        B: Backend,
+        S: Send + Clone + 'static,
+        H: Service<Cx<B>, Error = Infallible> + Clone + Send + 'static,
+        H::Response: IntoSignal + 'static,
+        H::Future: Send + 'static,
+    {
+        let endpoint = Endpoint::from_service(service);
+        self.inner.route(tag.into(), endpoint);
+        self
+    }
+
+    /// Replaces the current fallback [`Handler`].
+    /// Fallback handler processes all tasks without matching [`Tag`]s.
+    ///
+    /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
+    ///
+    /// [`Signal::Continue`]: crate::handler::Signal::Continue
+    pub fn fallback<H, V>(mut self, handler: H) -> Self
+    where
+        B: Backend,
+        S: Send + Clone + 'static,
+        H: Handler<B, V, S>,
+        H::Future: Send + 'static,
+        V: Send + 'static,
+    {
+        let endpoint = Endpoint::from_handler(handler);
+        self.inner.fallback(endpoint);
+        self
+    }
+
+    pub fn fallback_service<H>(mut self, service: H) -> Self
+    where
+        B: Backend,
+        S: Send + Clone + 'static,
+        H: Service<Cx<B>, Error = Infallible> + Clone + Send + 'static,
+        H::Response: IntoSignal + 'static,
+        H::Future: Send + 'static,
+    {
+        let endpoint = Endpoint::from_service(service);
+        self.inner.fallback(endpoint);
+        self
+    }
+
+    /// Merges with another [`Router`] by appending all [`Handler`]s to matching [`Tag`]s.
+    pub fn merge(mut self, other: Router<B, S>) -> Self {
+        self.inner.merge(other.inner);
+        self
+    }
+
+    pub fn layer<L>(self, layer: L) -> Self
+    where
+        B: 'static,
+        S: Clone + Send + 'static,
+        L: Layer<Route<B, Infallible>> + Clone + Send + 'static,
+        L::Service: Service<Cx<B>> + Clone + Send + 'static,
+        <L::Service as Service<Cx<B>>>::Response: IntoSignal + 'static,
+        <L::Service as Service<Cx<B>>>::Error: Into<Infallible> + 'static,
+        <L::Service as Service<Cx<B>>>::Future: Send + 'static,
+    {
         Self {
-            inner: Arc::new(inner),
+            inner: self.inner.layer(layer),
         }
     }
 
-    pub fn route<L, H, T>(self, label: L, handler: H) -> Self
-    where
-        L: Into<Label>,
-        H: Handler<T, S>,
-        T: 'static,
-    {
-        let label = label.into();
-        todo!()
-    }
-
-    pub fn nest(self, other: Router<S>) -> Self {
-        todo!()
-    }
-
-    pub fn merge(self, other: Router<S>) -> Self {
-        todo!()
-    }
-
-    pub fn fallback<H, T>(self, handler: H) -> Self
-    where
-        H: Handler<T, S>,
-        T: 'static,
-    {
-        todo!()
-    }
-
-    pub fn with_state<S2>(self, state: S) -> Router<S2> {
-        todo!()
-    }
-
-    fn map_inner<F, S2>(self, f: F) -> Router<S2>
-    where
-        F: FnOnce(RouterInner<S>) -> RouterInner<S2>,
-    {
-        Router {
-            inner: Arc::new(f(self.into_inner())),
-        }
-    }
-
-    fn map_inner_mut<F>(self, f: F) -> Self
-    where
-        F: FnOnce(&mut RouterInner<S>),
-    {
-        let mut inner = self.into_inner();
-        f(&mut inner);
-        Router {
-            inner: Arc::new(inner),
-        }
-    }
-
-    fn into_inner(self) -> RouterInner<S> {
-        Arc::try_unwrap(self.inner).unwrap_or_else(|arc| RouterInner {
-            routes: arc.routes.clone(),
-            fallback: arc.fallback.clone(),
-        })
+    pub fn with_state<S2>(self, state: S) -> Router<B, S2> {
+        let inner = self.inner.with_state(state);
+        Router { inner }
     }
 }
 
-impl<S> Default for Router<S>
+impl<B, S> Clone for Router<B, S> {
+    fn clone(&self) -> Self {
+        let inner = self.inner.clone();
+        Self { inner }
+    }
+}
+
+impl<B, S> fmt::Display for Router<B, S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Router").finish_non_exhaustive()
+    }
+}
+
+impl<B, S> Default for Router<B, S>
 where
-    S: Clone + Send + Sync + 'static,
+    B: Backend,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use crate::extract::{FromRef, State};
-//     use crate::handler::Handler;
-//     use crate::routing::{Label, Router};
-//
-//     #[test]
-//     fn basic_routing() {
-//         async fn handler() {}
-//         let router: Router<()> = Router::default()
-//             .route(Label::default(), handler)
-//             .route(Label::default(), || async {})
-//             .fallback(handler)
-//             .with_state(());
-//     }
-//
-//     #[test]
-//     fn state_routing() {
-//         #[derive(Debug, Default, Clone)]
-//         struct AppState {
-//             sub: u32,
-//         }
-//
-//         impl FromRef<AppState> for u32 {
-//             fn from_ref(input: &AppState) -> Self {
-//                 input.sub.clone()
-//             }
-//         }
-//
-//         async fn handler(State(_): State<AppState>, State(_): State<u32>) {}
-//
-//         let router: Router<AppState> = Router::default()
-//             .route(Label::default(), handler)
-//             .with_state(AppState::default());
-//     }
-// }
+impl<B> Service<Cx<B>> for Router<B, ()> {
+    type Response = Signal;
+    type Error = Infallible;
+    type Future = RouteFuture<B, Infallible>;
+
+    #[inline]
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn call(&mut self, cx: Cx<B>) -> Self::Future {
+        self.inner.call(cx)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::context::Tag;
+    use crate::extract::{FromRef, State};
+    use crate::routing::Router;
+
+    #[test]
+    fn basic_routing() {
+        async fn handler() {}
+
+        let router: Router = Router::new()
+            .route(Tag::default(), handler)
+            .route(Tag::default(), handler);
+    }
+
+    #[test]
+    fn state_routing() {
+        #[derive(Debug, Default, Clone)]
+        struct AppState {
+            sub: u32,
+        }
+
+        impl FromRef<AppState> for u32 {
+            fn from_ref(input: &AppState) -> Self {
+                input.sub.clone()
+            }
+        }
+
+        async fn handler(_: State<AppState>, _: State<u32>) {}
+
+        let router: Router = Router::new()
+            .route(Tag::default(), handler)
+            .route(Tag::default(), handler)
+            .with_state(AppState::default());
+    }
+}

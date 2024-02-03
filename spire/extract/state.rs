@@ -1,10 +1,13 @@
 use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
-use crate::extract::{FromContext, FromContextParts};
-use crate::handler::HandlerContext;
+use spire_core::context::Context;
 
+use crate::extract::FromContextParts;
+
+/// TODO.
 pub trait FromRef<T> {
+    /// TODO.
     fn from_ref(input: &T) -> Self;
 }
 
@@ -17,32 +20,33 @@ where
     }
 }
 
+/// TODO.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct State<T>(pub T);
 
 #[async_trait::async_trait]
-impl<S, T> FromContextParts<S> for State<T>
+impl<B, S, T> FromContextParts<B, S> for State<T>
 where
+    S: Send + Sync + 'static,
     T: FromRef<S>,
-    S: Send + Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(_cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(_cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
         let state = T::from_ref(state);
         Ok(Self(state))
     }
 }
 
-impl<S> Deref for State<S> {
-    type Target = S;
+impl<T> Deref for State<T> {
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<S> DerefMut for State<S> {
+impl<T> DerefMut for State<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

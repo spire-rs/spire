@@ -2,11 +2,10 @@
 
 [package]
 name = "spire-macros"
-
 version = { workspace = true }
 edition = { workspace = true }
-readme = { workspace = true }
 license = { workspace = true }
+readme = "./README.md"
 
 authors = { workspace = true }
 repository = { workspace = true }

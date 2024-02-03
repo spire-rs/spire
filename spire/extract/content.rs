@@ -1,100 +1,65 @@
 use std::convert::Infallible;
 
+use bytes::Bytes;
 use serde::de::DeserializeOwned;
 
-use crate::extract::FromContextParts;
-use crate::handler::HandlerContext;
+use spire_core::backend::Backend;
+use spire_core::context::{Context, Response};
 
+use crate::extract::FromContext;
+
+/// TODO.
 #[derive(Debug, Clone)]
-pub struct Body(pub Vec<u8>);
+pub struct Body(pub Bytes);
 
 #[async_trait::async_trait]
-impl<S> FromContextParts<S> for Body
+impl<B, S> FromContext<B, S> for Body
 where
-    S: Send + Sync,
+    B: Backend,
+    S: Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
+        let _ = Response::from_context(cx, state).await;
         todo!()
     }
 }
 
+/// TODO.
 #[derive(Debug, Clone)]
 pub struct Text(pub String);
 
 #[async_trait::async_trait]
-impl<S> FromContextParts<S> for Text
+impl<B, S> FromContext<B, S> for Text
 where
-    S: Send + Sync,
+    B: Backend,
+    S: Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
-        let Body(body) = Body::from_context_parts(cx, state).await?;
-
+    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
+        let _ = Response::from_context(cx, state).await;
         todo!()
     }
 }
 
-// TODO: Html.
-#[derive(Debug, Clone)]
-pub struct Html(pub ());
-
-#[async_trait::async_trait]
-impl<S> FromContextParts<S> for Html
-where
-    S: Send + Sync,
-{
-    type Rejection = Infallible;
-
-    async fn from_context_parts(cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
-        let Body(body) = Body::from_context_parts(cx, state).await?;
-
-        todo!()
-    }
-}
-
-#[derive(Debug, Clone)]
+/// TODO.
+/// Mostly used for API scraping.
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Json<T>(pub T);
 
 #[async_trait::async_trait]
-impl<S, T> FromContextParts<S> for Json<T>
+impl<B, S, T> FromContext<B, S> for Json<T>
 where
+    B: Backend,
+    S: Sync,
     T: DeserializeOwned,
-    S: Send + Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
-        let Body(body) = Body::from_context_parts(cx, state).await?;
-
+    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
+        let _ = Text::from_context(cx, state).await;
         todo!()
     }
 }
-
-impl<T> From<T> for Json<T> {
-    fn from(inner: T) -> Self {
-        Self(inner)
-    }
-}
-
-// pub trait HtmlTransform {
-//     type Content;
-// }
-//
-// pub struct Normal;
-// impl HtmlTransform for Normal {
-//     type Content = u32;
-// }
-//
-// pub struct Reduce;
-// impl HtmlTransform for Reduce {
-//     type Content = u64;
-// }
-//
-// pub struct Html<T = Normal>(pub T::Content)
-//     where
-//         T: HtmlTransform;
-//
-// pub fn handle(Html(body): Html) {}

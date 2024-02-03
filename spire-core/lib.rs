@@ -2,14 +2,12 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
 
-pub use collect::{Collector, Error, IntoSignal, Result, Signal};
-pub use collect::{Context, Metrics, Request, Response};
+pub mod backend;
+pub mod context;
+pub mod dataset;
+pub mod process;
 
-mod collect;
-
-#[cfg(feature = "client")]
-pub mod client;
-#[cfg(feature = "driver")]
-pub mod driver;
-pub mod macros;
-mod router;
+/// Alias for a type-erased [`Error`] type.
+///
+/// [`Error`]: std::error::Error
+pub type BoxError = Box<dyn std::error::Error + Send + Sync>;

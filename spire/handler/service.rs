@@ -1,26 +1,26 @@
 use std::convert::Infallible;
 use std::fmt;
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures_util::future::Map;
+use futures::{future::Map, FutureExt};
+use pin_project_lite::pin_project;
 use tower::Service;
 
-use spire_core::Signal;
+use spire_core::context::Context as Cx;
 
-use crate::handler::{Handler, HandlerContext};
+use crate::handler::{Handler, Signal};
 
-/// TODO: Make opaque.
-pub type HandlerFuture<F> = Map<F, fn(Signal) -> Result<Signal, Infallible>>;
-
-/// An adapter that makes a [`Handler`] into a [`Service`].
-pub struct HandlerService<H, T, S> {
-    marker: PhantomData<T>,
+pub struct HandlerService<H, V, S> {
+    marker: PhantomData<V>,
     handler: H,
     state: S,
 }
 
-impl<H, T, S> HandlerService<H, T, S> {
+impl<H, V, S> HandlerService<H, V, S> {
+    /// Creates a new [`HandlerService`].
     pub fn new(handler: H, state: S) -> Self {
         Self {
             marker: PhantomData,
@@ -30,7 +30,7 @@ impl<H, T, S> HandlerService<H, T, S> {
     }
 
     /// Gets a reference to the state.
-    pub fn state(&self) -> &S {
+    pub fn state_ref(&self) -> &S {
         &self.state
     }
 
@@ -40,13 +40,35 @@ impl<H, T, S> HandlerService<H, T, S> {
     }
 }
 
-impl<H, T, S> fmt::Debug for HandlerService<H, T, S> {
+impl<H, V, S> fmt::Debug for HandlerService<H, V, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HandlerService").finish_non_exhaustive()
     }
 }
 
-impl<H, T, S> Clone for HandlerService<H, T, S>
+impl<B, H, V, S> Service<Cx<B>> for HandlerService<H, V, S>
+where
+    H: Handler<B, V, S>,
+    S: Clone,
+{
+    type Response = Signal;
+    type Error = Infallible;
+    type Future = HandlerFuture<H::Future>;
+
+    #[inline]
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn call(&mut self, cx: Cx<B>) -> Self::Future {
+        let handler = self.handler.clone();
+        let future = handler.call(cx, self.state.clone());
+        HandlerFuture::new(future)
+    }
+}
+
+impl<H, V, S> Clone for HandlerService<H, V, S>
 where
     H: Clone,
     S: Clone,
@@ -60,27 +82,40 @@ where
     }
 }
 
-impl<H, T, S> Service<HandlerContext> for HandlerService<H, T, S>
-where
-    H: Handler<T, S> + Clone + Send + 'static,
-    S: Clone + Send + Sync,
-{
-    type Response = Signal;
-    type Error = Infallible;
-    type Future = HandlerFuture<<H as Handler<T, S>>::Future>;
-
-    #[inline]
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, cx: HandlerContext) -> Self::Future {
-        use futures_util::future::FutureExt;
-
-        let handler = self.handler.clone();
-        let future = handler.call(cx, self.state.clone());
-        future.map(Ok as _)
+pin_project! {
+    /// Opaque [`Future`] return type for [`Handler::call`].
+    #[derive(Debug)]
+    pub struct HandlerFuture<F>
+    where
+        F: Future<Output = Signal>
+    {
+        #[pin]
+        future: HandlerFut<F>,
     }
 }
 
-// pub struct BoxHandlerService {}
+/// Underlying [`HandlerFuture`] type.
+type HandlerFut<F> = Map<F, fn(Signal) -> Result<Signal, Infallible>>;
+
+impl<F> HandlerFuture<F>
+where
+    F: Future<Output = Signal>,
+{
+    /// Creates a new [`HandlerFuture`].
+    pub fn new(future: F) -> Self {
+        let future = future.map(Ok as _);
+        Self { future }
+    }
+}
+
+impl<F> Future for HandlerFuture<F>
+where
+    F: Future<Output = Signal>,
+{
+    type Output = Result<Signal, Infallible>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        this.future.poll(cx)
+    }
+}

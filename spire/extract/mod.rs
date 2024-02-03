@@ -1,22 +1,19 @@
 use std::convert::Infallible;
 
-pub use content::{Body, Html, Json, Text};
-pub use queue::{DataQueue, TaskQueue};
-use spire_core::IntoSignal;
-pub use state::{FromRef, State};
+use spire_core::context::Context;
+use spire_core::process::IntoSignal;
 
-use crate::handler::HandlerContext;
+pub use crate::extract::content::{Body, Json, Text};
+pub use crate::extract::context::Dataset;
+pub use crate::extract::markup::{Html, Nest, Select, Selector};
+pub use crate::extract::state::{FromRef, State};
 
-#[cfg(feature = "client")]
-pub mod client;
 mod content;
-#[cfg(feature = "driver")]
-pub mod driver;
-mod queue;
+mod context;
+mod markup;
 mod state;
-// TODO: mod language;
 
-mod private {
+mod sealed {
     #[derive(Debug, Clone, Copy)]
     pub enum ViaParts {}
 
@@ -25,80 +22,85 @@ mod private {
 }
 
 #[async_trait::async_trait]
-pub trait FromContextParts<S>: Sized {
+pub trait FromContextParts<B, S>: Sized {
     type Rejection: IntoSignal;
 
-    async fn from_context_parts(cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection>;
+    async fn from_context_parts(cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection>;
 }
 
 #[async_trait::async_trait]
-pub trait FromContext<S, V = private::ViaRequest>: Sized {
+pub trait FromContext<B, S, V = sealed::ViaRequest>: Sized {
     type Rejection: IntoSignal;
 
-    async fn from_context(cx: HandlerContext, state: &S) -> Result<Self, Self::Rejection>;
+    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection>;
 }
 
 #[async_trait::async_trait]
-impl<S, T> FromContext<S, private::ViaParts> for T
+impl<B, S, T> FromContext<B, S, sealed::ViaParts> for T
 where
-    S: Send + Sync,
-    T: FromContextParts<S>,
+    B: Sync + Send + 'static,
+    S: Sync + Send + 'static,
+    T: FromContextParts<B, S>,
 {
-    type Rejection = <Self as FromContextParts<S>>::Rejection;
+    type Rejection = <Self as FromContextParts<B, S>>::Rejection;
 
-    async fn from_context(cx: HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
         Self::from_context_parts(&cx, state).await
     }
 }
 
 #[async_trait::async_trait]
-impl<S, T> FromContextParts<S> for Option<T>
+impl<B, S, T> FromContextParts<B, S> for Option<T>
 where
-    S: Send + Sync,
-    T: FromContextParts<S>,
+    B: Sync + Send + 'static,
+    S: Sync + Send + 'static,
+    T: FromContextParts<B, S>,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
         Ok(T::from_context_parts(cx, state).await.ok())
     }
 }
 
 #[async_trait::async_trait]
-impl<S, T> FromContext<S> for Option<T>
+impl<B, S, T> FromContext<B, S> for Option<T>
 where
-    S: Send + Sync,
-    T: FromContext<S>,
+    B: Sync + Send + 'static,
+    S: Sync + Send + 'static,
+    T: FromContext<B, S>,
 {
     type Rejection = Infallible;
 
-    async fn from_context(cx: HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
         Ok(T::from_context(cx, state).await.ok())
     }
 }
 
 #[async_trait::async_trait]
-impl<S, T> FromContextParts<S> for Result<T, T::Rejection>
+impl<B, S, T> FromContextParts<B, S> for Result<T, T::Rejection>
 where
-    S: Send + Sync,
-    T: FromContextParts<S>,
+    B: Sync + Send + 'static,
+    S: Sync + Send + 'static,
+    T: FromContextParts<B, S>,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
         Ok(T::from_context_parts(cx, state).await)
     }
 }
 
 #[async_trait::async_trait]
-impl<S, T> FromContext<S> for Result<T, T::Rejection>
+impl<B, S, T> FromContext<B, S> for Result<T, T::Rejection>
 where
-    S: Send + Sync,
-    T: FromContext<S>,
+    B: Sync + Send + 'static,
+    S: Sync + Send + 'static,
+    T: FromContext<B, S>,
 {
     type Rejection = Infallible;
 
-    async fn from_context(cx: HandlerContext, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
         Ok(T::from_context(cx, state).await)
     }
 }
