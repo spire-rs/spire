@@ -32,6 +32,11 @@ impl<H, T, S> HandlerService<H, T, S> {
     pub fn state(&self) -> &S {
         &self.state
     }
+
+    /// Gets a mutable reference to the state.
+    pub fn state_mut(&mut self) -> &mut S {
+        &mut self.state
+    }
 }
 
 impl<H, T, S> fmt::Debug for HandlerService<H, T, S> {
@@ -76,3 +81,5 @@ where
         future.map(Ok as _)
     }
 }
+
+// pub struct BoxHandlerService {}

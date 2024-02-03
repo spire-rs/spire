@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::net::SocketAddr;
 
-use crate::{Handler, Process, Result};
+use crate::{Driver, Handler, Result};
 
 // TODO.
 pub struct SafariDriver {
@@ -25,12 +25,12 @@ impl Default for SafariDriver {
 }
 
 #[async_trait::async_trait]
-impl Process for SafariDriver {
+impl Driver for SafariDriver {
     async fn run(&self) -> Result<()> {
         self.handler.run().await
     }
 
-    async fn addr(&self) -> Result<SocketAddr> {
+    fn addr(&self) -> Result<SocketAddr> {
         todo!()
     }
 
@@ -53,7 +53,7 @@ mod test {
     async fn run() -> Result<()> {
         let driver: SafariDriver = SafariDriver::new();
         driver.run().await?;
-        let _ = driver.addr().await?;
+        let _ = driver.addr()?;
         driver.close().await
     }
 }

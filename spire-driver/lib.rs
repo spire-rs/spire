@@ -1,3 +1,7 @@
+#![forbid(unsafe_code)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![doc = include_str!("./README.md")]
+
 pub(crate) use crate::handler::*;
 pub use crate::process::*;
 
@@ -7,7 +11,7 @@ mod process;
 // TODO: Download.
 // TODO: Install.
 
-/// Unrecoverable failure during [`Process`] execution.
+/// Unrecoverable failure during [`Driver`] execution.
 ///
 /// This may be extended in the future so exhaustive matching is discouraged.
 #[derive(Debug, thiserror::Error)]
@@ -20,7 +24,7 @@ pub enum Error {
     FailedToAbort(std::io::Error),
 }
 
-/// A specialized [`Result`] type for [`Process`] operations.
+/// A specialized [`Result`] type for [`Driver`] operations.
 ///
 /// [`Result`]: std::result::Result
 pub type Result<T> = std::result::Result<T, Error>;

@@ -1,11 +1,15 @@
-use std::collections::HashMap;
 use std::fmt;
+use std::marker::PhantomData;
 
-use spire_core::collect::Label;
+use spire_core::Label;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct RouteId(u32);
 
 pub struct PathRouter<S> {
     // Vec<Route>
-    routes: HashMap<String, S>,
+    marker: PhantomData<S>,
+    // routes: HashMap<RouteId, Vec<>>,
 }
 
 impl<S> PathRouter<S> {
@@ -36,7 +40,8 @@ impl<S> fmt::Debug for PathRouter<S> {
 impl<S> Default for PathRouter<S> {
     fn default() -> Self {
         Self {
-            routes: HashMap::default(),
+            marker: PhantomData,
+            // routes: HashMap::default(),
         }
     }
 }

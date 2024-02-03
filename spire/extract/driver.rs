@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use crate::extract::FromContextParts;
 use crate::handler::HandlerContext;
 
+// TODO: Version, name, stats.
 pub trait WebDriver {}
 
 pub struct Chrome {}
@@ -23,9 +24,11 @@ pub struct BrowserHandler<T> {
     marker: PhantomData<T>,
 }
 
+impl<T> BrowserHandler<T> {}
+
 impl<T> fmt::Debug for BrowserHandler<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.debug_struct("BrowserHandler").finish_non_exhaustive()
     }
 }
 
@@ -42,6 +45,6 @@ impl<S, T> FromContextParts<S> for Browser<T> {
 
 impl<T> fmt::Debug for Browser<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.debug_struct("Browser").finish_non_exhaustive()
     }
 }

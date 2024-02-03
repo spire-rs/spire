@@ -1,17 +1,17 @@
 use std::convert::Infallible;
 
-pub use client::Client;
-pub use content::{Body, Json, Text};
+pub use content::{Body, Html, Json, Text};
 pub use queue::TaskQueue;
 pub use state::{FromRef, State};
 
 use crate::handler::{HandlerContext, IntoControlFlow};
 
-mod client;
+pub mod client;
 mod content;
 pub mod driver;
-pub mod queue;
+mod queue;
 mod state;
+// TODO: mod language;
 
 mod private {
     #[derive(Debug, Clone, Copy)]
@@ -37,9 +37,9 @@ pub trait FromContext<S, V = private::ViaRequest>: Sized {
 
 #[async_trait::async_trait]
 impl<S, T> FromContext<S, private::ViaParts> for T
-    where
-        S: Send + Sync,
-        T: FromContextParts<S>,
+where
+    S: Send + Sync,
+    T: FromContextParts<S>,
 {
     type Rejection = <Self as FromContextParts<S>>::Rejection;
 
@@ -50,9 +50,9 @@ impl<S, T> FromContext<S, private::ViaParts> for T
 
 #[async_trait::async_trait]
 impl<S, T> FromContextParts<S> for Option<T>
-    where
-        S: Send + Sync,
-        T: FromContextParts<S>,
+where
+    S: Send + Sync,
+    T: FromContextParts<S>,
 {
     type Rejection = Infallible;
 
@@ -63,9 +63,9 @@ impl<S, T> FromContextParts<S> for Option<T>
 
 #[async_trait::async_trait]
 impl<S, T> FromContext<S> for Option<T>
-    where
-        S: Send + Sync,
-        T: FromContext<S>,
+where
+    S: Send + Sync,
+    T: FromContext<S>,
 {
     type Rejection = Infallible;
 
@@ -76,9 +76,9 @@ impl<S, T> FromContext<S> for Option<T>
 
 #[async_trait::async_trait]
 impl<S, T> FromContextParts<S> for Result<T, T::Rejection>
-    where
-        S: Send + Sync,
-        T: FromContextParts<S>,
+where
+    S: Send + Sync,
+    T: FromContextParts<S>,
 {
     type Rejection = Infallible;
 
@@ -89,9 +89,9 @@ impl<S, T> FromContextParts<S> for Result<T, T::Rejection>
 
 #[async_trait::async_trait]
 impl<S, T> FromContext<S> for Result<T, T::Rejection>
-    where
-        S: Send + Sync,
-        T: FromContext<S>,
+where
+    S: Send + Sync,
+    T: FromContext<S>,
 {
     type Rejection = Infallible;
 

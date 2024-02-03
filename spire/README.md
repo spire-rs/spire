@@ -25,3 +25,5 @@ The flexible crawler & scraper framework powered by [tokio-rs/tokio][tokio] and
 The collection of libraries used for parsing inclusion and exclusion protocols,
 used by tower extensions. (robots.txt) etower-rs/tower middlewares for web data
 extraction and general data processing. Parsing libraries .d
+
+- Both direct access to http clients and web driver

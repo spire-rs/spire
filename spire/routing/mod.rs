@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-pub use spire_core::collect::Label;
+pub use spire_core::Label;
 
 use crate::handler::Handler;
 use crate::routing::fallback::Fallback;
@@ -101,6 +101,9 @@ where
         Self::new()
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct MakeRouter<S> {}
 
 #[cfg(test)]
 mod test {

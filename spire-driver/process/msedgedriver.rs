@@ -2,14 +2,14 @@ use std::ffi::OsString;
 use std::fmt;
 use std::net::SocketAddr;
 
-use crate::{Handler, Process, Result};
+use crate::{Driver, Handler, Result};
 
 // TODO.
-pub struct EdgeDriver {
+pub struct MsEdgeDriver {
     handler: Handler,
 }
 
-impl EdgeDriver {
+impl MsEdgeDriver {
     pub fn new() -> Self {
         let args = Vec::default();
         let exec = OsString::from("msedgedriver");
@@ -17,19 +17,19 @@ impl EdgeDriver {
         Self { handler }
     }
 }
-impl Default for EdgeDriver {
+impl Default for MsEdgeDriver {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[async_trait::async_trait]
-impl Process for EdgeDriver {
+impl Driver for MsEdgeDriver {
     async fn run(&self) -> Result<()> {
         self.handler.run().await
     }
 
-    async fn addr(&self) -> Result<SocketAddr> {
+    fn addr(&self) -> Result<SocketAddr> {
         todo!()
     }
 
@@ -38,7 +38,7 @@ impl Process for EdgeDriver {
     }
 }
 
-impl fmt::Debug for EdgeDriver {
+impl fmt::Debug for MsEdgeDriver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EdgeDriver").finish_non_exhaustive()
     }
@@ -50,9 +50,9 @@ mod test {
 
     #[tokio::test]
     async fn run() -> Result<()> {
-        let driver: EdgeDriver = EdgeDriver::new();
+        let driver: MsEdgeDriver = MsEdgeDriver::new();
         driver.run().await?;
-        let _ = driver.addr().await?;
+        let _ = driver.addr()?;
         driver.close().await
     }
 }

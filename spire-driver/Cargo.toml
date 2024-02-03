@@ -38,8 +38,6 @@ full = [
 ]
 
 stdio-null = []
-fantoccini = []
-
 chromedriver = []
 geckodriver = []
 msedgedriver = []

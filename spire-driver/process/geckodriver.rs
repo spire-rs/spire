@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use crate::{Handler, Process, Result};
+use crate::{Driver, Handler, Result};
 
 pub struct GeckoDriver {
     handler: Handler,
@@ -55,12 +55,12 @@ impl Default for GeckoDriver {
 }
 
 #[async_trait::async_trait]
-impl Process for GeckoDriver {
+impl Driver for GeckoDriver {
     async fn run(&self) -> Result<()> {
         self.handler.run().await
     }
 
-    async fn addr(&self) -> Result<SocketAddr> {
+    fn addr(&self) -> Result<SocketAddr> {
         Ok(self.addr)
     }
 
@@ -83,7 +83,7 @@ mod test {
     async fn run() -> Result<()> {
         let driver: GeckoDriver = GeckoDriver::default();
         driver.run().await?;
-        let _ = driver.addr().await?;
+        let _ = driver.addr()?;
         driver.close().await
     }
 }
