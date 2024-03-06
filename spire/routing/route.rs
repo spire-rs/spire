@@ -7,11 +7,11 @@ use tower::util::{MapErrLayer, MapResponseLayer};
 use tower::{Layer, Service, ServiceExt};
 
 use spire_core::context::Context as Cx;
-use spire_core::process::{IntoSignal, Signal};
+use spire_core::context::{IntoSignal, Signal};
 
 use crate::routing::RouteFuture;
 
-/// TODO: Wraps `tower::`[`Service`].
+/// Provides type-erasure for the underlying `tower::`[`Service`].
 pub struct Route<B, E> {
     inner: Mutex<BoxCloneService<Cx<B>, Signal, E>>,
 }

@@ -6,12 +6,12 @@ use tower::{Layer, Service};
 
 use spire_core::backend::Backend;
 use spire_core::context::Context as Cx;
-use spire_core::process::IntoSignal;
+use spire_core::context::IntoSignal;
 
 use crate::handler::Handler;
 use crate::routing::Route;
 
-/// Type erasure utility for [`Handler`]s.
+/// Provides type-erasure for [`Handler`]s.
 pub struct MakeRoute<B, S, E>(Mutex<Box<dyn EraseRoute<B, S, E>>>);
 
 impl<B, S> MakeRoute<B, S, Infallible> {

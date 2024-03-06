@@ -41,7 +41,11 @@ where
 }
 
 /// TODO.
-pub trait Select {}
+pub trait Select {
+    fn list_selected() -> Vec<String>;
+
+    fn from_list(selected: &[String]) -> Self;
+}
 
 /// TODO.
 pub struct Selector<T>(pub T);

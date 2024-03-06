@@ -7,7 +7,7 @@ use tower::{Layer, Service};
 
 use spire_core::backend::Backend;
 use spire_core::context::{Context as Cx, Tag};
-use spire_core::process::{IntoSignal, Signal};
+use spire_core::context::{IntoSignal, Signal};
 
 use crate::routing::{Endpoint, Route, RouteFuture};
 
@@ -62,20 +62,16 @@ impl<B, S> TagRouter<B, S> {
         todo!()
     }
 
-    pub fn with_state<S2>(self, state: S) -> TagRouter<B, S2> {
-        todo!()
-    }
-}
-
-impl<B> TagRouter<B, ()> {
-    fn find_by_tag(&self, tag: &Tag) -> Endpoint<B, ()> {
-        let fallback = || match &self.current_fallback {
-            Some(user_fallback) => user_fallback.clone(),
-            None => self.default_fallback.clone(),
-        };
-
-        let tagged = self.tag_router.get(tag).cloned();
-        tagged.unwrap_or_else(fallback)
+    pub fn with_state<S2>(self, state: S) -> TagRouter<B, S2>
+    where
+        S: Clone,
+    {
+        let remap = |(k, v): (Tag, Endpoint<B, S>)| (k, v.with_state(state.clone()));
+        TagRouter {
+            tag_router: self.tag_router.into_iter().map(remap).collect(),
+            current_fallback: self.current_fallback.map(|x| x.with_state(state)),
+            default_fallback: self.default_fallback,
+        }
     }
 }
 
@@ -103,6 +99,13 @@ impl<B> Service<Cx<B>> for TagRouter<B, ()> {
 
     #[inline]
     fn call(&mut self, cx: Cx<B>) -> Self::Future {
-        self.find_by_tag(cx.tag()).call(cx)
+        let fallback = || match &self.current_fallback {
+            Some(user_fallback) => user_fallback.clone(),
+            None => self.default_fallback.clone(),
+        };
+
+        let tagged = self.tag_router.get(cx.tag()).cloned();
+        let mut endpoint = tagged.unwrap_or_else(fallback);
+        endpoint.call(cx)
     }
 }

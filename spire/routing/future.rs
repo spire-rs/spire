@@ -6,10 +6,12 @@ use pin_project_lite::pin_project;
 use tower::util::{BoxCloneService, Oneshot};
 
 use spire_core::context::Context as Cx;
-use spire_core::process::Signal;
+use spire_core::context::Signal;
 
 pin_project! {
     /// Response [`Future`] for [`Route`].
+    ///
+    /// [`Route`]: crate::routing::Route
     pub struct RouteFuture<B, E> {
         #[pin]
         kind: RouteFutureKind<B, E>,

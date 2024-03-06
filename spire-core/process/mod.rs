@@ -4,19 +4,18 @@ use std::marker::PhantomData;
 
 use tower::Service;
 
-use crate::context::Context;
-pub use crate::process::signal::{IntoSignal, Signal};
+use crate::context::{Context, IntoSignal};
+use crate::process::daemon::Process;
 
+mod daemon;
 mod metric;
-mod signal;
 
-pub struct Process<B> {
+pub struct Daemon<B> {
+    inner: Process<()>,
     backend: PhantomData<B>,
 }
 
-struct Daemon {}
-
-impl<B> Process<B> {
+impl<B> Daemon<B> {
     pub fn new<S>(svc: S) -> Self
     where
         S: Service<Context<B>, Error = Infallible>,
@@ -26,14 +25,14 @@ impl<B> Process<B> {
     }
 }
 
-impl<B> Clone for Process<B> {
+impl<B> Clone for Daemon<B> {
     fn clone(&self) -> Self {
         todo!()
     }
 }
 
-impl<B> fmt::Debug for Process<B> {
+impl<B> fmt::Debug for Daemon<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.debug_struct("Daemon").finish_non_exhaustive()
     }
 }

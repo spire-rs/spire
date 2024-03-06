@@ -6,7 +6,7 @@ use tower::{Layer, Service};
 
 use spire_core::backend::Backend;
 use spire_core::context::{Context as Cx, Tag};
-use spire_core::process::{IntoSignal, Signal};
+use spire_core::context::{IntoSignal, Signal};
 
 use crate::handler::Handler;
 use crate::routing::endpoint::Endpoint;
@@ -65,8 +65,6 @@ impl<B, S> Router<B, S> {
     /// Fallback handler processes all tasks without matching [`Tag`]s.
     ///
     /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
-    ///
-    /// [`Signal::Continue`]: crate::handler::Signal::Continue
     pub fn fallback<H, V>(mut self, handler: H) -> Self
     where
         B: Backend,
@@ -80,6 +78,10 @@ impl<B, S> Router<B, S> {
         self
     }
 
+    /// Replaces the current fallback [`Handler`] with a provided `tower::`[`Service`].
+    /// Fallback handler processes all tasks without matching [`Tag`]s.
+    ///
+    /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
     pub fn fallback_service<H>(mut self, service: H) -> Self
     where
         B: Backend,
@@ -114,7 +116,10 @@ impl<B, S> Router<B, S> {
         }
     }
 
-    pub fn with_state<S2>(self, state: S) -> Router<B, S2> {
+    pub fn with_state<S2>(self, state: S) -> Router<B, S2>
+    where
+        S: Clone,
+    {
         let inner = self.inner.with_state(state);
         Router { inner }
     }

@@ -4,8 +4,7 @@ use std::task::{Context, Poll};
 use tower::load::Load;
 use tower::{Layer, Service};
 
-use crate::context::Context as Cx;
-use crate::process::Signal;
+use crate::context::{Context as Cx, Signal};
 
 #[derive(Debug, Default, PartialOrd, PartialEq, Clone)]
 pub struct Stats {

@@ -106,7 +106,7 @@ where
 mod test {
     use std::time::Duration;
 
-    use crate::process::{IntoSignal, Signal};
+    use crate::{IntoSignal, Signal};
 
     #[test]
     fn basic() {

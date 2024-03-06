@@ -6,7 +6,7 @@ use tower::{Layer, Service};
 
 use spire_core::backend::Backend;
 use spire_core::context::Context as Cx;
-use spire_core::process::{IntoSignal, Signal};
+use spire_core::context::{IntoSignal, Signal};
 
 use crate::handler::Handler;
 use crate::routing::{MakeRoute, Route, RouteFuture};

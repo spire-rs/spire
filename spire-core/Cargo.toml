@@ -36,11 +36,13 @@ tracing = []
 util = []
 
 [dependencies]
-http = { workspace = true }
-http-body = { workspace = true }
 bytes = { workspace = true }
 tower = { workspace = true, features = ["load"] }
-
 async-trait = { workspace = true }
+thiserror = { workspace = true }
+
+http = { version = "1.1.0" }
+http-body = { version = "1.0.0" }
+
 fantoccini = { version = "0.20.0-rc.7", optional = true }
 deadpool = { version = "0.10.0", optional = true }

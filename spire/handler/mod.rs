@@ -2,7 +2,7 @@ use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 
 use spire_core::context::Context;
-use spire_core::process::{IntoSignal, Signal};
+use spire_core::context::{IntoSignal, Signal};
 
 use crate::extract::{FromContext, FromContextParts};
 use crate::handler::macros::all_the_tuples;
@@ -34,7 +34,7 @@ mod service;
 /// ```rust
 /// # use spire::routing::Router;
 /// # use spire_core::context::Tag;
-/// # use spire_core::process::Signal;
+/// # use spire_core::Signal;
 ///
 /// let router: Router = Router::new()
 ///     .route(Tag::default(), Signal::Continue);

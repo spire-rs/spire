@@ -3,6 +3,7 @@
 /// [`axum`]: https://github.com/tokio-rs/axum
 #[rustfmt::skip]
 #[macro_export]
+#[doc(hidden)]
 macro_rules! all_the_tuples {
     ($name:ident) => {
         $name!([], T1);
@@ -24,4 +25,5 @@ macro_rules! all_the_tuples {
     };
 }
 
+// TODO: Make unavailable from outside.
 pub use all_the_tuples;

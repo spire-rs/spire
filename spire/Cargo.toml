@@ -39,8 +39,8 @@ spire-core = { workspace = true }
 spire-macros = { workspace = true, optional = true }
 
 bytes = { workspace = true }
-tower = { workspace = true, features = ["util"] }
 futures = { workspace = true }
+tower = { workspace = true, features = ["util"] }
 async-trait = { workspace = true }
 pin-project-lite = { workspace = true }
 serde = { workspace = true }

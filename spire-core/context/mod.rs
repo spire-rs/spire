@@ -1,8 +1,11 @@
 pub use body::Body;
 pub use queue::TaskQueue;
+pub use signal::{IntoSignal, Signal};
 pub use task::{Request, Response, Tag, Task};
 
 use crate::backend::Backend;
+
+mod signal;
 
 mod body;
 mod queue;

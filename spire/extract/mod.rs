@@ -1,7 +1,20 @@
+//!
+//! ### Intro
+//!
+//! A [`Handler`] function is an async function that takes any number of extractors as arguments.
+//! An extractor is a type that implements [`FromContext`] or [`FromContextParts`].
+//!
+//! ### Extractors
+//!
+//! Request, and Response
+//! Body, Text, and Json
+//! Html, Select
+//!
+
 use std::convert::Infallible;
 
 use spire_core::context::Context;
-use spire_core::process::IntoSignal;
+use spire_core::context::IntoSignal;
 
 pub use crate::extract::content::{Body, Json, Text};
 pub use crate::extract::context::Dataset;
