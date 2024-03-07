@@ -1,11 +1,8 @@
 pub use boxed::BoxDataset;
 pub use memory::InMemDataset;
-pub use sqlite::SqliteDataset;
 
 mod boxed;
 mod memory;
-mod sets;
-mod sqlite;
 
 /// Unrecoverable failure during [`Dataset`] insertion.
 ///
@@ -28,11 +25,13 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Features a mirrored API from `burn::data::dataset::`[`Dataset`].
 ///
 /// [`Dataset`]: https://docs.rs/burn/0.12.1/burn/data/dataset/trait.Dataset.html
-pub trait Dataset<T> {
+#[async_trait::async_trait]
+pub trait Dataset<T>: Send + Sync + 'static {
     /// Inserts another item into the collection.
-    fn append(&self, data: T) -> Result<()>;
+    async fn append(&self, data: T) -> Result<()>;
 
-    fn evict(&self) -> Option<T>;
+    /// Removes and returns the next item from the collection.
+    async fn evict(&self) -> Option<T>;
 
     /// Returns the number of items in the dataset.
     fn len(&self) -> usize;

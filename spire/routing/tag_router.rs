@@ -6,10 +6,10 @@ use std::task::{Context, Poll};
 use tower::{Layer, Service};
 
 use spire_core::backend::Backend;
+use spire_core::context::Signal;
 use spire_core::context::{Context as Cx, Tag};
-use spire_core::context::{IntoSignal, Signal};
 
-use crate::routing::{Endpoint, Route, RouteFuture};
+use crate::routing::{Endpoint, RouteFuture};
 
 pub struct TagRouter<B, S> {
     tag_router: HashMap<Tag, Endpoint<B, S>>,
@@ -23,6 +23,7 @@ async fn default_fallback() -> Signal {
 }
 
 impl<B, S> TagRouter<B, S> {
+    /// Creates a new [`TagRouter`].
     pub fn new() -> Self
     where
         B: Backend,
@@ -42,19 +43,12 @@ impl<B, S> TagRouter<B, S> {
     pub fn fallback(&mut self, endpoint: Endpoint<B, S>) {
         self.current_fallback.replace(endpoint);
     }
-
-    pub fn layer<L>(mut self, layer: L) -> Self
+    pub fn layer<F>(mut self, func: F) -> Self
     where
-        B: 'static,
-        S: Clone + Send + 'static,
-        L: Layer<Route<B, Infallible>> + Clone + Send + 'static,
-        L::Service: Service<Cx<B>> + Clone + Send + 'static,
-        <L::Service as Service<Cx<B>>>::Response: IntoSignal + 'static,
-        <L::Service as Service<Cx<B>>>::Error: Into<Infallible> + 'static,
-        <L::Service as Service<Cx<B>>>::Future: Send + 'static,
+        F: Fn(Tag, Endpoint<B, S>) -> (Tag, Endpoint<B, S>),
     {
-        let remap = |(k, v): (Tag, Endpoint<B, S>)| (k, v.layer(layer.clone()));
-        self.tag_router = self.tag_router.into_iter().map(remap).collect();
+        let it = self.tag_router.into_iter();
+        self.tag_router = it.map(|(k, v)| func(k, v)).collect();
         self
     }
 

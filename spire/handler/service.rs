@@ -10,8 +10,9 @@ use pin_project_lite::pin_project;
 use tower::Service;
 
 use spire_core::context::Context as Cx;
+use spire_core::context::Signal;
 
-use crate::handler::{Handler, Signal};
+use crate::handler::Handler;
 
 pub struct HandlerService<H, V, S> {
     marker: PhantomData<V>,

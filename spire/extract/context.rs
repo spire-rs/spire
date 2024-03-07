@@ -12,6 +12,9 @@ use spire_core::dataset::BoxDataset;
 
 use crate::extract::{FromContext, FromContextParts};
 
+// TODO: Timing<BetweenReqResp>, <BeforeResp>, <SinceReq>, <SinceResp>
+// Req created, Handler called, Resp created
+
 #[async_trait::async_trait]
 impl<B, S> FromContextParts<B, S> for Request {
     type Rejection = Infallible;

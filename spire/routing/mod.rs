@@ -111,8 +111,9 @@ impl<B, S> Router<B, S> {
         <L::Service as Service<Cx<B>>>::Error: Into<Infallible> + 'static,
         <L::Service as Service<Cx<B>>>::Future: Send + 'static,
     {
+        let remap = |k: Tag, v: Endpoint<B, S>| (k, v.layer(layer.clone()));
         Self {
-            inner: self.inner.layer(layer),
+            inner: self.inner.layer(remap),
         }
     }
 

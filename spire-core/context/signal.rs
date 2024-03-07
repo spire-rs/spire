@@ -3,6 +3,7 @@ use std::error::Error;
 use std::time::Duration;
 
 use crate::context::Tag;
+use crate::dataset;
 
 ///
 /// [`ControlFlow`]: std::ops::ControlFlow
@@ -28,7 +29,7 @@ impl Signal {
         match self {
             Signal::Wait(_, x) => *x,
             Signal::Repeat(_, x) => *x,
-            _ => Duration::default(),
+            _ => Duration::from_secs(0),
         }
     }
 }
@@ -58,6 +59,12 @@ impl IntoSignal for Infallible {
 impl IntoSignal for Duration {
     fn into_signal(self) -> Signal {
         Signal::Wait(Tag::default(), self)
+    }
+}
+
+impl IntoSignal for dataset::Error {
+    fn into_signal(self) -> Signal {
+        todo!()
     }
 }
 
@@ -106,7 +113,7 @@ where
 mod test {
     use std::time::Duration;
 
-    use crate::{IntoSignal, Signal};
+    use crate::context::{IntoSignal, Signal};
 
     #[test]
     fn basic() {

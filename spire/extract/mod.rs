@@ -1,3 +1,4 @@
+//! Types and traits for extracting data from [`Context`].
 //!
 //! ### Intro
 //!
@@ -6,10 +7,14 @@
 //!
 //! ### Extractors
 //!
-//! Request, and Response
-//! Body, Text, and Json
-//! Html, Select
+//! - [`Request`], and [`Response`]
+//! - [`Body`], [`Text`], and [`Json`]
+//! - [`Html`], Select (and [`Select`] trait)
 //!
+//!
+//! [`Request`]: spire_core::context::Request
+//! [`Response`]: spire_core::context::Response
+//! [`Handler`]: crate::handler::Handler
 
 use std::convert::Infallible;
 
@@ -18,7 +23,7 @@ use spire_core::context::IntoSignal;
 
 pub use crate::extract::content::{Body, Json, Text};
 pub use crate::extract::context::Dataset;
-pub use crate::extract::markup::{Html, Nest, Select, Selector};
+pub use crate::extract::markup::{Html, Select, Selector};
 pub use crate::extract::state::{FromRef, State};
 
 mod content;

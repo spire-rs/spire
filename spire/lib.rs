@@ -4,8 +4,8 @@
 
 #[doc(inline)]
 pub use routing::Router;
-pub use spire_core::{backend, context};
 pub use spire_core::Daemon;
+pub use spire_core::{backend, context};
 #[cfg(feature = "macros")]
 pub use spire_macros::*;
 

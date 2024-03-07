@@ -1,7 +1,11 @@
+use tower::Service;
+
 #[cfg(feature = "client")]
 pub use client::Client;
 #[cfg(feature = "driver")]
 pub use driver::Driver;
+
+use crate::context::{IntoSignal, Request, Response};
 
 #[cfg(feature = "client")]
 mod client;
@@ -9,13 +13,19 @@ mod client;
 mod driver;
 
 #[async_trait::async_trait]
-pub trait Backend: Clone + Send + Sync + Sized + 'static {}
+pub trait Backend: Clone + Send + Sync + Sized + 'static {
+    type Client;
+    type Error: IntoSignal;
 
-#[derive(Debug, Clone)]
-pub struct TracingBackend {}
+    async fn resolve(self, request: Request) -> Result<Response, Self::Error>;
+}
 
-impl TracingBackend {}
+#[async_trait::async_trait]
+impl Backend for () {
+    type Client = ();
+    type Error = ();
 
-impl Backend for TracingBackend {}
-
-impl Backend for () {}
+    async fn resolve(self, request: Request) -> Result<Response, Self::Error> {
+        todo!()
+    }
+}

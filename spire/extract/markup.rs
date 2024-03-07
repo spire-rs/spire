@@ -6,36 +6,40 @@ use spire_core::context::Context;
 
 use crate::extract::FromContextParts;
 
+// TODO: also use for Text?
+pub trait Transform<T> {
+    type Output;
+
+    fn transform(input: T) -> Self::Output;
+}
+
+pub struct Normal;
+
+impl<T> Transform<T> for Normal {
+    type Output = T;
+
+    fn transform(input: T) -> Self::Output {
+        input
+    }
+}
+
+// pub struct Reduce;
+
 /// TODO.
 #[derive(Debug, Clone)]
-pub struct Html(pub ());
+pub struct Html<T = Normal>(pub T::Output)
+where
+    T: Transform<()>;
 
 #[async_trait::async_trait]
-impl<B, S> FromContextParts<B, S> for Html
+impl<B, S, T> FromContextParts<B, S> for Html<T>
 where
     B: Backend,
+    T: Transform<()>,
 {
     type Rejection = Infallible;
 
     async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
-        todo!()
-    }
-}
-
-/// TODO.
-#[derive(Debug, Clone)]
-pub struct Nest(pub ());
-
-#[async_trait::async_trait]
-impl<B, S> FromContextParts<B, S> for Nest
-where
-    B: Backend,
-    S: Sync,
-{
-    type Rejection = Infallible;
-
-    async fn from_context_parts(cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let html = Html::from_context_parts(cx, state).await;
         todo!()
     }
 }
@@ -60,7 +64,7 @@ where
     type Rejection = Infallible;
 
     async fn from_context_parts(cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let html = Html::from_context_parts(cx, state).await;
+        let html = Html::<Normal>::from_context_parts(cx, state).await;
         todo!()
     }
 }

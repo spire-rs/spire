@@ -1,14 +1,10 @@
-use std::convert::Infallible;
 use std::fmt;
 use std::sync::Arc;
 
-use deadpool::managed::{Manager, Metrics, RecycleResult};
+use manager::BrowserManager;
 
 use crate::backend::Backend;
-
-/// Extension trait for Backend::Client
-/// ... for backends that run actual browsers
-pub trait Browser {}
+use crate::context::{Request, Response};
 
 #[derive(Clone)]
 pub struct Driver {
@@ -19,7 +15,17 @@ struct DriverInner {
     manager: BrowserManager,
 }
 
-impl Driver {}
+impl Driver {
+    pub fn new() -> Self {
+        let inner = DriverInner {
+            manager: BrowserManager::new(),
+        };
+
+        Self {
+            inner: Arc::new(inner),
+        }
+    }
+}
 
 impl fmt::Debug for Driver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -27,28 +33,51 @@ impl fmt::Debug for Driver {
     }
 }
 
-impl Backend for Driver {}
+#[async_trait::async_trait]
+impl Backend for Driver {
+    type Client = fantoccini::Client;
+    type Error = ();
 
-// BrowserPool
-
-pub struct BrowserManager {}
-
-impl BrowserManager {
-    pub fn new() -> Self {
-        Self {}
+    async fn resolve(self, request: Request) -> Result<Response, Self::Error> {
+        todo!()
     }
 }
 
-#[deadpool::async_trait]
-impl Manager for BrowserManager {
-    type Type = ();
-    type Error = Infallible;
+mod manager {
+    use std::convert::Infallible;
 
-    async fn create(&self) -> Result<Self::Type, Self::Error> {
-        todo!()
+    use deadpool::managed::{Manager, Metrics, RecycleResult};
+
+    /// Extension trait for Backend::Client
+    /// ... for backends that run actual browsers
+    pub trait Browser {}
+
+    pub struct BrowserManager {
+        // builder: ClientBuilder<()>,
+        // webdriver: Vec<()>
     }
 
-    async fn recycle(&self, obj: &mut Self::Type, metrics: &Metrics) -> RecycleResult<Self::Error> {
-        todo!()
+    impl BrowserManager {
+        pub fn new() -> Self {
+            todo!()
+        }
+    }
+
+    #[deadpool::async_trait]
+    impl Manager for BrowserManager {
+        type Type = ();
+        type Error = Infallible;
+
+        async fn create(&self) -> Result<Self::Type, Self::Error> {
+            todo!()
+        }
+
+        async fn recycle(
+            &self,
+            obj: &mut Self::Type,
+            metrics: &Metrics,
+        ) -> RecycleResult<Self::Error> {
+            todo!()
+        }
     }
 }

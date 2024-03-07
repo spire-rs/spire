@@ -13,7 +13,11 @@ struct InMemDatasetInner<T> {
 
 impl<T> InMemDataset<T> {
     pub fn new() -> Self {
-        todo!()
+        let inner = Arc::new(InMemDatasetInner {
+            buffer: Mutex::new(VecDeque::new()),
+        });
+
+        Self { inner }
     }
 }
 
@@ -29,14 +33,18 @@ impl<T> Default for InMemDataset<T> {
     }
 }
 
-impl<T> Dataset<T> for InMemDataset<T> {
-    fn append(&self, data: T) -> Result<()> {
+#[async_trait::async_trait]
+impl<T> Dataset<T> for InMemDataset<T>
+where
+    T: Send + Sync + 'static,
+{
+    async fn append(&self, data: T) -> Result<()> {
         let mut guard = self.inner.buffer.lock();
         guard.expect("should not be already held").push_back(data);
         Ok(())
     }
 
-    fn evict(&self) -> Option<T> {
+    async fn evict(&self) -> Option<T> {
         let mut guard = self.inner.buffer.lock();
         guard.expect("should not be already held").pop_front()
     }

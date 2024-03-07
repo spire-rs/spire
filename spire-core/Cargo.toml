@@ -32,6 +32,9 @@ full = ["client", "driver", "tracing", "util"]
 client = []
 driver = ["dep:fantoccini", "dep:deadpool"]
 
+#time = []
+#chrono = []
+
 tracing = []
 util = []
 
@@ -43,6 +46,7 @@ thiserror = { workspace = true }
 
 http = { version = "1.1.0" }
 http-body = { version = "1.0.0" }
+time = { version = "0.3.34" }
 
 fantoccini = { version = "0.20.0-rc.7", optional = true }
 deadpool = { version = "0.10.0", optional = true }
