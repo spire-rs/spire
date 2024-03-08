@@ -5,11 +5,10 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use http_body::{Body as HttpBody, Frame, SizeHint};
-use http_body_util::{BodyExt, Empty};
 use http_body_util::combinators::BoxBody;
+use http_body_util::{BodyExt, Empty};
 
 use crate::BoxError;
-use crate::context::Error;
 
 /// Forked from [`axum_core`]`::body::Body`.
 ///
@@ -31,16 +30,19 @@ where
 /// [`Body`]: http_body::Body
 /// [`Request`]: http::Request
 /// [`Response`]: http::Response
-pub struct Body(BoxBody<Bytes, Error>);
+pub struct Body(BoxBody<Bytes, BoxError>);
 
 impl Body {
     /// Creates a new [`Body`].
     pub fn new<B>(body: B) -> Self
     where
         B: HttpBody<Data = Bytes> + Send + Sync + 'static,
-        B::Error: Into<BoxError>,
+        B::Error: Into<BoxError> + Send + Sync + 'static,
     {
-        try_downcast(body).unwrap_or_else(|x| Self(x.map_err(Error::new).boxed()))
+        try_downcast(body).unwrap_or_else(|x| {
+            let boxed = x.map_err(|x| x.into()).boxed();
+            Self(boxed)
+        })
     }
 }
 
@@ -70,7 +72,7 @@ impl fmt::Debug for Body {
 
 impl HttpBody for Body {
     type Data = Bytes;
-    type Error = Error;
+    type Error = BoxError;
 
     #[inline]
     fn poll_frame(

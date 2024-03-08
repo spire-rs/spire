@@ -4,6 +4,7 @@ use std::sync::Arc;
 use manager::BrowserManager;
 
 use crate::backend::Backend;
+use crate::BoxError;
 use crate::context::{Request, Response};
 
 #[derive(Clone)]
@@ -36,9 +37,9 @@ impl fmt::Debug for Driver {
 #[async_trait::async_trait]
 impl Backend for Driver {
     type Client = fantoccini::Client;
-    type Error = ();
+    type Error = BoxError;
 
-    async fn resolve(self, request: Request) -> Result<Response, Self::Error> {
+    async fn try_resolve(&mut self, request: Request) -> Result<Response, Self::Error> {
         todo!()
     }
 }

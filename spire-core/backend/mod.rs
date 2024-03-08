@@ -1,9 +1,10 @@
 #[cfg(feature = "client")]
-pub use client::Client;
+pub use client::HttpClient;
 #[cfg(feature = "driver")]
 pub use driver::Driver;
 
-use crate::context::{IntoSignal, Request, Response};
+use crate::context::{Request, Response};
+use crate::BoxError;
 
 #[cfg(feature = "client")]
 mod client;
@@ -13,17 +14,17 @@ mod driver;
 #[async_trait::async_trait]
 pub trait Backend: Clone + Send + Sync + Sized + 'static {
     type Client;
-    type Error: IntoSignal;
+    type Error: Into<BoxError> + Send + Sync + 'static;
 
-    async fn resolve(self, request: Request) -> Result<Response, Self::Error>;
+    async fn try_resolve(&mut self, request: Request) -> Result<Response, Self::Error>;
 }
 
 #[async_trait::async_trait]
 impl Backend for () {
     type Client = ();
-    type Error = ();
+    type Error = BoxError;
 
-    async fn resolve(self, request: Request) -> Result<Response, Self::Error> {
+    async fn try_resolve(&mut self, request: Request) -> Result<Response, Self::Error> {
         todo!()
     }
 }

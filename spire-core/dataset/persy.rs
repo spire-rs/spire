@@ -1,7 +1,8 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use crate::dataset::{Dataset, Result};
+use crate::BoxError;
+use crate::dataset::Dataset;
 
 pub struct PersyDataset<T> {
     marker: PhantomData<T>,
@@ -30,11 +31,13 @@ impl<T> Dataset<T> for PersyDataset<T>
 where
     T: Send + Sync + 'static,
 {
-    async fn append(&self, data: T) -> Result<()> {
+    type Error = BoxError;
+
+    async fn add(&self, data: T) -> Result<(), Self::Error> {
         todo!()
     }
 
-    async fn evict(&self) -> Option<T> {
+    async fn get(&self) -> Result<Option<T>, Self::Error> {
         todo!()
     }
 

@@ -16,6 +16,17 @@ use crate::extract::{FromContext, FromContextParts};
 // Req created, Handler called, Resp created
 
 #[async_trait::async_trait]
+impl <B, S> FromContextParts<B, S> for Context<B> {
+    type Rejection = Infallible;
+
+    async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
+        // Ok(cx.clone())
+
+        todo!()
+    }
+}
+
+#[async_trait::async_trait]
 impl<B, S> FromContextParts<B, S> for Request {
     type Rejection = Infallible;
 

@@ -5,8 +5,10 @@ use std::sync::Arc;
 use tower::Service;
 
 use crate::backend::Backend;
+use crate::BoxError;
 use crate::context::{Context, Queue, Request, Signal};
-use crate::dataset::{BoxDataset, Dataset};
+use crate::dataset::Dataset;
+use crate::dataset::util::BoxCloneDataset;
 
 mod future;
 mod metric;
@@ -37,21 +39,21 @@ impl<B, S> Daemon<B, S> {
         Self { inner }
     }
 
-    /// Replaces the [`Dataset`] use by the request queue.
+    /// Replaces the [`Dataset`] used by the [`Queue`].
     ///
-    /// If the [`Dataset`] for the request queue is not provided, then
-    /// the default [`Queue`], backed by [`InMemDataset`] is used instead.
+    /// If the `Dataset` for the `Queue` is not provided, then
+    /// the queue backed by the [`InMemDataset`] is used instead.
     ///
     /// ### Note
     ///
-    /// Does not move items from the replaced dataset.
+    /// Does not move items from the replaced `Dataset`.
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
     pub fn with_queue<D>(mut self, dataset: D) -> Self
     where
         B: Clone,
         S: Clone,
-        D: Dataset<Request>,
+        D: Dataset<Request, Error = BoxError> + Clone,
     {
         self.map_inner(|mut inner| {
             inner.queue = Queue::new(dataset);
@@ -61,9 +63,9 @@ impl<B, S> Daemon<B, S> {
 
     pub fn with_dataset<D, T>(self, dataset: D) -> Self
     where
-        D: Dataset<T>,
+        D: Dataset<T, Error = BoxError> + Clone,
     {
-        let dataset = BoxDataset::new(dataset);
+        let dataset = BoxCloneDataset::new(dataset);
         todo!()
     }
 
@@ -93,13 +95,16 @@ impl<B, S> Daemon<B, S> {
     where
         B: Clone,
     {
-        if let Some(request) = self.inner.queue.poll().await {
+        let poll = self.inner.queue.poll();
+        let cx = if let Ok(Some(request)) = poll.await {
             let backend = self.inner.backend.clone();
             let queue = self.inner.queue.clone();
             Context::new(backend, queue, request)
         } else {
             return Signal::Skip;
         };
+
+        // TODO. wait until all done an repeat poll
 
         todo!()
     }

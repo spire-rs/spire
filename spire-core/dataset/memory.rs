@@ -1,8 +1,9 @@
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::convert::Infallible;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::dataset::{Dataset, Result};
+use crate::dataset::Dataset;
 
 /// Simple in-memory [`Dataset`].
 pub struct InMemDataset<T> {
@@ -60,20 +61,22 @@ impl<T> Dataset<T> for InMemDataset<T>
 where
     T: Send + Sync + 'static,
 {
-    async fn append(&self, data: T) -> Result<()> {
+    type Error = Infallible;
+
+    async fn add(&self, data: T) -> Result<(), Self::Error> {
         let guard = self.inner.buffer.lock();
         let mut lock = guard.expect("should not be already held");
         lock.push_back(data);
         Ok(())
     }
 
-    async fn evict(&self) -> Option<T> {
+    async fn get(&self) -> Result<Option<T>, Self::Error> {
         let guard = self.inner.buffer.lock();
         let mut lock = guard.expect("should not be already held");
         if self.inner.fifo.load(Ordering::SeqCst) {
-            lock.pop_front()
+            Ok(lock.pop_front())
         } else {
-            lock.pop_back()
+            Ok(lock.pop_back())
         }
     }
 

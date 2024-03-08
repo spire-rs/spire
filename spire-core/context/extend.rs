@@ -1,10 +1,12 @@
 use std::num::NonZeroUsize;
 
-use crate::context::{Body, Request};
+use http::request::Builder;
+
+use crate::context::Request;
 
 /// Extends the [`Request`] with an identifier used for routing.
 ///
-/// To ensure the type-safe usage of [`Tag`]s and [`crate::context::Task`]s inside of handlers,
+/// To ensure the type-safe usage of [`Tag`]s and [`Task`]s inside of handlers,
 /// you may want to create a custom enum, that implements `Into<Tag>` or `Into<Task>`:
 ///
 /// ```rust
@@ -57,6 +59,9 @@ impl From<u64> for Tag {
 pub struct Depth(pub NonZeroUsize);
 
 impl Depth {
+    /// The smallest recursive [`Depth`] value.
+    const MIN: Depth = Depth(NonZeroUsize::MIN);
+
     /// Creates a new [`Depth`] extension.
     pub fn new(depth: usize) -> Self {
         Self(NonZeroUsize::new(depth).unwrap_or(NonZeroUsize::MIN))
@@ -70,13 +75,7 @@ impl Depth {
 
 impl Default for Depth {
     fn default() -> Self {
-        NonZeroUsize::MIN.into()
-    }
-}
-
-impl From<NonZeroUsize> for Depth {
-    fn from(value: NonZeroUsize) -> Self {
-        Depth(value)
+        Depth::MIN
     }
 }
 
@@ -96,21 +95,72 @@ impl Default for Time {
     }
 }
 
-pub trait Task {
-    // Replace tag, get event timestamps, get depth
+mod sealed {
+    use super::{Builder, Request};
+
+    pub trait Sealed {}
+    impl<B> Sealed for Request<B> {}
+    impl Sealed for Builder {}
 }
 
-impl Task for Request<Body> {}
+/// Extension trait for `http::`[`Request`].
+pub trait Task: sealed::Sealed {
+    // TODO: Event timestamps.
+
+    /// Returns a reference to the attached tag.
+    fn tag(&self) -> Option<&Tag>;
+    /// Returns a mutable reference to the attached tag.
+    fn tag_mut(&mut self) -> Option<&mut Tag>;
+    /// Returns a recursive depth of this [`Request`].
+    fn depth(&self) -> usize;
+}
+
+impl<B> Task for Request<B> {
+    fn tag(&self) -> Option<&Tag> {
+        self.extensions().get()
+    }
+
+    fn tag_mut(&mut self) -> Option<&mut Tag> {
+        self.extensions_mut().get_mut()
+    }
+
+    fn depth(&self) -> usize {
+        let depth = self.extensions().get::<Depth>();
+        depth.unwrap_or(&Depth::MIN).get()
+    }
+}
+
+/// Extension trait for `http::request::`[`Builder`].
+pub trait TaskBuilder {
+    /// Attaches a [`Tag`] to this [`Builder`].
+    fn tag(self, tag: impl Into<Tag>) -> Self;
+
+    /// Attaches a depth value to this [`Builder`].
+    fn depth(self, depth: usize) -> Self;
+}
+
+impl TaskBuilder for Builder {
+    fn tag(self, tag: impl Into<Tag>) -> Self {
+        self.extension(tag.into())
+    }
+
+    fn depth(self, depth: usize) -> Self {
+        self.extension(Depth::new(depth))
+    }
+}
 
 #[cfg(test)]
 mod test {
+    use http::request::Builder;
+
+    use crate::context::{Body, Tag, TaskBuilder};
 
     #[test]
-    fn with_tag() {}
-
-    #[test]
-    fn with_depth() {}
-
-    #[test]
-    fn with_time() {}
+    fn build() {
+        let build = Builder::new()
+            .uri("https://example.com/")
+            .tag(Tag::default())
+            .body(Body::default());
+        matches!(build, Ok(_));
+    }
 }

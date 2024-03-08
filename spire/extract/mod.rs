@@ -7,11 +7,10 @@
 //!
 //! ### Extractors
 //!
-//! -
+//! - [`Context`], [`Tag`], and [`Queue`]
 //! - [`Backend`], [`Request`], and [`Response`] for low-level manual manipulations.
 //! - [`Body`], [`Text`], and [`Json`]
 //! - [`Html`], Select (and [`Select`] trait)
-//!
 //!
 //! [`Backend`]: spire_core::backend::Backend
 //! [`Request`]: spire_core::context::Request

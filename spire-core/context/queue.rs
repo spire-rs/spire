@@ -1,30 +1,35 @@
 use std::fmt;
 
+use crate::BoxError;
 use crate::context::Request;
-use crate::dataset::{BoxDataset, Dataset, InMemDataset, Result};
+use crate::dataset::{Dataset, InMemDataset};
+use crate::dataset::util::{BoxCloneDataset, MapErr};
 
+/// [`Request`] queue backed by the [`Dataset`].
 #[derive(Clone)]
 pub struct Queue {
-    inner: BoxDataset<Request>,
+    inner: BoxCloneDataset<Request, BoxError>,
 }
 
 impl Queue {
     /// Creates a new [`Queue`].
-    pub fn new<T>(dataset: T) -> Self
+    pub fn new<T, E>(dataset: T) -> Self
     where
-        T: Dataset<Request>,
+        T: Dataset<Request, Error = E> + Clone,
+        E: Into<BoxError>,
     {
-        let inner = BoxDataset::new(dataset);
+        let f = |x: E| -> BoxError { x.into() };
+        let inner = BoxCloneDataset::new(MapErr::new(dataset, f));
         Self { inner }
     }
 
-    pub async fn append(&self, request: impl Into<Request>) -> Result<()> {
+    pub async fn append(&self, request: impl Into<Request>) -> Result<(), BoxError> {
         // TODO: Make sure has event timestamp.
-        self.inner.append(request.into()).await
+        self.inner.add(request.into()).await
     }
 
-    pub(crate) async fn poll(&self) -> Option<Request> {
-        todo!()
+    pub(crate) async fn poll(&self) -> Result<Option<Request>, BoxError> {
+        self.inner.get().await
     }
 }
 

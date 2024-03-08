@@ -1,15 +1,15 @@
 use std::convert::Infallible;
-use std::error::Error;
 use std::time::Duration;
 
 use crate::context::Tag;
-use crate::dataset;
+use crate::{BoxError, Error};
 
-/// Represents various signals that can be emitted during task processing.
+/// Represents various events that can be emitted during [`Request`] processing.
 ///
 /// Signals are used to tell whether it should exit early or go on as usual,
 /// similar to the standard library's [`ControlFlow`] enum.
 ///
+/// [`Request`]: crate::context::Request
 /// [`ControlFlow`]: std::ops::ControlFlow
 #[derive(Debug, Default)]
 pub enum Signal {
@@ -25,7 +25,7 @@ pub enum Signal {
     Repeat(Tag, Duration),
 
     /// Task failed, terminate all collector tasks.
-    Stop(Box<dyn Error + Send + Sync>),
+    Stop(BoxError),
 }
 
 impl Signal {
@@ -39,7 +39,9 @@ impl Signal {
     }
 }
 
+/// Trait for generating [`Signal`]s.
 pub trait IntoSignal {
+    /// Transforms `self` into the [`Signal`].
     fn into_signal(self) -> Signal;
 }
 
@@ -67,13 +69,13 @@ impl IntoSignal for Duration {
     }
 }
 
-impl IntoSignal for dataset::Error {
+impl IntoSignal for Error {
     fn into_signal(self) -> Signal {
         todo!()
     }
 }
 
-impl IntoSignal for Box<dyn Error + Send + Sync> {
+impl IntoSignal for BoxError {
     fn into_signal(self) -> Signal {
         Signal::Stop(self)
     }
