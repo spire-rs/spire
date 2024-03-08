@@ -1,20 +1,16 @@
-use std::marker::PhantomData;
-
 use crate::dataset::Dataset;
 
 #[derive(Debug, Clone)]
-pub struct MapData<T, D, F, F2> {
+pub struct MapData<D, F, F2> {
     inner: D,
-    marker: PhantomData<T>,
     f_to_inner: F,
     f_from_inner: F2,
 }
 
-impl<T, D, F, F2> MapData<T, D, F, F2> {
+impl<D, F, F2> MapData<D, F, F2> {
     pub fn new(inner: D, to: F, from: F2) -> Self {
         Self {
             inner,
-            marker: PhantomData,
             f_to_inner: to,
             f_from_inner: from,
         }
@@ -22,7 +18,7 @@ impl<T, D, F, F2> MapData<T, D, F, F2> {
 }
 
 #[async_trait::async_trait]
-impl<T, T2, D, F, F2> Dataset<T2> for MapData<T, D, F, F2>
+impl<D, F, F2, T, T2> Dataset<T2> for MapData<D, F, F2>
 where
     T: Send + Sync + 'static,
     T2: Send + Sync + 'static,

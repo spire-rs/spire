@@ -1,15 +1,13 @@
 use std::fmt;
 
-use crate::BoxError;
 use crate::context::Request;
+use crate::dataset::util::{BoxCloneDataset, DatasetExt};
 use crate::dataset::{Dataset, InMemDataset};
-use crate::dataset::util::{BoxCloneDataset, MapErr};
+use crate::BoxError;
 
 /// [`Request`] queue backed by the [`Dataset`].
 #[derive(Clone)]
-pub struct Queue {
-    inner: BoxCloneDataset<Request, BoxError>,
-}
+pub struct Queue(BoxCloneDataset<Request, BoxError>);
 
 impl Queue {
     /// Creates a new [`Queue`].
@@ -19,17 +17,7 @@ impl Queue {
         E: Into<BoxError>,
     {
         let f = |x: E| -> BoxError { x.into() };
-        let inner = BoxCloneDataset::new(MapErr::new(dataset, f));
-        Self { inner }
-    }
-
-    pub async fn append(&self, request: impl Into<Request>) -> Result<(), BoxError> {
-        // TODO: Make sure has event timestamp.
-        self.inner.add(request.into()).await
-    }
-
-    pub(crate) async fn poll(&self) -> Result<Option<Request>, BoxError> {
-        self.inner.get().await
+        Self(BoxCloneDataset::new(dataset.map_err(f)))
     }
 }
 
@@ -42,5 +30,22 @@ impl fmt::Debug for Queue {
 impl Default for Queue {
     fn default() -> Self {
         Self::new(InMemDataset::fifo())
+    }
+}
+
+#[async_trait::async_trait]
+impl Dataset<Request> for Queue {
+    type Error = BoxError;
+
+    async fn add(&self, data: Request) -> Result<(), Self::Error> {
+        self.0.add(data).await
+    }
+
+    async fn get(&self) -> Result<Option<Request>, Self::Error> {
+        self.0.get().await
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }

@@ -1,8 +1,8 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use crate::BoxError;
 use crate::dataset::Dataset;
+use crate::BoxError;
 
 pub struct SqliteDataset<T> {
     marker: PhantomData<T>,

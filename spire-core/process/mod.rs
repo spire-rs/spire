@@ -5,10 +5,10 @@ use std::sync::Arc;
 use tower::Service;
 
 use crate::backend::Backend;
-use crate::BoxError;
 use crate::context::{Context, Queue, Request, Signal};
-use crate::dataset::Dataset;
 use crate::dataset::util::BoxCloneDataset;
+use crate::dataset::Dataset;
+use crate::BoxError;
 
 mod future;
 mod metric;
@@ -95,7 +95,7 @@ impl<B, S> Daemon<B, S> {
     where
         B: Clone,
     {
-        let poll = self.inner.queue.poll();
+        let poll = self.inner.queue.get();
         let cx = if let Ok(Some(request)) = poll.await {
             let backend = self.inner.backend.clone();
             let queue = self.inner.queue.clone();

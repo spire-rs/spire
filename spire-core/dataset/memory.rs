@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::convert::Infallible;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use crate::dataset::Dataset;
 

@@ -8,15 +8,13 @@ use std::convert::Infallible;
 
 use spire_core::backend::Backend;
 use spire_core::context::{Context, Request, Response};
-use spire_core::dataset::BoxDataset;
+use spire_core::dataset::util::BoxCloneDataset;
+use spire_core::BoxError;
 
 use crate::extract::{FromContext, FromContextParts};
 
-// TODO: Timing<BetweenReqResp>, <BeforeResp>, <SinceReq>, <SinceResp>
-// Req created, Handler called, Resp created
-
 #[async_trait::async_trait]
-impl <B, S> FromContextParts<B, S> for Context<B> {
+impl<B, S> FromContextParts<B, S> for Context<B> {
     type Rejection = Infallible;
 
     async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
@@ -47,7 +45,7 @@ where
     }
 }
 
-pub struct Dataset<T>(pub BoxDataset<T>);
+pub struct Dataset<T>(pub BoxCloneDataset<T, BoxError>);
 
 #[async_trait::async_trait]
 impl<B, S, T> FromContextParts<B, S> for Dataset<T> {

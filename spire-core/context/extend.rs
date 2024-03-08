@@ -85,6 +85,8 @@ impl Default for Depth {
 /// [`Response`]: http::Response
 #[derive(Debug, Clone)]
 pub struct Time {
+    // TODO: Timing<BetweenReqResp>, <BeforeResp>, <SinceReq>, <SinceResp>
+    // Req created, Handler called, Resp created
     initialized: (),
     dispatched: (),
 }
