@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use crate::context::Request;
+use crate::context::{Body, Request};
 
 /// Extends the [`Request`] with an identifier used for routing.
 ///
@@ -96,9 +96,11 @@ impl Default for Time {
     }
 }
 
-pub trait Task {}
+pub trait Task {
+    // Replace tag, get event timestamps, get depth
+}
 
-impl<B> Task for Request<B> {}
+impl Task for Request<Body> {}
 
 #[cfg(test)]
 mod test {

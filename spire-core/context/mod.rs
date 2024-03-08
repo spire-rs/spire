@@ -1,8 +1,10 @@
 use crate::backend::Backend;
+use crate::BoxError;
 pub use crate::context::body::Body;
 pub use crate::context::extension::{Depth, Tag, Task, Time};
 pub use crate::context::queue::Queue;
 pub use crate::context::signal::{IntoSignal, Signal};
+use crate::dataset::Dataset;
 
 mod body;
 mod extension;
@@ -17,6 +19,25 @@ pub type Request<B = Body> = http::Request<B>;
 ///
 /// [`Response`]: http::Response
 pub type Response<B = Body> = http::Response<B>;
+
+
+
+pub struct Error {
+    inner: BoxError,
+}
+
+impl Error {
+    /// Creates a new [`Error`] from a boxable error.
+    pub fn new(error: impl Into<BoxError>) -> Self {
+        let inner = error.into();
+        Self { inner }
+    }
+
+    /// Returns the underlying boxed error.
+    pub fn into_inner(self) -> BoxError {
+        self.inner
+    }
+}
 
 /// Framework-specific [`Context`] type.
 pub struct Context<B> {
@@ -41,7 +62,7 @@ impl<B> Context<B> {
         }
     }
 
-    pub async fn resolve(self)
+    pub async fn resolve(self) -> Result<(), BoxError>
     where
         B: Backend,
     {

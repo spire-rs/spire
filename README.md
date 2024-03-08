@@ -27,3 +27,7 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 - https://crates.io/crates/persy
 - https://developer.mozilla.org/en-US/docs/Web/API/Request
 - https://pola.rs/
+
+#### Notes
+
+- Extract as Argument pattern from [`axum`]

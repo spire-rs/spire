@@ -9,7 +9,7 @@ pub mod context;
 pub mod dataset;
 mod process;
 
-/// Alias for a type-erased [`Error`] type.
+/// Type alias for a type-erased [`Error`] type.
 ///
 /// [`Error`]: std::error::Error
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;

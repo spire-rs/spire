@@ -22,6 +22,7 @@ struct DaemonInner<B, S> {
 }
 
 impl<B, S> Daemon<B, S> {
+    /// Creates a new [`Daemon`].
     pub fn new(backend: B, inner: S) -> Self
     where
         B: Backend,
@@ -36,9 +37,16 @@ impl<B, S> Daemon<B, S> {
         Self { inner }
     }
 
+    /// Replaces the [`Dataset`] use by the request queue.
     ///
-    /// If the [`Dataset`] for the request Queue is not provided, then
-    /// the default Queue, backed by InMemDataset is used instead.
+    /// If the [`Dataset`] for the request queue is not provided, then
+    /// the default [`Queue`], backed by [`InMemDataset`] is used instead.
+    ///
+    /// ### Note
+    ///
+    /// Does not move items from the replaced dataset.
+    ///
+    /// [`InMemDataset`]: crate::dataset::InMemDataset
     pub fn with_queue<D>(mut self, dataset: D) -> Self
     where
         B: Clone,
@@ -74,10 +82,10 @@ impl<B, S> Daemon<B, S> {
         B: Clone,
         S: Clone,
     {
-        Arc::try_unwrap(self.inner).unwrap_or_else(|arc| DaemonInner {
-            inner: arc.inner.clone(),
-            backend: arc.backend.clone(),
-            queue: arc.queue.clone(),
+        Arc::try_unwrap(self.inner).unwrap_or_else(|x| DaemonInner {
+            inner: x.inner.clone(),
+            backend: x.backend.clone(),
+            queue: x.queue.clone(),
         })
     }
 
@@ -93,7 +101,6 @@ impl<B, S> Daemon<B, S> {
             return Signal::Skip;
         };
 
-        //
         todo!()
     }
 

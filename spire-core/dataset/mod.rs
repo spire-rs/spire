@@ -9,18 +9,17 @@
 //! ### Utility
 //!
 //! - [`BoxDataset`]
-//! - [`BackDataset`]
 //!
 
-pub use backed::BackDataset;
 pub use boxed::BoxDataset;
 pub use memory::InMemDataset;
 #[cfg(feature = "persy")]
+#[cfg_attr(docsrs, doc(cfg(feature = "persy")))]
 pub use persy::PersyDataset;
 #[cfg(feature = "sqlite")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
 pub use sqlite::SqliteDataset;
 
-mod backed;
 mod boxed;
 mod memory;
 #[cfg(feature = "persy")]

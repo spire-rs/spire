@@ -30,6 +30,9 @@ path = "./lib.rs"
 default = []
 full = ["macros", "tracing", "util"]
 
+sqlite = ["spire-core/sqlite"]
+persy = ["spire-core/persy"]
+
 macros = ["dep:spire-macros"]
 tracing = ["spire-core/tracing"]
 util = ["spire-core/util"]

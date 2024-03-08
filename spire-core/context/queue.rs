@@ -19,6 +19,7 @@ impl Queue {
     }
 
     pub async fn append(&self, request: impl Into<Request>) -> Result<()> {
+        // TODO: Make sure has event timestamp.
         self.inner.append(request.into()).await
     }
 

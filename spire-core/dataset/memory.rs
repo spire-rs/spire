@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::dataset::{Dataset, Result};
 
+/// Simple in-memory [`Dataset`].
 pub struct InMemDataset<T> {
     inner: Arc<InMemDatasetInner<T>>,
 }
@@ -34,6 +35,7 @@ impl<T> InMemDataset<T> {
         Self { inner }
     }
 
+    /// Changes `FIFO` to `LIFO` modes, or vice versa.
     pub fn flip(self) -> Self {
         let _ = self.inner.fifo.fetch_xor(true, Ordering::SeqCst);
         self
