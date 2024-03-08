@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use std::fmt;
 use std::task::{Context, Poll};
 
-use tower::{Layer, Service};
+use tower::Service;
 
 use spire_core::backend::Backend;
 use spire_core::context::Signal;

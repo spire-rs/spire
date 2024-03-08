@@ -7,11 +7,13 @@
 //!
 //! ### Extractors
 //!
-//! - [`Request`], and [`Response`]
+//! -
+//! - [`Backend`], [`Request`], and [`Response`] for low-level manual manipulations.
 //! - [`Body`], [`Text`], and [`Json`]
 //! - [`Html`], Select (and [`Select`] trait)
 //!
 //!
+//! [`Backend`]: spire_core::backend::Backend
 //! [`Request`]: spire_core::context::Request
 //! [`Response`]: spire_core::context::Response
 //! [`Handler`]: crate::handler::Handler

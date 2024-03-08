@@ -1,7 +1,7 @@
 # https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [package]
-name = "spire"
+name = "spire-bind"
 
 version = { workspace = true }
 edition = { workspace = true }
@@ -16,7 +16,7 @@ documentation = { workspace = true }
 categories = ["asynchronous", "web-programming"]
 keywords = ["crawler", "scraper", "web", "framework"]
 description = """
-The flexible scraper framework powered by tokio and tower.
+Language-agnostic bindings for Spire.
 """
 
 [package.metadata.docs.rs]
@@ -26,21 +26,5 @@ rustdoc-args = ["--cfg", "docsrs"]
 [lib]
 path = "./lib.rs"
 
-[features]
-default = []
-full = ["macros", "tracing", "util"]
-
-macros = ["dep:spire-macros"]
-tracing = ["spire-core/tracing"]
-util = ["spire-core/util"]
-
 [dependencies]
 spire-core = { workspace = true }
-spire-macros = { workspace = true, optional = true }
-
-bytes = { workspace = true }
-futures = { workspace = true }
-tower = { workspace = true, features = ["util"] }
-async-trait = { workspace = true }
-pin-project-lite = { workspace = true }
-serde = { workspace = true }

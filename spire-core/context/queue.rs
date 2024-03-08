@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::context::Request;
-use crate::dataset::{BoxDataset, Dataset, Result};
+use crate::dataset::{BoxDataset, Dataset, InMemDataset, Result};
 
 #[derive(Clone)]
 pub struct Queue {
@@ -22,11 +22,19 @@ impl Queue {
         self.inner.append(request.into()).await
     }
 
-    // pub(crate) async fn poll(&self) -> Option<Request> { todo!() }
+    pub(crate) async fn poll(&self) -> Option<Request> {
+        todo!()
+    }
 }
 
 impl fmt::Debug for Queue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Queue").finish_non_exhaustive()
+    }
+}
+
+impl Default for Queue {
+    fn default() -> Self {
+        Self::new(InMemDataset::fifo())
     }
 }

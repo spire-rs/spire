@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::dataset::{Dataset, Result};
@@ -9,27 +10,46 @@ pub struct InMemDataset<T> {
 
 struct InMemDatasetInner<T> {
     buffer: Mutex<VecDeque<T>>,
+    fifo: AtomicBool,
 }
 
 impl<T> InMemDataset<T> {
-    pub fn new() -> Self {
+    /// Creates a `First-In First-Out` [`InMemDataset`].
+    pub fn fifo() -> Self {
         let inner = Arc::new(InMemDatasetInner {
             buffer: Mutex::new(VecDeque::new()),
+            fifo: AtomicBool::new(true),
         });
 
         Self { inner }
+    }
+
+    /// Creates a `Last-In First-Out` [`InMemDataset`].
+    pub fn lifo() -> Self {
+        let inner = Arc::new(InMemDatasetInner {
+            buffer: Mutex::new(VecDeque::new()),
+            fifo: AtomicBool::new(false),
+        });
+
+        Self { inner }
+    }
+
+    pub fn flip(self) -> Self {
+        let _ = self.inner.fifo.fetch_xor(true, Ordering::SeqCst);
+        self
     }
 }
 
 impl<T> Clone for InMemDataset<T> {
     fn clone(&self) -> Self {
-        todo!()
+        let inner = self.inner.clone();
+        Self { inner }
     }
 }
 
 impl<T> Default for InMemDataset<T> {
     fn default() -> Self {
-        Self::new()
+        Self::fifo()
     }
 }
 
@@ -39,18 +59,25 @@ where
     T: Send + Sync + 'static,
 {
     async fn append(&self, data: T) -> Result<()> {
-        let mut guard = self.inner.buffer.lock();
-        guard.expect("should not be already held").push_back(data);
+        let guard = self.inner.buffer.lock();
+        let mut lock = guard.expect("should not be already held");
+        lock.push_back(data);
         Ok(())
     }
 
     async fn evict(&self) -> Option<T> {
-        let mut guard = self.inner.buffer.lock();
-        guard.expect("should not be already held").pop_front()
+        let guard = self.inner.buffer.lock();
+        let mut lock = guard.expect("should not be already held");
+        if self.inner.fifo.load(Ordering::SeqCst) {
+            lock.pop_front()
+        } else {
+            lock.pop_back()
+        }
     }
 
     fn len(&self) -> usize {
-        let mut guard = self.inner.buffer.lock();
-        guard.expect("should not be already held").len()
+        let guard = self.inner.buffer.lock();
+        let lock = guard.expect("should not be already held");
+        lock.len()
     }
 }

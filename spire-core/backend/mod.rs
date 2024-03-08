@@ -1,5 +1,3 @@
-use tower::Service;
-
 #[cfg(feature = "client")]
 pub use client::Client;
 #[cfg(feature = "driver")]

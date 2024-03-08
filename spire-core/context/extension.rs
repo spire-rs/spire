@@ -2,7 +2,7 @@ use std::num::NonZeroUsize;
 
 use crate::context::Request;
 
-/// Defines the [`Request`] identifier used for routing.
+/// Extends the [`Request`] with an identifier used for routing.
 ///
 /// To ensure the type-safe usage of [`Tag`]s and [`crate::context::Task`]s inside of handlers,
 /// you may want to create a custom enum, that implements `Into<Tag>` or `Into<Task>`:
@@ -52,13 +52,19 @@ impl From<u64> for Tag {
     }
 }
 
+/// Extends a [`Request`] to track a recursively increasing depth.
 #[derive(Debug, Copy, Clone)]
 pub struct Depth(pub NonZeroUsize);
 
 impl Depth {
+    /// Creates a new [`Depth`] extension.
     pub fn new(depth: usize) -> Self {
-        let depth = NonZeroUsize::new(depth);
-        depth.map(Self).unwrap_or_default()
+        Self(NonZeroUsize::new(depth).unwrap_or(NonZeroUsize::MIN))
+    }
+
+    /// Returns the depth as a primitive type.
+    pub fn get(&self) -> usize {
+        self.0.get()
     }
 }
 
@@ -74,12 +80,10 @@ impl From<NonZeroUsize> for Depth {
     }
 }
 
-impl From<Depth> for NonZeroUsize {
-    fn from(value: Depth) -> Self {
-        value.0
-    }
-}
-
+/// Extends a [`Request`] and [`Response`] with event timestamps.
+///
+/// [`Request`]: http::Request
+/// [`Response`]: http::Response
 #[derive(Debug, Clone)]
 pub struct Time {
     initialized: (),
@@ -95,3 +99,16 @@ impl Default for Time {
 pub trait Task {}
 
 impl<B> Task for Request<B> {}
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    fn with_tag() {}
+
+    #[test]
+    fn with_depth() {}
+
+    #[test]
+    fn with_time() {}
+}

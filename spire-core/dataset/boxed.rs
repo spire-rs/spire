@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use crate::dataset::{Dataset, Result};
 
-/// Defines a type-erased [`Dataset`].
+/// Defines a boxed [`Dataset`] trait.
+///
+/// ....type-erased [`Dataset`].
 pub struct BoxDataset<T> {
     inner: Arc<BoxDatasetInner<T>>,
 }

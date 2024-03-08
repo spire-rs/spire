@@ -5,6 +5,10 @@ use std::time::Duration;
 use crate::context::Tag;
 use crate::dataset;
 
+/// Represents various signals that can be emitted during task processing.
+///
+/// Signals are used to tell whether it should exit early or go on as usual,
+/// similar to the standard library's [`ControlFlow`] enum.
 ///
 /// [`ControlFlow`]: std::ops::ControlFlow
 #[derive(Debug, Default)]
@@ -25,6 +29,7 @@ pub enum Signal {
 }
 
 impl Signal {
+    /// Returns the provided [`Duration`] if applicable, zero secs otherwise.
     pub fn duration(&self) -> Duration {
         match self {
             Signal::Wait(_, x) => *x,

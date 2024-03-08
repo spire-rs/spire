@@ -1,11 +1,12 @@
 use std::convert::Infallible;
 use std::fmt;
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use tower::Service;
 
-use crate::context::{Context, IntoSignal};
+use crate::backend::Backend;
+use crate::context::{Context, Queue, Request, Signal};
+use crate::dataset::{BoxDataset, Dataset};
 
 mod future;
 mod metric;
@@ -15,15 +16,90 @@ pub struct Daemon<B, S> {
 }
 
 struct DaemonInner<B, S> {
+    backend: B,
     inner: S,
-    backend: PhantomData<B>,
+    queue: Queue,
 }
 
 impl<B, S> Daemon<B, S> {
-    pub fn new(svc: S) -> Self
+    pub fn new(backend: B, inner: S) -> Self
     where
-        S: Service<Context<B>, Error = Infallible>,
-        S::Response: IntoSignal,
+        B: Backend,
+        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+    {
+        let inner = Arc::new(DaemonInner {
+            queue: Queue::default(),
+            inner,
+            backend,
+        });
+
+        Self { inner }
+    }
+
+    ///
+    /// If the [`Dataset`] for the request Queue is not provided, then
+    /// the default Queue, backed by InMemDataset is used instead.
+    pub fn with_queue<D>(mut self, dataset: D) -> Self
+    where
+        B: Clone,
+        S: Clone,
+        D: Dataset<Request>,
+    {
+        self.map_inner(|mut inner| {
+            inner.queue = Queue::new(dataset);
+            inner
+        })
+    }
+
+    pub fn with_dataset<D, T>(self, dataset: D) -> Self
+    where
+        D: Dataset<T>,
+    {
+        let dataset = BoxDataset::new(dataset);
+        todo!()
+    }
+
+    fn map_inner<F>(self, f: F) -> Self
+    where
+        B: Clone,
+        S: Clone,
+        F: FnOnce(DaemonInner<B, S>) -> DaemonInner<B, S>,
+    {
+        let inner = Arc::new(f(self.into_inner()));
+        Self { inner }
+    }
+
+    fn into_inner(self) -> DaemonInner<B, S>
+    where
+        B: Clone,
+        S: Clone,
+    {
+        Arc::try_unwrap(self.inner).unwrap_or_else(|arc| DaemonInner {
+            inner: arc.inner.clone(),
+            backend: arc.backend.clone(),
+            queue: arc.queue.clone(),
+        })
+    }
+
+    async fn call_after_poll(&self) -> Signal
+    where
+        B: Clone,
+    {
+        if let Some(request) = self.inner.queue.poll().await {
+            let backend = self.inner.backend.clone();
+            let queue = self.inner.queue.clone();
+            Context::new(backend, queue, request)
+        } else {
+            return Signal::Skip;
+        };
+
+        //
+        todo!()
+    }
+
+    pub async fn run(self)
+    where
+        S: Service<Context<B>, Response = Signal, Error = Infallible>,
     {
         todo!()
     }

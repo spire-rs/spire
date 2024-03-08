@@ -42,7 +42,9 @@ pub struct Dataset<T>(pub BoxDataset<T>);
 impl<B, S, T> FromContextParts<B, S> for Dataset<T> {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
         todo!()
     }
 }
+
+// TODO: Deref into BoxDataset<T>;

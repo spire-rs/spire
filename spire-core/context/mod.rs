@@ -9,9 +9,13 @@ mod extension;
 mod queue;
 mod signal;
 
-/// Type alias for [`http::Request`] whose body type defaults to [`Body`].
+/// Type alias for `http::`[`Request`] whose body type defaults to [`Body`].
+///
+/// [`Request`]: http::Request
 pub type Request<B = Body> = http::Request<B>;
-/// Type alias for [`http::Response`] whose body type defaults to [`Body`].
+/// Type alias for `http::`[`Response`] whose body type defaults to [`Body`].
+///
+/// [`Response`]: http::Response
 pub type Response<B = Body> = http::Response<B>;
 
 /// Framework-specific [`Context`] type.
@@ -19,11 +23,11 @@ pub struct Context<B> {
     backend: B,
     request: Request,
     response: Option<Response>,
-    queue: Option<Queue>,
+    queue: Queue,
 }
 
 impl<B> Context<B> {
-    pub fn new(backend: B, request: impl Into<Request>) -> Self {
+    pub fn new(backend: B, queue: Queue, request: impl Into<Request>) -> Self {
         let mut request = request.into();
         request.extensions_mut().get_or_insert_with(Tag::default);
         request.extensions_mut().get_or_insert_with(Depth::default);
@@ -33,12 +37,8 @@ impl<B> Context<B> {
             backend,
             request,
             response: None,
-            queue: None,
+            queue,
         }
-    }
-
-    pub(crate) fn attach_queue(&mut self, queue: Queue) {
-        self.queue = Some(queue);
     }
 
     pub async fn resolve(self)
