@@ -22,7 +22,7 @@ impl<T> Clone for SqliteDataset<T> {
 
 impl<T> fmt::Debug for SqliteDataset<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.debug_struct("SqliteDataset").finish_non_exhaustive()
     }
 }
 

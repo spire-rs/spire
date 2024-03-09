@@ -39,7 +39,7 @@ where
     type Rejection = Infallible;
 
     async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let _ = Response::from_context(cx, state).await;
+        let _ = Body::from_context(cx, state).await;
         todo!()
     }
 }

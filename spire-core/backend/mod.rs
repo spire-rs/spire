@@ -7,9 +7,9 @@ use crate::context::{Request, Response};
 use crate::BoxError;
 
 #[cfg(feature = "client")]
-mod client;
+pub mod client;
 #[cfg(feature = "driver")]
-mod driver;
+pub mod driver;
 
 #[async_trait::async_trait]
 pub trait Backend: Clone + Send + Sync + Sized + 'static {

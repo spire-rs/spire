@@ -1,12 +1,16 @@
 //! Various utility [`Dataset`]s.
 
-pub use boxed::{BoxCloneDataset, BoxDataset};
-pub use remap::{MapData, MapErr};
+pub use boxed::BoxDataset;
+pub use boxed_clone::BoxCloneDataset;
+pub use map_data::MapData;
+pub use map_err::MapErr;
 
 use crate::dataset::Dataset;
 
 mod boxed;
-mod remap;
+mod boxed_clone;
+mod map_data;
+mod map_err;
 
 /// Extension trait for [`Dataset`]s that provides a set of adapters.
 pub trait DatasetExt<T>: Dataset<T> {

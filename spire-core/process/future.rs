@@ -50,7 +50,7 @@ impl<F> Future for DaemonFuture<F> {
 
         let signal = match this.kind.project() {
             DaemonFutureKindProj::Future { future } => match future.poll(cx) {
-                Poll::Ready(Ok(sig)) => sig,
+                Poll::Ready(Ok(x)) => x,
                 Poll::Ready(_) => unreachable!(),
                 Poll::Pending => return Poll::Pending,
             },

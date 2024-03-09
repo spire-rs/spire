@@ -25,7 +25,7 @@ use spire_core::context::IntoSignal;
 
 pub use crate::extract::content::{Body, Json, Text};
 pub use crate::extract::context::Dataset;
-pub use crate::extract::markup::{Html, Select, Selector};
+pub use crate::extract::markup::{transform, Html, Select, Selector};
 pub use crate::extract::state::{FromRef, State};
 
 mod content;

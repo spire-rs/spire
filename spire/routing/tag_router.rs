@@ -6,8 +6,8 @@ use std::task::{Context, Poll};
 use tower::Service;
 
 use spire_core::backend::Backend;
-use spire_core::context::Signal;
 use spire_core::context::{Context as Cx, Tag};
+use spire_core::context::{Signal, Task};
 
 use crate::routing::{Endpoint, RouteFuture};
 
@@ -37,12 +37,17 @@ impl<B, S> TagRouter<B, S> {
 
     // TODO: Append instead?
     pub fn route(&mut self, tag: Tag, endpoint: Endpoint<B, S>) {
-        let _ = self.tag_router.insert(tag, endpoint);
+        if matches!(tag, Tag::Fallback) {
+            self.fallback(endpoint);
+        } else {
+            let _ = self.tag_router.insert(tag, endpoint);
+        }
     }
 
     pub fn fallback(&mut self, endpoint: Endpoint<B, S>) {
         self.current_fallback.replace(endpoint);
     }
+
     pub fn layer<F>(mut self, func: F) -> Self
     where
         F: Fn(Tag, Endpoint<B, S>) -> (Tag, Endpoint<B, S>),
@@ -98,7 +103,8 @@ impl<B> Service<Cx<B>> for TagRouter<B, ()> {
             None => self.default_fallback.clone(),
         };
 
-        let tagged = self.tag_router.get(cx.tag()).cloned();
+        let tag = cx.request().tag().unwrap_or(&Tag::Fallback);
+        let tagged = self.tag_router.get(tag).cloned();
         let mut endpoint = tagged.unwrap_or_else(fallback);
         endpoint.call(cx)
     }

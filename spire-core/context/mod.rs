@@ -7,7 +7,8 @@ use crate::context::extend::{Depth, Time};
 pub use crate::context::extend::{Tag, Task, TaskBuilder};
 pub use crate::context::queue::Queue;
 pub use crate::context::signal::{IntoSignal, Signal};
-use crate::BoxError;
+use crate::dataset::util::BoxCloneDataset;
+use crate::{BoxError, Error};
 
 mod body;
 mod extend;
@@ -28,8 +29,16 @@ pub type Response<B = Body> = http::Response<B>;
 pub struct Context<B> {
     backend: B,
     request: Request,
-    response: Option<Response>,
+    response: Content<Response>,
     queue: Queue,
+}
+
+#[derive(Debug, Default)]
+enum Content<T> {
+    #[default]
+    None,
+    Response(T),
+    Error(BoxError),
 }
 
 impl<B> Context<B> {
@@ -43,7 +52,7 @@ impl<B> Context<B> {
         Self {
             backend,
             request,
-            response: None,
+            response: Content::None,
             queue,
         }
     }
@@ -52,36 +61,46 @@ impl<B> Context<B> {
     where
         B: Backend,
     {
-        if self.response.is_some() {
-            return Ok(());
-        }
+        // TODO.
+
+        // if self.response.is_some() {
+        //     return Ok(());
+        // }
 
         let request = self.request.clone();
         let response = self.backend.try_resolve(request).await;
         let response = response.map_err(|x| x.into())?;
-        self.response.replace(response);
+        // self.response.replace(response);
 
         Ok(())
     }
 
     pub fn queue(&self) -> Queue {
+        self.queue.clone()
+    }
+
+    pub fn dataset<T>(&self) -> BoxCloneDataset<T, Error> {
         todo!()
     }
 
-    /// Returns a reference to the attached tag.
-    pub fn tag(&self) -> &Tag {
-        let ext = self.request.extensions().get();
-        ext.expect("tag should be present")
+    pub fn request(&self) -> &Request {
+        todo!()
     }
 
-    /// Returns a mutable reference to the attached tag.
-    pub fn tag_mut(&mut self) -> &mut Tag {
-        let ext = self.request.extensions_mut().get_mut();
-        ext.expect("tag should be present")
-    }
-
-    /// Returns a recursive depth of this [`Request`].
-    pub fn depth(&self) -> usize {
-        self.request.depth()
-    }
+    // /// Returns a reference to the attached tag.
+    // pub fn tag(&self) -> &Tag {
+    //     let ext = self.request.extensions().get();
+    //     ext.expect("tag should be present")
+    // }
+    //
+    // /// Returns a mutable reference to the attached tag.
+    // pub fn tag_mut(&mut self) -> &mut Tag {
+    //     let ext = self.request.extensions_mut().get_mut();
+    //     ext.expect("tag should be present")
+    // }
+    //
+    // /// Returns a recursive depth of this [`Request`].
+    // pub fn depth(&self) -> usize {
+    //     self.request.depth()
+    // }
 }

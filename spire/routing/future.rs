@@ -51,8 +51,8 @@ impl<B, E> Future for RouteFuture<B, E> {
 
         let signal = match this.kind.project() {
             RouteFutureKindProj::Future { future } => match future.poll(cx) {
-                Poll::Ready(Ok(sig)) => sig,
-                Poll::Ready(Err(err)) => return Poll::Ready(Err(err)),
+                Poll::Ready(Ok(x)) => x,
+                Poll::Ready(Err(x)) => return Poll::Ready(Err(x)),
                 Poll::Pending => return Poll::Pending,
             },
             RouteFutureKindProj::Signal { signal } => signal

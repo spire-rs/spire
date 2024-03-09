@@ -1,6 +1,8 @@
+use std::fmt;
+
 use crate::dataset::Dataset;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MapData<D, F, F2> {
     inner: D,
     f_to_inner: F,
@@ -8,12 +10,22 @@ pub struct MapData<D, F, F2> {
 }
 
 impl<D, F, F2> MapData<D, F, F2> {
+    /// Creates a new [`MapData`].
     pub fn new(inner: D, to: F, from: F2) -> Self {
         Self {
             inner,
             f_to_inner: to,
             f_from_inner: from,
         }
+    }
+}
+
+impl<D, F, F2> fmt::Debug for MapData<D, F, F2>
+where
+    D: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.inner, f)
     }
 }
 
@@ -36,40 +48,6 @@ where
     async fn get(&self) -> Result<Option<T2>, Self::Error> {
         let data = self.inner.get().await;
         data.map(|x| x.map(self.f_from_inner.clone()))
-    }
-
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct MapErr<D, F> {
-    inner: D,
-    f: F,
-}
-
-impl<D, F> MapErr<D, F> {
-    pub fn new(inner: D, f: F) -> Self {
-        Self { inner, f }
-    }
-}
-
-#[async_trait::async_trait]
-impl<T, D, F, E2> Dataset<T> for MapErr<D, F>
-where
-    T: Send + Sync + 'static,
-    D: Dataset<T>,
-    F: FnOnce(D::Error) -> E2 + Clone + Send + Sync + 'static,
-{
-    type Error = E2;
-
-    async fn add(&self, data: T) -> Result<(), Self::Error> {
-        self.inner.add(data).await.map_err(self.f.clone())
-    }
-
-    async fn get(&self) -> Result<Option<T>, Self::Error> {
-        self.inner.get().await.map_err(self.f.clone())
     }
 
     fn len(&self) -> usize {

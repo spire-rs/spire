@@ -34,6 +34,8 @@ pub enum Tag {
     Fallback,
     Sequence(String),
     Rehash(u64),
+    // TODO: Fn matcher?
+    // Fn(fn(Request) -> bool),
 }
 
 impl From<&str> for Tag {

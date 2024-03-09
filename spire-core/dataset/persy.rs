@@ -22,7 +22,7 @@ impl<T> Clone for PersyDataset<T> {
 
 impl<T> fmt::Debug for PersyDataset<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.debug_struct("PersyDataset").finish_non_exhaustive()
     }
 }
 

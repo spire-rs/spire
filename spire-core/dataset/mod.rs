@@ -1,4 +1,4 @@
-//! Data collection with [`Dataset`] and utilities.
+//! Data collection with [`Dataset`] and its utilities.
 //!
 //! ### Datasets
 //!

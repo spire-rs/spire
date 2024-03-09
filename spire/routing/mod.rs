@@ -174,7 +174,7 @@ mod test {
     fn basic_routing() {
         async fn handler() {}
 
-        let router: Router = Router::new()
+        let _: Router = Router::new()
             .route(Tag::default(), handler)
             .route(Tag::default(), handler);
     }
@@ -194,7 +194,7 @@ mod test {
 
         async fn handler(_: State<AppState>, _: State<u32>) {}
 
-        let router: Router = Router::new()
+        let _: Router = Router::new()
             .route(Tag::default(), handler)
             .route(Tag::default(), handler)
             .with_state(AppState::default());

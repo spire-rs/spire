@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use tower::Service;
 
+use crate::{BoxError, Error};
 use crate::backend::Backend;
 use crate::context::{Context, Queue, Request, Signal};
-use crate::dataset::util::BoxCloneDataset;
 use crate::dataset::Dataset;
-use crate::BoxError;
+use crate::dataset::util::{BoxCloneDataset, DatasetExt};
 
 mod future;
 mod metric;
@@ -39,6 +39,21 @@ impl<B, S> Daemon<B, S> {
         Self { inner }
     }
 
+    pub async fn run(self)
+    where
+        S: Service<Context<B>, Response = Signal, Error = Infallible>,
+    {
+        todo!()
+    }
+
+    pub async fn exec(backend: B, inner: S)
+    where
+        B: Backend,
+        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+    {
+        Self::new(backend, inner).run().await;
+    }
+
     /// Replaces the [`Dataset`] used by the [`Queue`].
     ///
     /// If the `Dataset` for the `Queue` is not provided, then
@@ -49,11 +64,12 @@ impl<B, S> Daemon<B, S> {
     /// Does not move items from the replaced `Dataset`.
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
-    pub fn with_queue<D>(mut self, dataset: D) -> Self
+    pub fn with_queue<D, E>(self, dataset: D) -> Self
     where
         B: Clone,
         S: Clone,
-        D: Dataset<Request, Error = BoxError> + Clone,
+        D: Dataset<Request, Error = E> + Clone,
+        E: Into<BoxError>,
     {
         self.map_inner(|mut inner| {
             inner.queue = Queue::new(dataset);
@@ -61,11 +77,26 @@ impl<B, S> Daemon<B, S> {
         })
     }
 
-    pub fn with_dataset<D, T>(self, dataset: D) -> Self
+    ///
+    ///
+    /// ### Note
+    ///
+    /// If the handler requests for a [`Dataset`] of a specific type, but  no `Dataset` of this
+    /// type was provided, it will be lazily initialized as a `first-in first-out` [`InMemDataset`].
+    ///
+    /// [`InMemDataset`]: crate::dataset::InMemDataset
+    pub fn with_dataset<D, E, T>(self, dataset: D) -> Self
     where
-        D: Dataset<T, Error = BoxError> + Clone,
+        D: Dataset<T, Error = E> + Clone,
+        E: Into<BoxError>,
+        T: Send + Sync + 'static,
     {
-        let dataset = BoxCloneDataset::new(dataset);
+        let f = |x: E| -> Error { Error::Dataset(x.into()) };
+        let dataset = BoxCloneDataset::new(dataset.map_err(f));
+        todo!()
+    }
+
+    pub fn dataset<T>(&self) -> BoxCloneDataset<T, Error> {
         todo!()
     }
 
@@ -106,13 +137,6 @@ impl<B, S> Daemon<B, S> {
 
         // TODO. wait until all done an repeat poll
 
-        todo!()
-    }
-
-    pub async fn run(self)
-    where
-        S: Service<Context<B>, Response = Signal, Error = Infallible>,
-    {
         todo!()
     }
 }
