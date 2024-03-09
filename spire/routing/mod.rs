@@ -4,7 +4,6 @@ use std::task::{Context, Poll};
 
 use tower::{Layer, Service};
 
-use spire_core::backend::Backend;
 use spire_core::context::{Context as Cx, Tag};
 use spire_core::context::{IntoSignal, Signal};
 
@@ -27,9 +26,11 @@ pub struct Router<B = (), S = ()> {
 
 impl<B, S> Router<B, S> {
     /// Creates a new [`Router`] with a given [`Backend`].
+    ///
+    /// [`Backend`]: crate::backend::Backend
     pub fn new() -> Self
     where
-        B: Backend,
+        B: 'static,
     {
         let inner = TagRouter::<B, S>::new();
         Self { inner }
@@ -37,7 +38,7 @@ impl<B, S> Router<B, S> {
 
     pub fn route<H, V>(mut self, tag: impl Into<Tag>, handler: H) -> Self
     where
-        B: Backend,
+        B: 'static,
         S: Send + Clone + 'static,
         H: Handler<B, V, S>,
         H::Future: Send + 'static,
@@ -50,7 +51,7 @@ impl<B, S> Router<B, S> {
 
     pub fn route_service<H>(mut self, tag: impl Into<Tag>, service: H) -> Self
     where
-        B: Backend,
+        B: 'static,
         S: Send + Clone + 'static,
         H: Service<Cx<B>, Error = Infallible> + Clone + Send + 'static,
         H::Response: IntoSignal + 'static,
@@ -67,7 +68,7 @@ impl<B, S> Router<B, S> {
     /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
     pub fn fallback<H, V>(mut self, handler: H) -> Self
     where
-        B: Backend,
+        B: 'static,
         S: Send + Clone + 'static,
         H: Handler<B, V, S>,
         H::Future: Send + 'static,
@@ -84,7 +85,7 @@ impl<B, S> Router<B, S> {
     /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
     pub fn fallback_service<H>(mut self, service: H) -> Self
     where
-        B: Backend,
+        B: 'static,
         S: Send + Clone + 'static,
         H: Service<Cx<B>, Error = Infallible> + Clone + Send + 'static,
         H::Response: IntoSignal + 'static,
@@ -141,7 +142,7 @@ impl<B, S> fmt::Display for Router<B, S> {
 
 impl<B, S> Default for Router<B, S>
 where
-    B: Backend,
+    B: 'static,
 {
     fn default() -> Self {
         Self::new()

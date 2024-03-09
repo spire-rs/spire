@@ -4,7 +4,6 @@ use std::sync::Mutex;
 
 use tower::{Layer, Service};
 
-use spire_core::backend::Backend;
 use spire_core::context::Context as Cx;
 use spire_core::context::IntoSignal;
 
@@ -18,7 +17,7 @@ impl<B, S> MakeRoute<B, S, Infallible> {
     /// Creates a [`MakeRoute`] from a [`Handler`].
     pub fn new<H, V>(handler: H) -> Self
     where
-        B: Backend,
+        B: 'static,
         S: Clone + Send + 'static,
         H: Handler<B, V, S>,
         H::Future: Send + 'static,

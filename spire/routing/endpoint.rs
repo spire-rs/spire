@@ -4,7 +4,6 @@ use std::task::{Context, Poll};
 
 use tower::{Layer, Service};
 
-use spire_core::backend::Backend;
 use spire_core::context::Context as Cx;
 use spire_core::context::{IntoSignal, Signal};
 
@@ -22,7 +21,6 @@ pub enum Endpoint<B, S> {
 impl<B, S> Endpoint<B, S> {
     pub fn from_service<T>(service: T) -> Self
     where
-        B: Backend,
         T: Service<Cx<B>, Error = Infallible> + Clone + Send + 'static,
         T::Response: IntoSignal + 'static,
         T::Future: Send + 'static,
@@ -32,7 +30,7 @@ impl<B, S> Endpoint<B, S> {
 
     pub fn from_handler<H, V>(handler: H) -> Self
     where
-        B: Backend,
+        B: 'static,
         S: Clone + Send + 'static,
         H: Handler<B, V, S>,
         H::Future: Send + 'static,
@@ -62,6 +60,20 @@ impl<B, S> Endpoint<B, S> {
             Endpoint::Route(x) => Endpoint::Route(x),
             Endpoint::Handler(x) => Endpoint::Route(x.into_route(state)),
         }
+    }
+}
+
+/// Ignores all incoming tasks by returning [`Signal::Continue`].
+async fn default_fallback() -> Signal {
+    Signal::Continue
+}
+
+impl<B> Default for Endpoint<B, ()>
+where
+    B: 'static,
+{
+    fn default() -> Self {
+        Endpoint::from_handler(default_fallback)
     }
 }
 

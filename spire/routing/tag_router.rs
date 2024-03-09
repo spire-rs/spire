@@ -5,7 +5,6 @@ use std::task::{Context, Poll};
 
 use tower::Service;
 
-use spire_core::backend::Backend;
 use spire_core::context::{Context as Cx, Tag};
 use spire_core::context::{Signal, Task};
 
@@ -17,21 +16,16 @@ pub struct TagRouter<B, S> {
     default_fallback: Endpoint<B, ()>,
 }
 
-/// Ignores all incoming tasks by returning [`Signal::Continue`].
-async fn default_fallback() -> Signal {
-    Signal::Continue
-}
-
 impl<B, S> TagRouter<B, S> {
     /// Creates a new [`TagRouter`].
     pub fn new() -> Self
     where
-        B: Backend,
+        B: 'static,
     {
         Self {
             tag_router: HashMap::default(),
             current_fallback: None,
-            default_fallback: Endpoint::from_handler(default_fallback),
+            default_fallback: Endpoint::default(),
         }
     }
 
