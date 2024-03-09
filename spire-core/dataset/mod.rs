@@ -3,6 +3,9 @@
 //! ### Datasets
 //!
 //! - [`InMemDataset`]
+//! - `SqliteDataset`
+//! - `RedbDataset`
+//! - `PersyDataset`
 //!
 //! ### Utility
 //!
@@ -17,8 +20,10 @@
 //! [`MapErr`]: util::MapErr
 
 pub use memory::InMemDataset;
+pub(crate) use ttable::Datasets;
 
 mod memory;
+mod ttable;
 pub mod util;
 
 /// Basic expandable collection of items with a defined size.

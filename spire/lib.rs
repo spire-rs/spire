@@ -16,11 +16,13 @@ pub mod prelude {}
 
 #[cfg(test)]
 mod test {
-    use crate::{Daemon, Result, Router};
+    use spire_core::context::IntoSignal;
+
     use crate::backend::HttpClient;
     use crate::context::{Queue, Tag};
     use crate::dataset::{Dataset as _, InMemDataset};
-    use crate::extract::{Dataset, Html, transform::Reduce};
+    use crate::extract::{transform::Reduce, Dataset, Html};
+    use crate::{Daemon, Result, Router};
 
     #[test]
     fn example() {
@@ -29,7 +31,7 @@ mod test {
             Dataset(dataset): Dataset<u64>,
             Html(html): Html<Reduce>,
         ) -> Result<()> {
-            let u = dataset.get().await?;
+            let u = dataset.get().await.into_signal();
             dataset.add(1).await?;
 
             Ok(())
@@ -40,7 +42,8 @@ mod test {
             .route(Tag::Rehash(2), handler)
             .fallback(handler);
 
-        let daemon = Daemon::new(HttpClient::new(), router)
+        let backend = HttpClient::default();
+        let daemon = Daemon::new(backend, router)
             .with_queue(InMemDataset::queue())
             .with_dataset(InMemDataset::<u64>::new());
 

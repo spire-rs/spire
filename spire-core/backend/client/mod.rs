@@ -1,20 +1,35 @@
 use std::fmt;
+use std::sync::Mutex;
+
+use tower::Service;
+use tower::util::BoxCloneService;
 
 use crate::backend::Backend;
-use crate::context::{Request, Response};
 use crate::BoxError;
+use crate::context::{Request, Response};
 
-pub struct HttpClient {}
+pub struct HttpClient {
+    inner: HttpClientInner
+}
+
+struct HttpClientInner {
+    svc: Mutex<BoxCloneService<Request, Response, BoxError>>,
+}
 
 impl HttpClient {
-    pub fn new() -> Self {
+    pub fn new<S, E>(svc: S) -> Self
+    where
+        S: Service<Request, Response = Response, Error = E> + Clone,
+        E: Into<BoxError>,
+    {
         todo!()
     }
 }
 
 impl Default for HttpClient {
     fn default() -> Self {
-        Self::new()
+        // Self::new()
+        todo!()
     }
 }
 

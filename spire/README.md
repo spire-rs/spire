@@ -21,3 +21,9 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 
 [tokio-rs/tokio]: https://github.com/tokio-rs/tokio/
 [tower-rs/tower]: https://github.com/tower-rs/tower/
+
+```rust
+fn main() {
+    println!("Hello!");
+}
+```

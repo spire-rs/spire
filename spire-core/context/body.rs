@@ -92,3 +92,27 @@ impl HttpBody for Body {
         self.0.size_hint()
     }
 }
+
+#[derive(Debug, Default)]
+pub enum Content<T> {
+    #[default]
+    None,
+    Response(T),
+    Error(BoxError),
+}
+
+impl<T> Content<T> {
+    pub fn map<F, T2>(self, f: F) -> Content<T2>
+    where
+        F: FnOnce(T) -> T2,
+    {
+        todo!()
+    }
+
+    pub fn some(&self) -> Option<&T> {
+        match self {
+            Content::Response(x) => Some(x),
+            _ => None,
+        }
+    }
+}

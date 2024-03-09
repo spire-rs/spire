@@ -1,4 +1,4 @@
-//! Data retrieval [`Backend`]s.
+//! Types and traits for data retrieval [`Backend`]s.
 //!
 
 #[cfg(feature = "client")]
@@ -6,7 +6,7 @@
 pub use client::HttpClient;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
-pub use driver::Driver;
+pub use driver::WebDriver;
 
 use crate::context::{Request, Response};
 use crate::BoxError;

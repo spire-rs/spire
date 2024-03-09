@@ -72,13 +72,13 @@ where
     }
 }
 
-// TODO: Rename to Dataset?
 pub struct Dataset<T>(pub BoxCloneDataset<T, Error>);
 
 #[async_trait::async_trait]
 impl<B, S, T> FromContextParts<B, S> for Dataset<T>
 where
     B: Sync,
+    T: Send + Sync + 'static,
 {
     type Rejection = Infallible;
 

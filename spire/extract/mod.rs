@@ -15,7 +15,8 @@
 //! [`Backend`]: spire_core::backend::Backend
 //! [`Request`]: spire_core::context::Request
 //! [`Response`]: spire_core::context::Response
-//! [`Response`]: spire_core::context::Response
+//! [`Tag`]: spire_core::context::Tag
+//! [`Queue`]: spire_core::context::Queue
 //! [`Handler`]: crate::handler::Handler
 
 use std::convert::Infallible;
@@ -25,7 +26,9 @@ use spire_core::context::IntoSignal;
 
 pub use crate::extract::content::{Body, Json, Text};
 pub use crate::extract::context::Dataset;
-pub use crate::extract::markup::{transform, Html, Select, Selector};
+pub use crate::extract::markup::{transform, Html};
+#[cfg(feature = "macros")]
+pub use crate::extract::markup::{Select, Selector};
 pub use crate::extract::state::{FromRef, State};
 
 mod content;

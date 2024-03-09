@@ -55,6 +55,7 @@ where
     }
 }
 
+#[cfg(feature = "macros")]
 #[async_trait::async_trait]
 impl<B, S, T> FromContextParts<B, S> for Selector<T>
 where

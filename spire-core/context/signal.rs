@@ -29,12 +29,21 @@ pub enum Signal {
 }
 
 impl Signal {
-    /// Returns the provided [`Duration`] if applicable, zero secs otherwise.
+    /// Returns the provided [`Duration`] if applicable, default otherwise.
     pub fn duration(&self) -> Duration {
         match self {
             Signal::Wait(_, x) => *x,
             Signal::Repeat(_, x) => *x,
-            _ => Duration::from_secs(0),
+            _ => Duration::default(),
+        }
+    }
+
+    // Returns the provided [`Tag`] if applicable, default otherwise.
+    pub fn tag(&self) -> Tag {
+        match self {
+            Signal::Wait(x, _) => x.clone(),
+            Signal::Repeat(x, _) => x.clone(),
+            _ => Tag::default(),
         }
     }
 }

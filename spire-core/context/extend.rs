@@ -31,6 +31,9 @@ use crate::context::Request;
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
 pub enum Tag {
     /// Explicitly call the fallback handler.
+    /// Refers to `self` handler if returned with a [`Signal`].
+    ///
+    /// [`Signal`]: crate::context::Signal
     #[default]
     Fallback,
     Sequence(String),
@@ -170,7 +173,9 @@ mod test {
         let build = Builder::new()
             .uri("https://example.com/")
             .tag(Tag::default())
+            .depth(2)
             .body(Body::default());
+
         matches!(build, Ok(_));
     }
 }

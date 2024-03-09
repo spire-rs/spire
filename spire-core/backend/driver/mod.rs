@@ -10,7 +10,7 @@ use crate::BoxError;
 mod manager;
 
 #[derive(Clone)]
-pub struct Driver {
+pub struct WebDriver {
     inner: Arc<DriverInner>,
 }
 
@@ -18,7 +18,7 @@ struct DriverInner {
     manager: BrowserManager,
 }
 
-impl Driver {
+impl WebDriver {
     pub fn new() -> Self {
         let inner = DriverInner {
             manager: BrowserManager::new(),
@@ -30,20 +30,20 @@ impl Driver {
     }
 }
 
-impl Default for Driver {
+impl Default for WebDriver {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl fmt::Debug for Driver {
+impl fmt::Debug for WebDriver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Driver").finish_non_exhaustive()
     }
 }
 
 #[async_trait::async_trait]
-impl Backend for Driver {
+impl Backend for WebDriver {
     type Client = fantoccini::Client;
     type Error = BoxError;
 
