@@ -59,7 +59,8 @@ where
     type Rejection = Infallible;
 
     async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let _ = Text::from_context(cx, state).await;
+        let _ = Body::from_context(cx, state).await;
+        // serde_json::from_slice()
         todo!()
     }
 }

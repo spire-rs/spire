@@ -24,9 +24,9 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 
 #### Links
 
-- https://crates.io/crates/persy
-- https://developer.mozilla.org/en-US/docs/Web/API/Request
-- https://pola.rs/
+- https://crates.io/crates/persy for sqlite dataset alt
+- https://pola.rs/ for pyo3 python bindings
+- https://napi.rs/ for nodejs bindings
 
 #### Notes
 

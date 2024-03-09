@@ -14,7 +14,7 @@ impl HttpClient {
 
 impl Default for HttpClient {
     fn default() -> Self {
-        todo!()
+        Self::new()
     }
 }
 

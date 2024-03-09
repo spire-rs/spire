@@ -46,14 +46,6 @@ impl<B, S> Daemon<B, S> {
         todo!()
     }
 
-    pub async fn exec(backend: B, inner: S)
-    where
-        B: Backend,
-        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
-    {
-        Self::new(backend, inner).run().await;
-    }
-
     /// Replaces the [`Dataset`] used by the [`Queue`].
     ///
     /// If the `Dataset` for the `Queue` is not provided, then
@@ -71,6 +63,7 @@ impl<B, S> Daemon<B, S> {
         D: Dataset<Request, Error = E> + Clone,
         E: Into<BoxError>,
     {
+        // todo. accessed as dataset::<Request>()?
         self.map_inner(|mut inner| {
             inner.queue = Queue::new(dataset);
             inner

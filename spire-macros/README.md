@@ -13,7 +13,7 @@
 [crates-url]: https://crates.io/crates/spire
 [docs-badge]: https://img.shields.io/docsrs/spire?logo=Docs.rs&style=flat-square
 [docs-url]: http://docs.rs/spire
-[coverage-badge]: https://img.shields.io/codecov/c/github/spire-re/spire?logo=codecov&logoColor=white&style=flat-square
+[coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
 [coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
 The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and

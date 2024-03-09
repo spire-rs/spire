@@ -19,13 +19,14 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// This may be extended in the future so exhaustive matching is discouraged.
 ///
 /// [`Request`]: context::Request
+#[derive(Debug)]
 pub enum Error {
     Backend(BoxError),
     Dataset(BoxError),
 }
 
-/// A specialized [`Result`] type for [`Request`] processing.
+/// Specialized [`Result`] type for [`Request`] processing.
 ///
 /// [`Result`]: std::result::Result
 /// [`Request`]: context::Request
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;

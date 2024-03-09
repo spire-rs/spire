@@ -25,6 +25,11 @@ impl Queue {
         self.0.add(request).await
     }
 
+    /// TODO. append, store current req in queue
+    pub async fn branch(&self, request: Request) -> Result<()> {
+        todo!()
+    }
+
     /// Returns the next request from the queue.
     pub(crate) async fn get(&self) -> Result<Option<Request>> {
         self.0.get().await

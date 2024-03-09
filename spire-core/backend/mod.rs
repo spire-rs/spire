@@ -1,14 +1,21 @@
+//! Data retrieval [`Backend`]s.
+//!
+
 #[cfg(feature = "client")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub use client::HttpClient;
 #[cfg(feature = "driver")]
+#[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::Driver;
 
 use crate::context::{Request, Response};
 use crate::BoxError;
 
 #[cfg(feature = "client")]
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub mod client;
 #[cfg(feature = "driver")]
+#[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub mod driver;
 
 #[async_trait::async_trait]

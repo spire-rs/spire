@@ -1,6 +1,7 @@
 use std::num::NonZeroUsize;
 
 use http::request::Builder;
+use time::OffsetDateTime;
 
 use crate::context::Request;
 
@@ -89,8 +90,8 @@ impl Default for Depth {
 pub struct Time {
     // TODO: Timing<BetweenReqResp>, <BeforeResp>, <SinceReq>, <SinceResp>
     // Req created, Handler called, Resp created
-    initialized: (),
-    dispatched: (),
+    initialized: OffsetDateTime,
+    dispatched: Option<OffsetDateTime>,
 }
 
 impl Default for Time {
@@ -160,7 +161,12 @@ mod test {
     use crate::context::{Body, Tag, TaskBuilder};
 
     #[test]
-    fn build() {
+    fn request_tag() {}
+
+    fn request_time() {}
+
+    #[test]
+    fn builder() {
         let build = Builder::new()
             .uri("https://example.com/")
             .tag(Tag::default())

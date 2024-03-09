@@ -3,8 +3,6 @@
 //! ### Datasets
 //!
 //! - [`InMemDataset`]
-//! - [`SqliteDataset`]
-//! - [`PersyDataset`]
 //!
 //! ### Utility
 //!
@@ -19,18 +17,8 @@
 //! [`MapErr`]: util::MapErr
 
 pub use memory::InMemDataset;
-#[cfg(feature = "persy")]
-#[cfg_attr(docsrs, doc(cfg(feature = "persy")))]
-pub use persy::PersyDataset;
-#[cfg(feature = "sqlite")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
-pub use sqlite::SqliteDataset;
 
 mod memory;
-#[cfg(feature = "persy")]
-mod persy;
-#[cfg(feature = "sqlite")]
-mod sqlite;
 pub mod util;
 
 /// Basic expandable collection of items with a defined size.

@@ -6,6 +6,7 @@ pub trait Select {
     fn from_list(selected: &[String]) -> Self;
 }
 
+#[derive(Clone)]
 pub struct Selector<T>(pub T);
 
 impl<T> Selector<T> {
