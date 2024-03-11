@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::dataset::Dataset;
 
+// TODO: Docs.
 #[derive(Clone)]
 pub struct MapErr<D, F> {
     inner: D,

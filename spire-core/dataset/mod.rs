@@ -22,6 +22,7 @@
 pub use memory::InMemDataset;
 pub(crate) use ttable::Datasets;
 
+mod extend;
 mod memory;
 mod ttable;
 pub mod util;

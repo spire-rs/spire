@@ -4,6 +4,17 @@ use std::time::Duration;
 use crate::context::Tag;
 use crate::{BoxError, Error};
 
+/// Defines a way to select or filter out [`Tags`].
+#[derive(Debug, Default, Clone)]
+pub enum Query {
+    // TODO: FnOnce(Tag) -> bool query.
+    #[default]
+    Same,
+    Every,
+    Exclude(Vec<Tag>),
+    Include(Vec<Tag>),
+}
+
 /// Represents various events that can be emitted during [`Request`] processing.
 ///
 /// Signals are used to tell whether it should exit early or go on as usual,
@@ -20,12 +31,12 @@ pub enum Signal {
     Skip,
 
     /// Task processed, wait before tasks with matching tags.
-    Wait(Tag, Duration),
+    Wait(Query, Duration),
     /// Task failed, wait before tasks with matching tags.
-    Repeat(Tag, Duration),
+    Repeat(Query, Duration),
 
     /// Task failed, terminate all collector tasks.
-    Stop(BoxError),
+    Stop(Query, Error),
 }
 
 impl Signal {
@@ -38,12 +49,13 @@ impl Signal {
         }
     }
 
-    // Returns the provided [`Tag`] if applicable, default otherwise.
-    pub fn tag(&self) -> Tag {
+    // Returns the provided [`Query`] if applicable, default otherwise.
+    pub fn query(&self) -> Query {
         match self {
             Signal::Wait(x, _) => x.clone(),
             Signal::Repeat(x, _) => x.clone(),
-            _ => Tag::default(),
+            Signal::Stop(x, _) => x.clone(),
+            _ => Query::default(),
         }
     }
 }
@@ -74,19 +86,19 @@ impl IntoSignal for Infallible {
 
 impl IntoSignal for Duration {
     fn into_signal(self) -> Signal {
-        Signal::Wait(Tag::default(), self)
+        Signal::Wait(Query::default(), self)
     }
 }
 
 impl IntoSignal for Error {
     fn into_signal(self) -> Signal {
-        todo!()
+        Signal::Stop(Query::Every, self)
     }
 }
 
 impl IntoSignal for BoxError {
     fn into_signal(self) -> Signal {
-        Signal::Stop(self)
+        Error::new(self).into_signal()
     }
 }
 
@@ -112,9 +124,9 @@ where
             match x {
                 Signal::Continue => Signal::Skip,
                 Signal::Skip => Signal::Continue,
-                Signal::Wait(t, x) => Signal::Repeat(t, x),
-                Signal::Repeat(t, x) => Signal::Wait(t, x),
-                Signal::Stop(x) => Signal::Stop(x),
+                Signal::Wait(q, x) => Signal::Repeat(q, x),
+                Signal::Repeat(q, x) => Signal::Wait(q, x),
+                Signal::Stop(q, x) => Signal::Stop(q, x),
             }
         }
 

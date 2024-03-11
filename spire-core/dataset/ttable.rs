@@ -7,9 +7,9 @@ use crate::dataset::util::{BoxCloneDataset, DatasetExt};
 use crate::dataset::{Dataset, InMemDataset};
 use crate::{BoxError, Error};
 
-// TODO: Rc -> Arc, + Send + Sync?
 #[derive(Clone, Default)]
 pub struct Datasets {
+    // TODO: Rc -> Arc, + Send + Sync?
     inner: Arc<DatasetsInner>,
 }
 
@@ -65,7 +65,7 @@ where
     E: Into<BoxError>,
     T: Send + Sync + 'static,
 {
-    let f = |x: E| Error::Dataset(x.into());
+    let f = |x: E| Error::new(x);
     dataset.map_err(f).boxed_clone()
 }
 

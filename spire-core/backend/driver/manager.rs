@@ -2,10 +2,6 @@ use std::convert::Infallible;
 
 use deadpool::managed::{Manager, Metrics, RecycleResult};
 
-/// Extension trait for Backend::Client
-/// ... for backends that run actual browsers
-pub trait Browser {}
-
 pub struct BrowserManager {
     // builder: ClientBuilder<()>,
     // webdriver: Vec<()>

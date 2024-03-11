@@ -10,8 +10,9 @@ pub trait Select {
 pub struct Selector<T>(pub T);
 
 impl<T> Selector<T> {
-    pub fn new() -> Self
+    pub fn new<U>(tags: U) -> Self
     where
+        U: IntoIterator<Item = ()>,
         T: Select,
     {
         todo!()

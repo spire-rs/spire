@@ -16,13 +16,34 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Unrecoverable failure during [`Request`] processing.
 ///
-/// This may be extended in the future so exhaustive matching is discouraged.
-///
 /// [`Request`]: context::Request
 #[derive(Debug)]
-pub enum Error {
-    Backend(BoxError),
-    Dataset(BoxError),
+pub struct Error {
+    // TODO: thiserror.
+    inner: BoxError,
+}
+
+impl Error {
+    pub fn new<T>(error: T) -> Self
+    where
+        T: Into<BoxError>,
+    {
+        let inner: BoxError = error.into();
+        Self { inner }
+    }
+
+    pub fn into_inner(self) -> BoxError {
+        self.inner
+    }
+}
+
+impl<T> From<T> for Error
+where
+    T: Into<BoxError>,
+{
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
 }
 
 /// Specialized [`Result`] type for [`Request`] processing.

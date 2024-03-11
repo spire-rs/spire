@@ -4,12 +4,12 @@ use std::sync::Arc;
 
 use tower::Service;
 
-use crate::{BoxError, Error, Result};
 use crate::backend::Backend;
 use crate::context::{Context, Request, Signal};
-use crate::dataset::{Dataset, Datasets};
 use crate::dataset::util::BoxCloneDataset;
+use crate::dataset::{Dataset, Datasets};
 use crate::process::runner::Runner;
+use crate::{BoxError, Error, Result};
 
 mod future;
 mod metric;

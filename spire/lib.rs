@@ -16,30 +16,24 @@ pub mod prelude {}
 
 #[cfg(test)]
 mod test {
-    use spire_core::context::IntoSignal;
-
     use crate::backend::HttpClient;
-    use crate::context::{Queue, Tag};
+    use crate::context::Queue;
     use crate::dataset::{Dataset as _, InMemDataset};
-    use crate::extract::{transform::Reduce, Dataset, Html};
+    use crate::extract::Dataset;
     use crate::{Daemon, Result, Router};
 
     #[test]
     fn example() {
-        async fn handler(
-            queue: Queue,
-            Dataset(dataset): Dataset<u64>,
-            Html(html): Html<Reduce>,
-        ) -> Result<()> {
-            let u = dataset.get().await.into_signal();
+        async fn handler(queue: Queue, Dataset(dataset): Dataset<u64>) -> Result<()> {
+            let u = dataset.get().await?;
             dataset.add(1).await?;
 
             Ok(())
         }
 
         let router = Router::new()
-            .route(Tag::Rehash(1), handler)
-            .route(Tag::Rehash(2), handler)
+            .route("main$", handler)
+            .route("page*", handler)
             .fallback(handler);
 
         let backend = HttpClient::default();

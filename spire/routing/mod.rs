@@ -4,15 +4,14 @@ use std::task::{Context, Poll};
 
 use tower::{Layer, Service};
 
-use spire_core::context::{Context as Cx, Tag};
-use spire_core::context::{IntoSignal, Signal};
+use endpoint::Endpoint;
+pub use future::RouteFuture;
+use make_route::MakeRoute;
+pub use route::Route;
+use spire_core::context::{Context as Cx, IntoSignal, Signal, Tag};
+use tag_router::TagRouter;
 
 use crate::handler::Handler;
-use crate::routing::endpoint::Endpoint;
-pub use crate::routing::future::RouteFuture;
-use crate::routing::make_route::MakeRoute;
-pub use crate::routing::route::Route;
-use crate::routing::tag_router::TagRouter;
 
 mod endpoint;
 mod future;

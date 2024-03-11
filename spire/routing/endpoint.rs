@@ -10,11 +10,10 @@ use spire_core::context::{IntoSignal, Signal};
 use crate::handler::Handler;
 use crate::routing::{MakeRoute, Route, RouteFuture};
 
-/// TODO.
 pub enum Endpoint<B, S> {
-    /// TODO. [`Service`]
+    /// Cloneable [`Service`].
     Route(Route<B, Infallible>),
-    /// TODO. [`Handler`]
+    /// [`Handler`] without state.
     Handler(MakeRoute<B, S, Infallible>),
 }
 

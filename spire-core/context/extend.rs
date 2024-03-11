@@ -7,23 +7,24 @@ use crate::context::Request;
 
 /// Extends the [`Request`] with an identifier used for routing.
 ///
-/// To ensure the type-safe usage of [`Tag`]s and [`Task`]s inside of handlers,
-/// you may want to create a custom enum, that implements `Into<Tag>` or `Into<Task>`:
+/// To ensure the type-safe usage of [`Tag`]s inside of handlers,
+/// you may want to create a custom enum, that implements `Into<Tag>`:
 ///
 /// ```rust
 /// use spire_core::context::Tag;
 ///
 /// #[derive(Debug, Clone)]
 /// pub enum Routes {
-///     DiscoverLinks(String),
-///     ExtractFromPage(String),
+///     A(String),
+///     B(String),
 /// }
 ///
 /// impl Into<Tag> for Routes {
 ///     fn into(self) -> Tag {
 ///         match self {
-///             Routes::DiscoverLinks(x) => todo!(),
-///             Routes::ExtractFromPage(x) => todo!(),
+///             // ...
+/// #           Routes::A(x) => Tag::Sequence(x),
+/// #           Routes::B(x) => Tag::Sequence(x),
 ///         }
 ///     }
 /// }
@@ -31,15 +32,12 @@ use crate::context::Request;
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
 pub enum Tag {
     /// Explicitly call the fallback handler.
-    /// Refers to `self` handler if returned with a [`Signal`].
-    ///
-    /// [`Signal`]: crate::context::Signal
     #[default]
     Fallback,
+    ///
     Sequence(String),
+    ///
     Rehash(u64),
-    // TODO: Fn matcher?
-    // Fn(fn(Request) -> bool),
 }
 
 impl From<&str> for Tag {
@@ -95,11 +93,15 @@ pub struct Time {
     // Req created, Handler called, Resp created
     initialized: OffsetDateTime,
     dispatched: Option<OffsetDateTime>,
+    // retrieved: Option<OffsetDateTime>,
 }
 
 impl Default for Time {
     fn default() -> Self {
-        todo!()
+        Self {
+            initialized: OffsetDateTime::now_utc(),
+            dispatched: None,
+        }
     }
 }
 
@@ -139,7 +141,7 @@ impl<B> Task for Request<B> {
 }
 
 /// Extension trait for `http::request::`[`Builder`].
-pub trait TaskBuilder {
+pub trait TaskBuilder: sealed::Sealed {
     /// Attaches a [`Tag`] to this [`Builder`].
     fn tag(self, tag: impl Into<Tag>) -> Self;
 
@@ -166,7 +168,7 @@ mod test {
     #[test]
     fn request_tag() {}
 
-    fn request_time() {}
+    fn request_timing() {}
 
     #[test]
     fn builder() {

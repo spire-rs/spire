@@ -1,11 +1,11 @@
 use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 
+use macros::all_the_tuples;
+pub use service::HandlerService;
 use spire_core::context::{Context, IntoSignal, Signal};
 
 use crate::extract::{FromContext, FromContextParts};
-use crate::handler::macros::all_the_tuples;
-pub use crate::handler::service::HandlerService;
 
 mod macros;
 mod service;

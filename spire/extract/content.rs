@@ -4,9 +4,9 @@ use bytes::Bytes;
 use serde::de::DeserializeOwned;
 
 use spire_core::backend::Backend;
-use spire_core::context::{Context, Response};
+use spire_core::context::Context;
 
-use crate::extract::FromContext;
+use crate::extract::{FromContext, FromContextParts};
 
 /// TODO.
 #[derive(Debug, Clone)]
@@ -20,8 +20,8 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let _ = Response::from_context(cx, state).await;
+    async fn from_context(mut cx: Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
+        let _ = cx.response_mut();
         todo!()
     }
 }
@@ -61,6 +61,22 @@ where
     async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
         let _ = Body::from_context(cx, state).await;
         // serde_json::from_slice()
+        todo!()
+    }
+}
+
+/// TODO.
+#[derive(Debug, Clone)]
+pub struct Html(pub ());
+
+#[async_trait::async_trait]
+impl<B, S> FromContextParts<B, S> for Html
+where
+    B: Backend,
+{
+    type Rejection = Infallible;
+
+    async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
         todo!()
     }
 }

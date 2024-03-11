@@ -7,10 +7,14 @@
 //!
 //! ### Extractors
 //!
-//! - [`Context`], [`Tag`], [`Queue`], and [`Dataset`]
-//! - [`Backend`], [`Request`], and [`Response`] for low-level manual manipulations.
+//! - [`Context`] to access [`Request`], and [`Response`] for granular control over data fetching.
 //! - [`Body`], [`Text`], and [`Json`]
-//! - [`Html`], Select (and [`Select`] trait)
+//! - [`Html`], [`Selector`] and [`Select`] trait for declarative markup search and extraction.
+//! - [`Queue`], and [`Dataset`] for creating new requests and saving scraped data.
+//! - [`State`] and [`FromRef`] trait for state extraction.
+//!
+//! - [`Backend`]-specific [`HttpClient`] and [`WebDriver`].
+//! TODO: Browser, Client.
 //!
 //! [`Backend`]: spire_core::backend::Backend
 //! [`Request`]: spire_core::context::Request
@@ -21,19 +25,17 @@
 
 use std::convert::Infallible;
 
-use spire_core::context::Context;
-use spire_core::context::IntoSignal;
-
-pub use crate::extract::content::{Body, Json, Text};
-pub use crate::extract::context::Dataset;
-pub use crate::extract::markup::{transform, Html};
+pub use content::{Body, Html, Json, Text};
+pub use context::Dataset;
 #[cfg(feature = "macros")]
-pub use crate::extract::markup::{Select, Selector};
-pub use crate::extract::state::{FromRef, State};
+pub use macros::{Select, Selector};
+use spire_core::context::{Context, IntoSignal};
+pub use state::{FromRef, State};
 
+mod browser;
 mod content;
 mod context;
-mod markup;
+mod macros;
 mod state;
 
 mod sealed {

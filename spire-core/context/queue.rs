@@ -1,21 +1,21 @@
 use std::fmt;
 
-use crate::context::{Depth, Request, Task};
+use crate::context::{Depth, Request};
 use crate::dataset::util::BoxCloneDataset;
 use crate::dataset::Dataset;
 use crate::{Error, Result};
 
-/// [`Request`] queue backed by the [`Dataset`].
+/// [`Request`] queue backed by the [`Dataset`]<`Request`>.
 #[derive(Clone)]
 pub struct Queue {
-    request: Request,
     inner: BoxCloneDataset<Request, Error>,
+    depth: usize,
 }
 
 impl Queue {
     /// Creates a new [`Queue`].
-    pub fn new(request: Request, inner: BoxCloneDataset<Request, Error>) -> Self {
-        Self { request, inner }
+    pub fn new(inner: BoxCloneDataset<Request, Error>, depth: usize) -> Self {
+        Self { inner, depth }
     }
 
     /// Inserts another [`Request`] into the queue.
@@ -23,11 +23,10 @@ impl Queue {
         self.inner.add(request).await
     }
 
-    /// Automatically increases [`Request`]'s depth.
+    /// Inserts another [`Request`] into the queue. Also increases `Request`'s depth.
     pub async fn branch(&self, mut request: Request) -> Result<()> {
-        let depth = self.request.depth().saturating_add(1);
-        let f = || Depth::new(depth);
-        let _ = request.extensions_mut().get_or_insert_with(f);
+        let depth = Depth::new(self.depth.saturating_add(1));
+        let _ = request.extensions_mut().get_or_insert(depth);
         self.append(request).await
     }
 }
