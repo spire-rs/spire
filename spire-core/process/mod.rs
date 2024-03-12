@@ -7,7 +7,7 @@ use tower::Service;
 use crate::backend::Backend;
 use crate::context::{Context, Request, Signal};
 use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::{Dataset, Datasets};
+use crate::dataset::Dataset;
 use crate::process::runner::Runner;
 use crate::{BoxError, Error, Result};
 
@@ -26,11 +26,8 @@ impl<B, S> Daemon<B, S> {
         B: Backend,
         S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
     {
-        let datasets = Datasets::default();
-        let inner = Runner::new(backend, inner, datasets);
-        Self {
-            inner: Arc::new(inner),
-        }
+        let inner = Arc::new(Runner::new(backend, inner));
+        Self { inner }
     }
 
     pub async fn run(self) -> Result<()>
@@ -49,7 +46,7 @@ impl<B, S> Daemon<B, S> {
     ///
     /// Does not move items from the replaced `Dataset`.
     ///
-    /// [`InMemDataset`]: InMemDataset
+    /// [`InMemDataset`]: crate::dataset::InMemDataset
     /// [`Queue`]: crate::context::Queue
     pub fn with_queue<D, E>(self, dataset: D) -> Self
     where
@@ -67,7 +64,7 @@ impl<B, S> Daemon<B, S> {
     /// If the handler requests for a [`Dataset`] of a specific type, but  no `Dataset` of this
     /// type was provided, it will be lazily initialized as a `first-in first-out` [`InMemDataset`].
     ///
-    /// [`InMemDataset`]: InMemDataset
+    /// [`InMemDataset`]: crate::dataset::InMemDataset
     pub fn with_dataset<D, E, T>(self, dataset: D) -> Self
     where
         D: Dataset<T, Error = E> + Clone,
@@ -78,6 +75,7 @@ impl<B, S> Daemon<B, S> {
         self
     }
 
+    /// Returns either the previously provided or default-initialized boxed [`Dataset`].
     pub fn dataset<T>(&self) -> BoxCloneDataset<T, Error>
     where
         T: Send + Sync + 'static,
@@ -106,24 +104,6 @@ impl<B, S> Daemon<B, S> {
             service: x.service.clone(),
         })
     }
-
-    async fn call_after_poll(&self) -> Signal
-    where
-        B: Clone,
-    {
-        // let poll = self.inner.queue.get();
-        // let cx = if let Ok(Some(request)) = poll.await {
-        //     let backend = self.inner.backend.clone();
-        //     let queue = self.inner.queue.clone();
-        //     Context::new(backend, queue, request)
-        // } else {
-        //     return Signal::Skip;
-        // };
-
-        // TODO. wait until all done an repeat poll
-
-        todo!()
-    }
 }
 
 impl<B, S> Clone for Daemon<B, S> {
@@ -135,6 +115,8 @@ impl<B, S> Clone for Daemon<B, S> {
 
 impl<B, S> fmt::Debug for Daemon<B, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Daemon").finish_non_exhaustive()
+        f.debug_struct("Daemon")
+            .field("Datasets", &self.inner.datasets.len())
+            .finish_non_exhaustive()
     }
 }

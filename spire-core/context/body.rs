@@ -32,6 +32,8 @@ where
 /// [`Response`]: http::Response
 pub struct Body(BoxBody<Bytes, BoxError>);
 
+// TODO: Resolve into bytes & keep resolved.
+
 impl Body {
     /// Creates a new [`Body`].
     pub fn new<B>(body: B) -> Self
@@ -86,3 +88,13 @@ impl HttpBody for Body {
         self.0.size_hint()
     }
 }
+
+/// Type alias for `http::`[`Request`] whose body type defaults to [`Body`].
+///
+/// [`Request`]: http::Request
+pub type Request<B = Body> = http::Request<B>;
+
+/// Type alias for `http::`[`Response`] whose body type defaults to [`Body`].
+///
+/// [`Response`]: http::Response
+pub type Response<B = Body> = http::Response<B>;

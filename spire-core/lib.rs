@@ -17,9 +17,10 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// Unrecoverable failure during [`Request`] processing.
 ///
 /// [`Request`]: context::Request
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
 pub struct Error {
-    // TODO: thiserror.
+    #[from]
     inner: BoxError,
 }
 
@@ -34,15 +35,6 @@ impl Error {
 
     pub fn into_inner(self) -> BoxError {
         self.inner
-    }
-}
-
-impl<T> From<T> for Error
-where
-    T: Into<BoxError>,
-{
-    fn from(value: T) -> Self {
-        Self::new(value)
     }
 }
 

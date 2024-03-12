@@ -12,6 +12,7 @@ pub struct Stats {
     responses: usize,
 }
 
+#[derive(Debug, Clone)]
 pub struct Metrics<S> {
     stats: Stats,
     inner: S,

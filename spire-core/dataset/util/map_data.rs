@@ -6,8 +6,8 @@ use crate::dataset::Dataset;
 #[derive(Clone)]
 pub struct MapData<D, F, F2> {
     inner: D,
-    f_to_inner: F,
-    f_from_inner: F2,
+    f_2inner: F,
+    f_inner2: F2,
 }
 
 impl<D, F, F2> MapData<D, F, F2> {
@@ -15,8 +15,8 @@ impl<D, F, F2> MapData<D, F, F2> {
     pub fn new(inner: D, to: F, from: F2) -> Self {
         Self {
             inner,
-            f_to_inner: to,
-            f_from_inner: from,
+            f_2inner: to,
+            f_inner2: from,
         }
     }
 }
@@ -42,13 +42,13 @@ where
     type Error = D::Error;
 
     async fn add(&self, data: T2) -> Result<(), Self::Error> {
-        let data = self.f_to_inner.clone()(data);
+        let data = self.f_2inner.clone()(data);
         self.inner.add(data).await
     }
 
     async fn get(&self) -> Result<Option<T2>, Self::Error> {
         let data = self.inner.get().await;
-        data.map(|x| x.map(self.f_from_inner.clone()))
+        data.map(|x| x.map(self.f_inner2.clone()))
     }
 
     fn len(&self) -> usize {

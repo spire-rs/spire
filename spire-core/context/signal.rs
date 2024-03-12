@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::context::Tag;
 use crate::{BoxError, Error};
 
-/// Defines a way to select or filter out [`Tags`].
+/// Defines a way to select or filter out [`Tag`]s.
 #[derive(Debug, Default, Clone)]
 pub enum Query {
     // TODO: FnOnce(Tag) -> bool query.
@@ -40,6 +40,10 @@ pub enum Signal {
 }
 
 impl Signal {
+    pub fn error(error: impl Into<BoxError>) -> Self {
+        Signal::Stop(Query::Same, Error::new(error))
+    }
+
     /// Returns the provided [`Duration`] if applicable, default otherwise.
     pub fn duration(&self) -> Duration {
         match self {

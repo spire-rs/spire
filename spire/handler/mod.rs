@@ -1,4 +1,4 @@
-use std::future::{ready, Future, Ready};
+use std::future::{Future, ready, Ready};
 use std::pin::Pin;
 
 use macros::all_the_tuples;
@@ -37,8 +37,6 @@ mod service;
 /// let router: Router = Router::new()
 ///     .route(Tag::default(), Signal::Continue);
 /// ```
-///
-// TODO: Move B to <V, S, B>.
 pub trait Handler<B, V, S>: Clone + Send + Sized + 'static {
     type Future: Future<Output = Signal>;
 

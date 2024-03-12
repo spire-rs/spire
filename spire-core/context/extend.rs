@@ -105,16 +105,8 @@ impl Default for Time {
     }
 }
 
-mod sealed {
-    use super::{Builder, Request};
-
-    pub trait Sealed {}
-    impl<B> Sealed for Request<B> {}
-    impl Sealed for Builder {}
-}
-
 /// Extension trait for `http::`[`Request`].
-pub trait Task: sealed::Sealed {
+pub trait Task {
     // TODO: Event timestamps.
 
     /// Returns a reference to the attached tag.
@@ -141,12 +133,14 @@ impl<B> Task for Request<B> {
 }
 
 /// Extension trait for `http::request::`[`Builder`].
-pub trait TaskBuilder: sealed::Sealed {
+pub trait TaskBuilder {
     /// Attaches a [`Tag`] to this [`Builder`].
     fn tag(self, tag: impl Into<Tag>) -> Self;
 
     /// Attaches a depth value to this [`Builder`].
     fn depth(self, depth: usize) -> Self;
+
+    // fn branch(&self) -> Self;
 }
 
 impl TaskBuilder for Builder {

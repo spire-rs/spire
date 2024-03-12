@@ -1,6 +1,7 @@
 use std::fmt;
 
-use crate::context::{Depth, Request};
+use crate::context::extend::{Depth, Time};
+use crate::context::{Request, Tag};
 use crate::dataset::util::BoxCloneDataset;
 use crate::dataset::Dataset;
 use crate::{Error, Result};
@@ -19,7 +20,10 @@ impl Queue {
     }
 
     /// Inserts another [`Request`] into the queue.
-    pub async fn append(&self, request: Request) -> Result<()> {
+    pub async fn append(&self, mut request: Request) -> Result<()> {
+        request.extensions_mut().get_or_insert_with(Tag::default);
+        request.extensions_mut().get_or_insert_with(Depth::default);
+        request.extensions_mut().get_or_insert_with(Time::default);
         self.inner.add(request).await
     }
 
