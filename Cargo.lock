@@ -955,13 +955,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spire-bind"
-version = "0.1.0"
-dependencies = [
- "spire-core",
-]
-
-[[package]]
 name = "spire-core"
 version = "0.1.0"
 dependencies = [

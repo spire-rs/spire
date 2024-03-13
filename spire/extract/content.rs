@@ -2,11 +2,12 @@ use std::convert::Infallible;
 
 use bytes::Bytes;
 use serde::de::DeserializeOwned;
+use tower::Service;
 
-use spire_core::backend::Backend;
-use spire_core::context::Context;
+use spire_core::context::{Context, Request, Response};
+use spire_core::Error;
 
-use crate::extract::{FromContext, FromContextParts};
+use crate::extract::FromContext;
 
 /// TODO.
 #[derive(Debug, Clone)]
@@ -15,13 +16,14 @@ pub struct Body(pub Bytes);
 #[async_trait::async_trait]
 impl<B, S> FromContext<B, S> for Body
 where
-    B: Backend,
+    B: Service<Request, Response = Response, Error = Error> + Send+Sync + 'static,
+    <B as Service<Request>>::Future: Send,
     S: Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context(mut cx: Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
-        let _ = cx.response_mut();
+    async fn from_context(cx: Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
+        let _ = cx.try_resolve().await;
         todo!()
     }
 }
@@ -33,7 +35,8 @@ pub struct Text(pub String);
 #[async_trait::async_trait]
 impl<B, S> FromContext<B, S> for Text
 where
-    B: Backend,
+    B: Service<Request, Response = Response, Error = Error>+ Send+Sync + 'static,
+    <B as Service<Request>>::Future: Send,
     S: Sync,
 {
     type Rejection = Infallible;
@@ -52,7 +55,8 @@ pub struct Json<T>(pub T);
 #[async_trait::async_trait]
 impl<B, S, T> FromContext<B, S> for Json<T>
 where
-    B: Backend,
+    B: Service<Request, Response = Response, Error = Error> + Send+Sync + 'static,
+    <B as Service<Request>>::Future: Send,
     S: Sync,
     T: DeserializeOwned,
 {
@@ -70,13 +74,16 @@ where
 pub struct Html(pub ());
 
 #[async_trait::async_trait]
-impl<B, S> FromContextParts<B, S> for Html
+impl<B, S> FromContext<B, S> for Html
 where
-    B: Backend,
+    B: Service<Request, Response = Response, Error = Error> + Send+Sync + 'static,
+    <B as Service<Request>>::Future: Send,
+    S: Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
+        let _ = Body::from_context(cx, state).await;
         todo!()
     }
 }

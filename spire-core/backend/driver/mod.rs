@@ -1,55 +1,65 @@
 use std::fmt;
-use std::sync::Arc;
+use std::future::{Future, Ready};
+use std::task::{Context, Poll};
+
+use deadpool::managed::Pool;
+use fantoccini::Client;
+use tower::Service;
 
 // use browser::Browser;
 use manager::BrowserManager;
 
 use crate::backend::Backend;
 use crate::context::{Request, Response};
-use crate::BoxError;
+use crate::Error;
 
 mod browser;
 mod manager;
 
 #[derive(Clone)]
-pub struct WebDriverPool {
-    inner: Arc<DriverInner>,
+pub struct BrowserPool {
+    pool: Pool<BrowserManager>,
 }
 
-struct DriverInner {
-    manager: BrowserManager,
-}
+impl BrowserPool {
+    pub fn new(pool: Pool<BrowserManager>) -> Self {
+        Self { pool }
+    }
 
-impl WebDriverPool {
-    pub fn new() -> Self {
-        let inner = DriverInner {
-            manager: BrowserManager::new(),
-        };
-
-        Self {
-            inner: Arc::new(inner),
-        }
+    pub fn builder() -> BrowserManager {
+        BrowserManager::new()
     }
 }
 
-impl Default for WebDriverPool {
+impl Default for BrowserPool {
     fn default() -> Self {
-        Self::new()
+        // Self::builder()
+        todo!()
     }
 }
 
-impl fmt::Debug for WebDriverPool {
+impl fmt::Debug for BrowserPool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Driver").finish_non_exhaustive()
     }
 }
 
-#[async_trait::async_trait]
-impl Backend for WebDriverPool {
-    type Client = fantoccini::Client;
-    type Error = BoxError;
+impl Service<Request> for BrowserPool {
+    type Response = Response;
+    type Error = Error;
+    type Future = Ready<Result<Response, Error>>;
 
-    async fn call(&mut self, req: Request) -> Result<Response, Self::Error> {
+    #[inline]
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn call(&mut self, req: Request) -> Self::Future {
         todo!()
     }
+}
+
+impl Backend for BrowserPool {
+    type Client = Client;
 }

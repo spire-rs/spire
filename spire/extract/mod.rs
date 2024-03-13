@@ -35,6 +35,7 @@ pub use state::{FromRef, State};
 mod browser;
 mod content;
 mod context;
+#[cfg(feature = "macros")]
 mod macros;
 mod state;
 

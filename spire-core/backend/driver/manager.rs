@@ -1,6 +1,8 @@
 use std::convert::Infallible;
+use std::fmt;
+use std::future::Future;
 
-use deadpool::managed::{Manager, Metrics, RecycleResult};
+use deadpool::managed::{Manager, Metrics, Pool, RecycleResult};
 
 pub struct BrowserManager {
     // builder: ClientBuilder<()>,
@@ -9,6 +11,28 @@ pub struct BrowserManager {
 
 impl BrowserManager {
     pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn with_instance(self, browser: ()) -> Self {
+        todo!()
+    }
+
+    pub fn with_dynamic<F, Fut>(self, f: F) -> Self
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Option<()>>,
+    {
+        todo!()
+    }
+
+    pub fn into_pool(self) -> Pool<Self> {
+        Pool::builder(self).build().expect("should not timeout")
+    }
+}
+
+impl fmt::Debug for BrowserManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         todo!()
     }
 }

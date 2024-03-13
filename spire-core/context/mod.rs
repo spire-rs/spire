@@ -1,15 +1,17 @@
 //! [`Request`]'s [`Context`] and its extensions.
 //!
 
+use tower::{Service, ServiceExt};
+
 pub use body::{Body, Request, Response};
 pub use extend::{Tag, Task, TaskBuilder};
 pub use queue::Queue;
 pub use signal::{IntoSignal, Query, Signal};
 
-use crate::backend::Backend;
-use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::Datasets;
 use crate::{Error, Result};
+use crate::backend::Backend;
+use crate::dataset::Datasets;
+use crate::dataset::util::BoxCloneDataset;
 
 mod body;
 mod extend;
@@ -34,9 +36,14 @@ impl<B> Context<B> {
         }
     }
 
+    pub fn peek_request(&self) -> Option<&Request> {
+        Some(&self.request)
+    }
+
     pub async fn try_resolve(mut self) -> Result<Response>
     where
-        B: Backend,
+        B: Service<Request, Response = Response, Error = Error>,
+        <B as Service<Request>>::Future: Send,
     {
         let resp = self.backend.call(self.request).await;
         resp.map_err(Error::new)

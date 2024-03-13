@@ -7,8 +7,8 @@ use std::convert::Infallible;
 
 use spire_core::backend::HttpClient;
 use spire_core::context::{Context, Queue, Tag, Task};
-use spire_core::dataset::Dataset as CoreDataset;
 use spire_core::dataset::util::BoxCloneDataset;
+use spire_core::dataset::Dataset as CoreDataset;
 use spire_core::Error;
 
 use crate::extract::{FromContext, FromContextParts};
@@ -57,8 +57,8 @@ where
     type Rejection = Infallible;
 
     async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
-        let tag = cx.request_ref().tag().cloned();
-        Ok(tag.unwrap_or_default())
+        let tag = cx.peek_request().and_then(|x| x.tag());
+        Ok(tag.cloned().unwrap_or_default())
     }
 }
 

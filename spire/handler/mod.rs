@@ -1,4 +1,4 @@
-use std::future::{Future, ready, Ready};
+use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 
 use macros::all_the_tuples;

@@ -103,7 +103,11 @@ impl<B> Service<Cx<B>> for TagRouter<B, ()> {
             None => self.default_fallback.clone(),
         };
 
-        let tag = cx.request_ref().tag().unwrap_or(&Tag::Fallback);
+        let tag = cx
+            .peek_request()
+            .and_then(|x| x.tag())
+            .unwrap_or(&Tag::Fallback);
+
         let tagged = self.tag_router.get(tag).cloned();
         let mut endpoint = tagged.unwrap_or_else(fallback);
         endpoint.call(cx)

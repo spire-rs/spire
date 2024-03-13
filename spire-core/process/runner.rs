@@ -2,11 +2,10 @@ use std::convert::Infallible;
 
 use tower::{Layer, Service, ServiceExt};
 
-use crate::backend::Backend;
-use crate::context::{Context, Request, Signal};
+use crate::context::{Context, Request, Response, Signal};
 use crate::dataset::{Dataset, Datasets};
 use crate::process::metric::{Metrics, MetricsLayer};
-use crate::Result;
+use crate::{Error, Result};
 
 pub struct Runner<B, S> {
     // TODO: Error handler.
@@ -18,7 +17,7 @@ pub struct Runner<B, S> {
 impl<B, S> Runner<B, S> {
     pub fn new(backend: B, service: S) -> Self
     where
-        B: Backend,
+        B: Service<Request, Response = Response, Error = Error> + Clone,
         S: Service<Context<B>, Response = Signal, Error = Infallible>,
     {
         let layer = MetricsLayer::default();
@@ -42,7 +41,7 @@ impl<B, S> Runner<B, S> {
 
     async fn try_call(&self, request: Request) -> Signal
     where
-        B: Backend,
+        B: Service<Request, Response = Response, Error = Error> + Clone,
         S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
     {
         let backend = self.backend.clone();

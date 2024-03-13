@@ -4,8 +4,7 @@ use std::sync::Arc;
 
 use tower::Service;
 
-use crate::backend::Backend;
-use crate::context::{Context, Request, Signal};
+use crate::context::{Context, Request, Response, Signal};
 use crate::dataset::util::BoxCloneDataset;
 use crate::dataset::Dataset;
 use crate::process::runner::Runner;
@@ -23,7 +22,7 @@ impl<B, S> Daemon<B, S> {
     /// Creates a new [`Daemon`].
     pub fn new(backend: B, inner: S) -> Self
     where
-        B: Backend,
+        B: Service<Request, Response = Response, Error = Error> + Clone,
         S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
     {
         let inner = Arc::new(Runner::new(backend, inner));
@@ -32,6 +31,7 @@ impl<B, S> Daemon<B, S> {
 
     pub async fn run(self) -> Result<()>
     where
+        B: Service<Request, Response = Response, Error = Error> + Clone,
         S: Service<Context<B>, Response = Signal, Error = Infallible>,
     {
         todo!()

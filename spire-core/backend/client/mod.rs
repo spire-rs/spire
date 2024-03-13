@@ -1,5 +1,7 @@
 use std::fmt;
+use std::future::Ready;
 use std::sync::Mutex;
+use std::task::{Context, Poll};
 
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
@@ -8,12 +10,12 @@ use builder::Builder;
 
 use crate::backend::Backend;
 use crate::context::{Body, Request, Response};
-use crate::BoxError;
+use crate::{BoxError, Error};
 
 mod builder;
 
 pub struct HttpClient {
-    inner: Mutex<BoxCloneService<Request, Response, BoxError>>,
+    inner: Mutex<BoxCloneService<Request, Response, Error>>,
 }
 
 impl HttpClient {
@@ -22,9 +24,9 @@ impl HttpClient {
     where
         S: Service<Request, Response = Response, Error = E> + Clone + Send + 'static,
         S::Future: Send + 'static,
-        E: Into<BoxError>,
+        E: Into<BoxError> + 'static,
     {
-        let svc = svc.map_err(|x: E| -> BoxError { x.into() });
+        let svc = svc.map_err(Error::new);
         let inner = Mutex::new(BoxCloneService::new(svc));
         Self { inner }
     }
@@ -33,8 +35,8 @@ impl HttpClient {
     where
         S: Service<Request<B>, Response = Response<B>, Error = E> + Clone + Send + 'static,
         S::Future: Send + 'static,
-        B: TryInto<Body, Error = ETryInto> + TryFrom<Body, Error = ETryFrom>,
         E: Into<BoxError>,
+        B: TryInto<Body, Error = ETryInto> + TryFrom<Body, Error = ETryFrom>,
         ETryInto: Into<BoxError>,
         ETryFrom: Into<BoxError>,
     {
@@ -67,14 +69,25 @@ impl fmt::Debug for HttpClient {
     }
 }
 
+impl Service<Request> for HttpClient {
+    type Response = Response;
+    type Error = Error;
+    type Future = Ready<Result<Response, Error>>;
+
+    #[inline]
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn call(&mut self, req: Request) -> Self::Future {
+        todo!()
+    }
+}
+
 #[async_trait::async_trait]
 impl Backend for HttpClient {
     type Client = ();
-    type Error = BoxError;
-
-    async fn call(&mut self, req: Request) -> Result<Response, Self::Error> {
-        todo!()
-    }
 }
 
 #[cfg(test)]
