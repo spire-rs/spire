@@ -9,7 +9,7 @@
 //!
 //! - [`Context`] to access [`Request`], and [`Response`] for granular control over data fetching.
 //! - [`Body`], [`Text`], and [`Json`]
-//! - [`Html`], [`Selector`] and [`Select`] trait for declarative markup search and extraction.
+//! - [`Html`], [`Elements`] and [`Select`] trait for declarative markup search and extraction.
 //! - [`Queue`], and [`Dataset`] for creating new requests and saving scraped data.
 //! - [`State`] and [`FromRef`] trait for state extraction.
 //!
@@ -20,7 +20,7 @@
 //! [`Request`]: spire_core::context::Request
 //! [`Response`]: spire_core::context::Response
 //! [`Tag`]: spire_core::context::Tag
-//! [`Queue`]: spire_core::context::Queue
+//! [`Queue`]: spire_core::context::RequestQueue
 //! [`Handler`]: crate::handler::Handler
 
 use std::convert::Infallible;
@@ -28,7 +28,7 @@ use std::convert::Infallible;
 pub use content::{Body, Html, Json, Text};
 pub use context::Dataset;
 #[cfg(feature = "macros")]
-pub use macros::{Select, Selector};
+pub use macros::{Elements, Select};
 use spire_core::context::{Context, IntoSignal};
 pub use state::{FromRef, State};
 

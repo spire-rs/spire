@@ -6,6 +6,7 @@
 //! - `SqliteDataset`
 //! - `RedbDataset`
 //! - `PersyDataset`
+//! - `FuturesDataset`: futures::Stream + futures::Sink
 //!
 //! ### Utility
 //!

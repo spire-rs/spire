@@ -1,5 +1,9 @@
 use std::fmt;
 
+use async_stream::try_stream;
+
+use futures::stream::Stream;
+
 use crate::dataset::Dataset;
 
 /// Type-erased, cloneable boxed [`Dataset`].
@@ -28,6 +32,22 @@ impl<T, E> BoxCloneDataset<T, E> {
     {
         let dataset = Box::new(dataset);
         Self { dataset }
+    }
+
+    pub(crate) fn into_stream(self) -> impl Stream<Item = Result<T, E>>
+    where
+        T: 'static,
+        E: 'static,
+    {
+        // TODO: Remove Option into Result<T, E>.
+        try_stream! {
+            loop {
+                let item = self.dataset.get().await?;
+                if let Some(item) = item {
+                    yield item;
+                }
+            }
+        }
     }
 }
 

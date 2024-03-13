@@ -10,7 +10,6 @@ use crate::dataset::Dataset;
 use crate::process::runner::Runner;
 use crate::{BoxError, Error, Result};
 
-mod future;
 mod metric;
 mod runner;
 
@@ -29,12 +28,13 @@ impl<B, S> Daemon<B, S> {
         Self { inner }
     }
 
-    pub async fn run(self) -> Result<()>
+    pub async fn run(self) -> Result<usize>
     where
         B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible>,
+        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
     {
-        todo!()
+        // TODO: Add tracing.
+        self.inner.poll_until_empty().await
     }
 
     /// Replaces the [`Dataset`] used by the [`Queue`].
@@ -47,7 +47,7 @@ impl<B, S> Daemon<B, S> {
     /// Does not move items from the replaced `Dataset`.
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
-    /// [`Queue`]: crate::context::Queue
+    /// [`Queue`]: crate::context::RequestQueue
     pub fn with_queue<D, E>(self, dataset: D) -> Self
     where
         D: Dataset<Request, Error = E> + Clone,

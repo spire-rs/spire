@@ -1,45 +1,68 @@
 use std::convert::Infallible;
 
-use tower::{Layer, Service, ServiceExt};
+use futures::stream::StreamExt;
+use tower::{Service, ServiceBuilder, ServiceExt};
 
-use crate::context::{Context, Request, Response, Signal};
-use crate::dataset::{Dataset, Datasets};
+use crate::context::{Context, IntoSignal, Request, Response, Signal};
+use crate::dataset::Datasets;
 use crate::process::metric::{Metrics, MetricsLayer};
 use crate::{Error, Result};
 
 pub struct Runner<B, S> {
     // TODO: Error handler.
+    // TODO: Delay<S> wrapper.
     pub(crate) service: Metrics<S>,
     pub(crate) datasets: Datasets,
     pub(crate) backend: B,
 }
 
 impl<B, S> Runner<B, S> {
-    pub fn new(backend: B, service: S) -> Self
+    pub fn new(backend: B, inner: S) -> Self
     where
         B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible>,
+        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
     {
-        let layer = MetricsLayer::default();
+        let service = ServiceBuilder::default()
+            .layer(MetricsLayer::default())
+            .service(inner);
+
         Self {
-            service: layer.layer(service),
+            service,
             datasets: Datasets::default(),
             backend,
         }
     }
 
-    async fn try_poll(&self) -> Result<()> {
-        let queue = self.datasets.get::<Request>();
-        let request = queue.get().await?;
+    pub async fn poll_until_empty(&self) -> Result<usize>
+    where
+        B: Service<Request, Response = Response, Error = Error> + Clone,
+        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+    {
+        let dataset = self.datasets.get::<Request>();
 
-        // TODO: Wait until available and retry.
-        // let _ = self.try_call(request.unwrap());
-        // let _ = self.signal();
+        // TODO: Repeat until returns zero?
+        let stream = dataset
+            .into_stream()
+            .then(|x| async { self.call_service(x).await })
+            .map(|x| async { self.notify_signal(x).await })
+            .buffer_unordered(8)
+            .count();
 
-        todo!()
+        Ok(stream.await)
     }
 
-    async fn try_call(&self, request: Request) -> Signal
+    async fn call_service(&self, request: Result<Request>) -> Signal
+    where
+        B: Service<Request, Response = Response, Error = Error> + Clone,
+        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+    {
+        match request {
+            Ok(x) => self.try_call_service(x).await,
+            Err(x) => x.into_signal(),
+        }
+    }
+
+    async fn try_call_service(&self, request: Request) -> Signal
     where
         B: Service<Request, Response = Response, Error = Error> + Clone,
         S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
@@ -52,7 +75,7 @@ impl<B, S> Runner<B, S> {
         oneshot.await.expect("should be infallible")
     }
 
-    async fn signal(&self, signal: Signal) -> Result<()> {
-        todo!()
+    async fn notify_signal(&self, signal: Signal) {
+        // TODO.
     }
 }

@@ -7,9 +7,9 @@ pub trait Select {
 }
 
 #[derive(Clone)]
-pub struct Selector<T>(pub T);
+pub struct Elements<T>(pub T);
 
-impl<T> Selector<T> {
+impl<T> Elements<T> {
     pub fn new<U>(tags: U) -> Self
     where
         U: IntoIterator<Item = ()>,
@@ -19,7 +19,7 @@ impl<T> Selector<T> {
     }
 }
 
-impl<T> Deref for Selector<T> {
+impl<T> Deref for Elements<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -27,7 +27,7 @@ impl<T> Deref for Selector<T> {
     }
 }
 
-impl<T> DerefMut for Selector<T> {
+impl<T> DerefMut for Elements<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

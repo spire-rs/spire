@@ -17,14 +17,14 @@ pub mod prelude {}
 #[cfg(test)]
 mod test {
     use crate::backend::HttpClient;
-    use crate::context::Queue;
+    use crate::context::RequestQueue;
     use crate::dataset::{Dataset as _, InMemDataset};
     use crate::extract::Dataset;
     use crate::{Daemon, Result, Router};
 
     #[test]
     fn example() {
-        async fn handler(queue: Queue, Dataset(dataset): Dataset<u64>) -> Result<()> {
+        async fn handler(queue: RequestQueue, Dataset(dataset): Dataset<u64>) -> Result<()> {
             let u = dataset.get().await?;
             dataset.add(1).await?;
 

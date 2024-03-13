@@ -1,22 +1,22 @@
-use std::convert::Infallible;
-
 use spire_core::backend::Backend;
 use spire_core::context::Context;
-pub use spire_macros::extract::{Select, Selector};
+use spire_core::Error;
+pub use spire_macros::extract::{Elements, Select};
 
-use crate::extract::{FromContextParts, Html};
+use crate::extract::{FromContext, Html};
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContextParts<B, S> for Selector<T>
+impl<B, S, T> FromContext<B, S> for Elements<T>
 where
     B: Backend,
     S: Sync,
     T: Select,
 {
-    type Rejection = Infallible;
+    type Rejection = Error;
 
-    async fn from_context_parts(cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let html = Html::from_context_parts(cx, state).await;
+    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
+        let _ = Html::from_context(cx, state).await?;
+
         todo!()
     }
 }

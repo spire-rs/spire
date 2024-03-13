@@ -8,6 +8,7 @@ use spire_core::context::Context;
 use crate::extract::FromContextParts;
 
 pub struct BrowserHandler<T> {
+    // client:
     marker: PhantomData<T>,
 }
 

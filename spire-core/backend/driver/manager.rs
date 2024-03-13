@@ -4,6 +4,8 @@ use std::future::Future;
 
 use deadpool::managed::{Manager, Metrics, Pool, RecycleResult};
 
+use crate::backend::BrowserPool;
+
 pub struct BrowserManager {
     // builder: ClientBuilder<()>,
     // webdriver: Vec<()>
@@ -26,8 +28,18 @@ impl BrowserManager {
         todo!()
     }
 
-    pub fn into_pool(self) -> Pool<Self> {
+    pub fn build(self) -> BrowserPool {
+        BrowserPool::new(self.into_pool())
+    }
+
+    fn into_pool(self) -> Pool<Self> {
         Pool::builder(self).build().expect("should not timeout")
+    }
+}
+
+impl Default for BrowserManager {
+    fn default() -> Self {
+        todo!()
     }
 }
 

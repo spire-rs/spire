@@ -1,5 +1,5 @@
 use std::fmt;
-use std::future::{Future, Ready};
+use std::future::Ready;
 use std::task::{Context, Poll};
 
 use deadpool::managed::Pool;

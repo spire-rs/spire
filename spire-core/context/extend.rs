@@ -110,7 +110,10 @@ pub trait Task {
     // TODO: Event timestamps.
 
     /// Returns a reference to the attached tag.
-    fn tag(&self) -> Option<&Tag>;
+    fn try_tag(&self) -> Option<&Tag>;
+    /// Returns a reference to the attached tag.
+    fn tag(&self) -> &Tag;
+
     /// Returns a mutable reference to the attached tag.
     fn tag_mut(&mut self) -> Option<&mut Tag>;
     /// Returns a recursive depth of this [`Request`].
@@ -118,8 +121,12 @@ pub trait Task {
 }
 
 impl<B> Task for Request<B> {
-    fn tag(&self) -> Option<&Tag> {
+    fn try_tag(&self) -> Option<&Tag> {
         self.extensions().get()
+    }
+
+    fn tag(&self) -> &Tag {
+        self.try_tag().unwrap_or(&Tag::Fallback)
     }
 
     fn tag_mut(&mut self) -> Option<&mut Tag> {
