@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::dataset::Dataset;
 
-/// Type-erased, boxed [`Dataset`].
+/// Type-erased [`Dataset`].
 pub struct BoxDataset<T, E> {
     dataset: Box<dyn Dataset<T, Error = E>>,
 }

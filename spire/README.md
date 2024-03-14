@@ -22,8 +22,16 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 [tokio-rs/tokio]: https://github.com/tokio-rs/tokio/
 [tower-rs/tower]: https://github.com/tower-rs/tower/
 
+#### Examples
+
 ```rust
 fn main() {
     println!("Hello!");
 }
 ```
+
+#### Notes
+
+- Routing uses Extract as Argument pattern from [axum][tokio-rs/axum].
+
+[tokio-rs/axum]: https://github.com/tokio-rs/axum/

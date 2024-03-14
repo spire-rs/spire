@@ -1,30 +1,20 @@
 use std::convert::Infallible;
 use std::task::{Context, Poll};
 
-use tower::load::Load;
 use tower::{Layer, Service};
 
 use crate::context::{Context as Cx, Signal};
 
-/// TODO: Serde.
-#[derive(Debug, Default, PartialOrd, PartialEq, Clone)]
-pub struct Stats {
-    requests: usize,
-    responses: usize,
-    errors: usize,
-}
-
 /// TODO.
 #[derive(Debug, Clone)]
-pub struct Metrics<S> {
-    stats: Stats,
+pub struct Signals<S> {
     inner: S,
 }
 
-impl<S> Metrics<S> {
-    /// Creates a new [`Metrics`] service.
-    pub fn new(inner: S, stats: Stats) -> Self {
-        Self { inner, stats }
+impl<S> Signals<S> {
+    /// Creates a new [`Signals`] service.
+    pub fn new(inner: S) -> Self {
+        Self { inner }
     }
 
     /// Returns a reference to the inner service.
@@ -41,9 +31,14 @@ impl<S> Metrics<S> {
     pub fn into_inner(self) -> S {
         self.inner
     }
+
+    /// TODO.
+    pub async fn notify_signal(&self, signal: Signal) {
+        todo!()
+    }
 }
 
-impl<B, S> Service<Cx<B>> for Metrics<S>
+impl<B, S> Service<Cx<B>> for Signals<S>
 where
     S: Service<Cx<B>, Response = Signal, Error = Infallible>,
 {
@@ -62,36 +57,15 @@ where
     }
 }
 
-impl<S> Load for Metrics<S> {
-    type Metric = Stats;
-
-    fn load(&self) -> Self::Metric {
-        self.stats.clone()
-    }
+#[derive(Debug, Default, Clone)]
+pub struct SignalsLayer {
+    _marker: (),
 }
 
-#[derive(Debug, Clone)]
-pub struct MetricsLayer {
-    stats: Stats,
-}
-
-impl MetricsLayer {
-    /// Creates a new [`MetricsLayer`].
-    pub fn new(stats: Stats) -> Self {
-        Self { stats }
-    }
-}
-
-impl Default for MetricsLayer {
-    fn default() -> Self {
-        Self::new(Stats::default())
-    }
-}
-
-impl<S> Layer<S> for MetricsLayer {
-    type Service = Metrics<S>;
+impl<S> Layer<S> for SignalsLayer {
+    type Service = Signals<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        Metrics::new(inner, self.stats.clone())
+        Signals::new(inner)
     }
 }

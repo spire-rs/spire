@@ -12,6 +12,7 @@ use crate::{BoxError, Error, Result};
 
 mod metric;
 mod runner;
+mod signal;
 
 pub struct Daemon<B, S> {
     inner: Arc<Runner<B, S>>,
@@ -34,10 +35,10 @@ impl<B, S> Daemon<B, S> {
         S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
     {
         // TODO: Add tracing.
-        self.inner.poll_until_empty().await
+        self.inner.run_until_empty().await
     }
 
-    /// Replaces the [`Dataset`] used by the [`Queue`].
+    /// Replaces the [`Dataset`] used by the [`RequestQueue`].
     ///
     /// If the `Dataset` for the `Queue` is not provided, then
     /// the queue backed by the [`InMemDataset`] is used instead.
@@ -47,8 +48,8 @@ impl<B, S> Daemon<B, S> {
     /// Does not move items from the replaced `Dataset`.
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
-    /// [`Queue`]: crate::context::RequestQueue
-    pub fn with_queue<D, E>(self, dataset: D) -> Self
+    /// [`RequestQueue`]: crate::context::RequestQueue
+    pub fn with_request_queue<D, E>(self, dataset: D) -> Self
     where
         D: Dataset<Request, Error = E> + Clone,
         E: Into<BoxError>,
@@ -60,6 +61,8 @@ impl<B, S> Daemon<B, S> {
     /// Inserts or replaces (if any already inserted) the provided [`Dataset`].
     ///
     /// ### Note
+    ///
+    /// Does not move items from the replaced `Dataset`.
     ///
     /// If the handler requests for a [`Dataset`] of a specific type, but  no `Dataset` of this
     /// type was provided, it will be lazily initialized as a `first-in first-out` [`InMemDataset`].
@@ -81,28 +84,6 @@ impl<B, S> Daemon<B, S> {
         T: Send + Sync + 'static,
     {
         self.inner.datasets.get::<T>()
-    }
-
-    fn map_inner<F>(self, f: F) -> Self
-    where
-        B: Clone,
-        S: Clone,
-        F: FnOnce(Runner<B, S>) -> Runner<B, S>,
-    {
-        let inner = Arc::new(f(self.into_inner()));
-        Self { inner }
-    }
-
-    fn into_inner(self) -> Runner<B, S>
-    where
-        B: Clone,
-        S: Clone,
-    {
-        Arc::try_unwrap(self.inner).unwrap_or_else(|x| Runner {
-            datasets: x.datasets.clone(),
-            backend: x.backend.clone(),
-            service: x.service.clone(),
-        })
     }
 }
 

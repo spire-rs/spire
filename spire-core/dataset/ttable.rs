@@ -3,8 +3,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::dataset::util::{BoxCloneDataset, DatasetExt};
-use crate::dataset::{Dataset, InMemDataset};
+use crate::dataset::util::BoxCloneDataset;
+use crate::dataset::{Dataset, DatasetExt, InMemDataset};
 use crate::{BoxError, Error};
 
 #[derive(Clone, Default)]

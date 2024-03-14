@@ -27,7 +27,3 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 - https://crates.io/crates/persy for sqlite dataset alt
 - https://pola.rs/ for pyo3 python bindings
 - https://napi.rs/ for nodejs bindings
-
-#### Notes
-
-- Extract as Argument pattern from [`axum`]

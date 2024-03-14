@@ -45,9 +45,7 @@ where
     type Rejection = Infallible;
 
     async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
-        // TODO.
-        // Ok(cx.queue())
-        todo!()
+        Ok(cx.queue())
     }
 }
 

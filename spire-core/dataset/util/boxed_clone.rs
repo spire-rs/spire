@@ -1,12 +1,11 @@
 use std::fmt;
 
 use async_stream::try_stream;
-
 use futures::stream::Stream;
 
 use crate::dataset::Dataset;
 
-/// Type-erased, cloneable boxed [`Dataset`].
+/// Cloneable type-erased [`Dataset`].
 pub struct BoxCloneDataset<T, E> {
     dataset: Box<dyn CloneDataset<T, Error = E>>,
 }

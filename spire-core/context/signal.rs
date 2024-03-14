@@ -7,12 +7,34 @@ use crate::{BoxError, Error};
 /// Defines a way to select or filter out [`Tag`]s.
 #[derive(Debug, Default, Clone)]
 pub enum Query {
-    // TODO: FnOnce(Tag) -> bool query.
+    /// Matches the same [`Tag`] as used by the [`Request`].
+    ///
+    /// Does not match [`Tag::Fallback`].
+    ///
+    /// [`Request`]: crate::context::Request
     #[default]
-    Same,
+    Owner,
+
+    /// Matches every [`Tag`], including [`Tag::Fallback`].
     Every,
+
+    /// Matches every [`Tag`], but from the provided list.
     Exclude(Vec<Tag>),
+
+    /// Matches every [`Tag`] from the provided list.
     Include(Vec<Tag>),
+}
+
+impl Query {
+    pub(crate) fn is_match(&self, tag: &Tag, owner: &Tag) -> bool {
+        let is_fallback = matches!(owner, &Tag::Fallback);
+        match self {
+            Query::Owner => !is_fallback && tag == owner,
+            Query::Every => true,
+            Query::Exclude(x) => !x.contains(tag),
+            Query::Include(x) => x.contains(tag),
+        }
+    }
 }
 
 /// Represents various events that can be emitted during [`Request`] processing.
@@ -41,7 +63,7 @@ pub enum Signal {
 
 impl Signal {
     pub fn error(error: impl Into<BoxError>) -> Self {
-        Signal::Stop(Query::Same, Error::new(error))
+        Signal::Stop(Query::Owner, Error::new(error))
     }
 
     /// Returns the provided [`Duration`] if applicable, default otherwise.

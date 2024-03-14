@@ -47,17 +47,23 @@ mod sealed {
     pub enum ViaRequest {}
 }
 
+/// TODO.
 #[async_trait::async_trait]
 pub trait FromContextParts<B, S>: Sized {
+    /// TODO.
     type Rejection: IntoSignal;
 
+    /// TODO.
     async fn from_context_parts(cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection>;
 }
 
+/// TODO.
 #[async_trait::async_trait]
 pub trait FromContext<B, S, V = sealed::ViaRequest>: Sized {
+    /// TODO.
     type Rejection: IntoSignal;
 
+    /// TODO.
     async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection>;
 }
 

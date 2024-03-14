@@ -32,8 +32,6 @@ where
 /// [`Response`]: http::Response
 pub struct Body(BoxBody<Bytes, BoxError>);
 
-// TODO: Resolve into bytes & keep resolved.
-
 impl Body {
     /// Creates a new [`Body`].
     pub fn new<B>(body: B) -> Self

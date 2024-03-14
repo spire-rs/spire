@@ -11,7 +11,7 @@ use crate::context::Request;
 /// you may want to create a custom enum, that implements `Into<Tag>`:
 ///
 /// ```rust
-/// use spire_core::context::Tag;
+/// # use spire_core::context::Tag;
 ///
 /// #[derive(Debug, Clone)]
 /// pub enum Routes {
@@ -31,7 +31,7 @@ use crate::context::Request;
 /// ```
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
 pub enum Tag {
-    /// Explicitly call the fallback handler.
+    /// Explicitly calls the fallback handler.
     #[default]
     Fallback,
     ///
@@ -111,11 +111,10 @@ pub trait Task {
 
     /// Returns a reference to the attached tag.
     fn try_tag(&self) -> Option<&Tag>;
+
     /// Returns a reference to the attached tag.
     fn tag(&self) -> &Tag;
 
-    /// Returns a mutable reference to the attached tag.
-    fn tag_mut(&mut self) -> Option<&mut Tag>;
     /// Returns a recursive depth of this [`Request`].
     fn depth(&self) -> usize;
 }
@@ -127,10 +126,6 @@ impl<B> Task for Request<B> {
 
     fn tag(&self) -> &Tag {
         self.try_tag().unwrap_or(&Tag::Fallback)
-    }
-
-    fn tag_mut(&mut self) -> Option<&mut Tag> {
-        self.extensions_mut().get_mut()
     }
 
     fn depth(&self) -> usize {
@@ -146,8 +141,6 @@ pub trait TaskBuilder {
 
     /// Attaches a depth value to this [`Builder`].
     fn depth(self, depth: usize) -> Self;
-
-    // fn branch(&self) -> Self;
 }
 
 impl TaskBuilder for Builder {
@@ -179,6 +172,6 @@ mod test {
             .depth(2)
             .body(Body::default());
 
-        matches!(build, Ok(_));
+        assert!(matches!(build, Ok(_)));
     }
 }

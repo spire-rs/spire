@@ -8,7 +8,7 @@ use tower::Service;
 pub use client::HttpClient;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
-pub use driver::BrowserPool;
+pub use driver::{BrowserBackend, BrowserClient, BrowserManager, BrowserPool};
 
 use crate::context::{Request, Response};
 use crate::Error;

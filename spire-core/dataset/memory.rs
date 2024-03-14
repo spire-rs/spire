@@ -16,6 +16,8 @@ struct InMemDatasetInner<T> {
 
 impl<T> InMemDataset<T> {
     /// Creates a new [`InMemDataset`].
+    ///
+    /// Same as [`InMemDataset::queue`].
     pub fn new() -> Self {
         Self::queue()
     }

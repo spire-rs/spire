@@ -10,7 +10,7 @@ use crate::{Error, Result};
 ///
 /// See [`Daemon::with_queue`].
 ///
-/// [`Daemon::with_queue`]: crate::Daemon::with_queue
+/// [`Daemon::with_queue`]: crate::Daemon::with_request_queue
 #[derive(Clone)]
 pub struct RequestQueue {
     inner: BoxCloneDataset<Request, Error>,

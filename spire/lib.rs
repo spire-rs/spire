@@ -38,7 +38,7 @@ mod test {
 
         let backend = HttpClient::default();
         let daemon = Daemon::new(backend, router)
-            .with_queue(InMemDataset::queue())
+            .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new());
 
         let _ = daemon.run();

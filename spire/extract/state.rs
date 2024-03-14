@@ -33,8 +33,8 @@ where
     type Rejection = Infallible;
 
     async fn from_context_parts(_cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let state = T::from_ref(state);
-        Ok(Self(state))
+        let inner = T::from_ref(state);
+        Ok(Self(inner))
     }
 }
 

@@ -19,8 +19,7 @@ mod extend;
 mod queue;
 mod signal;
 
-// TODO.
-/// Framework-specific context of the task, [`Request`].
+/// Framework-specific context of the [`Request`].
 pub struct Context<B> {
     request: Request,
     backend: B,
@@ -37,10 +36,14 @@ impl<B> Context<B> {
         }
     }
 
+    /// Returns the reference to the inner [`Request`].
+    ///
+    /// Used by extractors to access extensions.
     pub fn peek(&self) -> &Request {
         &self.request
     }
 
+    /// Resolves the [`Request`] and returns [`Response`] or [`Error`].
     pub async fn try_resolve(mut self) -> Result<Response>
     where
         B: Service<Request, Response = Response, Error = Error>,
@@ -50,11 +53,15 @@ impl<B> Context<B> {
         ret.map_err(Error::new)
     }
 
+    /// Initializes and returns the [`RequestQueue`].
     pub fn queue(&self) -> RequestQueue {
         let dataset = self.datasets.get::<Request>();
         RequestQueue::new(dataset, self.request.depth())
     }
 
+    /// Initializes and returns the boxed [`Dataset`] of type `T`.
+    ///
+    /// [`Dataset`]: crate::dataset::Dataset
     pub fn dataset<T>(&self) -> BoxCloneDataset<T, Error>
     where
         T: Send + Sync + 'static,
