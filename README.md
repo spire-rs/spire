@@ -22,8 +22,11 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 [tokio-rs/tokio]: https://github.com/tokio-rs/tokio/
 [tower-rs/tower]: https://github.com/tower-rs/tower/
 
-#### Links
+#### Crates
 
-- https://crates.io/crates/persy for sqlite dataset alt
-- https://pola.rs/ for pyo3 python bindings
-- https://napi.rs/ for nodejs bindings
+- [spire](./spire/): Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+  Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+- [spire-core](./spire-core/): Lorem ipsum dolor sit amet, consectetur
+  adipiscing elit. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+- [spire-macros](./spire-macros/): Lorem ipsum dolor sit amet, consectetur
+  adipiscing elit. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
