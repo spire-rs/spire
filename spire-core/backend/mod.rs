@@ -1,7 +1,13 @@
 //! Types and traits for data retrieval [`Backend`]s.
 //!
+//! ### Backends
+//!
+//! - [`HttpClientPool`]
+//! - [`BrowserPool`]
+//!
 
-use async_trait::async_trait;
+use std::future::Future;
+
 use tower::Service;
 
 #[cfg(feature = "client")]
@@ -9,10 +15,10 @@ use tower::Service;
 pub use client::{HttpClient, HttpClientBuilder, HttpClientPool};
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
-pub use driver::{BrowserBackend, BrowserClient, BrowserManager, BrowserPool};
+pub use driver::{BrowserClient, BrowserManager, BrowserPool};
 
 use crate::context::{Request, Response};
-use crate::{Error, Result};
+use crate::Result;
 
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
@@ -22,10 +28,23 @@ pub mod client;
 pub mod driver;
 
 /// TODO.
-#[async_trait]
-pub trait Backend {
-    /// TODO.
-    type Client: Service<Request, Response = Response, Error = Error>;
+#[async_trait::async_trait]
+pub trait Backend: Send + Sized + 'static {
+    /// Associated client type.
+    type Client: Client + Send + 'static;
 
-    async fn instance(&self) -> Result<Self::Client>;
+    /// Returns a [`Self::Client`] from the pool.
+    async fn call(&self) -> Result<Self::Client>;
+}
+
+/// Extension trait for [`Backend`]s that manage actual browsers.
+///
+/// Currently works as a marker trait only.
+pub trait BrowserBackend: Backend {}
+
+/// TODO.
+#[async_trait::async_trait]
+pub trait Client: Sized + 'static {
+    /// Attempts to retrieve the [`Response`].
+    async fn invoke(self, req: Request) -> Result<Response>;
 }

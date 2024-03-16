@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use crate::BoxError;
 
 #[async_trait::async_trait]
-trait BrowserDriver {
+pub trait BrowserDriver {
     type Error;
 
     fn connect(&mut self) -> Result<(), Self::Error>;

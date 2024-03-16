@@ -2,21 +2,22 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::task::{Context, Poll};
 
-use fantoccini::Client;
+use fantoccini::Client as WebClient;
 use futures::future::BoxFuture;
 use tower::Service;
 
+use crate::backend::Client;
 use crate::context::{Request, Response};
-use crate::Error;
+use crate::{Error, Result};
 
 #[derive(Clone)]
 pub struct BrowserClient {
     id: u32,
-    client: Client,
+    client: WebClient,
 }
 
 impl BrowserClient {
-    pub fn new(id: u32, client: Client) -> Self {
+    pub fn new(id: u32, client: WebClient) -> Self {
         Self { id, client }
     }
 
@@ -24,7 +25,7 @@ impl BrowserClient {
         self.id
     }
 
-    pub fn into_inner(self) -> Client {
+    pub fn into_inner(self) -> WebClient {
         self.client
     }
 }
@@ -36,7 +37,7 @@ impl fmt::Debug for BrowserClient {
 }
 
 impl Deref for BrowserClient {
-    type Target = Client;
+    type Target = WebClient;
 
     fn deref(&self) -> &Self::Target {
         &self.client
@@ -61,6 +62,13 @@ impl Service<Request> for BrowserClient {
 
     #[inline]
     fn call(&mut self, req: Request) -> Self::Future {
+        todo!()
+    }
+}
+
+#[async_trait::async_trait]
+impl Client for BrowserClient {
+    async fn invoke(self, req: Request) -> Result<Response> {
         todo!()
     }
 }

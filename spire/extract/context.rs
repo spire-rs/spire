@@ -7,8 +7,8 @@ use std::convert::Infallible;
 
 use spire_core::backend::{HttpClient, HttpClientPool};
 use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::Dataset as CoreDataset;
 use spire_core::dataset::util::BoxCloneDataset;
+use spire_core::dataset::Dataset as CoreDataset;
 use spire_core::Error;
 
 use crate::extract::{FromContext, FromContextParts};

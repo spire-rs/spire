@@ -1,5 +1,4 @@
 use std::num::NonZeroUsize;
-use std::time::Instant;
 
 use http::request::Builder;
 
@@ -15,16 +14,16 @@ use crate::context::Request;
 ///
 /// #[derive(Debug, Clone)]
 /// pub enum Routes {
-///     A(String),
-///     B(String),
+///     A,
+///     B,
 /// }
 ///
 /// impl Into<Tag> for Routes {
 ///     fn into(self) -> Tag {
 ///         match self {
 ///             // ...
-/// #           Routes::A(x) => Tag::Sequence(x),
-/// #           Routes::B(x) => Tag::Sequence(x),
+/// #           Routes::A => 1.into(),
+/// #           Routes::B => 2.into(),
 ///         }
 ///     }
 /// }
@@ -100,36 +99,12 @@ impl Default for Depth {
     }
 }
 
-/// Extends a [`Request`] and [`Response`] with event timestamps.
-///
-/// [`Request`]: http::Request
-/// [`Response`]: http::Response
-#[derive(Debug, Clone)]
-pub struct Time {
-    // TODO: Timing<BetweenReqResp>, <BeforeResp>, <SinceReq>, <SinceResp>
-    // Req created, Handler called, Resp created
-    initialized: Instant,
-    dispatched: Option<Instant>,
-    // retrieved: Option<OffsetDateTime>,
-}
-
-impl Default for Time {
-    fn default() -> Self {
-        Self {
-            initialized: Instant::now(),
-            dispatched: None,
-        }
-    }
-}
-
 /// Extension trait for `http::`[`Request`].
 pub trait Task {
-    // TODO: Event timestamps.
-
-    /// Returns a reference to the attached tag.
+    /// Returns a reference to the attached [`Tag`].
     fn try_tag(&self) -> Option<&Tag>;
 
-    /// Returns a reference to the attached tag.
+    /// Returns a reference to the attached [`Tag`], [`Tag::Fallback`] otherwise.
     fn tag(&self) -> &Tag;
 
     /// Returns a recursive depth of this [`Request`].

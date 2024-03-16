@@ -7,13 +7,14 @@ use tower::{Service, ServiceExt};
 
 pub use body::{Body, Request, Response};
 pub use extend::{Tag, Task, TaskBuilder};
+use extend::Depth;
 pub use queue::RequestQueue;
 pub use signal::{IntoSignal, Signal, TagQuery};
 
-use crate::backend::Backend;
-use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::Datasets;
 use crate::{Error, Result};
+use crate::backend::{Backend, Client};
+use crate::dataset::Datasets;
+use crate::dataset::util::BoxCloneDataset;
 
 mod body;
 mod extend;
@@ -29,7 +30,7 @@ pub struct Context<B> {
 
 impl<B> Context<B> {
     /// Creates a new [`Context`].
-    pub fn new(request: Request, backend: B, datasets: Datasets) -> Self {
+    pub(crate) fn new(request: Request, backend: B, datasets: Datasets) -> Self {
         Self {
             request,
             backend,
@@ -45,20 +46,21 @@ impl<B> Context<B> {
     }
 
     /// Resolves the [`Request`] and returns [`Response`] or [`Error`].
-    pub async fn try_resolve(mut self) -> Result<Response>
+    pub async fn try_resolve(self) -> Result<Response>
     where
-        B: Service<Request, Response = Response, Error = Error>,
-        <B as Service<Request>>::Future: Send,
+        B: Backend,
     {
-        let ret = self.backend.call(self.request).await;
-        ret.map_err(Error::new)
+        let client: B::Client = self.backend.call().await?;
+        let response: Response = client.invoke(self.request).await?;
+        Ok(response)
     }
 
+    /// Returns the [`Backend`]'s client.
     pub async fn client(&self) -> Result<B::Client>
     where
         B: Backend,
     {
-        self.backend.instance().await
+        self.backend.call().await
     }
 
     /// Initializes and returns the [`RequestQueue`].

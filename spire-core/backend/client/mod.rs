@@ -1,3 +1,7 @@
+//! TODO.
+//!
+//!
+
 use std::fmt;
 use std::sync::Mutex;
 use std::task::{Context, Poll};
@@ -16,7 +20,7 @@ use crate::context::{Request, Response};
 mod builder;
 mod handler;
 
-/// Simple http client [`Backend`  backed by the underlying [`Service`].
+/// Simple http client [`Backend`]  backed by the underlying [`Service`].
 pub struct HttpClientPool {
     inner: Mutex<BoxCloneService<Request, Response, Error>>,
 }
@@ -82,7 +86,7 @@ impl Service<Request> for HttpClientPool {
 impl Backend for HttpClientPool {
     type Client = HttpClient;
 
-    async fn instance(&self) -> Result<Self::Client> {
+    async fn call(&self) -> Result<Self::Client> {
         let svc = self.inner.lock().unwrap();
         Ok(HttpClient::new(svc.clone()))
     }

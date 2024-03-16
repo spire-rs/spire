@@ -1,3 +1,7 @@
+//! TODO.
+//!
+//!
+
 use std::fmt;
 use std::future::Ready;
 use std::task::{Context, Poll};
@@ -5,16 +9,16 @@ use std::task::{Context, Poll};
 use deadpool::managed::Pool;
 use tower::Service;
 
-pub use browser::BrowserClient;
-pub use manager::BrowserManager;
+pub use builder::BrowserManager;
+pub use handler::BrowserClient;
 use process::BrowserProcess;
 
-use crate::backend::Backend;
-use crate::context::{Request, Response};
 use crate::{Error, Result};
+use crate::backend::{Backend, BrowserBackend};
+use crate::context::{Request, Response};
 
-mod browser;
-mod manager;
+mod builder;
+mod handler;
 mod process;
 
 /// Web-driver [`Backend`].
@@ -53,6 +57,7 @@ impl Service<Request> for BrowserPool {
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // TODO: Check for available browsers.
         Poll::Ready(Ok(()))
     }
 
@@ -66,15 +71,10 @@ impl Service<Request> for BrowserPool {
 impl Backend for BrowserPool {
     type Client = BrowserClient;
 
-    async fn instance(&self) -> Result<Self::Client> {
+    async fn call(&self) -> Result<Self::Client> {
         todo!()
     }
 }
-
-/// Extension trait for [`Backend`]s that manage actual browsers.
-///
-/// Currently works as a marker trait only.
-pub trait BrowserBackend: Backend {}
 
 impl BrowserBackend for BrowserPool {}
 

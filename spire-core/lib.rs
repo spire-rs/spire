@@ -2,8 +2,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
 
-extern crate core;
-
 pub use process::Daemon;
 
 pub mod backend;

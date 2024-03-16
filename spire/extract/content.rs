@@ -1,8 +1,8 @@
 use bytes::Bytes;
 use serde::de::DeserializeOwned;
-use tower::Service;
 
-use spire_core::context::{Context, Request, Response};
+use spire_core::backend::Backend;
+use spire_core::context::Context;
 use spire_core::Error;
 
 use crate::extract::FromContext;
@@ -14,8 +14,7 @@ pub struct Body(pub Bytes);
 #[async_trait::async_trait]
 impl<B, S> FromContext<B, S> for Body
 where
-    B: Service<Request, Response = Response, Error = Error> + Send + Sync + 'static,
-    <B as Service<Request>>::Future: Send,
+    B: Backend,
     S: Sync,
 {
     type Rejection = Error;
@@ -33,8 +32,7 @@ pub struct Text(pub String);
 #[async_trait::async_trait]
 impl<B, S> FromContext<B, S> for Text
 where
-    B: Service<Request, Response = Response, Error = Error> + Send + Sync + 'static,
-    <B as Service<Request>>::Future: Send,
+    B: Backend,
     S: Sync,
 {
     type Rejection = Error;
@@ -54,8 +52,7 @@ pub struct Json<T>(pub T);
 #[async_trait::async_trait]
 impl<B, S, T> FromContext<B, S> for Json<T>
 where
-    B: Service<Request, Response = Response, Error = Error> + Send + Sync + 'static,
-    <B as Service<Request>>::Future: Send,
+    B: Backend,
     S: Sync,
     T: DeserializeOwned,
 {
@@ -75,8 +72,7 @@ pub struct Html(pub ());
 #[async_trait::async_trait]
 impl<B, S> FromContext<B, S> for Html
 where
-    B: Service<Request, Response = Response, Error = Error> + Send + Sync + 'static,
-    <B as Service<Request>>::Future: Send,
+    B: Backend,
     S: Sync,
 {
     type Rejection = Error;
