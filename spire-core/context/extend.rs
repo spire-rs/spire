@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
+use std::time::Instant;
 
 use http::request::Builder;
-use time::OffsetDateTime;
 
 use crate::context::Request;
 
@@ -38,6 +38,23 @@ pub enum Tag {
     Sequence(String),
     ///
     Rehash(u64),
+}
+
+impl Tag {
+    pub fn fallback() -> Self {
+        Self::Fallback
+    }
+
+    pub fn sequence<T>(seq: T) -> Self
+    where
+        T: AsRef<str>,
+    {
+        Tag::Sequence(seq.as_ref().to_owned())
+    }
+
+    pub fn is_fallback(&self) -> bool {
+        matches!(self, Tag::Fallback)
+    }
 }
 
 impl From<&str> for Tag {
@@ -91,15 +108,15 @@ impl Default for Depth {
 pub struct Time {
     // TODO: Timing<BetweenReqResp>, <BeforeResp>, <SinceReq>, <SinceResp>
     // Req created, Handler called, Resp created
-    initialized: OffsetDateTime,
-    dispatched: Option<OffsetDateTime>,
+    initialized: Instant,
+    dispatched: Option<Instant>,
     // retrieved: Option<OffsetDateTime>,
 }
 
 impl Default for Time {
     fn default() -> Self {
         Self {
-            initialized: OffsetDateTime::now_utc(),
+            initialized: Instant::now(),
             dispatched: None,
         }
     }
@@ -157,21 +174,26 @@ impl TaskBuilder for Builder {
 mod test {
     use http::request::Builder;
 
-    use crate::context::{Body, Tag, TaskBuilder};
+    use crate::context::{Body, Request, Tag, Task, TaskBuilder};
+
+    fn make_request(f: fn(Builder) -> Builder) -> Request {
+        let request = Builder::new().uri("https://example.com/");
+        f(request).body(Body::default()).unwrap()
+    }
 
     #[test]
-    fn request_tag() {}
-
-    fn request_timing() {}
+    fn with_tag() {
+        let request = make_request(|x| x);
+        assert_eq!(request.tag(), &Tag::fallback());
+        let request = make_request(|x| x.tag(Tag::sequence("")));
+        assert_eq!(request.tag(), &Tag::sequence(""));
+    }
 
     #[test]
-    fn builder() {
-        let build = Builder::new()
-            .uri("https://example.com/")
-            .tag(Tag::default())
-            .depth(2)
-            .body(Body::default());
-
-        assert!(matches!(build, Ok(_)));
+    fn with_depth() {
+        let request = make_request(|x| x);
+        assert_eq!(request.depth(), 1);
+        let request = make_request(|x| x.depth(2));
+        assert_eq!(request.depth(), 2);
     }
 }

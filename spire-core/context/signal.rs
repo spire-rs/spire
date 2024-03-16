@@ -6,7 +6,7 @@ use crate::{BoxError, Error};
 
 /// Defines a way to select or filter out [`Tag`]s.
 #[derive(Debug, Default, Clone)]
-pub enum Query {
+pub enum TagQuery {
     /// Matches the same [`Tag`] as used by the [`Request`].
     ///
     /// Does not match [`Tag::Fallback`].
@@ -25,14 +25,14 @@ pub enum Query {
     Include(Vec<Tag>),
 }
 
-impl Query {
+impl TagQuery {
+    /// Matches a [`Tag`] to the owned [`TagQuery`].
     pub(crate) fn is_match(&self, tag: &Tag, owner: &Tag) -> bool {
-        let is_fallback = matches!(owner, &Tag::Fallback);
         match self {
-            Query::Owner => !is_fallback && tag == owner,
-            Query::Every => true,
-            Query::Exclude(x) => !x.contains(tag),
-            Query::Include(x) => x.contains(tag),
+            TagQuery::Owner => !owner.is_fallback() && tag == owner,
+            TagQuery::Every => true,
+            TagQuery::Exclude(x) => !x.contains(tag),
+            TagQuery::Include(x) => x.contains(tag),
         }
     }
 }
@@ -46,24 +46,24 @@ impl Query {
 /// [`ControlFlow`]: std::ops::ControlFlow
 #[derive(Debug, Default)]
 pub enum Signal {
-    /// Task processed, immediately proceed with another task.
+    /// Task succeeded, immediately proceed with another task.
     #[default]
     Continue,
     /// Task failed, immediately proceed with another task.
     Skip,
 
-    /// Task processed, wait before tasks with matching tags.
-    Wait(Query, Duration),
-    /// Task failed, wait before tasks with matching tags.
-    Repeat(Query, Duration),
+    /// Task succeeded, wait before tasks with matching tags.
+    Wait(TagQuery, Duration),
+    /// Task failed, wait before repeating this task.
+    Repeat(TagQuery, Duration),
 
     /// Task failed, terminate all collector tasks.
-    Stop(Query, Error),
+    Stop(TagQuery, Error),
 }
 
 impl Signal {
     pub fn error(error: impl Into<BoxError>) -> Self {
-        Signal::Stop(Query::Owner, Error::new(error))
+        Signal::Stop(TagQuery::Owner, Error::new(error))
     }
 
     /// Returns the provided [`Duration`] if applicable, default otherwise.
@@ -76,12 +76,12 @@ impl Signal {
     }
 
     // Returns the provided [`Query`] if applicable, default otherwise.
-    pub fn query(&self) -> Query {
+    pub fn query(&self) -> TagQuery {
         match self {
             Signal::Wait(x, _) => x.clone(),
             Signal::Repeat(x, _) => x.clone(),
             Signal::Stop(x, _) => x.clone(),
-            _ => Query::default(),
+            _ => TagQuery::default(),
         }
     }
 }
@@ -112,13 +112,13 @@ impl IntoSignal for Infallible {
 
 impl IntoSignal for Duration {
     fn into_signal(self) -> Signal {
-        Signal::Wait(Query::default(), self)
+        Signal::Wait(TagQuery::default(), self)
     }
 }
 
 impl IntoSignal for Error {
     fn into_signal(self) -> Signal {
-        Signal::Stop(Query::Every, self)
+        Signal::Stop(TagQuery::Every, self)
     }
 }
 

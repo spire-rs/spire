@@ -7,13 +7,15 @@ use tower::Service;
 
 pub use browser::BrowserClient;
 pub use manager::BrowserManager;
+use process::BrowserProcess;
 
 use crate::backend::Backend;
 use crate::context::{Request, Response};
-use crate::Error;
+use crate::{Error, Result};
 
 mod browser;
 mod manager;
+mod process;
 
 /// Web-driver [`Backend`].
 #[derive(Clone)]
@@ -22,7 +24,7 @@ pub struct BrowserPool {
 }
 
 impl BrowserPool {
-    pub fn new(pool: Pool<BrowserManager>) -> Self {
+    pub(crate) fn new(pool: Pool<BrowserManager>) -> Self {
         Self { pool }
     }
 
@@ -33,8 +35,8 @@ impl BrowserPool {
 
 impl Default for BrowserPool {
     fn default() -> Self {
-        // Self::builder()
-        todo!()
+        // TODO. Add default processes.
+        Self::builder().build()
     }
 }
 
@@ -60,8 +62,13 @@ impl Service<Request> for BrowserPool {
     }
 }
 
+#[async_trait::async_trait]
 impl Backend for BrowserPool {
     type Client = BrowserClient;
+
+    async fn instance(&self) -> Result<Self::Client> {
+        todo!()
+    }
 }
 
 /// Extension trait for [`Backend`]s that manage actual browsers.

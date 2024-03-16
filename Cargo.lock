@@ -991,9 +991,9 @@ dependencies = [
  "http-body-util",
  "hyper 1.2.0",
  "hyper-util",
+ "pin-project-lite",
  "reqwest",
  "thiserror",
- "time",
  "tower",
 ]
 

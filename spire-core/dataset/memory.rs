@@ -66,25 +66,22 @@ where
     type Error = Infallible;
 
     async fn add(&self, data: T) -> Result<(), Self::Error> {
-        let guard = self.inner.buffer.lock();
-        let mut lock = guard.expect("should not be already held");
-        lock.push_back(data);
+        let mut guard = self.inner.buffer.lock().unwrap();
+        guard.push_back(data);
         Ok(())
     }
 
     async fn get(&self) -> Result<Option<T>, Self::Error> {
-        let guard = self.inner.buffer.lock();
-        let mut lock = guard.expect("should not be already held");
+        let mut guard = self.inner.buffer.lock().unwrap();
         if self.inner.is_fifo {
-            Ok(lock.pop_front())
+            Ok(guard.pop_front())
         } else {
-            Ok(lock.pop_back())
+            Ok(guard.pop_back())
         }
     }
 
     fn len(&self) -> usize {
-        let guard = self.inner.buffer.lock();
-        let lock = guard.expect("should not be already held");
-        lock.len()
+        let guard = self.inner.buffer.lock().unwrap();
+        guard.len()
     }
 }

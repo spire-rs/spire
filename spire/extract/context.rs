@@ -5,10 +5,10 @@
 
 use std::convert::Infallible;
 
-use spire_core::backend::HttpClient;
+use spire_core::backend::{HttpClient, HttpClientPool};
 use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::util::BoxCloneDataset;
 use spire_core::dataset::Dataset as CoreDataset;
+use spire_core::dataset::util::BoxCloneDataset;
 use spire_core::Error;
 
 use crate::extract::{FromContext, FromContextParts};
@@ -25,15 +25,17 @@ where
     }
 }
 
+// TODO: Move under feature.
+// TODO: HttpClient.
 #[async_trait::async_trait]
-impl<S> FromContextParts<HttpClient, S> for HttpClient {
-    type Rejection = Infallible;
+impl<S> FromContextParts<HttpClientPool, S> for HttpClient {
+    type Rejection = Error;
 
     async fn from_context_parts(
-        cx: &Context<HttpClient>,
+        cx: &Context<HttpClientPool>,
         _state: &S,
     ) -> Result<Self, Self::Rejection> {
-        todo!()
+        cx.client().await
     }
 }
 

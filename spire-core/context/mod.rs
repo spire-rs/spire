@@ -8,8 +8,9 @@ use tower::{Service, ServiceExt};
 pub use body::{Body, Request, Response};
 pub use extend::{Tag, Task, TaskBuilder};
 pub use queue::RequestQueue;
-pub use signal::{IntoSignal, Query, Signal};
+pub use signal::{IntoSignal, Signal, TagQuery};
 
+use crate::backend::Backend;
 use crate::dataset::util::BoxCloneDataset;
 use crate::dataset::Datasets;
 use crate::{Error, Result};
@@ -51,6 +52,13 @@ impl<B> Context<B> {
     {
         let ret = self.backend.call(self.request).await;
         ret.map_err(Error::new)
+    }
+
+    pub async fn client(&self) -> Result<B::Client>
+    where
+        B: Backend,
+    {
+        self.backend.instance().await
     }
 
     /// Initializes and returns the [`RequestQueue`].

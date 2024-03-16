@@ -4,7 +4,7 @@ use futures::stream::StreamExt;
 use tower::load::Load;
 use tower::{Service, ServiceBuilder, ServiceExt};
 
-use crate::context::{Context, IntoSignal, Request, Response, Signal, Tag, Task};
+use crate::context::{Context, IntoSignal, Request, Response, Signal};
 use crate::dataset::Datasets;
 use crate::process::metric::{Metrics, MetricsLayer, Stats};
 use crate::process::signal::{Signals, SignalsLayer};
@@ -64,38 +64,35 @@ impl<B, S> Runner<B, S> {
 
         let stream = dataset
             .into_stream()
-            .then(|x| async { self.call_service(x).await })
-            .map(|x| async { self.notify_signal(x).await })
+            .map(|x| async { self.call_service(x).await })
             .buffer_unordered(8)
             .count();
 
         Ok(stream.await)
     }
 
-    async fn call_service(&self, request: Result<Request>) -> Signal
+    async fn call_service(&self, request: Result<Request>)
     where
         B: Service<Request, Response = Response, Error = Error> + Clone,
         S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
     {
         match request {
-            Ok(x) => self.try_call_service(x).await.1,
-            // TODO: Call error_handler if provided.
-            Err(x) => x.into_signal(),
+            Ok(x) => self.try_call_service(x).await,
+            Err(x) => self.notify_signal(x.into_signal()).await,
         }
     }
 
-    async fn try_call_service(&self, request: Request) -> (Tag, Signal)
+    async fn try_call_service(&self, request: Request)
     where
         B: Service<Request, Response = Response, Error = Error> + Clone,
         S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
     {
         let backend = self.backend.clone();
         let datasets = self.datasets.clone();
-        let caller_tag = request.tag().clone();
         let cx = Context::new(request, backend, datasets);
 
         let oneshot = self.service.clone().oneshot(cx);
-        (caller_tag, oneshot.await.unwrap())
+        oneshot.await.unwrap()
     }
 
     async fn notify_signal(&self, signal: Signal) {

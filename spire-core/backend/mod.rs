@@ -1,17 +1,18 @@
 //! Types and traits for data retrieval [`Backend`]s.
 //!
 
+use async_trait::async_trait;
 use tower::Service;
 
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-pub use client::HttpClient;
+pub use client::{HttpClient, HttpClientBuilder, HttpClientPool};
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::{BrowserBackend, BrowserClient, BrowserManager, BrowserPool};
 
 use crate::context::{Request, Response};
-use crate::Error;
+use crate::{Error, Result};
 
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
@@ -21,7 +22,10 @@ pub mod client;
 pub mod driver;
 
 /// TODO.
-pub trait Backend: Service<Request, Response = Response, Error = Error> {
+#[async_trait]
+pub trait Backend {
     /// TODO.
-    type Client;
+    type Client: Service<Request, Response = Response, Error = Error>;
+
+    async fn instance(&self) -> Result<Self::Client>;
 }

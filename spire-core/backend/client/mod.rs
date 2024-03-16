@@ -1,26 +1,28 @@
 use std::fmt;
-use std::future::Ready;
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 
-use tower::util::BoxCloneService;
+use futures::future::BoxFuture;
 use tower::{Service, ServiceExt};
+use tower::util::BoxCloneService;
 
-use builder::Builder;
+pub use builder::HttpClientBuilder;
+pub use handler::HttpClient;
 
+use crate::{BoxError, Error, Result};
 use crate::backend::Backend;
-use crate::context::{Body, Request, Response};
-use crate::{BoxError, Error};
+use crate::context::{Request, Response};
 
 mod builder;
+mod handler;
 
-/// http client [`Backend`] backed by the underlying [`Service`].
-pub struct HttpClient {
+/// Simple http client [`Backend`  backed by the underlying [`Service`].
+pub struct HttpClientPool {
     inner: Mutex<BoxCloneService<Request, Response, Error>>,
 }
 
-impl HttpClient {
-    /// Creates a new [`HttpClient`].
+impl HttpClientPool {
+    /// Creates a new [`HttpClientPool`].
     pub fn new<S, E>(svc: S) -> Self
     where
         S: Service<Request, Response = Response, Error = E> + Clone + Send + 'static,
@@ -32,31 +34,19 @@ impl HttpClient {
         Self { inner }
     }
 
-    pub fn new2<S, B, E, ETryInto, ETryFrom>(svc: S) -> Self
-    where
-        S: Service<Request<B>, Response = Response<B>, Error = E> + Clone + Send + 'static,
-        S::Future: Send + 'static,
-        E: Into<BoxError>,
-        B: TryInto<Body, Error = ETryInto> + TryFrom<Body, Error = ETryFrom>,
-        ETryInto: Into<BoxError>,
-        ETryFrom: Into<BoxError>,
-    {
-        // TODO: remap Body.
-        todo!()
-    }
-
-    pub fn builder() -> Builder {
-        Builder::new()
+    /// Creates a new [`HttpClientBuilder`].
+    pub fn builder() -> HttpClientBuilder {
+        HttpClientBuilder::new()
     }
 }
 
-impl Default for HttpClient {
+impl Default for HttpClientPool {
     fn default() -> Self {
-        todo!()
+        Self::builder().build()
     }
 }
 
-impl Clone for HttpClient {
+impl Clone for HttpClientPool {
     fn clone(&self) -> Self {
         let svc = self.inner.lock().unwrap();
         let inner = Mutex::new(svc.clone());
@@ -64,31 +54,38 @@ impl Clone for HttpClient {
     }
 }
 
-impl fmt::Debug for HttpClient {
+impl fmt::Debug for HttpClientPool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HttpClient").finish_non_exhaustive()
     }
 }
 
-impl Service<Request> for HttpClient {
+impl Service<Request> for HttpClientPool {
     type Response = Response;
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future = BoxFuture<'static, Result<Response>>;
 
     #[inline]
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let mut guard = self.inner.lock().unwrap();
+        guard.poll_ready(cx)
     }
 
     #[inline]
     fn call(&mut self, req: Request) -> Self::Future {
-        todo!()
+        let mut guard = self.inner.lock().unwrap();
+        guard.call(req)
     }
 }
 
 #[async_trait::async_trait]
-impl Backend for HttpClient {
-    type Client = ();
+impl Backend for HttpClientPool {
+    type Client = HttpClient;
+
+    async fn instance(&self) -> Result<Self::Client> {
+        let svc = self.inner.lock().unwrap();
+        Ok(HttpClient::new(svc.clone()))
+    }
 }
 
 #[cfg(test)]
@@ -97,9 +94,9 @@ mod test {
     use reqwest::{Request as RwRequest, Response as RwResponse};
     use tower::ServiceBuilder;
 
-    use crate::backend::HttpClient;
-    use crate::context::{Request, Response};
+    use crate::backend::HttpClientPool;
     use crate::BoxError;
+    use crate::context::{Request, Response};
 
     #[test]
     fn reqwest() {
@@ -107,11 +104,11 @@ mod test {
         // BLOCKED: https://github.com/seanmonstar/reqwest/pull/2060
 
         let svc = ServiceBuilder::default()
-            .map_request(|x: Request| -> RwRequest { todo!() })
-            .map_response(|x: RwResponse| -> Response { todo!() })
+            .map_request(|_x: Request| -> RwRequest { unreachable!() })
+            .map_response(|_x: RwResponse| -> Response { unreachable!() })
             .map_err(|x: Error| -> BoxError { x.into() })
             .service(Client::default());
 
-        let _ = HttpClient::new(svc);
+        let _ = HttpClientPool::new(svc);
     }
 }

@@ -38,7 +38,6 @@ impl<T, E> BoxCloneDataset<T, E> {
         T: 'static,
         E: 'static,
     {
-        // TODO: Remove Option into Result<T, E>.
         try_stream! {
             loop {
                 let item = self.dataset.get().await?;

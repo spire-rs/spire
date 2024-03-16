@@ -96,3 +96,28 @@ pub type Request<B = Body> = http::Request<B>;
 ///
 /// [`Response`]: http::Response
 pub type Response<B = Body> = http::Response<B>;
+
+#[cfg(test)]
+mod test {
+    use bytes::Bytes;
+    use http_body_util::{Empty, Full};
+
+    use crate::context::Body;
+
+    #[test]
+    pub fn empty() {
+        let _ = Body::default();
+        let _ = Body::new(Empty::new());
+    }
+
+    #[test]
+    pub fn full() {
+        let body = Full::new(Bytes::new());
+        let _ = Body::new(body);
+    }
+
+    #[test]
+    pub fn stream() {
+        // TODO: Streaming body.
+    }
+}

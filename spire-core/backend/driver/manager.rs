@@ -5,21 +5,27 @@ use std::time::Instant;
 
 use deadpool::managed::{Manager, Metrics, Pool, RecycleResult};
 
+use crate::backend::driver::BrowserProcess;
 use crate::backend::{BrowserClient, BrowserPool};
 use crate::Error;
 
 /// [`BrowserPool`] builder.
 pub struct BrowserManager {
-    managed: HashMap<u32, ()>,
     // builder: ClientBuilder<()>,
-    // webdriver: Vec<()>
+    promised: HashMap<u32, ConnType>,
+    managed: HashMap<u32, ()>,
+    connected: HashMap<u32, ()>,
+}
+
+enum ConnType {
+    Managed(BrowserProcess),
+    Unmanaged(String),
 }
 
 impl BrowserManager {
     pub fn new() -> Self {
-        Self {
-            managed: HashMap::default(),
-        }
+        // BLOCKED: https://github.com/jonhoo/fantoccini/pull/245
+        todo!()
     }
 
     pub fn with_unmanaged<T>(self, webdriver: T) -> Self

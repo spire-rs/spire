@@ -1,18 +1,13 @@
-// pub trait WebDriver {}
-
-// pub struct ChromeDriver {}
-
-// pub enum Connection {
-//     Managed(DriverProcess),
-//     Unmanaged(String),
-// }
-
-// pub struct DriverProcess {}
-
 use std::fmt;
 use std::ops::{Deref, DerefMut};
+use std::task::{Context, Poll};
 
 use fantoccini::Client;
+use futures::future::BoxFuture;
+use tower::Service;
+
+use crate::context::{Request, Response};
+use crate::Error;
 
 #[derive(Clone)]
 pub struct BrowserClient {
@@ -51,5 +46,21 @@ impl Deref for BrowserClient {
 impl DerefMut for BrowserClient {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.client
+    }
+}
+
+impl Service<Request> for BrowserClient {
+    type Response = Response;
+    type Error = Error;
+    type Future = BoxFuture<'static, crate::Result<Response>>;
+
+    #[inline]
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        todo!()
+    }
+
+    #[inline]
+    fn call(&mut self, req: Request) -> Self::Future {
+        todo!()
     }
 }

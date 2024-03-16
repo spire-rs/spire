@@ -1,18 +1,18 @@
-use crate::backend::HttpClient;
+use crate::backend::HttpClientPool;
 
-pub struct Builder {}
+pub struct HttpClientBuilder {}
 
-impl Builder {
+impl HttpClientBuilder {
     pub fn new() -> Self {
         todo!()
     }
 
-    pub fn build(self) -> HttpClient {
+    pub fn build(self) -> HttpClientPool {
         todo!()
     }
 }
 
-impl Default for Builder {
+impl Default for HttpClientBuilder {
     fn default() -> Self {
         Self::new()
     }
