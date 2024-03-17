@@ -6,7 +6,7 @@ use tower::Service;
 
 use crate::{BoxError, Error, Result};
 use crate::context::{Context, Request, Response, Signal};
-use crate::dataset::Dataset;
+use crate::dataset::{Dataset, InMemDataset};
 use crate::dataset::util::BoxCloneDataset;
 use crate::process::runner::Runner;
 
@@ -58,10 +58,11 @@ impl<B, S> Daemon<B, S> {
         self
     }
 
-    /// Inserts or replaces (if any already inserted) the provided [`Dataset`].
+    /// Inserts the provided [`Dataset`].
     ///
     /// ### Note
     ///
+    /// Replaces the dataset of the same type if it is already inserted.
     /// Does not move items from the replaced `Dataset`.
     ///
     /// If the handler requests for a [`Dataset`] of a specific type, but  no `Dataset` of this
@@ -78,7 +79,11 @@ impl<B, S> Daemon<B, S> {
         self
     }
 
-    /// Returns either the previously provided or default-initialized boxed [`Dataset`].
+    /// Returns the [`Dataset`] of the requested type.
+    ///
+    /// ### Note
+    ///
+    /// Inserts and returns the [`InMemDataset`] if none was found.
     pub fn dataset<T>(&self) -> BoxCloneDataset<T, Error>
     where
         T: Send + Sync + 'static,
@@ -106,13 +111,13 @@ impl<B, S> fmt::Debug for Daemon<B, S> {
 pub struct DaemonHandle {}
 
 impl DaemonHandle {
-    /// TODO.
-    pub fn new() -> Self {
+    /// Creates a new [`DaemonHandle`].
+    pub(crate) fn new() -> Self {
         todo!()
     }
 
-    /// TODO.
-    pub async fn wait(self) -> Result<()> {
+    /// Waits until the TODO.
+    pub async fn wait(self) -> Result<usize> {
         todo!()
     }
 }

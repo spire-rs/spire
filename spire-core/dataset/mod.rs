@@ -1,5 +1,7 @@
 //! Data collection with [`Dataset`] and its utilities.
 //!
+//! [`Datasets`], type-erased collection of `Dataset`s.
+//!
 //! ### Datasets
 //!
 //! - [`InMemDataset`]

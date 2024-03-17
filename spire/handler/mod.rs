@@ -10,7 +10,7 @@ use crate::extract::{FromContext, FromContextRef};
 mod macros;
 mod service;
 
-/// Trait for async functions that can be used to handle [`Request`]s.
+/// Async functions that can be used to handle [`Request`]s.
 ///
 /// You shouldn't need to depend on this trait directly. It is automatically
 /// implemented to closures of the right types.

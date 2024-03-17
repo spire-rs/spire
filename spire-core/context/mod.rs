@@ -4,15 +4,15 @@
 use std::fmt;
 
 pub use body::{Body, Request, Response};
-use extend::Depth;
 pub use extend::{Tag, Task, TaskBuilder};
+use extend::Depth;
 pub use queue::RequestQueue;
 pub use signal::{IntoSignal, Signal, TagQuery};
 
-use crate::backend::{Backend, Client};
-use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::Datasets;
 use crate::{Error, Result};
+use crate::backend::{Backend, Client};
+use crate::dataset::Datasets;
+use crate::dataset::util::BoxCloneDataset;
 
 mod body;
 mod extend;
@@ -28,7 +28,7 @@ pub struct Context<B> {
 
 impl<B> Context<B> {
     /// Creates a new [`Context`].
-    pub(crate) fn new(request: Request, backend: B, datasets: Datasets) -> Self {
+    pub fn new(request: Request, backend: B, datasets: Datasets) -> Self {
         Self {
             request,
             backend,
