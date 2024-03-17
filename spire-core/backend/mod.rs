@@ -2,17 +2,13 @@
 //!
 //! ### Backends
 //!
-//! - [`HttpClientPool`]
+//! - [`HttpClient`]
 //! - [`BrowserPool`]
 //!
 
-use std::future::Future;
-
-use tower::Service;
-
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-pub use client::{HttpClient, HttpClientBuilder, HttpClientPool};
+pub use client::{HttpClient, HttpClientBuilder};
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::{BrowserClient, BrowserManager, BrowserPool};

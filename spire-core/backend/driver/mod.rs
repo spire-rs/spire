@@ -28,10 +28,12 @@ pub struct BrowserPool {
 }
 
 impl BrowserPool {
+    /// Creates a new [`BrowserPool`].
     pub(crate) fn new(pool: Pool<BrowserManager>) -> Self {
         Self { pool }
     }
 
+    /// Creates a new [`BrowserManager`].
     pub fn builder() -> BrowserManager {
         BrowserManager::new()
     }

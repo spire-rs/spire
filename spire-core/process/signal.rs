@@ -8,7 +8,7 @@ use pin_project_lite::pin_project;
 use tower::load::Load;
 use tower::{Layer, Service};
 
-use crate::context::{Context as Cx, Signal};
+use crate::context::{Context as Cx, Signal, Tag, Task};
 
 /// TODO.
 #[derive(Clone)]
@@ -50,7 +50,20 @@ impl<S> Signals<S> {
     }
 
     /// Applies the signal to the subsequent requests.
-    pub async fn notify_signal(&self, signal: Signal) {
+    pub fn notify_signal(&self, signal: Signal) {
+        match signal {
+            Signal::Continue => {}
+            Signal::Skip => {}
+            Signal::Wait(_, _) => {}
+            Signal::Repeat(_, _) => {}
+            Signal::Stop(_, _) => {}
+        }
+
+        todo!()
+    }
+
+    /// TODO.
+    pub fn find_queries(&self, tag: &Tag) {
         todo!()
     }
 }
@@ -79,6 +92,8 @@ where
 
     #[inline]
     fn call(&mut self, cx: Cx<B>) -> Self::Future {
+        let _ = self.find_queries(cx.peek().tag());
+        // TODO: Apply queries.
         SignalsFuture::new(self.inner.call(cx))
     }
 }

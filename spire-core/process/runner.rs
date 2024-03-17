@@ -1,14 +1,14 @@
 use std::convert::Infallible;
 
 use futures::stream::StreamExt;
-use tower::load::Load;
 use tower::{Service, ServiceBuilder, ServiceExt};
+use tower::load::Load;
 
+use crate::{Error, Result};
 use crate::context::{Context, IntoSignal, Request, Response, Signal};
 use crate::dataset::Datasets;
 use crate::process::metric::{Metrics, MetricsLayer, Stats};
 use crate::process::signal::{Signals, SignalsLayer};
-use crate::{Error, Result};
 
 pub struct Runner<B, S> {
     pub(crate) service: Signals<Metrics<S>>,
@@ -64,25 +64,25 @@ impl<B, S> Runner<B, S> {
 
         let stream = dataset
             .into_stream()
-            .map(|x| async { self.call_service(x).await })
+            .map(|x| async { self.try_call_service(x).await })
             .buffer_unordered(8)
             .count();
 
         Ok(stream.await)
     }
 
-    async fn call_service(&self, request: Result<Request>)
+    async fn try_call_service(&self, request: Result<Request>)
     where
         B: Service<Request, Response = Response, Error = Error> + Clone,
         S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
     {
         match request {
-            Ok(x) => self.try_call_service(x).await,
-            Err(x) => self.notify_signal(x.into_signal()).await,
+            Ok(x) => self.call_service(x).await,
+            Err(x) => self.notify_signal(x.into_signal()),
         }
     }
 
-    async fn try_call_service(&self, request: Request)
+    async fn call_service(&self, request: Request)
     where
         B: Service<Request, Response = Response, Error = Error> + Clone,
         S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
@@ -95,7 +95,7 @@ impl<B, S> Runner<B, S> {
         oneshot.await.unwrap()
     }
 
-    async fn notify_signal(&self, signal: Signal) {
-        self.service.notify_signal(signal).await
+    fn notify_signal(&self, signal: Signal) {
+        self.service.notify_signal(signal)
     }
 }

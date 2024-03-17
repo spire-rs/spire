@@ -5,8 +5,8 @@ use std::time::Instant;
 
 use deadpool::managed::{Manager, Metrics, Pool, RecycleResult};
 
-use crate::backend::driver::BrowserProcess;
 use crate::backend::{BrowserClient, BrowserPool};
+use crate::backend::driver::BrowserProcess;
 use crate::Error;
 
 /// [`BrowserPool`] builder.
@@ -23,6 +23,7 @@ enum ConnType {
 }
 
 impl BrowserManager {
+    /// Creates a new [`BrowserManager`].
     pub fn new() -> Self {
         // BLOCKED: https://github.com/jonhoo/fantoccini/pull/245
         todo!()

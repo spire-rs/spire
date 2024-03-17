@@ -11,22 +11,20 @@ use tower::{Service, ServiceExt};
 use tower::util::BoxCloneService;
 
 pub use builder::HttpClientBuilder;
-pub use handler::HttpClient;
 
 use crate::{BoxError, Error, Result};
-use crate::backend::Backend;
+use crate::backend::{Backend, Client};
 use crate::context::{Request, Response};
 
 mod builder;
-mod handler;
 
 /// Simple http client [`Backend`]  backed by the underlying [`Service`].
-pub struct HttpClientPool {
+pub struct HttpClient {
     inner: Mutex<BoxCloneService<Request, Response, Error>>,
 }
 
-impl HttpClientPool {
-    /// Creates a new [`HttpClientPool`].
+impl HttpClient {
+    /// Creates a new [`HttpClient`].
     pub fn new<S, E>(svc: S) -> Self
     where
         S: Service<Request, Response = Response, Error = E> + Clone + Send + 'static,
@@ -44,13 +42,13 @@ impl HttpClientPool {
     }
 }
 
-impl Default for HttpClientPool {
+impl Default for HttpClient {
     fn default() -> Self {
         Self::builder().build()
     }
 }
 
-impl Clone for HttpClientPool {
+impl Clone for HttpClient {
     fn clone(&self) -> Self {
         let svc = self.inner.lock().unwrap();
         let inner = Mutex::new(svc.clone());
@@ -58,13 +56,13 @@ impl Clone for HttpClientPool {
     }
 }
 
-impl fmt::Debug for HttpClientPool {
+impl fmt::Debug for HttpClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HttpClient").finish_non_exhaustive()
     }
 }
 
-impl Service<Request> for HttpClientPool {
+impl Service<Request> for HttpClient {
     type Response = Response;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Response>>;
@@ -83,12 +81,19 @@ impl Service<Request> for HttpClientPool {
 }
 
 #[async_trait::async_trait]
-impl Backend for HttpClientPool {
-    type Client = HttpClient;
+impl Backend for HttpClient {
+    type Client = Self;
 
     async fn call(&self) -> Result<Self::Client> {
-        let svc = self.inner.lock().unwrap();
-        Ok(HttpClient::new(svc.clone()))
+        Ok(self.clone())
+    }
+}
+
+#[async_trait::async_trait]
+impl Client for HttpClient {
+    #[inline]
+    async fn invoke(self, req: Request) -> Result<Response> {
+        self.oneshot(req).await
     }
 }
 
@@ -98,7 +103,7 @@ mod test {
     use reqwest::{Request as RwRequest, Response as RwResponse};
     use tower::ServiceBuilder;
 
-    use crate::backend::HttpClientPool;
+    use crate::backend::HttpClient;
     use crate::BoxError;
     use crate::context::{Request, Response};
 
@@ -113,6 +118,6 @@ mod test {
             .map_err(|x: Error| -> BoxError { x.into() })
             .service(Client::default());
 
-        let _ = HttpClientPool::new(svc);
+        let _ = HttpClient::new(svc);
     }
 }

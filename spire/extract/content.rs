@@ -64,21 +64,3 @@ where
         Ok(Json(inner))
     }
 }
-
-/// TODO.
-#[derive(Debug, Clone)]
-pub struct Html(pub ());
-
-#[async_trait::async_trait]
-impl<B, S> FromContext<B, S> for Html
-where
-    B: Backend,
-    S: Sync,
-{
-    type Rejection = Error;
-
-    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let Body(bytes) = Body::from_context(cx, state).await?;
-        todo!()
-    }
-}

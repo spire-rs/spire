@@ -26,7 +26,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 path = "./lib.rs"
 
 [features]
-default = ["client", "driver"]
+default = []
 full = ["client", "driver", "tracing", "util"]
 
 client = ["dep:hyper", "dep:hyper-util"]
@@ -37,7 +37,7 @@ util = []
 
 [dependencies]
 bytes = { workspace = true }
-tower = { workspace = true, features = ["load"] }
+tower = { workspace = true, features = ["load", "util"] }
 async-trait = { workspace = true }
 pin-project-lite = { workspace = true }
 thiserror = { workspace = true }

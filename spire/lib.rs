@@ -18,7 +18,7 @@ pub mod prelude {}
 mod test {
     use spire_core::backend::BrowserPool;
 
-    use crate::backend::HttpClientPool;
+    use crate::backend::HttpClient;
     use crate::context::RequestQueue;
     use crate::dataset::{Dataset as _, InMemDataset};
     use crate::extract::Dataset;
@@ -38,9 +38,9 @@ mod test {
             .route("page*", handler)
             .fallback(handler);
 
-        let backend = HttpClientPool::default();
+        let backend = HttpClient::default();
         let daemon = Daemon::new(backend, router)
-            .with_request_queue(InMemDataset::stack())
+            .with_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new());
 
         let _ = daemon.run();
@@ -59,7 +59,7 @@ mod test {
 
         let backend = BrowserPool::builder().build();
         let daemon = Daemon::new(backend, router)
-            .with_request_queue(InMemDataset::stack())
+            .with_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new());
 
         let _ = daemon.run();

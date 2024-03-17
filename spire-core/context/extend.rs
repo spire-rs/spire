@@ -18,15 +18,16 @@ use crate::context::Request;
 ///     B,
 /// }
 ///
-/// impl Into<Tag> for Routes {
-///     fn into(self) -> Tag {
-///         match self {
+/// impl From<Routes> for Tag {
+///     fn from(route: Routes) -> Self {
+///         match route {
 ///             // ...
 /// #           Routes::A => 1.into(),
 /// #           Routes::B => 2.into(),
 ///         }
 ///     }
 /// }
+///
 /// ```
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
 pub enum Tag {

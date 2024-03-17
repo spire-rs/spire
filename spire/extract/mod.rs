@@ -3,40 +3,41 @@
 //! ### Intro
 //!
 //! A [`Handler`] function is an async function that takes any number of extractors as arguments.
-//! An extractor is a type that implements [`FromContext`] or [`FromContextParts`].
+//! An extractor is a type that implements [`FromContextRef`] or [`FromContext`].
+//!
+//! [`Handler`]: crate::handler::Handler
 //!
 //! ### Extractors
 //!
 //! - [`Context`] to access [`Request`], and [`Response`] for granular control over data fetching.
 //! - [`Body`], [`Text`], and [`Json`]
-//! - [`Html`], [`Elements`] and [`Select`] trait for declarative markup search and extraction.
-//! - [`Queue`], and [`Dataset`] for creating new requests and saving scraped data.
+//!
+//! - [`Html`] (for [`HttpClient`]) or [`View`] (for [`BrowserPool`]) for direct markup access,
+//! or [`Elements`] and [`Select`] trait for declarative markup extraction.
+//! - [`RequestQueue`], and [`Dataset`] for creating new requests and saving scraped data.
 //! - [`State`] and [`FromRef`] trait for state extraction.
 //!
-//! - [`Backend`]-specific [`HttpClient`] and [`WebDriver`].
-//! TODO: Browser, Client.
+//! - [`Backend`]-specific [`HttpClient`] and [`BrowserClient`] (for [`BrowserPool`]).
 //!
 //! [`Backend`]: spire_core::backend::Backend
+//! [`HttpClient`]: spire_core::backend::HttpClient
+//! [`BrowserPool`]: spire_core::backend::BrowserPool
+//! [`BrowserClient`]: spire_core::backend::BrowserClient
+//!
 //! [`Request`]: spire_core::context::Request
 //! [`Response`]: spire_core::context::Response
-//! [`Tag`]: spire_core::context::Tag
-//! [`Queue`]: spire_core::context::RequestQueue
-//! [`Handler`]: crate::handler::Handler
+//! [`RequestQueue`]: spire_core::context::RequestQueue
 
 use std::convert::Infallible;
 
-pub use content::{Body, Html, Json, Text};
-pub use context::Dataset;
-#[cfg(feature = "macros")]
-pub use macros::{Elements, Select};
 use spire_core::context::{Context, IntoSignal};
-pub use state::{FromRef, State};
 
-mod browser;
+pub use crate::extract::content::{Body, Json, Text};
+pub use crate::extract::context::*;
+pub use crate::extract::state::{FromRef, State};
+
 mod content;
 mod context;
-#[cfg(feature = "macros")]
-mod macros;
 mod state;
 
 mod sealed {
@@ -49,7 +50,7 @@ mod sealed {
 
 /// TODO.
 #[async_trait::async_trait]
-pub trait FromContextParts<B, S>: Sized {
+pub trait FromContextRef<B, S>: Sized {
     /// TODO.
     type Rejection: IntoSignal;
 
@@ -72,9 +73,9 @@ impl<B, S, T> FromContext<B, S, sealed::ViaParts> for T
 where
     B: Sync + Send + 'static,
     S: Sync + Send + 'static,
-    T: FromContextParts<B, S>,
+    T: FromContextRef<B, S>,
 {
-    type Rejection = <Self as FromContextParts<B, S>>::Rejection;
+    type Rejection = <Self as FromContextRef<B, S>>::Rejection;
 
     async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
         Self::from_context_parts(&cx, state).await
@@ -82,11 +83,11 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContextParts<B, S> for Option<T>
+impl<B, S, T> FromContextRef<B, S> for Option<T>
 where
     B: Sync + Send + 'static,
     S: Sync + Send + 'static,
-    T: FromContextParts<B, S>,
+    T: FromContextRef<B, S>,
 {
     type Rejection = Infallible;
 
@@ -110,11 +111,11 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContextParts<B, S> for Result<T, T::Rejection>
+impl<B, S, T> FromContextRef<B, S> for Result<T, T::Rejection>
 where
     B: Sync + Send + 'static,
     S: Sync + Send + 'static,
-    T: FromContextParts<B, S>,
+    T: FromContextRef<B, S>,
 {
     type Rejection = Infallible;
 

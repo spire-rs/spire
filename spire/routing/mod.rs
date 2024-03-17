@@ -24,7 +24,7 @@ pub struct Router<B = (), S = ()> {
 }
 
 impl<B, S> Router<B, S> {
-    /// Creates a new [`Router`] with a given [`Backend`].
+    /// Creates a new [`Router`] of the specified [`Backend`] type.
     ///
     /// [`Backend`]: crate::backend::Backend
     pub fn new() -> Self

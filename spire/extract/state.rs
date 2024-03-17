@@ -3,11 +3,11 @@ use std::ops::{Deref, DerefMut};
 
 use spire_core::context::Context;
 
-use crate::extract::FromContextParts;
+use crate::extract::FromContextRef;
 
 /// Used to do reference-to-value conversions thus not consuming the input value.
 pub trait FromRef<T> {
-    /// Converts to this type from a reference to the input type.
+    /// Converts to the type from a reference to the input type.
     fn from_ref(input: &T) -> Self;
 }
 
@@ -25,7 +25,7 @@ where
 pub struct State<T>(pub T);
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContextParts<B, S> for State<T>
+impl<B, S, T> FromContextRef<B, S> for State<T>
 where
     S: Send + Sync + 'static,
     T: FromRef<S>,

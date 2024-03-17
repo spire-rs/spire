@@ -28,7 +28,10 @@ path = "./lib.rs"
 
 [features]
 default = []
-full = ["macros", "tracing", "util"]
+full = ["client", "driver", "macros", "tracing", "util"]
+
+client = ["spire-core/client", "dep:scraper"]
+driver = ["spire-core/driver"]
 
 macros = ["dep:spire-macros"]
 tracing = ["spire-core/tracing"]
@@ -43,5 +46,7 @@ futures = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 async-trait = { workspace = true }
 pin-project-lite = { workspace = true }
+
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { version = "1.0.114" }
+scraper = { version = "0.19.0", optional = true }

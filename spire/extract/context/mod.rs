@@ -1,17 +1,20 @@
-// TODO: Visual: Screen, Color, Capture.
-
-// pub struct Snapshot {}
-// pub struct Capture {}
-
 use std::convert::Infallible;
 
-use spire_core::backend::{HttpClient, HttpClientPool};
 use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::util::BoxCloneDataset;
 use spire_core::dataset::Dataset as CoreDataset;
+use spire_core::dataset::util::BoxCloneDataset;
 use spire_core::Error;
 
-use crate::extract::{FromContext, FromContextParts};
+use crate::extract::{FromContext, FromContextRef};
+#[cfg(feature = "client")]
+pub use crate::extract::context::client::Html;
+#[cfg(feature = "driver")]
+pub use crate::extract::context::driver::{Browser, BrowserHandle, View};
+
+#[cfg(feature = "client")]
+mod client;
+#[cfg(feature = "driver")]
+mod driver;
 
 #[async_trait::async_trait]
 impl<B, S> FromContext<B, S> for Context<B>
@@ -25,22 +28,8 @@ where
     }
 }
 
-// TODO: Move under feature.
-// TODO: HttpClient.
 #[async_trait::async_trait]
-impl<S> FromContextParts<HttpClientPool, S> for HttpClient {
-    type Rejection = Error;
-
-    async fn from_context_parts(
-        cx: &Context<HttpClientPool>,
-        _state: &S,
-    ) -> Result<Self, Self::Rejection> {
-        cx.client().await
-    }
-}
-
-#[async_trait::async_trait]
-impl<B, S> FromContextParts<B, S> for RequestQueue
+impl<B, S> FromContextRef<B, S> for RequestQueue
 where
     B: Sync,
 {
@@ -52,7 +41,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, S> FromContextParts<B, S> for Tag
+impl<B, S> FromContextRef<B, S> for Tag
 where
     B: Sync,
 {
@@ -66,7 +55,7 @@ where
 pub struct Dataset<T>(pub BoxCloneDataset<T, Error>);
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContextParts<B, S> for Dataset<T>
+impl<B, S, T> FromContextRef<B, S> for Dataset<T>
 where
     B: Sync,
     T: Send + Sync + 'static,

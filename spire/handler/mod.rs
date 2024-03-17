@@ -1,16 +1,16 @@
-use std::future::{ready, Future, Ready};
+use std::future::{Future, ready, Ready};
 use std::pin::Pin;
 
 use macros::all_the_tuples;
 pub use service::HandlerService;
 use spire_core::context::{Context, IntoSignal, Signal};
 
-use crate::extract::{FromContext, FromContextParts};
+use crate::extract::{FromContext, FromContextRef};
 
 mod macros;
 mod service;
 
-/// Trait for async functions that can be used to handle requests.
+/// Trait for async functions that can be used to handle [`Request`]s.
 ///
 /// You shouldn't need to depend on this trait directly. It is automatically
 /// implemented to closures of the right types.
@@ -37,6 +37,8 @@ mod service;
 /// let router: Router = Router::new()
 ///     .route(Tag::default(), Signal::Continue);
 /// ```
+///
+/// [`Request`]: crate::context::Request
 pub trait Handler<B, V, S>: Clone + Send + Sized + 'static {
     type Future: Future<Output = Signal>;
 
@@ -95,7 +97,7 @@ macro_rules! impl_handler {
             F: FnOnce($($ty,)* $last,) -> Fut + Clone + Send + 'static,
             Fut: Future<Output = Ret> + Send,
             Ret: IntoSignal,
-            $( $ty: FromContextParts<B, S> + Send, )*
+            $( $ty: FromContextRef<B, S> + Send, )*
             $last: FromContext<B,S, M> + Send,
         {
             type Future = Pin<Box<dyn Future<Output = Signal> + Send>>;

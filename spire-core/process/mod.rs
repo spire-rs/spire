@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use tower::Service;
 
-use crate::context::{Context, Request, Response, Signal};
-use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::Dataset;
-use crate::process::runner::Runner;
 use crate::{BoxError, Error, Result};
+use crate::context::{Context, Request, Response, Signal};
+use crate::dataset::Dataset;
+use crate::dataset::util::BoxCloneDataset;
+use crate::process::runner::Runner;
 
 mod metric;
 mod runner;
@@ -49,7 +49,7 @@ impl<B, S> Daemon<B, S> {
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
     /// [`RequestQueue`]: crate::context::RequestQueue
-    pub fn with_request_queue<D, E>(self, dataset: D) -> Self
+    pub fn with_queue<D, E>(self, dataset: D) -> Self
     where
         D: Dataset<Request, Error = E> + Clone,
         E: Into<BoxError>,
@@ -99,5 +99,20 @@ impl<B, S> fmt::Debug for Daemon<B, S> {
         f.debug_struct("Daemon")
             .field("Datasets", &self.inner.datasets.len())
             .finish_non_exhaustive()
+    }
+}
+
+/// TODO.
+pub struct DaemonHandle {}
+
+impl DaemonHandle {
+    /// TODO.
+    pub fn new() -> Self {
+        todo!()
+    }
+
+    /// TODO.
+    pub async fn wait(self) -> Result<()> {
+        todo!()
     }
 }
