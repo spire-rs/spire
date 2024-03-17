@@ -5,10 +5,10 @@ use tower::{Service, ServiceBuilder, ServiceExt};
 use tower::load::Load;
 
 use crate::{Error, Result};
+use crate::backend::daemon::{Metrics, MetricsLayer, Stats};
+use crate::backend::daemon::{Signals, SignalsLayer};
 use crate::context::{Context, IntoSignal, Request, Response, Signal};
 use crate::dataset::Datasets;
-use crate::process::metric::{Metrics, MetricsLayer, Stats};
-use crate::process::signal::{Signals, SignalsLayer};
 
 pub struct Runner<B, S> {
     pub(crate) service: Signals<Metrics<S>>,
@@ -17,6 +17,7 @@ pub struct Runner<B, S> {
 }
 
 impl<B, S> Runner<B, S> {
+    // TODO: Use Backend?
     pub fn new(backend: B, inner: S) -> Self
     where
         B: Service<Request, Response = Response, Error = Error> + Clone,
@@ -36,7 +37,7 @@ impl<B, S> Runner<B, S> {
     }
 
     pub fn stats(&self) -> Stats {
-        self.service.get_ref().load()
+        self.service.load()
     }
 
     pub async fn run_until_empty(&self) -> Result<usize>

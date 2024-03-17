@@ -11,7 +11,7 @@ pub use route::Route;
 use spire_core::context::{Context as Cx, IntoSignal, Signal, Tag};
 use tag_router::TagRouter;
 
-use crate::handler::Handler;
+pub use crate::handler::{Handler, HandlerService};
 
 mod endpoint;
 mod future;

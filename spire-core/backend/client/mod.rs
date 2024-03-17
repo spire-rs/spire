@@ -7,14 +7,14 @@ use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
-use tower::{Service, ServiceExt};
 use tower::util::BoxCloneService;
+use tower::{Service, ServiceExt};
 
 pub use builder::HttpClientBuilder;
 
-use crate::{BoxError, Error, Result};
 use crate::backend::{Backend, Client};
 use crate::context::{Request, Response};
+use crate::{BoxError, Error, Result};
 
 mod builder;
 
@@ -104,8 +104,8 @@ mod test {
     use tower::ServiceBuilder;
 
     use crate::backend::HttpClient;
-    use crate::BoxError;
     use crate::context::{Request, Response};
+    use crate::BoxError;
 
     #[test]
     fn reqwest() {

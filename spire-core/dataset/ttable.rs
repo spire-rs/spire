@@ -3,9 +3,9 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{BoxError, Error};
-use crate::dataset::{Dataset, DatasetExt, InMemDataset};
 use crate::dataset::util::BoxCloneDataset;
+use crate::dataset::{Dataset, DatasetExt, InMemDataset};
+use crate::{BoxError, Error};
 
 /// Type-erased collection of `Dataset`s.
 #[derive(Clone, Default)]
@@ -42,20 +42,16 @@ impl Datasets {
         let _ = guard.insert(TypeId::of::<T>(), dataset);
     }
 
-    fn try_get<T>(&self) -> Option<BoxCloneDataset<T, Error>>
+    /// Returns the [`Dataset`] of the requested type.
+    pub fn try_get<T>(&self) -> Option<BoxCloneDataset<T, Error>>
     where
         T: Send + Sync + 'static,
     {
-        let make_mem = || boxed(InMemDataset::<T>::queue());
-
-        let mut guard = self.inner.mx.lock().unwrap();
-        let dataset = match guard.entry(TypeId::of::<T>()) {
-            Entry::Occupied(x) => x.into_mut(),
-            Entry::Vacant(x) => x.insert(Box::new(make_mem())),
-        };
+        let guard = self.inner.mx.lock().unwrap();
+        let dataset = guard.get(&TypeId::of::<T>());
 
         type Ds<T> = BoxCloneDataset<T, Error>;
-        dataset.downcast_ref::<Ds<T>>().cloned()
+        dataset.and_then(|x| x.downcast_ref::<Ds<T>>()).cloned()
     }
 
     /// Returns the [`Dataset`] of the requested type.
@@ -68,7 +64,15 @@ impl Datasets {
     where
         T: Send + Sync + 'static,
     {
-        self.try_get::<T>().unwrap()
+        let make_mem = || boxed(InMemDataset::<T>::queue());
+        let mut guard = self.inner.mx.lock().unwrap();
+        let dataset = match guard.entry(TypeId::of::<T>()) {
+            Entry::Occupied(x) => x.into_mut(),
+            Entry::Vacant(x) => x.insert(Box::new(make_mem())),
+        };
+
+        type Ds<T> = BoxCloneDataset<T, Error>;
+        dataset.downcast_ref::<Ds<T>>().cloned().unwrap()
     }
 
     /// Returns the total amount of inserted [`Dataset`]s.

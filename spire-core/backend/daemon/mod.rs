@@ -1,19 +1,25 @@
 use std::convert::Infallible;
 use std::fmt;
+use std::future::Future;
 use std::sync::Arc;
 
+use futures::future::BoxFuture;
 use tower::Service;
+
+use metric::{Metrics, MetricsLayer, Stats};
+use runner::Runner;
+use signal::{Signals, SignalsLayer};
 
 use crate::{BoxError, Error, Result};
 use crate::context::{Context, Request, Response, Signal};
-use crate::dataset::{Dataset, InMemDataset};
+use crate::dataset::Dataset;
 use crate::dataset::util::BoxCloneDataset;
-use crate::process::runner::Runner;
 
 mod metric;
 mod runner;
 mod signal;
 
+/// TODO.
 pub struct Daemon<B, S> {
     inner: Arc<Runner<B, S>>,
 }
@@ -36,6 +42,16 @@ impl<B, S> Daemon<B, S> {
     {
         // TODO: Add tracing.
         self.inner.run_until_empty().await
+    }
+
+    // TODO: Replace run.
+    pub async fn run2(self) -> Result<DaemonHandle>
+    where
+        B: Service<Request, Response = Response, Error = Error> + Clone,
+        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+    {
+        let fut = self.inner.run_until_empty();
+        todo!()
     }
 
     /// Replaces the [`Dataset`] used by the [`RequestQueue`].
@@ -84,6 +100,8 @@ impl<B, S> Daemon<B, S> {
     /// ### Note
     ///
     /// Inserts and returns the [`InMemDataset`] if none was found.
+    ///
+    /// [`InMemDataset`]: crate::dataset::InMemDataset
     pub fn dataset<T>(&self) -> BoxCloneDataset<T, Error>
     where
         T: Send + Sync + 'static,
@@ -108,11 +126,17 @@ impl<B, S> fmt::Debug for Daemon<B, S> {
 }
 
 /// TODO.
-pub struct DaemonHandle {}
+pub struct DaemonHandle {
+    // TODO: tokio join handle?
+    fut: BoxFuture<'static, Result<usize>>,
+}
 
 impl DaemonHandle {
     /// Creates a new [`DaemonHandle`].
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new<F>(fut: F) -> Self
+    where
+        F: Future<Output = Result<usize>>,
+    {
         todo!()
     }
 

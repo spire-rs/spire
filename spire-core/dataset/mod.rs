@@ -22,7 +22,7 @@
 //! [`MapErr`]: util::MapErr
 
 pub use memory::InMemDataset;
-pub(crate) use ttable::Datasets;
+pub use ttable::Datasets;
 #[doc(inline)]
 pub use util::DatasetExt;
 

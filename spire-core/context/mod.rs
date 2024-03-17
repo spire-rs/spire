@@ -4,15 +4,15 @@
 use std::fmt;
 
 pub use body::{Body, Request, Response};
-pub use extend::{Tag, Task, TaskBuilder};
 use extend::Depth;
+pub use extend::{Tag, Task, TaskBuilder};
 pub use queue::RequestQueue;
 pub use signal::{IntoSignal, Signal, TagQuery};
 
-use crate::{Error, Result};
 use crate::backend::{Backend, Client};
-use crate::dataset::Datasets;
 use crate::dataset::util::BoxCloneDataset;
+use crate::dataset::Datasets;
+use crate::{Error, Result};
 
 mod body;
 mod extend;

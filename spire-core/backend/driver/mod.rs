@@ -13,9 +13,9 @@ pub use builder::BrowserManager;
 pub use handler::BrowserClient;
 use process::BrowserProcess;
 
-use crate::{Error, Result};
 use crate::backend::{Backend, BrowserBackend};
 use crate::context::{Request, Response};
+use crate::{Error, Result};
 
 mod builder;
 mod handler;

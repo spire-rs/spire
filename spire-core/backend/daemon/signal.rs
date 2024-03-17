@@ -62,8 +62,8 @@ impl<S> Signals<S> {
         todo!()
     }
 
-    /// TODO.
-    pub fn find_queries(&self, tag: &Tag) {
+    /// Returns all applicable queries.
+    pub fn find_queries(&self, tag: &Tag) -> Vec<()> {
         todo!()
     }
 }

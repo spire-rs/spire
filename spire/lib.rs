@@ -8,7 +8,7 @@ pub use spire_core::{backend, context, dataset};
 pub use spire_core::{Daemon, Error, Result};
 
 pub mod extract;
-pub mod handler;
+mod handler;
 pub mod routing;
 
 #[doc(hidden)]
@@ -18,11 +18,11 @@ pub mod prelude {}
 mod test {
     use spire_core::backend::BrowserPool;
 
+    use crate::{Daemon, Result, Router};
     use crate::backend::HttpClient;
     use crate::context::RequestQueue;
     use crate::dataset::{Dataset as _, InMemDataset};
     use crate::extract::Dataset;
-    use crate::{Daemon, Result, Router};
 
     #[test]
     fn http_client() {

@@ -5,8 +5,8 @@ use std::time::Instant;
 
 use deadpool::managed::{Manager, Metrics, Pool, RecycleResult};
 
-use crate::backend::{BrowserClient, BrowserPool};
 use crate::backend::driver::BrowserProcess;
+use crate::backend::{BrowserClient, BrowserPool};
 use crate::Error;
 
 /// [`BrowserPool`] builder.
