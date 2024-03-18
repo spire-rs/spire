@@ -33,6 +33,7 @@ impl<T, E> BoxCloneDataset<T, E> {
         Self { dataset }
     }
 
+    // TODO: Expose?
     pub(crate) fn into_stream(self) -> impl Stream<Item = Result<T, E>>
     where
         T: 'static,

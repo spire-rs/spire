@@ -2,8 +2,9 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::backend::{Backend, Router};
+use crate::backend::Backend;
 use crate::context::{Context, Signal};
+use crate::daemon::Worker;
 
 /// TODO: Serde.
 /// sequential estimation
@@ -49,30 +50,35 @@ impl StatsLock {
 }
 
 #[derive(Clone)]
-pub struct StatRouter<S> {
+pub struct StatWorker<S> {
     inner: S,
     stats: StatsLock,
 }
 
-impl<S> StatRouter<S> {
-    /// Creates a new [`StatRouter`].
+impl<S> StatWorker<S> {
+    /// Creates a new [`StatWorker`].
     pub fn new(inner: S, stats: Stats) -> Self {
         let stats = StatsLock::new(stats);
         Self { inner, stats }
     }
-}
 
-impl<S> fmt::Debug for StatRouter<S> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    /// Returns the current stats.
+    pub fn stats(&self) -> Stats {
         todo!()
     }
 }
 
+impl<S> fmt::Debug for StatWorker<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StatWorker").finish_non_exhaustive()
+    }
+}
+
 #[async_trait::async_trait]
-impl<B, S> Router<B> for StatRouter<S>
+impl<B, S> Worker<B> for StatWorker<S>
 where
     B: Backend,
-    S: Router<B>,
+    S: Worker<B>,
 {
     #[inline]
     async fn route(self, cx: Context<B>) -> Signal {

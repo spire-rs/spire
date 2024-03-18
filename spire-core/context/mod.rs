@@ -28,7 +28,10 @@ pub struct Context<B> {
 
 impl<B> Context<B> {
     /// Creates a new [`Context`].
-    pub fn new(request: Request, backend: B, datasets: Datasets) -> Self {
+    pub fn new(request: Request, backend: B, datasets: Datasets) -> Self
+    where
+        B: Backend,
+    {
         Self {
             request,
             backend,

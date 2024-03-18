@@ -21,6 +21,8 @@ mod handler;
 mod process;
 
 /// Web-driver [`Backend`].
+///
+/// [`Backend`]: crate::backend::Backend
 #[derive(Clone)]
 pub struct BrowserPool {
     pool: Pool<BrowserManager>,

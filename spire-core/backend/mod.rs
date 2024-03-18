@@ -1,45 +1,45 @@
 //! Types and traits for data retrieval [`Backend`]s.
 //!
-//! ### Backends
+//! ### Core
 //!
-//! - [`Backend`] and [`BrowserBackend`]
-//! - [`HttpClient`]
-//! - [`BrowserPool`]
+//! - [`Backend`] is a core trait used to instantiate [`Client`]s.
+//! - [`BrowserBackend`] is an extension trait for [`Backend`]s that run actual web browsers.
+//! - [`Client`] is a core trait used to fetch [`Response`]s with [`Request`]s.
 //!
-//! ### Daemon
+//! ### Backend
 //!
-//! - [`Router`]
-//! - [`Daemon`] and [`DaemonHandle`]
+//! - [`HttpClient`] is a simple http client backed by the underlying [`Service`].
+//! It is both [`Backend`] and [`Client`].
+//! - [`BrowserPool`] is a [`Backend`] built on top of [`fantoccini`] crate. Uses
+//! [`BrowserClient`] as a [`Client`].
 //!
-
-use std::convert::Infallible;
 
 use tower::{Service, ServiceExt};
 
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub use client::{HttpClient, HttpClientBuilder};
-pub use daemon::{Daemon, DaemonHandle};
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::{BrowserClient, BrowserManager, BrowserPool};
 
+use crate::context::{Request, Response};
 use crate::{Error, Result};
-use crate::context::{Context as Cx, Request, Response, Signal};
 
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-pub mod client;
-mod daemon;
+mod client;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
-pub mod driver;
+mod driver;
 
-/// TODO.
+/// Core trait used to instantiate [`Client`]s.
+///
+/// It is automatically implemented for cloneable [`Service`]s that return [`Client`]s.
 #[async_trait::async_trait]
 pub trait Backend: Clone + Send + Sized + 'static {
     /// Associated client type.
-    type Client: Client ;
+    type Client: Client;
 
     /// Returns a [`Self::Client`] from the pool.
     async fn client(&self) -> Result<Self::Client>;
@@ -51,7 +51,7 @@ where
     S: Service<(), Response = T, Error = Error>,
     S: Clone + Send + Sync + 'static,
     S::Future: Send + 'static,
-    T: Client ,
+    T: Client,
 {
     type Client = T;
 
@@ -68,7 +68,10 @@ where
 /// Currently works as a marker trait only.
 pub trait BrowserBackend: Backend {}
 
-/// TODO.
+/// Core trait used to fetch [`Response`]s with [`Request`]s.
+///
+/// It is automatically implemented for cloneable [`Service`]s that take [`Request`]
+/// and return [`Result`]<[`Response`]>.
 #[async_trait::async_trait]
 pub trait Client: Send + Sized + 'static {
     /// Tries to fetch the [`Response`].
@@ -87,28 +90,5 @@ where
         let mut copy = self.clone();
         let ready = copy.ready().await?;
         ready.call(req).await
-    }
-}
-
-/// TODO: Rename.
-#[async_trait::async_trait]
-pub trait Router<B>: Clone + Send + 'static {
-    /// TODO.
-    async fn route(self, cx: Cx<B>) -> Signal;
-}
-
-#[async_trait::async_trait]
-impl<S, B> Router<B> for S
-where
-    S: Service<Cx<B>, Response = Signal, Error = Infallible>,
-    S: Clone + Send  + 'static,
-    S::Future: Send + 'static,
-    B: Send + 'static,
-{
-    #[inline]
-    async fn route(self, cx: Cx<B>) -> Signal {
-        let mut copy = self.clone();
-        let ready = copy.ready().await.unwrap();
-        ready.call(cx).await.unwrap()
     }
 }

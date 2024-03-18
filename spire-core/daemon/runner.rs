@@ -1,39 +1,38 @@
 use futures::stream::StreamExt;
 
-use crate::backend::daemon::metric::{StatRouter, Stats};
-use crate::backend::{Backend, Router};
+use crate::backend::Backend;
 use crate::context::{Context as Cx, IntoSignal, Request, Signal};
+use crate::daemon::{StatWorker, Stats, Worker};
 use crate::dataset::Datasets;
 use crate::Result;
 
-pub struct Runner<B, S> {
-    pub(crate) service: StatRouter<S>,
+pub struct Runner<B, W> {
+    pub(crate) service: StatWorker<W>,
     pub datasets: Datasets,
     pub(crate) backend: B,
 }
 
-impl<B, S> Runner<B, S> {
-    // TODO: Use Backend?
-    pub fn new(backend: B, inner: S) -> Self
+impl<B, W> Runner<B, W> {
+    pub fn new(backend: B, inner: W) -> Self
     where
         B: Backend,
-        S: Router<B>,
+        W: Worker<B>,
     {
         Self {
-            service: StatRouter::new(inner, Stats::default()),
+            service: StatWorker::new(inner, Stats::default()),
             datasets: Datasets::default(),
             backend,
         }
     }
 
     pub fn stats(&self) -> Stats {
-        todo!()
+        self.service.stats()
     }
 
     pub async fn run_until_empty(&self) -> Result<usize>
     where
         B: Backend,
-        S: Router<B>,
+        W: Worker<B>,
     {
         let mut total = 0;
         loop {
@@ -49,7 +48,7 @@ impl<B, S> Runner<B, S> {
     pub async fn run_until_signal(&self) -> Result<usize>
     where
         B: Backend,
-        S: Router<B>,
+        W: Worker<B>,
     {
         let dataset = self.datasets.get::<Request>();
 
@@ -65,7 +64,7 @@ impl<B, S> Runner<B, S> {
     async fn try_call_service(&self, request: Result<Request>)
     where
         B: Backend,
-        S: Router<B>,
+        W: Worker<B>,
     {
         match request {
             Ok(x) => self.call_service(x).await,
@@ -76,7 +75,7 @@ impl<B, S> Runner<B, S> {
     async fn call_service(&self, request: Request)
     where
         B: Backend,
-        S: Router<B>,
+        W: Worker<B>,
     {
         let backend = self.backend.clone();
         let datasets = self.datasets.clone();
@@ -97,6 +96,6 @@ impl<B, S> Runner<B, S> {
             Signal::Stop(_, _) => {}
         }
 
-        todo!()
+        // TODO.
     }
 }

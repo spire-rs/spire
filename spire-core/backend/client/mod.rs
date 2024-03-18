@@ -18,7 +18,11 @@ use crate::{BoxError, Error, Result};
 
 mod builder;
 
-/// Simple http client [`Backend`]  backed by the underlying [`Service`].
+/// Simple http client backed by the underlying [`Service`].
+/// It is both [`Backend`] and [`Client`].
+///
+/// [`Backend`]: crate::backend::Backend
+/// [`Client`]: crate::backend::Client
 pub struct HttpClient {
     inner: Mutex<BoxCloneService<Request, Response, Error>>,
 }

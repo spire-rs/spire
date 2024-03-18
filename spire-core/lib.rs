@@ -2,10 +2,11 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
 
-pub use backend::{Daemon, DaemonHandle};
+pub use daemon::{Daemon, DaemonHandle, Worker};
 
 pub mod backend;
 pub mod context;
+mod daemon;
 pub mod dataset;
 
 /// Type alias for a type-erased [`Error`] type.

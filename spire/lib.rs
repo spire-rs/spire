@@ -5,11 +5,14 @@
 #[doc(inline)]
 pub use routing::Router;
 pub use spire_core::{backend, context, dataset};
-pub use spire_core::{Daemon, Error, Result};
+pub use spire_core::{Error, Result};
 
 pub mod extract;
 mod handler;
 pub mod routing;
+
+/// TODO.
+pub type Daemon<B, W = Router<B>> = spire_core::Daemon<B, W>;
 
 #[doc(hidden)]
 pub mod prelude {}
@@ -40,7 +43,7 @@ mod test {
 
         let backend = HttpClient::default();
         let daemon = Daemon::new(backend, router)
-            .with_queue(InMemDataset::stack())
+            .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new());
 
         let _ = daemon.run();
@@ -59,7 +62,7 @@ mod test {
 
         let backend = BrowserPool::builder().build();
         let daemon = Daemon::new(backend, router)
-            .with_queue(InMemDataset::stack())
+            .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new());
 
         let _ = daemon.run();
