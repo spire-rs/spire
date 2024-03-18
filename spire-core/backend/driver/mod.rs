@@ -13,8 +13,7 @@ pub use builder::BrowserManager;
 pub use handler::BrowserClient;
 use process::BrowserProcess;
 
-use crate::backend::{Backend, BrowserBackend};
-use crate::context::{Request, Response};
+use crate::backend::BrowserBackend;
 use crate::{Error, Result};
 
 mod builder;
@@ -52,10 +51,10 @@ impl fmt::Debug for BrowserPool {
     }
 }
 
-impl Service<Request> for BrowserPool {
-    type Response = Response;
+impl Service<()> for BrowserPool {
+    type Response = BrowserClient;
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -64,16 +63,7 @@ impl Service<Request> for BrowserPool {
     }
 
     #[inline]
-    fn call(&mut self, req: Request) -> Self::Future {
-        todo!()
-    }
-}
-
-#[async_trait::async_trait]
-impl Backend for BrowserPool {
-    type Client = BrowserClient;
-
-    async fn call(&self) -> Result<Self::Client> {
+    fn call(&mut self, req: ()) -> Self::Future {
         todo!()
     }
 }

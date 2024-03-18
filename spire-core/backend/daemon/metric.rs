@@ -1,16 +1,9 @@
-use std::convert::Infallible;
 use std::fmt;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::{ready, Context, Poll};
 use std::time::{Duration, Instant};
 
-use pin_project_lite::pin_project;
-use tower::load::Load;
-use tower::{Layer, Service};
-
-use crate::context::{Context as Cx, Signal};
+use crate::backend::{Backend, Router};
+use crate::context::{Context, Signal};
 
 /// TODO: Serde.
 /// sequential estimation
@@ -29,6 +22,15 @@ pub(crate) struct StatsLock {
 }
 
 impl StatsLock {
+    pub fn new(stats: Stats) -> Self {
+        let stats = Arc::new(Mutex::new(stats));
+        Self { stats }
+    }
+
+    pub fn stats(&self) -> Stats {
+        todo!()
+    }
+
     pub fn notify_request(&self) {
         let mut guard = self.stats.lock().unwrap();
         guard.requests += 1;
@@ -46,142 +48,41 @@ impl StatsLock {
     }
 }
 
-/// TODO.
 #[derive(Clone)]
-pub struct Metrics<S> {
-    stats: StatsLock,
+pub struct StatRouter<S> {
     inner: S,
+    stats: StatsLock,
 }
 
-impl<S> Metrics<S> {
-    /// Creates a new [`Metrics`] service.
+impl<S> StatRouter<S> {
+    /// Creates a new [`StatRouter`].
     pub fn new(inner: S, stats: Stats) -> Self {
-        let stats = StatsLock {
-            stats: Arc::new(Mutex::new(stats)),
-        };
-
+        let stats = StatsLock::new(stats);
         Self { inner, stats }
     }
-
-    /// Returns a reference to the inner service.
-    pub fn get_ref(&self) -> &S {
-        &self.inner
-    }
-
-    /// Returns a mutable reference to the inner service.
-    pub fn get_mut(&mut self) -> &mut S {
-        &mut self.inner
-    }
-
-    /// Returns the inner service, consuming self.
-    pub fn into_inner(self) -> S {
-        self.inner
-    }
 }
 
-impl<S> fmt::Debug for Metrics<S>
-where
-    S: fmt::Debug,
-{
+impl<S> fmt::Debug for StatRouter<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.inner, f)
+        todo!()
     }
 }
 
-impl<B, S> Service<Cx<B>> for Metrics<S>
+#[async_trait::async_trait]
+impl<B, S> Router<B> for StatRouter<S>
 where
-    S: Service<Cx<B>, Response = Signal, Error = Infallible>,
+    B: Backend,
+    S: Router<B>,
 {
-    type Response = Signal;
-    type Error = Infallible;
-    type Future = MetricsFuture<S::Future>;
-
     #[inline]
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
+    async fn route(self, cx: Context<B>) -> Signal {
+        let t0 = Instant::now();
+        self.stats.notify_request();
 
-    #[inline]
-    fn call(&mut self, cx: Cx<B>) -> Self::Future {
-        let stats = StatsLock {
-            stats: self.stats.stats.clone(),
-        };
+        let signal = self.inner.route(cx).await;
+        let since = Instant::now() - t0;
+        self.stats.notify_response(since);
 
-        MetricsFuture::new(self.inner.call(cx), stats)
-    }
-}
-
-impl<S> Load for Metrics<S> {
-    type Metric = Stats;
-
-    fn load(&self) -> Self::Metric {
-        let guard = self.stats.stats.lock().unwrap();
-        guard.clone()
-    }
-}
-
-pin_project! {
-    /// Response [`Future`] for [`Metrics`].
-    pub struct MetricsFuture<F> {
-        #[pin] future: F,
-        created: Instant,
-        stats: StatsLock,
-    }
-}
-
-impl<F> MetricsFuture<F> {
-    /// Creates a new [`MetricsFuture`].
-    pub(crate) fn new(future: F, stats: StatsLock) -> Self {
-        let created = Instant::now();
-        stats.notify_request();
-        Self {
-            future,
-            created,
-            stats,
-        }
-    }
-}
-
-impl<F> Future for MetricsFuture<F>
-where
-    F: Future<Output = Result<Signal, Infallible>>,
-{
-    type Output = Result<Signal, Infallible>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-
-        let signal = ready!(this.future.poll(cx));
-        let since = Instant::now().duration_since(*this.created);
-        this.stats.notify_response(since);
-
-        Poll::Ready(signal)
-    }
-}
-
-/// TODO.
-#[derive(Debug, Clone)]
-pub struct MetricsLayer {
-    stats: Stats,
-}
-
-impl MetricsLayer {
-    /// Creates a new [`MetricsLayer`].
-    pub fn new(stats: Stats) -> Self {
-        Self { stats }
-    }
-}
-
-impl Default for MetricsLayer {
-    fn default() -> Self {
-        Self::new(Stats::default())
-    }
-}
-
-impl<S> Layer<S> for MetricsLayer {
-    type Service = Metrics<S>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        Metrics::new(inner, self.stats.clone())
+        signal
     }
 }

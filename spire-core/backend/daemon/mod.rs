@@ -1,23 +1,19 @@
-use std::convert::Infallible;
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
 
 use futures::future::BoxFuture;
-use tower::Service;
 
-use metric::{Metrics, MetricsLayer, Stats};
 use runner::Runner;
-use signal::{Signals, SignalsLayer};
 
-use crate::{BoxError, Error, Result};
-use crate::context::{Context, Request, Response, Signal};
-use crate::dataset::Dataset;
+use crate::backend::{Backend, Router};
+use crate::context::Request;
 use crate::dataset::util::BoxCloneDataset;
+use crate::dataset::Dataset;
+use crate::{BoxError, Error, Result};
 
 mod metric;
 mod runner;
-mod signal;
 
 /// TODO.
 pub struct Daemon<B, S> {
@@ -28,8 +24,8 @@ impl<B, S> Daemon<B, S> {
     /// Creates a new [`Daemon`].
     pub fn new(backend: B, inner: S) -> Self
     where
-        B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+        B: Backend,
+        S: Router<B>,
     {
         let inner = Arc::new(Runner::new(backend, inner));
         Self { inner }
@@ -37,8 +33,8 @@ impl<B, S> Daemon<B, S> {
 
     pub async fn run(self) -> Result<usize>
     where
-        B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+        B: Backend,
+        S: Router<B>,
     {
         // TODO: Add tracing.
         self.inner.run_until_empty().await
@@ -47,8 +43,8 @@ impl<B, S> Daemon<B, S> {
     // TODO: Replace run.
     pub async fn run2(self) -> Result<DaemonHandle>
     where
-        B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+        B: Backend,
+        S: Router<B>,
     {
         let fut = self.inner.run_until_empty();
         todo!()
@@ -143,5 +139,34 @@ impl DaemonHandle {
     /// Waits until the TODO.
     pub async fn wait(self) -> Result<usize> {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[cfg(feature = "driver")]
+    use crate::backend::BrowserPool;
+    #[cfg(feature = "client")]
+    use crate::backend::HttpClient;
+    use crate::{backend::Router, Daemon};
+
+    fn make_service<B>() -> impl Router<B> {
+        todo!()
+    }
+
+    #[test]
+    #[cfg(feature = "client")]
+    fn with_client() {
+        let backend = HttpClient::default();
+        let service = make_service();
+        let _ = Daemon::new(backend, service);
+    }
+
+    #[test]
+    #[cfg(feature = "driver")]
+    fn with_driver() {
+        let backend = BrowserPool::default();
+        let service = make_service();
+        let _ = Daemon::new(backend, service);
     }
 }

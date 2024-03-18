@@ -6,7 +6,6 @@ use fantoccini::Client as WebClient;
 use futures::future::BoxFuture;
 use tower::Service;
 
-use crate::backend::Client;
 use crate::context::{Request, Response};
 use crate::{Error, Result};
 
@@ -62,13 +61,6 @@ impl Service<Request> for BrowserClient {
 
     #[inline]
     fn call(&mut self, req: Request) -> Self::Future {
-        todo!()
-    }
-}
-
-#[async_trait::async_trait]
-impl Client for BrowserClient {
-    async fn invoke(self, req: Request) -> Result<Response> {
         todo!()
     }
 }

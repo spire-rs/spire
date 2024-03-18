@@ -3,6 +3,7 @@
 //!
 
 use std::fmt;
+use std::future::{ready, Ready};
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 
@@ -12,7 +13,6 @@ use tower::{Service, ServiceExt};
 
 pub use builder::HttpClientBuilder;
 
-use crate::backend::{Backend, Client};
 use crate::context::{Request, Response};
 use crate::{BoxError, Error, Result};
 
@@ -62,6 +62,22 @@ impl fmt::Debug for HttpClient {
     }
 }
 
+impl Service<()> for HttpClient {
+    type Response = HttpClient;
+    type Error = Error;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
+
+    #[inline]
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn call(&mut self, _req: ()) -> Self::Future {
+        ready(Ok(self.clone()))
+    }
+}
+
 impl Service<Request> for HttpClient {
     type Response = Response;
     type Error = Error;
@@ -77,23 +93,6 @@ impl Service<Request> for HttpClient {
     fn call(&mut self, req: Request) -> Self::Future {
         let mut guard = self.inner.lock().unwrap();
         guard.call(req)
-    }
-}
-
-#[async_trait::async_trait]
-impl Backend for HttpClient {
-    type Client = Self;
-
-    async fn call(&self) -> Result<Self::Client> {
-        Ok(self.clone())
-    }
-}
-
-#[async_trait::async_trait]
-impl Client for HttpClient {
-    #[inline]
-    async fn invoke(self, req: Request) -> Result<Response> {
-        self.oneshot(req).await
     }
 }
 

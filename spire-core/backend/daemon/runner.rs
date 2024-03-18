@@ -1,17 +1,13 @@
-use std::convert::Infallible;
-
 use futures::stream::StreamExt;
-use tower::{Service, ServiceBuilder, ServiceExt};
-use tower::load::Load;
 
-use crate::{Error, Result};
-use crate::backend::daemon::{Metrics, MetricsLayer, Stats};
-use crate::backend::daemon::{Signals, SignalsLayer};
-use crate::context::{Context, IntoSignal, Request, Response, Signal};
+use crate::backend::daemon::metric::{StatRouter, Stats};
+use crate::backend::{Backend, Router};
+use crate::context::{Context as Cx, IntoSignal, Request, Signal};
 use crate::dataset::Datasets;
+use crate::Result;
 
 pub struct Runner<B, S> {
-    pub(crate) service: Signals<Metrics<S>>,
+    pub(crate) service: StatRouter<S>,
     pub datasets: Datasets,
     pub(crate) backend: B,
 }
@@ -20,30 +16,24 @@ impl<B, S> Runner<B, S> {
     // TODO: Use Backend?
     pub fn new(backend: B, inner: S) -> Self
     where
-        B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+        B: Backend,
+        S: Router<B>,
     {
-        let datasets = Datasets::default();
-        let service = ServiceBuilder::default()
-            .layer(SignalsLayer::default())
-            .layer(MetricsLayer::default())
-            .service(inner);
-
         Self {
-            service,
-            datasets,
+            service: StatRouter::new(inner, Stats::default()),
+            datasets: Datasets::default(),
             backend,
         }
     }
 
     pub fn stats(&self) -> Stats {
-        self.service.load()
+        todo!()
     }
 
     pub async fn run_until_empty(&self) -> Result<usize>
     where
-        B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+        B: Backend,
+        S: Router<B>,
     {
         let mut total = 0;
         loop {
@@ -58,8 +48,8 @@ impl<B, S> Runner<B, S> {
 
     pub async fn run_until_signal(&self) -> Result<usize>
     where
-        B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+        B: Backend,
+        S: Router<B>,
     {
         let dataset = self.datasets.get::<Request>();
 
@@ -74,8 +64,8 @@ impl<B, S> Runner<B, S> {
 
     async fn try_call_service(&self, request: Result<Request>)
     where
-        B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+        B: Backend,
+        S: Router<B>,
     {
         match request {
             Ok(x) => self.call_service(x).await,
@@ -85,18 +75,28 @@ impl<B, S> Runner<B, S> {
 
     async fn call_service(&self, request: Request)
     where
-        B: Service<Request, Response = Response, Error = Error> + Clone,
-        S: Service<Context<B>, Response = Signal, Error = Infallible> + Clone,
+        B: Backend,
+        S: Router<B>,
     {
         let backend = self.backend.clone();
         let datasets = self.datasets.clone();
-        let cx = Context::new(request, backend, datasets);
+        let cx = Cx::new(request, backend, datasets);
 
-        let oneshot = self.service.clone().oneshot(cx);
-        oneshot.await.unwrap()
+        let clone = self.service.clone();
+        let signal = clone.route(cx).await;
+        self.notify_signal(signal);
     }
 
+    /// Applies the signal to the subsequent requests.
     fn notify_signal(&self, signal: Signal) {
-        self.service.notify_signal(signal)
+        match signal {
+            Signal::Continue => {}
+            Signal::Skip => {}
+            Signal::Wait(_, _) => {}
+            Signal::Repeat(_, _) => {}
+            Signal::Stop(_, _) => {}
+        }
+
+        todo!()
     }
 }

@@ -3,14 +3,13 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::{Dataset, DatasetExt, InMemDataset};
 use crate::{BoxError, Error};
+use crate::dataset::{Dataset, DatasetExt, InMemDataset};
+use crate::dataset::util::BoxCloneDataset;
 
 /// Type-erased collection of `Dataset`s.
 #[derive(Clone, Default)]
 pub struct Datasets {
-    // TODO: Rc -> Arc, + Send + Sync?
     inner: Arc<DatasetsInner>,
 }
 

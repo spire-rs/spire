@@ -37,7 +37,7 @@ util = []
 
 [dependencies]
 bytes = { workspace = true }
-tower = { workspace = true, features = ["load", "util"] }
+tower = { workspace = true, features = ["util"] }
 async-trait = { workspace = true }
 pin-project-lite = { workspace = true }
 thiserror = { workspace = true }

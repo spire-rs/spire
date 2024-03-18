@@ -48,8 +48,8 @@ impl<B> Context<B> {
     where
         B: Backend,
     {
-        let client: B::Client = self.backend.call().await?;
-        let response: Response = client.invoke(self.request).await?;
+        let client: B::Client = self.backend.client().await?;
+        let response: Response = client.resolve(self.request).await?;
         Ok(response)
     }
 
@@ -58,7 +58,7 @@ impl<B> Context<B> {
     where
         B: Backend,
     {
-        self.backend.call().await
+        self.backend.client().await
     }
 
     /// Initializes and returns the [`RequestQueue`].

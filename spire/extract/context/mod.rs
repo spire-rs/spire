@@ -1,15 +1,15 @@
 use std::convert::Infallible;
 
 use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::Dataset as CoreDataset;
 use spire_core::dataset::util::BoxCloneDataset;
+use spire_core::dataset::Dataset as CoreDataset;
 use spire_core::Error;
 
-use crate::extract::{FromContext, FromContextRef};
 #[cfg(feature = "client")]
 pub use crate::extract::context::client::Html;
 #[cfg(feature = "driver")]
 pub use crate::extract::context::driver::{Browser, BrowserHandle, View};
+use crate::extract::{FromContext, FromContextRef};
 
 #[cfg(feature = "client")]
 mod client;
