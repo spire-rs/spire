@@ -28,14 +28,12 @@ path = "./lib.rs"
 
 [features]
 default = []
-full = ["client", "driver", "macros", "tracing", "util"]
+full = ["client", "driver", "macros", "tracing"]
+tracing = ["dep:tracing", "spire-core/tracing"]
+macros = ["dep:spire-macros"]
 
 client = ["spire-core/client", "dep:scraper"]
 driver = ["spire-core/driver"]
-
-macros = ["dep:spire-macros"]
-tracing = ["spire-core/tracing"]
-util = ["spire-core/util"]
 
 [dependencies]
 spire-core = { workspace = true }
@@ -50,3 +48,4 @@ pin-project-lite = { workspace = true }
 serde = { workspace = true }
 serde_json = { version = "1.0.114" }
 scraper = { version = "0.19.0", optional = true }
+tracing = { version = "0.1.40", optional = true }

@@ -2,7 +2,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
 
-pub use daemon::{Daemon, DaemonHandle, Worker};
+pub use daemon::Daemon;
 
 pub mod backend;
 pub mod context;

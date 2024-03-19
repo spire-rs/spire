@@ -5,14 +5,17 @@
 //! - [`Backend`] is a core trait used to instantiate [`Client`]s.
 //! - [`BrowserBackend`] is an extension trait for [`Backend`]s that run actual web browsers.
 //! - [`Client`] is a core trait used to fetch [`Response`]s with [`Request`]s.
+//! - [`Worker`] is a core trait used to process [`Context`]s and return [`Signal`]s.
 //!
 //! ### Backend
 //!
-//! - [`HttpClient`] is a simple http client backed by the underlying [`Service`].
+//! - [`HttpClient`] is a simple `http` client backed by the underlying [`Service`].
 //! It is both [`Backend`] and [`Client`].
-//! - [`BrowserPool`] is a [`Backend`] built on top of [`fantoccini`] crate. Uses
-//! [`BrowserClient`] as a [`Client`].
+//! - [`BrowserPool`] is a [`Backend`] built on top of [`fantoccini`] crate.
+//! Uses [`BrowserClient`] as a [`Client`].
 //!
+
+use std::convert::Infallible;
 
 use tower::{Service, ServiceExt};
 
@@ -23,7 +26,7 @@ pub use client::{HttpClient, HttpClientBuilder};
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::{BrowserClient, BrowserManager, BrowserPool};
 
-use crate::context::{Request, Response};
+use crate::context::{Context, Request, Response, Signal};
 use crate::{Error, Result};
 
 #[cfg(feature = "client")]
@@ -90,5 +93,32 @@ where
         let mut copy = self.clone();
         let ready = copy.ready().await?;
         ready.call(req).await
+    }
+}
+
+/// Core trait used to process [`Context`]s and return [`Signal`]s.
+///
+/// It is automatically implemented for cloneable [`Service`]s that take [`Context`].
+///
+/// [`Context`]: crate::context::Context
+#[async_trait::async_trait]
+pub trait Worker<B>: Clone + Send + 'static {
+    /// TODO: Remove clone?
+    async fn invoke(self, cx: Context<B>) -> Signal;
+}
+
+#[async_trait::async_trait]
+impl<S, B> Worker<B> for S
+where
+    S: Service<Context<B>, Response = Signal, Error = Infallible>,
+    S: Clone + Send + 'static,
+    S::Future: Send + 'static,
+    B: Send + 'static,
+{
+    #[inline]
+    async fn invoke(self, cx: Context<B>) -> Signal {
+        let mut copy = self.clone();
+        let ready = copy.ready().await.unwrap();
+        ready.call(cx).await.unwrap()
     }
 }

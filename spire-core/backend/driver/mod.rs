@@ -20,9 +20,11 @@ mod builder;
 mod handler;
 mod process;
 
-/// Web-driver [`Backend`].
+/// Web-driver [`Backend`] built on top of [`fantoccini`] crate.
+/// Uses [`BrowserClient`] as a [`Client`].
 ///
 /// [`Backend`]: crate::backend::Backend
+/// [`Client`]: crate::backend::Client
 #[derive(Clone)]
 pub struct BrowserPool {
     pool: Pool<BrowserManager>,

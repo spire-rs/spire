@@ -1,50 +1,15 @@
-use std::convert::Infallible;
 use std::fmt;
-use std::future::Future;
 use std::sync::Arc;
 
-use tower::{Service, ServiceExt};
-
-pub use handle::DaemonHandle;
-use metric::{StatWorker, Stats};
 use runner::Runner;
 
-use crate::backend::Backend;
-use crate::context::{Context, Request, Signal};
+use crate::backend::{Backend, Worker};
+use crate::context::Request;
 use crate::dataset::util::BoxCloneDataset;
 use crate::dataset::Dataset;
-use crate::{BoxError, Error};
+use crate::{BoxError, Error, Result};
 
-mod handle;
-mod metric;
 mod runner;
-
-/// Core trait used to process [`Context`]s and return [`Signal`]s.
-///
-/// It is automatically implemented for cloneable [`Service`]s that take [`Context`].
-///
-/// [`Context`]: crate::context::Context
-#[async_trait::async_trait]
-pub trait Worker<B>: Clone + Send + 'static {
-    /// TODO.
-    async fn route(self, cx: Context<B>) -> Signal;
-}
-
-#[async_trait::async_trait]
-impl<S, B> Worker<B> for S
-where
-    S: Service<Context<B>, Response = Signal, Error = Infallible>,
-    S: Clone + Send + 'static,
-    S::Future: Send + 'static,
-    B: Send + 'static,
-{
-    #[inline]
-    async fn route(self, cx: Context<B>) -> Signal {
-        let mut copy = self.clone();
-        let ready = copy.ready().await.unwrap();
-        ready.call(cx).await.unwrap()
-    }
-}
 
 /// TODO.
 /// is a polling loop
@@ -63,14 +28,16 @@ impl<B, W> Daemon<B, W> {
         Self { inner }
     }
 
-    pub fn run(self) -> DaemonHandle
+    /// Processes [`Request`]s with a provided [`Worker`] until the [`RequestQueue`] is empty.
+    ///
+    /// [`RequestQueue`]: crate::context::RequestQueue
+    pub async fn run(self) -> Result<usize>
     where
         B: Backend,
         W: Worker<B>,
     {
         // TODO: Add tracing.
-        let fut = self.inner.run_until_empty();
-        DaemonHandle::new(fut)
+        self.inner.run_until_empty().await
     }
 
     /// Replaces the [`Dataset`] used by the [`RequestQueue`].
@@ -100,8 +67,9 @@ impl<B, W> Daemon<B, W> {
     /// Replaces the dataset of the same type if it is already inserted.
     /// Does not move items from the replaced `Dataset`.
     ///
-    /// If the handler requests for a [`Dataset`] of a specific type, but  no `Dataset` of this
-    /// type was provided, it will be lazily initialized as a `first-in first-out` [`InMemDataset`].
+    /// If the handler requests for a [`Dataset`] of a specific type, but  no `Dataset` of
+    /// this type was provided, it will be lazily initialized as a `first-in first-out`
+    /// [`InMemDataset`].
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
     pub fn with_dataset<D, E, T>(self, dataset: D) -> Self
@@ -151,7 +119,7 @@ mod test {
     #[cfg(feature = "client")]
     use crate::backend::HttpClient;
     use crate::context::{Context, Signal};
-    use crate::{Daemon, Worker};
+    use crate::{backend::Worker, Daemon};
 
     #[derive(Debug, Clone)]
     struct T;
@@ -161,7 +129,7 @@ mod test {
     where
         B: Send + 'static,
     {
-        async fn route(self, _cx: Context<B>) -> Signal {
+        async fn invoke(self, _cx: Context<B>) -> Signal {
             Signal::default()
         }
     }

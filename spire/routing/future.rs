@@ -13,8 +13,7 @@ pin_project! {
     ///
     /// [`Route`]: crate::routing::Route
     pub struct RouteFuture<B, E> {
-        #[pin]
-        kind: RouteFutureKind<B, E>,
+        #[pin] kind: RouteFutureKind<B, E>,
     }
 }
 

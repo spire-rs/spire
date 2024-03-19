@@ -1,15 +1,20 @@
+use std::collections::HashMap;
+use std::time::Instant;
+
 use futures::stream::StreamExt;
 
-use crate::backend::Backend;
-use crate::context::{Context as Cx, IntoSignal, Request, Signal};
-use crate::daemon::{StatWorker, Stats, Worker};
+use crate::backend::{Backend, Worker};
+use crate::context::{Context as Cx, IntoSignal, Request, Signal, Tag, TagQuery, Task};
 use crate::dataset::Datasets;
 use crate::Result;
 
 pub struct Runner<B, W> {
-    pub(crate) service: StatWorker<W>,
-    pub datasets: Datasets,
+    pub(crate) service: W,
+    pub(crate) datasets: Datasets,
     pub(crate) backend: B,
+
+    // Fallback means all not-yet encountered tags.
+    pub(crate) delays: HashMap<Tag, Instant>,
 }
 
 impl<B, W> Runner<B, W> {
@@ -19,14 +24,11 @@ impl<B, W> Runner<B, W> {
         W: Worker<B>,
     {
         Self {
-            service: StatWorker::new(inner, Stats::default()),
+            service: inner,
             datasets: Datasets::default(),
             backend,
+            delays: HashMap::default(),
         }
-    }
-
-    pub fn stats(&self) -> Stats {
-        self.service.stats()
     }
 
     pub async fn run_until_empty(&self) -> Result<usize>
@@ -68,7 +70,7 @@ impl<B, W> Runner<B, W> {
     {
         match request {
             Ok(x) => self.call_service(x).await,
-            Err(x) => self.notify_signal(x.into_signal()),
+            Err(x) => self.notify_signal(x.into_signal(), Tag::Fallback),
         }
     }
 
@@ -79,17 +81,28 @@ impl<B, W> Runner<B, W> {
     {
         let backend = self.backend.clone();
         let datasets = self.datasets.clone();
+        let owner = request.tag().clone();
         let cx = Cx::new(request, backend, datasets);
 
         let clone = self.service.clone();
-        let signal = clone.route(cx).await;
-        self.notify_signal(signal);
+        let signal = clone.invoke(cx).await;
+        self.notify_signal(signal, owner);
+    }
+
+    fn find_queries(&self) -> Vec<TagQuery> {
+        todo!()
     }
 
     /// Applies the signal to the subsequent requests.
-    fn notify_signal(&self, signal: Signal) {
+    fn notify_signal(&self, signal: Signal, owner: Tag) {
+        for x in self.find_queries() {
+            let _ = x.is_match(&Tag::Fallback, &Tag::Fallback);
+        }
+
         match signal {
+            // TODO: Add Ok counter.
             Signal::Continue => {}
+            // TODO: Add Err counter.
             Signal::Skip => {}
             Signal::Wait(_, _) => {}
             Signal::Repeat(_, _) => {}

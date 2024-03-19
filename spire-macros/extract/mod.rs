@@ -15,6 +15,8 @@ impl<T> Elements<T> {
         U: IntoIterator<Item = ()>,
         T: Select,
     {
+        let _ = tags.into_iter();
+
         todo!()
     }
 }

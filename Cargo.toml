@@ -31,8 +31,8 @@ spire-macros = { path = "./spire-macros", version = "0.1.0" }
 bytes = { version = "1.5.0" }
 futures = { version = "0.3.30" }
 tower = { version = "0.4.13" }
-async-trait = { version = "0.1.77" }
+async-trait = { version = "0.1.78" }
 pin-project-lite = { version = "0.2.13" }
-thiserror = { version = "1.0.57" }
+thiserror = { version = "1.0.58" }
 serde = { version = "1.0.197" }
 time = { version = "0.3.34" }

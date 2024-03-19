@@ -18,11 +18,11 @@ pub enum TagQuery {
     /// Matches every [`Tag`], including [`Tag::Fallback`].
     Every,
 
-    /// Matches every [`Tag`], but from the provided list.
-    Exclude(Vec<Tag>),
+    /// Matches the provided [`Tag`].
+    Single(Tag),
 
     /// Matches every [`Tag`] from the provided list.
-    Include(Vec<Tag>),
+    List(Vec<Tag>),
 }
 
 impl TagQuery {
@@ -31,8 +31,8 @@ impl TagQuery {
         match self {
             TagQuery::Owner => !owner.is_fallback() && tag == owner,
             TagQuery::Every => true,
-            TagQuery::Exclude(x) => !x.contains(tag),
-            TagQuery::Include(x) => x.contains(tag),
+            TagQuery::List(x) => x.contains(tag),
+            TagQuery::Single(x) => x == tag,
         }
     }
 }
