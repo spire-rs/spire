@@ -13,7 +13,7 @@
 [crates-url]: https://crates.io/crates/spire
 [docs-badge]: https://img.shields.io/docsrs/spire?logo=Docs.rs&style=flat-square
 [docs-url]: http://docs.rs/spire
-[coverage-badge]: https://img.shields.io/codecov/c/github/spire-re/spire?logo=codecov&logoColor=white&style=flat-square
+[coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
 [coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
 The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
@@ -22,11 +22,32 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 [tokio-rs/tokio]: https://github.com/tokio-rs/tokio/
 [tower-rs/tower]: https://github.com/tower-rs/tower/
 
-#### Crates
+### Features
 
-- [spire](./spire/): Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-  Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-- [spire-core](./spire-core/): Lorem ipsum dolor sit amet, consectetur
-  adipiscing elit. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-- [spire-macros](./spire-macros/): Lorem ipsum dolor sit amet, consectetur
-  adipiscing elit. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+- Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+- Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+- Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+
+#### Examples
+
+- `spire::backend::HttpClient`:
+
+```rust
+fn main() {
+    println!("Hello!");
+}
+```
+
+- `spire::backend::BrowserPool`:
+
+```rust
+fn main() {
+    println!("Hello!");
+}
+```
+
+#### Notes
+
+- Routing uses Extract as Argument pattern from [axum][tokio-rs/axum].
+
+[tokio-rs/axum]: https://github.com/tokio-rs/axum/
