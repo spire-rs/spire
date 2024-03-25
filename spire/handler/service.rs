@@ -14,6 +14,11 @@ use spire_core::context::Signal;
 
 use crate::handler::Handler;
 
+/// TODO.
+///
+/// Automatically implements [`Worker`] if `H` is a [`Handler`].
+///
+/// [`Worker`]: crate::backend::Worker
 pub struct HandlerService<H, V, S> {
     marker: PhantomData<V>,
     handler: H,
@@ -22,7 +27,10 @@ pub struct HandlerService<H, V, S> {
 
 impl<H, V, S> HandlerService<H, V, S> {
     /// Creates a new [`HandlerService`].
-    pub fn new(handler: H, state: S) -> Self {
+    pub fn new<B>(handler: H, state: S) -> Self
+    where
+        H: Handler<B, V, S>,
+    {
         Self {
             marker: PhantomData,
             handler,
@@ -118,5 +126,29 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         this.future.poll(cx)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::handler::HandlerService;
+    use crate::Daemon;
+
+    async fn handler() {}
+
+    #[test]
+    #[cfg(feature = "client")]
+    fn with_client() {
+        let backend = crate::backend::HttpClient::default();
+        let service = HandlerService::new(handler, ());
+        let _ = Daemon::new(backend, service);
+    }
+
+    #[test]
+    #[cfg(feature = "driver")]
+    fn with_driver() {
+        let backend = crate::backend::BrowserPool::default();
+        let service = HandlerService::new(handler, ());
+        let _ = Daemon::new(backend, service);
     }
 }

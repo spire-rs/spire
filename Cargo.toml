@@ -28,9 +28,11 @@ spire = { path = "./spire", version = "0.1.0" }
 spire-core = { path = "./spire-core", version = "0.1.0" }
 spire-macros = { path = "./spire-macros", version = "0.1.0" }
 
-bytes = { version = "1.5.0" }
+tokio = { version = "1.36.0", default-features = false }
+tower = { version = "0.4.13", default-features = false }
+
+bytes = { version = "1.6.0" }
 futures = { version = "0.3.30" }
-tower = { version = "0.4.13" }
 async-trait = { version = "0.1.78" }
 pin-project-lite = { version = "0.2.13" }
 thiserror = { version = "1.0.58" }

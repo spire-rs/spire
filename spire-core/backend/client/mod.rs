@@ -11,12 +11,8 @@ use futures::future::BoxFuture;
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
-pub use builder::HttpClientBuilder;
-
 use crate::context::{Request, Response};
 use crate::{BoxError, Error, Result};
-
-mod builder;
 
 /// Simple `http` client backed by the underlying [`Service`].
 /// It is both [`Backend`] and [`Client`].
@@ -38,11 +34,6 @@ impl HttpClient {
         let svc = svc.map_err(Error::new);
         let inner = Mutex::new(BoxCloneService::new(svc));
         Self { inner }
-    }
-
-    /// Creates a new [`HttpClientBuilder`].
-    pub fn builder() -> HttpClientBuilder {
-        HttpClientBuilder::new()
     }
 }
 

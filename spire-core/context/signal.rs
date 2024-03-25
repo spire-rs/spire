@@ -54,23 +54,23 @@ pub enum Signal {
 
     /// Task succeeded, wait before tasks with matching tags.
     Wait(TagQuery, Duration),
-    /// Task failed, wait before repeating this task.
-    Repeat(TagQuery, Duration),
+    /// Task failed, wait before tasks with matching tags.
+    Hold(TagQuery, Duration),
 
     /// Task failed, terminate all collector tasks.
-    Stop(TagQuery, Error),
+    Fail(TagQuery, Error),
 }
 
 impl Signal {
     pub fn error(error: impl Into<BoxError>) -> Self {
-        Signal::Stop(TagQuery::Owner, Error::new(error))
+        Signal::Fail(TagQuery::Owner, Error::new(error))
     }
 
     /// Returns the provided [`Duration`] if applicable, default otherwise.
     pub fn duration(&self) -> Duration {
         match self {
             Signal::Wait(_, x) => *x,
-            Signal::Repeat(_, x) => *x,
+            Signal::Hold(_, x) => *x,
             _ => Duration::default(),
         }
     }
@@ -79,8 +79,8 @@ impl Signal {
     pub fn query(&self) -> TagQuery {
         match self {
             Signal::Wait(x, _) => x.clone(),
-            Signal::Repeat(x, _) => x.clone(),
-            Signal::Stop(x, _) => x.clone(),
+            Signal::Hold(x, _) => x.clone(),
+            Signal::Fail(x, _) => x.clone(),
             _ => TagQuery::default(),
         }
     }
@@ -118,7 +118,7 @@ impl IntoSignal for Duration {
 
 impl IntoSignal for Error {
     fn into_signal(self) -> Signal {
-        Signal::Stop(TagQuery::Every, self)
+        Signal::Fail(TagQuery::Every, self)
     }
 }
 
@@ -150,9 +150,9 @@ where
             match x {
                 Signal::Continue => Signal::Skip,
                 Signal::Skip => Signal::Continue,
-                Signal::Wait(q, x) => Signal::Repeat(q, x),
-                Signal::Repeat(q, x) => Signal::Wait(q, x),
-                Signal::Stop(q, x) => Signal::Stop(q, x),
+                Signal::Wait(q, x) => Signal::Hold(q, x),
+                Signal::Hold(q, x) => Signal::Wait(q, x),
+                Signal::Fail(q, x) => Signal::Fail(q, x),
             }
         }
 
@@ -189,6 +189,6 @@ mod test {
         let flip: Result<Duration, Duration> = Ok(Duration::default());
         assert!(matches!(flip.into_signal(), Signal::Wait(..)));
         let flip: Result<Duration, Duration> = Err(Duration::default());
-        assert!(matches!(flip.into_signal(), Signal::Repeat(..)));
+        assert!(matches!(flip.into_signal(), Signal::Hold(..)));
     }
 }

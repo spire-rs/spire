@@ -9,6 +9,7 @@ pub use spire_core::{Error, Result};
 
 pub mod extract;
 mod handler;
+pub mod middleware;
 pub mod routing;
 
 /// TODO.

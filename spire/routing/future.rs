@@ -23,15 +23,15 @@ type Fut<B, E> = Oneshot<BoxCloneService<Cx<B>, Signal, E>, Cx<B>>;
 pin_project! {
     #[project = RouteFutureKindProj]
     enum RouteFutureKind<B, E> {
-        Future { #[pin] future: Fut<B, E>, },
+        Future { #[pin] fut: Fut<B, E>, },
         Signal { signal: Option<Signal>, },
     }
 }
 
 impl<B, E> RouteFuture<B, E> {
     /// Creates a new [` RouteFuture`].
-    pub fn new(future: Fut<B, E>) -> Self {
-        let kind = RouteFutureKind::Future { future };
+    pub fn new(fut: Fut<B, E>) -> Self {
+        let kind = RouteFutureKind::Future { fut };
         Self { kind }
     }
 }
@@ -49,7 +49,7 @@ impl<B, E> Future for RouteFuture<B, E> {
         let this = self.project();
 
         let signal = match this.kind.project() {
-            RouteFutureKindProj::Future { future } => match future.poll(cx) {
+            RouteFutureKindProj::Future { fut } => match fut.poll(cx) {
                 Poll::Ready(Ok(x)) => x,
                 Poll::Ready(Err(x)) => return Poll::Ready(Err(x)),
                 Poll::Pending => return Poll::Pending,

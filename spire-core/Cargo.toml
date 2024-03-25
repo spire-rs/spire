@@ -34,8 +34,10 @@ client = ["dep:hyper", "dep:hyper-util"]
 driver = ["dep:fantoccini", "dep:deadpool"]
 
 [dependencies]
-bytes = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
 tower = { workspace = true, features = ["util"] }
+
+bytes = { workspace = true }
 async-trait = { workspace = true }
 pin-project-lite = { workspace = true }
 thiserror = { workspace = true }
@@ -53,4 +55,4 @@ deadpool = { version = "0.10.0", optional = true, features = [] }
 tracing = { version = "0.1.40", optional = true }
 
 [dev-dependencies]
-reqwest = { version = "0.11.26", features = [] }
+reqwest = { version = "0.12.1", features = [] }

@@ -21,7 +21,7 @@ use tower::{Service, ServiceExt};
 
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-pub use client::{HttpClient, HttpClientBuilder};
+pub use client::HttpClient;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::{BrowserClient, BrowserManager, BrowserPool};

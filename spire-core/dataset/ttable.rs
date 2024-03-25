@@ -19,7 +19,7 @@ struct DatasetsInner {
 }
 
 impl Datasets {
-    /// Creates a new [`Datasets`].
+    /// Creates an empty collection of [`Dataset`]s.
     pub fn new() -> Self {
         Self::default()
     }

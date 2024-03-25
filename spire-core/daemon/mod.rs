@@ -1,10 +1,9 @@
 use std::fmt;
 use std::sync::Arc;
 
-use runner::Runner;
-
 use crate::backend::{Backend, Worker};
 use crate::context::Request;
+use crate::daemon::runner::Runner;
 use crate::dataset::util::BoxCloneDataset;
 use crate::dataset::Dataset;
 use crate::{BoxError, Error, Result};
@@ -37,6 +36,7 @@ impl<B, W> Daemon<B, W> {
         W: Worker<B>,
     {
         // TODO: Add tracing.
+        // TODO: Add run for a single request.
         self.inner.run_until_empty().await
     }
 
@@ -114,12 +114,8 @@ impl<B, S> fmt::Debug for Daemon<B, S> {
 
 #[cfg(test)]
 mod test {
-    #[cfg(feature = "driver")]
-    use crate::backend::BrowserPool;
-    #[cfg(feature = "client")]
-    use crate::backend::HttpClient;
+    use crate::backend::Worker;
     use crate::context::{Context, Signal};
-    use crate::{backend::Worker, Daemon};
 
     #[derive(Debug, Clone)]
     struct T;
@@ -137,14 +133,14 @@ mod test {
     #[test]
     #[cfg(feature = "client")]
     fn with_client() {
-        let backend = HttpClient::default();
-        let _ = Daemon::new(backend, T);
+        let backend = crate::backend::HttpClient::default();
+        let _ = crate::Daemon::new(backend, T);
     }
 
     #[test]
     #[cfg(feature = "driver")]
     fn with_driver() {
-        let backend = BrowserPool::default();
-        let _ = Daemon::new(backend, T);
+        let backend = crate::backend::BrowserPool::default();
+        let _ = crate::Daemon::new(backend, T);
     }
 }

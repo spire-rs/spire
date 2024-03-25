@@ -49,7 +49,7 @@ pub trait Handler<B, V, S>: Clone + Send + Sized + 'static {
     ///
     /// [`Service`]: tower::Service
     fn with_state(self, state: S) -> HandlerService<Self, V, S> {
-        HandlerService::new(self, state)
+        HandlerService::new::<B>(self, state)
     }
 }
 

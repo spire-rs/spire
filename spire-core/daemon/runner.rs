@@ -1,12 +1,15 @@
-use std::collections::HashMap;
-use std::time::Instant;
+use std::collections::{HashMap, HashSet};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use futures::stream::StreamExt;
+use tokio::time::sleep_until;
 
 use crate::backend::{Backend, Worker};
-use crate::context::{Context as Cx, IntoSignal, Request, Signal, Tag, TagQuery, Task};
+use crate::context::{Context, Tag, TagQuery, Task};
+use crate::context::{IntoSignal, Request, Signal};
 use crate::dataset::Datasets;
-use crate::Result;
+use crate::{Error, Result};
 
 pub struct Runner<B, W> {
     pub(crate) service: W,
@@ -14,7 +17,8 @@ pub struct Runner<B, W> {
     pub(crate) backend: B,
 
     // Fallback means all not-yet encountered tags.
-    pub(crate) delays: HashMap<Tag, Instant>,
+    pub(crate) deferred: Mutex<HashMap<Tag, Instant>>,
+    pub(crate) blocked: Mutex<HashSet<Tag>>,
 }
 
 impl<B, W> Runner<B, W> {
@@ -25,9 +29,10 @@ impl<B, W> Runner<B, W> {
     {
         Self {
             service: inner,
-            datasets: Datasets::default(),
+            datasets: Datasets::new(),
             backend,
-            delays: HashMap::default(),
+            deferred: Mutex::new(HashMap::default()),
+            blocked: Mutex::new(HashSet::default()),
         }
     }
 
@@ -82,33 +87,71 @@ impl<B, W> Runner<B, W> {
         let backend = self.backend.clone();
         let datasets = self.datasets.clone();
         let owner = request.tag().clone();
-        let cx = Cx::new(request, backend, datasets);
 
-        let clone = self.service.clone();
-        let signal = clone.invoke(cx).await;
+        // TODO: Check blocks.
+        let until = self.find_defer(&owner);
+        sleep_until(until.into()).await;
+
+        let cx = Context::new(request, backend, datasets);
+        let signal = self.service.clone().invoke(cx).await;
         self.notify_signal(signal, owner);
     }
 
-    fn find_queries(&self) -> Vec<TagQuery> {
-        todo!()
+    fn find_defer(&self, owner: &Tag) -> Instant {
+        let now = Instant::now();
+
+        let delays = self.deferred.lock().unwrap();
+        let until = match delays.get(owner).cloned() {
+            None => delays.get(&Tag::Fallback).cloned(),
+            Some(x) => Some(x),
+        };
+
+        until.unwrap_or(now)
+    }
+
+    fn apply_defer(&self, owner: Tag, query: TagQuery, duration: Duration) {
+        let now = Instant::now();
+        let delays = self.deferred.lock().unwrap();
+
+        match query {
+            TagQuery::Owner => {}
+            TagQuery::Single(_) => {}
+
+            TagQuery::Every => {}
+            TagQuery::List(_) => {}
+        }
+    }
+
+    fn apply_block(&self, owner: Tag, query: TagQuery, reason: Error) {
+        // TODO: Tracing.
+
+        let mut blocks = self.blocked.lock().unwrap();
+        let _ = match query {
+            TagQuery::Owner => blocks.insert(owner),
+            TagQuery::Every => {
+                blocks.clear();
+                blocks.insert(Tag::Fallback)
+            }
+            TagQuery::Single(x) => blocks.insert(x),
+            TagQuery::List(x) => {
+                blocks.extend(x);
+                true
+            }
+        };
     }
 
     /// Applies the signal to the subsequent requests.
     fn notify_signal(&self, signal: Signal, owner: Tag) {
-        for x in self.find_queries() {
-            let _ = x.is_match(&Tag::Fallback, &Tag::Fallback);
-        }
+        // TODO: Add Ok/Err counter.
+        let _ = match &signal {
+            Signal::Continue | Signal::Wait(..) => false,
+            Signal::Skip | Signal::Hold(..) | Signal::Fail(..) => true,
+        };
 
         match signal {
-            // TODO: Add Ok counter.
-            Signal::Continue => {}
-            // TODO: Add Err counter.
-            Signal::Skip => {}
-            Signal::Wait(_, _) => {}
-            Signal::Repeat(_, _) => {}
-            Signal::Stop(_, _) => {}
-        }
-
-        // TODO.
+            Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(owner, x, t),
+            Signal::Fail(x, e) => self.apply_block(owner, x, e),
+            _ => { /* Ignore */ }
+        };
     }
 }
