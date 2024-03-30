@@ -1,25 +1,18 @@
-use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
-
 use futures::stream::StreamExt;
-use tokio::time::sleep_until;
 
 use crate::backend::{Backend, Worker};
-use crate::context::{Context, Tag, TagQuery, Task};
+use crate::context::{Context, Tag, Task};
 use crate::context::{IntoSignal, Request, Signal};
 use crate::dataset::Datasets;
-use crate::{Error, Result};
+use crate::Result;
 
 pub struct Runner<B, W> {
     pub(crate) service: W,
     pub(crate) datasets: Datasets,
     pub(crate) backend: B,
-
-    // Fallback means all not-yet encountered tags.
-    pub(crate) deferred: Mutex<HashMap<Tag, Instant>>,
-    pub(crate) blocked: Mutex<HashSet<Tag>>,
 }
+
+// TODO: Rem deferred/blocked.
 
 impl<B, W> Runner<B, W> {
     pub fn new(backend: B, inner: W) -> Self
@@ -31,8 +24,6 @@ impl<B, W> Runner<B, W> {
             service: inner,
             datasets: Datasets::new(),
             backend,
-            deferred: Mutex::new(HashMap::default()),
-            blocked: Mutex::new(HashSet::default()),
         }
     }
 
@@ -88,56 +79,9 @@ impl<B, W> Runner<B, W> {
         let datasets = self.datasets.clone();
         let owner = request.tag().clone();
 
-        // TODO: Check blocks.
-        let until = self.find_defer(&owner);
-        sleep_until(until.into()).await;
-
         let cx = Context::new(request, backend, datasets);
         let signal = self.service.clone().invoke(cx).await;
         self.notify_signal(signal, owner);
-    }
-
-    fn find_defer(&self, owner: &Tag) -> Instant {
-        let now = Instant::now();
-
-        let delays = self.deferred.lock().unwrap();
-        let until = match delays.get(owner).cloned() {
-            None => delays.get(&Tag::Fallback).cloned(),
-            Some(x) => Some(x),
-        };
-
-        until.unwrap_or(now)
-    }
-
-    fn apply_defer(&self, owner: Tag, query: TagQuery, duration: Duration) {
-        let now = Instant::now();
-        let delays = self.deferred.lock().unwrap();
-
-        match query {
-            TagQuery::Owner => {}
-            TagQuery::Single(_) => {}
-
-            TagQuery::Every => {}
-            TagQuery::List(_) => {}
-        }
-    }
-
-    fn apply_block(&self, owner: Tag, query: TagQuery, reason: Error) {
-        // TODO: Tracing.
-
-        let mut blocks = self.blocked.lock().unwrap();
-        let _ = match query {
-            TagQuery::Owner => blocks.insert(owner),
-            TagQuery::Every => {
-                blocks.clear();
-                blocks.insert(Tag::Fallback)
-            }
-            TagQuery::Single(x) => blocks.insert(x),
-            TagQuery::List(x) => {
-                blocks.extend(x);
-                true
-            }
-        };
     }
 
     /// Applies the signal to the subsequent requests.
@@ -149,8 +93,8 @@ impl<B, W> Runner<B, W> {
         };
 
         match signal {
-            Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(owner, x, t),
-            Signal::Fail(x, e) => self.apply_block(owner, x, e),
+            // Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(owner, x, t),
+            // Signal::Fail(x, e) => self.apply_block(owner, x, e),
             _ => { /* Ignore */ }
         };
     }

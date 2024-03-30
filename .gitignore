@@ -16,7 +16,6 @@ target/
 # Output
 dist/
 build/
-_*/
 
 # Environment
 env/

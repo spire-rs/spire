@@ -5,7 +5,10 @@ use tower::layer::util::Stack;
 use tower::ServiceBuilder;
 
 pub use exclude::{Exclude, ExcludeLayer};
+pub use include::{Include, IncludeLayer};
 
+mod block;
+mod defer;
 mod exclude;
 mod include;
 
@@ -14,8 +17,10 @@ pub mod futures {
     //!
 
     pub use exclude::ExcludeFuture;
+    pub use include::IncludeFuture;
 
     use crate::middleware::exclude;
+    use crate::middleware::include;
 }
 
 /// TODO.

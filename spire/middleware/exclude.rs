@@ -7,9 +7,7 @@ use std::task::{ready, Context, Poll};
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
 
-use spire_core::context::Signal;
-
-use crate::context::Context as Cx;
+use crate::context::{Context as Cx, Signal};
 
 /// TODO.
 #[derive(Clone)]
@@ -143,7 +141,7 @@ mod test {
     use tower::Layer;
 
     use crate::handler::HandlerService;
-    use crate::middlewares::ExcludeLayer;
+    use crate::middleware::ExcludeLayer;
     use crate::Daemon;
 
     async fn handler() {}
