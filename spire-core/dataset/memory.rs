@@ -15,11 +15,23 @@ struct InMemDatasetInner<T> {
 }
 
 impl<T> InMemDataset<T> {
-    /// Creates a new [`InMemDataset`].
+    /// Creates an empty [`InMemDataset`].
     ///
     /// Same as [`InMemDataset::queue`].
+    #[inline]
     pub fn new() -> Self {
         Self::queue()
+    }
+
+    /// Reserves capacity for at least `additional` more elements to be
+    /// inserted in the given `Dataset`.
+    pub fn reserved(self, additional: usize) -> Self {
+        {
+            let mut guard = self.inner.buffer.lock().unwrap();
+            guard.reserve(additional);
+        }
+
+        self
     }
 
     /// Creates a `First-In First-Out` [`InMemDataset`].

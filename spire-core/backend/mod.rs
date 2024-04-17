@@ -9,10 +9,16 @@
 //!
 //! ### Backend
 //!
-//! - [`HttpClient`] is a simple `http` client backed by the underlying [`Service`].
-//! It is both [`Backend`] and [`Client`].
+//! - [`HttpClient`] is a simple `http` client backed by the underlying
+//! `tower::`[`Service`]. It is both [`Backend`] and [`Client`].
 //! - [`BrowserPool`] is a [`Backend`] built on top of [`fantoccini`] crate.
 //! Uses [`BrowserClient`] as a [`Client`].
+//!
+//! ### Utils
+//!
+//! - [`DebugEntity`] is a no-op [`Backend`], [`Client`] and [`Worker`] used for
+//! testing and debugging.
+//! - [`TraceEntity`]
 //!
 
 use std::convert::Infallible;
@@ -22,9 +28,11 @@ use tower::{Service, ServiceExt};
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub use client::HttpClient;
+pub use debug::DebugEntity;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::{BrowserClient, BrowserManager, BrowserPool};
+pub use trace::TraceEntity;
 
 use crate::context::{Context, Request, Response, Signal};
 use crate::{Error, Result};
@@ -32,9 +40,11 @@ use crate::{Error, Result};
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 mod client;
+mod debug;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 mod driver;
+mod trace;
 
 /// Core trait used to instantiate [`Client`]s.
 ///
@@ -103,7 +113,7 @@ where
 /// [`Context`]: crate::context::Context
 #[async_trait::async_trait]
 pub trait Worker<B>: Clone + Send + 'static {
-    /// TODO: Remove clone?
+    /// TODO: Remove clone + &self?
     async fn invoke(self, cx: Context<B>) -> Signal;
 }
 

@@ -131,24 +131,32 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::backend::Worker;
     use crate::handler::HandlerService;
     use crate::Daemon;
 
-    async fn handler() {}
+    fn service<B: Send + 'static>() -> impl Worker<B> {
+        async fn handler() {}
+
+        HandlerService::new::<B>(handler, ())
+    }
+
+    #[test]
+    fn with_debug() {
+        // let _ = Daemon::new(backend, service());
+    }
 
     #[test]
     #[cfg(feature = "client")]
     fn with_client() {
         let backend = crate::backend::HttpClient::default();
-        let service = HandlerService::new(handler, ());
-        let _ = Daemon::new(backend, service);
+        let _ = Daemon::new(backend, service());
     }
 
     #[test]
     #[cfg(feature = "driver")]
     fn with_driver() {
         let backend = crate::backend::BrowserPool::default();
-        let service = HandlerService::new(handler, ());
-        let _ = Daemon::new(backend, service);
+        let _ = Daemon::new(backend, service());
     }
 }

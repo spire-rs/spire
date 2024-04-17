@@ -102,7 +102,12 @@ mod test {
     use crate::BoxError;
 
     #[test]
-    fn reqwest() {
+    fn hyper() {
+        let _ = HttpClient::default();
+    }
+
+    #[test]
+    fn service() {
         // BLOCKED: https://github.com/seanmonstar/reqwest/issues/2039
         // BLOCKED: https://github.com/seanmonstar/reqwest/pull/2060
 

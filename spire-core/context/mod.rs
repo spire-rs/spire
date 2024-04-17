@@ -42,8 +42,15 @@ impl<B> Context<B> {
     /// Returns the reference to the inner [`Request`].
     ///
     /// Used by extractors to access extensions.
-    pub fn peek(&self) -> &Request {
+    pub fn get_ref(&self) -> &Request {
         &self.request
+    }
+
+    /// Returns the mutable reference to the inner [`Request`].
+    ///
+    /// Used by extractors to access extensions.
+    pub fn get_mut(&mut self) -> &mut Request {
+        &mut self.request
     }
 
     /// Resolves the [`Request`] and returns [`Response`] or [`Error`].

@@ -71,7 +71,6 @@ impl fmt::Debug for BrowserManager {
     }
 }
 
-#[deadpool::async_trait]
 impl Manager for BrowserManager {
     type Type = BrowserClient;
     type Error = Error;

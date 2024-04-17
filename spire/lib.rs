@@ -20,17 +20,19 @@ pub mod prelude {}
 
 #[cfg(test)]
 mod test {
-    use spire_core::backend::BrowserPool;
-
-    use crate::backend::HttpClient;
     use crate::context::RequestQueue;
     use crate::dataset::{Dataset as _, InMemDataset};
     use crate::extract::Dataset;
     use crate::{Daemon, Result, Router};
 
     #[test]
-    fn http_client() {
-        async fn handler(queue: RequestQueue, Dataset(dataset): Dataset<u64>) -> Result<()> {
+    #[cfg(feature = "client")]
+    fn with_client() {
+        async fn handler(
+            queue: RequestQueue,
+            Dataset(dataset): Dataset<u32>,
+            Dataset(dataset): Dataset<u64>,
+        ) -> Result<()> {
             let u = dataset.get().await?;
             dataset.add(1).await?;
 
@@ -42,7 +44,7 @@ mod test {
             .route("page*", handler)
             .fallback(handler);
 
-        let backend = HttpClient::default();
+        let backend = crate::backend::HttpClient::default();
         let daemon = Daemon::new(backend, router)
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new());
@@ -51,8 +53,13 @@ mod test {
     }
 
     #[test]
-    fn browser() {
-        async fn handler() -> Result<()> {
+    #[cfg(feature = "driver")]
+    fn with_driver() {
+        async fn handler(
+            queue: RequestQueue,
+            Dataset(dataset): Dataset<u32>,
+            Dataset(dataset): Dataset<u64>,
+        ) -> Result<()> {
             Ok(())
         }
 
@@ -61,7 +68,7 @@ mod test {
             .route("page*", handler)
             .fallback(handler);
 
-        let backend = BrowserPool::builder().build();
+        let backend = crate::backend::BrowserPool::builder().build();
         let daemon = Daemon::new(backend, router)
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new());

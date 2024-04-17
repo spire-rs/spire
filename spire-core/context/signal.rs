@@ -15,14 +15,14 @@ pub enum TagQuery {
     #[default]
     Owner,
 
-    /// Matches every [`Tag`], including [`Tag::Fallback`].
-    Every,
-
     /// Matches the provided [`Tag`].
     Single(Tag),
 
     /// Matches every [`Tag`] from the provided list.
     List(Vec<Tag>),
+
+    /// Matches every [`Tag`], including [`Tag::Fallback`].
+    Every,
 }
 
 impl TagQuery {
@@ -30,9 +30,9 @@ impl TagQuery {
     pub(crate) fn is_match(&self, tag: &Tag, owner: &Tag) -> bool {
         match self {
             TagQuery::Owner => !owner.is_fallback() && tag == owner,
-            TagQuery::Every => true,
-            TagQuery::List(x) => x.contains(tag),
             TagQuery::Single(x) => x == tag,
+            TagQuery::List(x) => x.contains(tag),
+            TagQuery::Every => true,
         }
     }
 }
@@ -62,11 +62,12 @@ pub enum Signal {
 }
 
 impl Signal {
+    /// Creates a new [`Signal`] from the boxable error.
     pub fn error(error: impl Into<BoxError>) -> Self {
         Signal::Fail(TagQuery::Owner, Error::new(error))
     }
 
-    /// Returns the provided [`Duration`] if applicable, default otherwise.
+    /// Returns the [`Duration`] if applicable, default otherwise.
     pub fn duration(&self) -> Duration {
         match self {
             Signal::Wait(_, x) => *x,
@@ -75,7 +76,7 @@ impl Signal {
         }
     }
 
-    // Returns the provided [`Query`] if applicable, default otherwise.
+    // Returns the [`TagQuery`] if applicable, default otherwise.
     pub fn query(&self) -> TagQuery {
         match self {
             Signal::Wait(x, _) => x.clone(),

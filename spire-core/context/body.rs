@@ -12,7 +12,7 @@ use crate::BoxError;
 
 /// Forked from [`axum_core`]`::body::Body`.
 ///
-/// [`axum`]: https://github.com/tokio-rs/axum
+/// [`axum_core`]: https://github.com/tokio-rs/axum
 fn try_downcast<T, K>(k: K) -> Result<T, K>
 where
     T: 'static,
@@ -20,7 +20,7 @@ where
 {
     let mut k = Some(k);
     match <dyn Any>::downcast_mut::<Option<T>>(&mut k) {
-        Some(k) => Ok(k.take().unwrap()),
+        Some(x) => Ok(x.take().unwrap()),
         _ => Err(k.unwrap()),
     }
 }

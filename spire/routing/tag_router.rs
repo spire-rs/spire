@@ -29,8 +29,8 @@ impl<B, S> TagRouter<B, S> {
     }
 
     pub fn route(&mut self, tag: Tag, endpoint: Endpoint<B, S>) {
-        if matches!(tag, Tag::Fallback) {
-            self.fallback(endpoint)
+        if tag.is_fallback() {
+            self.fallback(endpoint);
         } else {
             // TODO: Panic on Some(_).
             self.tag_router.insert(tag, endpoint);
@@ -103,7 +103,7 @@ impl<B> Service<Cx<B>> for TagRouter<B, ()> {
             None => self.default_fallback.clone(),
         };
 
-        let tagged = self.tag_router.get(cx.peek().tag()).cloned();
+        let tagged = self.tag_router.get(cx.get_ref().tag()).cloned();
         let mut endpoint = tagged.unwrap_or_else(fallback);
         endpoint.call(cx)
     }

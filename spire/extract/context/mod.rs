@@ -48,7 +48,7 @@ where
     type Rejection = Infallible;
 
     async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx.peek().tag().clone())
+        Ok(cx.get_ref().tag().clone())
     }
 }
 

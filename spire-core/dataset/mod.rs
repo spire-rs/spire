@@ -4,15 +4,16 @@
 //!
 //! ### Datasets
 //!
-//! - [`InMemDataset`]
-//! - `SqliteDataset`
+//! - [`InMemDataset`] is a simple in-memory `FIFO` or `LIFO` `VecDeque`-based `Dataset`.
 //! - `RedbDataset`
 //! - `PersyDataset`
+//! - `SqliteDataset`
+//! - `SqlxDataset`
 //!
 //! ### Utility
 //!
-//! - [`BoxDataset`]
-//! - [`BoxCloneDataset`]
+//! - [`BoxDataset`] is a type-erased `Dataset`.
+//! - [`BoxCloneDataset`] is a clonable type-erased `Dataset`.
 //! - [`MapData`]
 //! - [`MapErr`]
 //!
@@ -32,7 +33,7 @@ pub mod util;
 
 /// Basic expandable collection of items with a defined size.
 ///
-/// Features a mirrored API from `burn::data::dataset::`[`Dataset`].
+/// Features a mirrored async API from `burn::data::dataset::`[`Dataset`].
 ///
 /// [`Dataset`]: https://docs.rs/burn/0.12.1/burn/data/dataset/trait.Dataset.html
 #[async_trait::async_trait]

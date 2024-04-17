@@ -28,13 +28,14 @@ spire = { path = "./spire", version = "0.1.0" }
 spire-core = { path = "./spire-core", version = "0.1.0" }
 spire-macros = { path = "./spire-macros", version = "0.1.0" }
 
+# TODO: Do i even need tokio?
 tokio = { version = "1.37.0", default-features = false }
 tower = { version = "0.4.13", default-features = false }
 
 bytes = { version = "1.6.0" }
 futures = { version = "0.3.30" }
-async-trait = { version = "0.1.79" }
+async-trait = { version = "0.1.80" }
 pin-project-lite = { version = "0.2.14" }
 thiserror = { version = "1.0.58" }
 serde = { version = "1.0.197" }
-time = { version = "0.3.34" }
+time = { version = "0.3.36" }

@@ -7,8 +7,6 @@ use tower::ServiceBuilder;
 pub use exclude::{Exclude, ExcludeLayer};
 pub use include::{Include, IncludeLayer};
 
-mod block;
-mod defer;
 mod exclude;
 mod include;
 
@@ -25,12 +23,19 @@ pub mod futures {
 
 /// TODO.
 pub trait ServiceBuilderExt<L> {
-    /// TODO.
+    /// Conditionally rejects requests based on a fetched `robots.txt` file.
     fn exclude(self) -> ServiceBuilder<Stack<ExcludeLayer, L>>;
+
+    /// TODO.
+    fn include(self) -> ServiceBuilder<Stack<IncludeLayer, L>>;
 }
 
 impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
     fn exclude(self) -> ServiceBuilder<Stack<ExcludeLayer, L>> {
-        todo!()
+        self.layer(ExcludeLayer::new())
+    }
+
+    fn include(self) -> ServiceBuilder<Stack<IncludeLayer, L>> {
+        self.layer(IncludeLayer::new())
     }
 }

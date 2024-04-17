@@ -34,9 +34,9 @@ pub enum Tag {
     /// Explicitly calls the fallback handler.
     #[default]
     Fallback,
-    ///
+    /// TODO.
     Sequence(String),
-    ///
+    /// TODO.
     Rehash(u64),
 }
 
@@ -52,6 +52,7 @@ impl Tag {
         Tag::Sequence(seq.as_ref().to_owned())
     }
 
+    /// Returns `true` if the [`Tag`] is an explicit fallback.
     pub fn is_fallback(&self) -> bool {
         matches!(self, Tag::Fallback)
     }

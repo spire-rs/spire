@@ -9,6 +9,7 @@ use tower::Service;
 use crate::context::{Request, Response};
 use crate::{Error, Result};
 
+/// Managed browser connection.
 #[derive(Clone)]
 pub struct BrowserClient {
     id: u32,
