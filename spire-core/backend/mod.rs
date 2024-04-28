@@ -60,8 +60,7 @@ pub trait Backend: Clone + Send + Sized + 'static {
 #[async_trait::async_trait]
 impl<S, T> Backend for S
 where
-    S: Service<(), Response = T, Error = Error>,
-    S: Clone + Send + Sync + 'static,
+    S: Service<(), Response = T, Error = Error> + Clone + Send + Sync + 'static,
     S::Future: Send + 'static,
     T: Client,
 {
@@ -88,14 +87,12 @@ pub trait Client: Send + Sized + 'static {
 #[async_trait::async_trait]
 impl<S> Client for S
 where
-    S: Service<Request, Response = Response, Error = Error>,
-    S: Clone + Send + 'static,
+    S: Service<Request, Response = Response, Error = Error> + Send + 'static,
     S::Future: Send + 'static,
 {
     #[inline]
-    async fn resolve(self, req: Request) -> Result<Response> {
-        let mut copy = self.clone();
-        let ready = copy.ready().await?;
+    async fn resolve(mut self, req: Request) -> Result<Response> {
+        let ready = self.ready().await?;
         ready.call(req).await
     }
 }
