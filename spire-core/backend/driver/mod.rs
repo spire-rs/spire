@@ -7,7 +7,6 @@ use tower::Service;
 
 pub use client::BrowserClient;
 pub use manager::BrowserManager;
-use process::BrowserProcess;
 
 use crate::{Error, Result};
 
@@ -31,19 +30,16 @@ impl BrowserPool {
         Self { pool }
     }
 
+    pub(crate) async fn get(&self) -> Result<BrowserClient> {
+        // BoxFuture::new()
+
+        let inner = self.pool.get().await.unwrap(); // TODO.
+        Ok(BrowserClient::new(inner))
+    }
+
     /// Creates a new [`BrowserManager`].
     pub fn builder() -> BrowserManager {
         BrowserManager::new()
-    }
-}
-
-impl Default for BrowserPool {
-    fn default() -> Self {
-        // TODO. Add default processes.
-        Self::builder()
-            .with_unmanaged("127.0.0.1:4444")
-            .with_unmanaged("127.0.0.1:4445")
-            .build()
     }
 }
 
@@ -66,6 +62,7 @@ impl Service<()> for BrowserPool {
 
     #[inline]
     fn call(&mut self, req: ()) -> Self::Future {
+        // self.pool.get().await
         todo!()
     }
 }

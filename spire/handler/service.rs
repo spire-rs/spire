@@ -132,7 +132,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::backend::Worker;
-    use crate::Daemon;
+    use crate::Client;
     use crate::handler::HandlerService;
 
     fn service<B: Send + 'static>() -> impl Worker<B> {
@@ -150,13 +150,13 @@ mod test {
     #[cfg(feature = "client")]
     fn with_client() {
         let backend = crate::backend::HttpClient::default();
-        let _ = Daemon::new(backend, service());
+        let _ = Client::new(backend, service());
     }
 
     #[test]
     #[cfg(feature = "driver")]
     fn with_driver() {
         let backend = crate::backend::BrowserPool::default();
-        let _ = Daemon::new(backend, service());
+        let _ = Client::new(backend, service());
     }
 }

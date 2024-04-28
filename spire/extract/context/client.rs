@@ -64,10 +64,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context_parts(
-        cx: &Context<HttpClient>,
-        _state: &S,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<HttpClient>, _: &S) -> Result<Self, Self::Rejection> {
         // let Html(html) = Html::from_context(cx, state).await?;
         todo!()
     }

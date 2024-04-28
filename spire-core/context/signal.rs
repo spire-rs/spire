@@ -58,13 +58,13 @@ pub enum Signal {
     Hold(TagQuery, Duration),
 
     /// Task failed, terminate all collector tasks.
-    Fail(TagQuery, Error),
+    Fail(TagQuery, BoxError),
 }
 
 impl Signal {
     /// Creates a new [`Signal`] from the boxable error.
     pub fn error(error: impl Into<BoxError>) -> Self {
-        Signal::Fail(TagQuery::Owner, Error::new(error))
+        error.into().into_signal()
     }
 
     /// Returns the [`Duration`] if applicable, default otherwise.
@@ -94,36 +94,35 @@ pub trait IntoSignal {
 }
 
 impl IntoSignal for Signal {
+    #[inline]
     fn into_signal(self) -> Signal {
         self
     }
 }
 
 impl IntoSignal for () {
+    #[inline]
     fn into_signal(self) -> Signal {
         Signal::Continue
     }
 }
 
 impl IntoSignal for Infallible {
+    #[inline]
     fn into_signal(self) -> Signal {
         Signal::Continue
     }
 }
 
 impl IntoSignal for Duration {
+    #[inline]
     fn into_signal(self) -> Signal {
         Signal::Wait(TagQuery::default(), self)
     }
 }
 
-impl IntoSignal for Error {
-    fn into_signal(self) -> Signal {
-        Signal::Fail(TagQuery::Every, self)
-    }
-}
-
 impl IntoSignal for BoxError {
+    #[inline]
     fn into_signal(self) -> Signal {
         Error::new(self).into_signal()
     }
@@ -136,7 +135,7 @@ where
     fn into_signal(self) -> Signal {
         match self {
             Some(x) => x.into_signal(),
-            None => Signal::Continue,
+            None => ().into_signal(),
         }
     }
 }

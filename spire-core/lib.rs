@@ -2,12 +2,14 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
 
-pub use daemon::Daemon;
+pub use process::Client;
+
+use crate::context::{IntoSignal, Signal, TagQuery};
 
 pub mod backend;
 pub mod context;
-mod daemon;
 pub mod dataset;
+mod process;
 
 /// Type alias for a type-erased [`Error`] type.
 ///
@@ -22,6 +24,7 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 pub struct Error {
     #[from]
     inner: BoxError,
+    // fatal: bool,
 }
 
 impl Error {
@@ -40,6 +43,13 @@ impl Error {
 impl From<http::Error> for Error {
     fn from(error: http::Error) -> Self {
         todo!()
+    }
+}
+
+// TODO: Use Error::signal.
+impl IntoSignal for Error {
+    fn into_signal(self) -> Signal {
+        Signal::Fail(TagQuery::Owner, self.into_inner())
     }
 }
 

@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use http_body::{Body as HttpBody, Frame, SizeHint};
 use http_body_util::combinators::BoxBody;
-use http_body_util::{BodyExt, Empty};
+use http_body_util::{BodyExt, Empty, Full};
 
 use crate::BoxError;
 
@@ -47,14 +47,51 @@ impl Body {
 }
 
 impl Default for Body {
+    #[inline]
     fn default() -> Self {
         Self::new(Empty::new())
     }
 }
 
 impl From<()> for Body {
+    #[inline]
     fn from(_: ()) -> Self {
         Self::default()
+    }
+}
+
+impl From<Bytes> for Body {
+    #[inline]
+    fn from(bytes: Bytes) -> Self {
+        Self::new(Full::new(bytes))
+    }
+}
+
+impl From<Vec<u8>> for Body {
+    #[inline]
+    fn from(vec: Vec<u8>) -> Self {
+        Bytes::from(vec).into()
+    }
+}
+
+impl From<&'static [u8]> for Body {
+    #[inline]
+    fn from(slice: &'static [u8]) -> Self {
+        Bytes::from(slice).into()
+    }
+}
+
+impl From<String> for Body {
+    #[inline]
+    fn from(string: String) -> Self {
+        string.into_bytes().into()
+    }
+}
+
+impl From<&'static str> for Body {
+    #[inline]
+    fn from(slice: &'static str) -> Body {
+        slice.as_bytes().into()
     }
 }
 

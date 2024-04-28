@@ -9,7 +9,9 @@ use tower::{Layer, Service};
 
 use crate::context::{Context as Cx, Signal};
 
-/// TODO.
+/// Conditionally rejects [`Request`]s based on a retrieved `robots.txt` file.
+///
+/// [`Request`]: crate::context::Request
 #[derive(Clone)]
 pub struct Exclude<S> {
     inner: S,
@@ -62,7 +64,7 @@ where
     }
 }
 
-/// TODO.
+/// A `tower::`[`Layer`] that produces a [`Exclude`] service.
 #[derive(Debug, Default, Clone)]
 pub struct ExcludeLayer {}
 
@@ -103,7 +105,7 @@ where
 {
     /// Creates a new [`ExcludeFuture`].
     pub fn new(cx: Cx<B>, mut inner: S) -> Self {
-        // TODO. Check if req in cached.
+        // TODO. Check if req in cached, use special dataset?.
 
         let fut = inner.call(cx);
         let kind = ExcludeFutureKind::Call { fut };
@@ -140,7 +142,7 @@ where
 mod test {
     use tower::Layer;
 
-    use crate::Daemon;
+    use crate::Client;
     use crate::handler::HandlerService;
     use crate::middleware::ExcludeLayer;
 
@@ -152,7 +154,7 @@ mod test {
         let backend = crate::backend::HttpClient::default();
         let service = HandlerService::new(handler, ());
         let layered = ExcludeLayer::new().layer(service);
-        let _ = Daemon::new(backend, layered);
+        let _ = Client::new(backend, layered);
     }
 
     #[test]
@@ -161,6 +163,6 @@ mod test {
         let backend = crate::backend::BrowserPool::default();
         let service = HandlerService::new(handler, ());
         let layered = ExcludeLayer::new().layer(service);
-        let _ = Daemon::new(backend, layered);
+        let _ = Client::new(backend, layered);
     }
 }

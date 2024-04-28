@@ -34,8 +34,8 @@ pub use client::HttpClient;
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::{BrowserClient, BrowserManager, BrowserPool};
 
-use crate::context::{Context, Request, Response, Signal};
 use crate::{Error, Result};
+use crate::context::{Context, Request, Response, Signal};
 
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
@@ -75,7 +75,7 @@ where
     }
 }
 
-/// Core trait used to fetch [`Response`]s with [`Request`]s.
+/// Core trait used to retrieve [`Response`]s with [`Request`]s.
 ///
 /// It is automatically implemented for cloneable [`Service`]s that take [`Request`]
 /// and return [`Result`]<[`Response`]>.

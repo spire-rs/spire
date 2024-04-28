@@ -1,8 +1,7 @@
 use std::convert::Infallible;
 
 use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::Dataset as CoreDataset;
-use spire_core::dataset::util::BoxCloneDataset;
+use spire_core::dataset::{Dataset, util::BoxCloneDataset};
 use spire_core::Error;
 
 use crate::extract::{FromContext, FromContextRef};
@@ -23,7 +22,7 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context(cx: Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<B>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx)
     }
 }
@@ -35,7 +34,7 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<B>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.queue())
     }
 }
@@ -47,29 +46,42 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<B>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.get_ref().tag().clone())
     }
 }
 
-/// TODO.
-pub struct Dataset<T>(pub BoxCloneDataset<T, Error>);
+/// TODO. Dataset?
+pub struct Data<T>(pub BoxCloneDataset<T, Error>);
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContextRef<B, S> for Dataset<T>
+impl<B, S, T> FromContextRef<B, S> for BoxCloneDataset<T, Error>
 where
     B: Sync,
-    T: Send + Sync + 'static,
+    T: Sync + Send + 'static,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<B>, _: &S) -> Result<Self, Self::Rejection> {
+        Ok(cx.dataset::<T>())
+    }
+}
+
+#[async_trait::async_trait]
+impl<B, S, T> FromContextRef<B, S> for Data<T>
+where
+    B: Sync,
+    T: Sync + Send + 'static,
+{
+    type Rejection = Infallible;
+
+    async fn from_context_parts(cx: &Context<B>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(cx.dataset::<T>()))
     }
 }
 
 #[async_trait::async_trait]
-impl<T> CoreDataset<T> for Dataset<T>
+impl<T> Dataset<T> for Data<T>
 where
     T: Send + Sync + 'static,
 {

@@ -54,7 +54,7 @@ impl<B> Context<B> {
     }
 
     /// Resolves the [`Request`] and returns [`Response`] or [`Error`].
-    pub async fn try_resolve(self) -> Result<Response>
+    pub async fn resolve(self) -> Result<Response>
     where
         B: Backend,
     {

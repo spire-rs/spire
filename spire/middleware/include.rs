@@ -2,14 +2,17 @@ use std::convert::Infallible;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll, ready};
 
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
 
 use crate::context::{Context as Cx, Signal};
 
-/// TODO.
+/// Populates [`RequestQueue`] with [`Request`]s from a retrieved `sitemap.xml`.
+///
+/// [`RequestQueue`]: crate::context::RequestQueue
+/// [`Request`]: crate::context::Request
 #[derive(Clone)]
 pub struct Include<S> {
     inner: S,
@@ -62,7 +65,7 @@ where
     }
 }
 
-/// TODO.
+/// A `tower::`[`Layer`] that produces a [`Include`] service.
 #[derive(Debug, Default, Clone)]
 pub struct IncludeLayer {}
 
@@ -140,9 +143,9 @@ where
 mod test {
     use tower::Layer;
 
+    use crate::Client;
     use crate::handler::HandlerService;
     use crate::middleware::IncludeLayer;
-    use crate::Daemon;
 
     async fn handler() {}
 
@@ -152,7 +155,7 @@ mod test {
         let backend = crate::backend::HttpClient::default();
         let service = HandlerService::new(handler, ());
         let layered = IncludeLayer::new().layer(service);
-        let _ = Daemon::new(backend, layered);
+        let _ = Client::new(backend, layered);
     }
 
     #[test]
@@ -161,6 +164,6 @@ mod test {
         let backend = crate::backend::BrowserPool::default();
         let service = HandlerService::new(handler, ());
         let layered = IncludeLayer::new().layer(service);
-        let _ = Daemon::new(backend, layered);
+        let _ = Client::new(backend, layered);
     }
 }

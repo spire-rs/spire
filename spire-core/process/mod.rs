@@ -3,19 +3,19 @@ use std::sync::Arc;
 
 use crate::backend::{Backend, Worker};
 use crate::context::{Body, Request};
-use crate::daemon::runner::Runner;
 use crate::dataset::{util::BoxCloneDataset, Dataset};
+use crate::process::runner::Runner;
 use crate::{BoxError, Error, Result};
 
 mod runner;
 
 /// Orchestrates the processing of [`Request`]s using provided [`Backend`] and [`Worker`].
-pub struct Daemon<B, W> {
+pub struct Client<B, W> {
     inner: Arc<Runner<B, W>>,
 }
 
-impl<B, W> Daemon<B, W> {
-    /// Creates a new [`Daemon`] with provided [`Backend`] and [`Worker`].
+impl<B, W> Client<B, W> {
+    /// Creates a new [`Client`] with provided [`Backend`] and [`Worker`].
     pub fn new(backend: B, inner: W) -> Self
     where
         B: Backend,
@@ -40,7 +40,7 @@ impl<B, W> Daemon<B, W> {
     ///
     /// ### Note
     ///
-    /// It's preferred to use [`Daemon::with_initial_request`] and [`Daemon::run`] instead.
+    /// It's preferred to use [`Client::with_initial_request`] and [`Client::run`] instead.
     ///
     /// Does not process the [`RequestQueue`].
     ///
@@ -74,11 +74,11 @@ impl<B, W> Daemon<B, W> {
         self
     }
 
-    /// Adds a single [`Request`] to the [`RequestQueue`] when a [`Daemon::run`] is invoked.
+    /// Adds a single [`Request`] to the [`RequestQueue`] when a [`Client::run`] is invoked.
     ///
     /// # Note
     ///
-    /// See [`Daemon::with_initial_requests`] for multiple `Request`s.
+    /// See [`Client::with_initial_requests`] for multiple `Request`s.
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub fn with_initial_request<R>(self, request: Request<R>) -> Self
@@ -89,11 +89,11 @@ impl<B, W> Daemon<B, W> {
         self
     }
 
-    /// Adds a set of [`Request`]s to the [`RequestQueue`] when a [`Daemon::run`] is invoked.
+    /// Adds a set of [`Request`]s to the [`RequestQueue`] when a [`Client::run`] is invoked.
     ///
     /// # Note
     ///
-    /// See [`Daemon::with_initial_request`] for a single `Request`.
+    /// See [`Client::with_initial_request`] for a single `Request`.
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub fn with_initial_requests<T, R>(self, requests: T) -> Self
@@ -151,14 +151,14 @@ impl<B, W> Daemon<B, W> {
     }
 }
 
-impl<B, S> Clone for Daemon<B, S> {
+impl<B, S> Clone for Client<B, S> {
     fn clone(&self) -> Self {
         let inner = self.inner.clone();
         Self { inner }
     }
 }
 
-impl<B, S> fmt::Debug for Daemon<B, S> {
+impl<B, S> fmt::Debug for Client<B, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Daemon")
             .field("Datasets", &self.inner.datasets.len())
@@ -173,7 +173,7 @@ mod test {
 
     use crate::backend::util::TraceEntity;
     use crate::dataset::InMemDataset;
-    use crate::{Daemon, Result};
+    use crate::{Client, Result};
 
     #[tokio::test]
     #[cfg_attr(feature = "tracing", traced_test)]
@@ -181,13 +181,13 @@ mod test {
         let entity = TraceEntity::default();
         let request = Request::get("https://example.com/").body(());
 
-        let daemon = Daemon::new(entity.clone(), entity)
+        let client = Client::new(entity.clone(), entity)
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new())
             .with_initial_request(request.unwrap());
 
-        let _ = daemon.dataset::<u64>();
-        let _ = daemon.run().await?;
+        let _ = client.dataset::<u64>();
+        let _ = client.run().await?;
         Ok(())
     }
 
@@ -200,11 +200,13 @@ mod test {
         let backend = TraceEntity::new(HttpClient::default());
         let request = Request::get("https://example.com/").body(());
 
-        let _ = Daemon::new(backend, TraceEntity::default())
+        let client = Client::new(backend, TraceEntity::default())
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new())
             .with_initial_request(request.unwrap());
 
+        let _ = client.dataset::<u64>();
+        let _ = client.run().await?;
         Ok(())
     }
 
@@ -217,11 +219,13 @@ mod test {
         let backend = TraceEntity::new(BrowserPool::default());
         let request = Request::get("https://example.com/").body(());
 
-        let _ = Daemon::new(backend, TraceEntity::default())
+        let client = Client::new(backend, TraceEntity::default())
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new())
             .with_initial_request(request.unwrap());
 
+        let _ = client.dataset::<u64>();
+        let _ = client.run().await?;
         Ok(())
     }
 }

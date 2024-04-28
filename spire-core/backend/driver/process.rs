@@ -3,9 +3,14 @@ use std::sync::Mutex;
 
 use crate::BoxError;
 
+enum ConnType {
+    Managed(BrowserProcess),
+    Unmanaged(String),
+}
+
 #[async_trait::async_trait]
 pub trait BrowserDriver {
-    type Error;
+    type Error: Into<BoxError>;
 
     fn connect(&mut self) -> Result<(), Self::Error>;
     fn address(&self) -> Result<String, Self::Error>;

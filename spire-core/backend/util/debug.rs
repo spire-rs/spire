@@ -53,7 +53,7 @@ where
             _ => {}
         }
 
-        let resp = cx.try_resolve().await;
+        let resp = cx.resolve().await;
         resp.map_or_else(IntoSignal::into_signal, |_| Signal::default())
     }
 }

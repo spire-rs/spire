@@ -7,7 +7,7 @@ use futures::future::BoxFuture;
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
-use crate::context::{Request, Response};
+use crate::context::{Body, Request, Response};
 use crate::{BoxError, Error, Result};
 
 /// Simple `http` client backed by the underlying [`Service`].
@@ -21,17 +21,19 @@ pub struct HttpClient {
 
 impl HttpClient {
     /// Creates a new [`HttpClient`].
-    pub fn new<S, E>(svc: S) -> Self
+    pub fn new<S, B, E>(svc: S) -> Self
     where
-        S: Service<Request, Response = Response, Error = E>,
+        S: Service<Request<B>, Response = Response<B>, Error = E>,
+        B: From<Body> + Into<Body>,
         S: Clone + Send + 'static,
         S::Future: Send + 'static,
         E: Into<BoxError> + 'static,
     {
-        // TODO: Allow Request<B>, Response<B>.
-        // where B: From<Body> + Into<Body>.
+        let svc = svc
+            .map_request(|x: Request| -> Request<B> { x.map(|x| x.into()) })
+            .map_response(|x: Response<B>| -> Response { x.map(|x| x.into()) })
+            .map_err(Error::new);
 
-        let svc = svc.map_err(Error::new);
         let inner = Mutex::new(BoxCloneService::new(svc));
         Self { inner }
     }
@@ -108,6 +110,7 @@ mod test {
 
     #[test]
     fn service() {
+        // TODO.
         // BLOCKED: https://github.com/seanmonstar/reqwest/issues/2039
         // BLOCKED: https://github.com/seanmonstar/reqwest/pull/2060
 

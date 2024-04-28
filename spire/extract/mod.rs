@@ -14,7 +14,7 @@
 //!
 //! - [`Html`] (for [`HttpClient`]) or [`View`] (for [`BrowserPool`]) for direct markup access,
 //! or [`Elements`] and [`Select`] trait for declarative markup extraction.
-//! - [`RequestQueue`], and [`Dataset`] for creating new requests and saving scraped data.
+//! - [`RequestQueue`], and [`Data`] for creating new requests and saving scraped data.
 //! - [`State`] and [`FromRef`] trait for state extraction.
 //!
 //! - [`Backend`]-specific [`HttpClient`] and [`BrowserClient`] (for [`BrowserPool`]).

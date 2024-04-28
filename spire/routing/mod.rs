@@ -1,3 +1,6 @@
+//! TODO.
+//!
+
 use std::convert::Infallible;
 use std::fmt;
 use std::task::{Context, Poll};
@@ -19,6 +22,7 @@ mod make_route;
 mod route;
 mod tag_router;
 
+/// TODO.
 pub struct Router<B = (), S = ()> {
     inner: TagRouter<B, S>,
 }

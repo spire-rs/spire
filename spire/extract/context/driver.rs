@@ -52,10 +52,7 @@ pub struct Browser<T>(pub BrowserHandle<T>);
 impl<S, T> FromContextRef<BrowserPool, S> for Browser<T> {
     type Rejection = Infallible;
 
-    async fn from_context_parts(
-        cx: &Context<BrowserPool>,
-        _state: &S,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<BrowserPool>, _: &S) -> Result<Self, Self::Rejection> {
         todo!()
     }
 }
@@ -68,10 +65,7 @@ pub struct View(pub ());
 impl<S> FromContextRef<BrowserPool, S> for View {
     type Rejection = Error;
 
-    async fn from_context_parts(
-        cx: &Context<BrowserPool>,
-        _state: &S,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<BrowserPool>, _: &S) -> Result<Self, Self::Rejection> {
         todo!()
     }
 }
@@ -99,10 +93,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context_parts(
-        cx: &Context<BrowserPool>,
-        _state: &S,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<BrowserPool>, _: &S) -> Result<Self, Self::Rejection> {
         todo!()
     }
 }

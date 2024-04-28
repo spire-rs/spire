@@ -2,53 +2,48 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::task::{Context, Poll};
 
-use fantoccini::Client as WebClient;
+use deadpool::managed::Object;
+use fantoccini::Client;
 use futures::future::BoxFuture;
 use tower::Service;
 
-use crate::context::{Request, Response};
 use crate::{Error, Result};
+use crate::backend::BrowserManager;
+use crate::context::{Request, Response};
 
-/// [`BrowserPool`] client. Manages browser connection.
+/// [`BrowserPool`] client.
+///
+/// Implements [`Deref`] and [`DerefMut`] to `fantoccini::`[`Client`].
 ///
 /// [`BrowserPool`]: crate::backend::BrowserPool
-#[derive(Clone)]
 pub struct BrowserClient {
-    id: u32,
-    client: WebClient,
+    inner: Object<BrowserManager>,
 }
 
 impl BrowserClient {
-    pub fn new(id: u32, client: WebClient) -> Self {
-        Self { id, client }
-    }
-
-    pub(crate) fn id(&self) -> u32 {
-        self.id
-    }
-
-    pub fn into_inner(self) -> WebClient {
-        self.client
+    /// Creates a new [`BrowserClient`].
+    pub(crate) fn new(inner: Object<BrowserManager>) -> Self {
+        Self { inner }
     }
 }
 
 impl fmt::Debug for BrowserClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.client, f)
+        fmt::Debug::fmt(&self.inner.client, f)
     }
 }
 
 impl Deref for BrowserClient {
-    type Target = WebClient;
+    type Target = Client;
 
     fn deref(&self) -> &Self::Target {
-        &self.client
+        &self.inner.client
     }
 }
 
 impl DerefMut for BrowserClient {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.client
+        &mut self.inner.client
     }
 }
 
