@@ -3,7 +3,6 @@
 //! ### Core
 //!
 //! - [`Backend`] is a core trait used to instantiate [`Client`]s.
-//! - [`BrowserBackend`] is an extension trait for [`Backend`]s that run actual web browsers.
 //! - [`Client`] is a core trait used to fetch [`Response`]s with [`Request`]s.
 //! - [`Worker`] is a core trait used to process [`Context`]s and return [`Signal`]s.
 //!
@@ -14,12 +13,15 @@
 //! - [`BrowserPool`] is a [`Backend`] built on top of [`fantoccini`] crate.
 //! Uses [`BrowserClient`] as a [`Client`].
 //!
-//! ### Utils
+//! ### Utility
 //!
-//! - [`DebugEntity`] is a no-op [`Backend`], [`Client`] and [`Worker`] used for
+//! - [`TraceEntity`] is a tracing wrapper for [`Backend`]s, [`Client`]s and [`Worker`]s,
+//! used for improved observability.
+//! - [`DebugEntity`] is a no-op [`Backend`], [`Client`] and [`Worker`], used for
 //! testing and debugging.
-//! - [`TraceEntity`]
 //!
+//! [`TraceEntity`]: util::TraceEntity
+//! [`DebugEntity`]: util::DebugEntity
 
 use std::convert::Infallible;
 
@@ -28,11 +30,9 @@ use tower::{Service, ServiceExt};
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub use client::HttpClient;
-pub use debug::DebugEntity;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::{BrowserClient, BrowserManager, BrowserPool};
-pub use trace::TraceEntity;
 
 use crate::context::{Context, Request, Response, Signal};
 use crate::{Error, Result};
@@ -40,11 +40,10 @@ use crate::{Error, Result};
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 mod client;
-mod debug;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 mod driver;
-mod trace;
+pub mod util;
 
 /// Core trait used to instantiate [`Client`]s.
 ///
@@ -75,11 +74,6 @@ where
         ready.call(()).await
     }
 }
-
-/// Extension trait for [`Backend`]s that manage actual browsers.
-///
-/// Currently works as a marker trait only.
-pub trait BrowserBackend: Backend {}
 
 /// Core trait used to fetch [`Response`]s with [`Request`]s.
 ///
@@ -113,7 +107,7 @@ where
 /// [`Context`]: crate::context::Context
 #[async_trait::async_trait]
 pub trait Worker<B>: Clone + Send + 'static {
-    /// TODO: Remove clone + &self?
+    /// TODO: Remove Clone + replace self with &self.
     async fn invoke(self, cx: Context<B>) -> Signal;
 }
 

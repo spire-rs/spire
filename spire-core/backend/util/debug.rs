@@ -1,23 +1,19 @@
 use std::fmt;
 
 use crate::backend::{Backend, Client, Worker};
-use crate::context::{Context, Request, Response, Signal};
+use crate::context::{Body, Context, IntoSignal, Request, Response, Signal};
 use crate::Result;
 
 /// No-op [`Backend`], [`Client`] and [`Worker`] used for testing and debugging.
-#[derive(Clone)]
-pub struct DebugEntity {}
-
-impl DebugEntity {
-    /// Creates a new [`DebugEntity`].
-    pub fn new() -> Self {
-        Self::default()
-    }
+#[derive(Clone, Default)]
+pub struct DebugEntity {
+    always: Option<bool>,
 }
 
-impl Default for DebugEntity {
-    fn default() -> Self {
-        todo!()
+impl DebugEntity {
+    /// Creates a new [`DebugEntity`] with an `always` rule.
+    pub fn new(always: Option<bool>) -> Self {
+        Self { always }
     }
 }
 
@@ -33,25 +29,31 @@ impl Backend for DebugEntity {
 
     #[inline]
     async fn client(&self) -> Result<Self::Client> {
-        todo!()
+        Ok(self.clone())
     }
 }
 
 #[async_trait::async_trait]
 impl Client for DebugEntity {
     #[inline]
-    async fn resolve(self, req: Request) -> Result<Response> {
-        todo!()
+    async fn resolve(self, _: Request) -> Result<Response> {
+        Ok(Response::new(Body::default()))
     }
 }
 
 #[async_trait::async_trait]
 impl<B> Worker<B> for DebugEntity
 where
-    B: Send + 'static,
+    B: Backend,
 {
-    #[inline]
     async fn invoke(self, cx: Context<B>) -> Signal {
-        todo!()
+        match self.always {
+            Some(true) => return Signal::Continue,
+            Some(false) => return Signal::Skip,
+            _ => {}
+        }
+
+        let resp = cx.try_resolve().await;
+        resp.map_or_else(IntoSignal::into_signal, |_| Signal::default())
     }
 }

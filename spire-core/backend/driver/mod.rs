@@ -1,7 +1,3 @@
-//! TODO.
-//!
-//!
-
 use std::fmt;
 use std::future::Ready;
 use std::task::{Context, Poll};
@@ -9,15 +5,14 @@ use std::task::{Context, Poll};
 use deadpool::managed::Pool;
 use tower::Service;
 
-pub use builder::BrowserManager;
-pub use handler::BrowserClient;
+pub use client::BrowserClient;
+pub use manager::BrowserManager;
 use process::BrowserProcess;
 
-use crate::backend::BrowserBackend;
 use crate::{Error, Result};
 
-mod builder;
-mod handler;
+mod client;
+mod manager;
 mod process;
 
 /// Web-driver [`Backend`] built on top of [`fantoccini`] crate.
@@ -45,7 +40,10 @@ impl BrowserPool {
 impl Default for BrowserPool {
     fn default() -> Self {
         // TODO. Add default processes.
-        Self::builder().build()
+        Self::builder()
+            .with_unmanaged("127.0.0.1:4444")
+            .with_unmanaged("127.0.0.1:4445")
+            .build()
     }
 }
 
@@ -71,8 +69,6 @@ impl Service<()> for BrowserPool {
         todo!()
     }
 }
-
-impl BrowserBackend for BrowserPool {}
 
 #[cfg(test)]
 mod test {

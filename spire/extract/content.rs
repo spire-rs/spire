@@ -20,7 +20,8 @@ where
     type Rejection = Error;
 
     async fn from_context(cx: Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
-        let _ = cx.try_resolve().await?;
+        let re = cx.try_resolve().await?;
+        let r = re.into_body();
         todo!()
     }
 }

@@ -13,9 +13,9 @@
 //! ### Utility
 //!
 //! - [`BoxDataset`] is a type-erased `Dataset`.
-//! - [`BoxCloneDataset`] is a clonable type-erased `Dataset`.
-//! - [`MapData`]
-//! - [`MapErr`]
+//! - [`BoxCloneDataset`] is a cloneable type-erased `Dataset`.
+//! - [`MapData`] transforms the data type of the `Dataset`.
+//! - [`MapErr`] transforms the error type of the `Dataset`.
 //!
 //! [`BoxDataset`]: util::BoxDataset
 //! [`BoxCloneDataset`]: util::BoxCloneDataset
@@ -49,7 +49,7 @@ pub trait Dataset<T>: Send + Sync + 'static {
     /// Returns the number of items in the dataset.
     fn len(&self) -> usize;
 
-    /// Checks if the dataset is empty.
+    /// Returns `true` if the dataset is empty.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }

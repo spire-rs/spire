@@ -1,11 +1,15 @@
 use std::ops::{Deref, DerefMut};
 
+/// TODO.
 pub trait Select {
+    /// TODO.
     fn list_selected() -> Vec<String>;
 
+    /// TODO.
     fn from_list(selected: &[String]) -> Self;
 }
 
+/// TODO.
 #[derive(Clone)]
 pub struct Elements<T>(pub T);
 

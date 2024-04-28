@@ -2,7 +2,9 @@ use std::fmt;
 
 use crate::dataset::Dataset;
 
-/// Type-erased [`Dataset`].
+/// Type-erased [`Dataset`] for a [`boxed`] method.
+///
+/// [`boxed`]: crate::dataset::DatasetExt::boxed
 pub struct BoxDataset<T, E> {
     dataset: Box<dyn Dataset<T, Error = E>>,
 }
@@ -20,7 +22,7 @@ impl<T, E> BoxDataset<T, E> {
 
 impl<T, E> fmt::Debug for BoxDataset<T, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BoxDataset").finish()
+        f.debug_struct("BoxDataset").finish_non_exhaustive()
     }
 }
 

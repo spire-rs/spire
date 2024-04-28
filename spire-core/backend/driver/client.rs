@@ -9,7 +9,9 @@ use tower::Service;
 use crate::context::{Request, Response};
 use crate::{Error, Result};
 
-/// Managed browser connection.
+/// [`BrowserPool`] client. Manages browser connection.
+///
+/// [`BrowserPool`]: crate::backend::BrowserPool
 #[derive(Clone)]
 pub struct BrowserClient {
     id: u32,
@@ -53,7 +55,7 @@ impl DerefMut for BrowserClient {
 impl Service<Request> for BrowserClient {
     type Response = Response;
     type Error = Error;
-    type Future = BoxFuture<'static, crate::Result<Response>>;
+    type Future = BoxFuture<'static, Result<Response>>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

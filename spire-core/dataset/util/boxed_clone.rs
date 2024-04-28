@@ -5,7 +5,9 @@ use futures::stream::Stream;
 
 use crate::dataset::Dataset;
 
-/// Cloneable type-erased [`Dataset`].
+/// Cloneable type-erased [`Dataset`] for a [`boxed_clone`] method.
+///
+/// [`boxed_clone`]: crate::dataset::DatasetExt::boxed_clone
 pub struct BoxCloneDataset<T, E> {
     dataset: Box<dyn CloneDataset<T, Error = E>>,
 }
@@ -40,7 +42,7 @@ impl<T, E> BoxCloneDataset<T, E> {
         E: 'static,
     {
         try_stream! {
-            loop {
+            while !self.dataset.is_empty() {
                 let item = self.dataset.get().await?;
                 if let Some(item) = item {
                     yield item;
@@ -63,7 +65,7 @@ where
 
 impl<T, E> fmt::Debug for BoxCloneDataset<T, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BoxCloneDataset").finish()
+        f.debug_struct("BoxCloneDataset").finish_non_exhaustive()
     }
 }
 

@@ -48,23 +48,31 @@ mod sealed {
     pub enum ViaRequest {}
 }
 
-/// TODO.
+/// Core trait for a non-consuming extractor.
 #[async_trait::async_trait]
 pub trait FromContextRef<B, S>: Sized {
-    /// TODO.
+    /// Extraction failure type.
+    ///
+    /// Should be convertable into the [`Signal`].
+    ///
+    /// [`Signal`]: crate::context::Signal
     type Rejection: IntoSignal;
 
-    /// TODO.
+    /// Extracts the value from the reference to the context.
     async fn from_context_parts(cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection>;
 }
 
-/// TODO.
+/// Core trait for a non-consuming extractor.
 #[async_trait::async_trait]
 pub trait FromContext<B, S, V = sealed::ViaRequest>: Sized {
-    /// TODO.
+    /// Extraction failure type.
+    ///
+    /// Should be convertable into the [`Signal`].
+    ///
+    /// [`Signal`]: crate::context::Signal
     type Rejection: IntoSignal;
 
-    /// TODO.
+    /// Extracts the value from the context.
     async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection>;
 }
 

@@ -25,16 +25,21 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn new<T>(error: T) -> Self
-    where
-        T: Into<BoxError>,
-    {
+    /// Creates a new [`Error`] from a boxable error.
+    pub fn new(error: impl Into<BoxError>) -> Self {
         let inner: BoxError = error.into();
         Self { inner }
     }
 
+    /// Returns inner error.
     pub fn into_inner(self) -> BoxError {
         self.inner
+    }
+}
+
+impl From<http::Error> for Error {
+    fn from(error: http::Error) -> Self {
+        todo!()
     }
 }
 

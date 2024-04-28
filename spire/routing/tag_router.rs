@@ -31,15 +31,15 @@ impl<B, S> TagRouter<B, S> {
     pub fn route(&mut self, tag: Tag, endpoint: Endpoint<B, S>) {
         if tag.is_fallback() {
             self.fallback(endpoint);
-        } else {
-            // TODO: Panic on Some(_).
-            self.tag_router.insert(tag, endpoint);
+        } else if self.tag_router.insert(tag, endpoint).is_some() {
+            panic!("should not override already routed tags")
         }
     }
 
     pub fn fallback(&mut self, endpoint: Endpoint<B, S>) {
-        // TODO: Panic on Some(_).
-        let _ = self.current_fallback.replace(endpoint);
+        if self.current_fallback.replace(endpoint).is_some() {
+            panic!("should not override already routed tags")
+        }
     }
 
     pub fn layer<F>(mut self, func: F) -> Self
@@ -76,7 +76,11 @@ impl<B, S> TagRouter<B, S> {
 
 impl<B, S> Clone for TagRouter<B, S> {
     fn clone(&self) -> Self {
-        todo!()
+        Self {
+            tag_router: self.tag_router.clone(),
+            current_fallback: self.current_fallback.clone(),
+            default_fallback: self.default_fallback.clone(),
+        }
     }
 }
 

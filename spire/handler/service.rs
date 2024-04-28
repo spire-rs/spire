@@ -14,7 +14,7 @@ use spire_core::context::Signal;
 
 use crate::handler::Handler;
 
-/// TODO.
+/// Implementation of a `tower::`[`Service`] for a [`Handler`].
 ///
 /// Automatically implements [`Worker`] if `H` is a [`Handler`].
 ///
@@ -132,8 +132,8 @@ where
 #[cfg(test)]
 mod test {
     use crate::backend::Worker;
-    use crate::handler::HandlerService;
     use crate::Daemon;
+    use crate::handler::HandlerService;
 
     fn service<B: Send + 'static>() -> impl Worker<B> {
         async fn handler() {}

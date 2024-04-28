@@ -1,10 +1,10 @@
+use std::cmp::max;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use futures::stream::StreamExt;
-use futures::TryStreamExt;
-use http_body::Body;
 
 use crate::backend::{Backend, Worker};
 use crate::context::{Context, Tag, TagQuery, Task};
@@ -17,10 +17,12 @@ pub struct Runner<B, W> {
     pub(crate) datasets: Datasets,
     pub(crate) backend: B,
 
+    inits: Mutex<Vec<Request>>,
+    limit: AtomicUsize,
+
     // Fallback means all not-yet encountered tags.
-    defer: Arc<Mutex<HashMap<Tag, Instant>>>,
-    block: Arc<Mutex<HashSet<Tag>>>,
-    inits: Arc<Mutex<Vec<Request>>>,
+    defer: Mutex<HashMap<Tag, Instant>>,
+    block: Mutex<HashSet<Tag>>,
 }
 
 impl<B, W> Runner<B, W> {
@@ -35,15 +37,21 @@ impl<B, W> Runner<B, W> {
             datasets: Datasets::new(),
             backend,
 
-            defer: Arc::new(Mutex::new(HashMap::new())),
-            block: Arc::new(Mutex::new(HashSet::new())),
-            inits: Arc::new(Mutex::new(Vec::new())),
+            inits: Mutex::new(Vec::new()),
+            limit: AtomicUsize::new(8),
+
+            defer: Mutex::new(HashMap::new()),
+            block: Mutex::new(HashSet::new()),
         }
     }
 
-    pub fn add_initial(&self, request: Request) {
+    pub fn with_initial_request(&self, request: Request) {
         let mut initial = self.inits.lock().unwrap();
         initial.push(request);
+    }
+
+    pub fn with_concurrency_limit(&self, limit: usize) {
+        self.limit.store(max(limit, 1), Ordering::SeqCst)
     }
 
     pub async fn run_until_empty(&self) -> Result<usize>
@@ -57,6 +65,9 @@ impl<B, W> Runner<B, W> {
                 x if x > 0 => total += x,
                 _ => break,
             }
+
+            #[cfg(feature = "tracing")]
+            tracing::info!(processed = total);
         }
 
         Ok(total)
@@ -77,59 +88,47 @@ impl<B, W> Runner<B, W> {
             dataset.add(request).await?;
         }
 
+        let try_call_service = |x: Result<Request>| async {
+            let (signal, owner) = match x {
+                Ok(x) => self.call_service(x).await,
+                Err(x) => (x.into_signal(), Tag::default()),
+            };
+
+            self.notify_signal(signal, owner).await
+        };
+
         let stream = dataset
             .into_stream()
-            .map(|x| async { self.try_call_service(x).await })
-            .buffer_unordered(8)
+            .map(try_call_service)
+            .buffered(self.limit.load(Ordering::SeqCst))
             .count();
-
-        // let stream = dataset
-        //     .into_stream()
-        //     .map_err(|x| async { self.notify_signal(x.into_signal(), Tag::Fallback); } )
-        //     .map_ok(|x| async { self.call_service(x).await; } )
-        //     .buffer_unordered(8)
-        //     .count();
 
         Ok(stream.await)
     }
 
-    async fn try_call_service(&self, request: Result<Request>)
+    pub async fn call_service(&self, request: Request) -> (Signal, Tag)
     where
         B: Backend,
         W: Worker<B>,
     {
-        match request {
-            Ok(x) => self.call_service(x).await,
-            Err(x) => self.notify_signal(x.into_signal(), Tag::Fallback),
-        }
-    }
-
-    pub async fn call_service(&self, request: Request)
-    where
-        B: Backend,
-        W: Worker<B>,
-    {
-        #[cfg(feature = "tracing")]
-        {
-            let size_hint = request.body().size_hint();
-            tracing::info!(
-                method = request.method().as_str(),
-                path = request.uri().path(),
-                bytes_lower = size_hint.lower(),
-                bytes_upper = size_hint.upper(),
-            );
-        }
-
         let owner = request.tag().clone();
-
-        // TODO: Tracing.
 
         let backend = self.backend.clone();
         let datasets = self.datasets.clone();
 
         let cx = Context::new(request, backend, datasets);
         let signal = self.service.clone().invoke(cx).await;
-        self.notify_signal(signal, owner);
+        (signal, owner)
+    }
+
+    /// Applies the signal to the subsequent requests.
+    async fn notify_signal(&self, signal: Signal, owner: Tag) {
+        // TODO: Add Ok/Err counter.
+        match signal {
+            Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(owner, x, t),
+            Signal::Fail(x, e) => self.apply_block(owner, x),
+            _ => { /* Ignore */ }
+        };
     }
 
     // TODO.
@@ -163,39 +162,22 @@ impl<B, W> Runner<B, W> {
 
     // TODO.
     fn apply_block(&self, owner: Tag, query: TagQuery) {
-        let mut lock = |x| {
+        let block = |x| {
             let mut guard = self.block.lock().unwrap();
             guard.insert(x);
         };
 
         match query {
-            TagQuery::Owner => lock(owner),
-            TagQuery::Every => lock(Tag::default()),
-            TagQuery::Single(x) => lock(x),
-            TagQuery::List(x) => x.into_iter().for_each(lock),
+            TagQuery::Owner => block(owner),
+            TagQuery::Every => block(Tag::default()),
+            TagQuery::Single(x) => block(x),
+            TagQuery::List(x) => x.into_iter().for_each(block),
         }
     }
 
     // TODO.
     fn find_block(&self, owner: &Tag) -> bool {
         let block = self.block.lock().unwrap();
-        block.contains(&owner)
-    }
-
-    async fn notify_signal2(&self, signal: Signal) {}
-
-    /// Applies the signal to the subsequent requests.
-    fn notify_signal(&self, signal: Signal, owner: Tag) {
-        // TODO: Add Ok/Err counter.
-        let _ = match &signal {
-            Signal::Continue | Signal::Wait(..) => false,
-            Signal::Skip | Signal::Hold(..) | Signal::Fail(..) => true,
-        };
-
-        match signal {
-            // Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(owner, x, t),
-            // Signal::Fail(x, e) => self.apply_block(owner, x),
-            _ => { /* Ignore */ }
-        };
+        block.contains(owner)
     }
 }

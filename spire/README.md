@@ -22,7 +22,7 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 [tokio-rs/tokio]: https://github.com/tokio-rs/tokio/
 [tower-rs/tower]: https://github.com/tower-rs/tower/
 
-### Features
+#### Features
 
 - Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 - Lorem ipsum dolor sit amet, consectetur adipiscing elit.
@@ -48,6 +48,6 @@ fn main() {
 
 #### Notes
 
-- Routing uses Extract as Argument pattern from [axum][tokio-rs/axum].
+- `routing` uses Extract as Argument pattern from [axum][tokio-rs/axum].
 
 [tokio-rs/axum]: https://github.com/tokio-rs/axum/

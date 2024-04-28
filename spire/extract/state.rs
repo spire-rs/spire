@@ -15,12 +15,28 @@ impl<T> FromRef<T> for T
 where
     T: Clone,
 {
+    #[inline]
     fn from_ref(input: &T) -> Self {
         input.clone()
     }
 }
 
 /// TODO.
+///
+/// ```rust
+/// use spire::extract::FromRef;
+///
+/// #[derive(Debug, Clone)]
+/// struct State {
+///     port: u16,
+/// }
+///
+/// impl FromRef<State> for u16 {
+///     fn from_ref(input: &State) -> Self {
+///         input.port
+///     }
+/// }
+/// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct State<T>(pub T);
 
@@ -33,20 +49,21 @@ where
     type Rejection = Infallible;
 
     async fn from_context_parts(_cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let inner = T::from_ref(state);
-        Ok(Self(inner))
+        Ok(Self(T::from_ref(state)))
     }
 }
 
 impl<T> Deref for State<T> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl<T> DerefMut for State<T> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

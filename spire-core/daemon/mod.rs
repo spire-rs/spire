@@ -4,20 +4,18 @@ use std::sync::Arc;
 use crate::backend::{Backend, Worker};
 use crate::context::{Body, Request};
 use crate::daemon::runner::Runner;
-use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::Dataset;
+use crate::dataset::{util::BoxCloneDataset, Dataset};
 use crate::{BoxError, Error, Result};
 
 mod runner;
 
-/// TODO.
-/// is a polling loop
+/// Orchestrates the processing of [`Request`]s using provided [`Backend`] and [`Worker`].
 pub struct Daemon<B, W> {
     inner: Arc<Runner<B, W>>,
 }
 
 impl<B, W> Daemon<B, W> {
-    /// Creates a new [`Daemon`].
+    /// Creates a new [`Daemon`] with provided [`Backend`] and [`Worker`].
     pub fn new(backend: B, inner: W) -> Self
     where
         B: Backend,
@@ -87,7 +85,7 @@ impl<B, W> Daemon<B, W> {
     where
         R: Into<Body>,
     {
-        self.inner.add_initial(request.map(Into::into));
+        self.inner.with_initial_request(request.map(Into::into));
         self
     }
 
@@ -104,9 +102,15 @@ impl<B, W> Daemon<B, W> {
         R: Into<Body>,
     {
         requests.into_iter().for_each(|request| {
-            self.inner.add_initial(request.map(Into::into));
+            self.inner.with_initial_request(request.map(Into::into));
         });
 
+        self
+    }
+
+    /// Limits a number of buffered (or in-flight) futures.
+    pub fn with_concurrency_limit(self, limit: usize) -> Self {
+        self.inner.with_concurrency_limit(limit);
         self
     }
 
@@ -114,7 +118,7 @@ impl<B, W> Daemon<B, W> {
     ///
     /// ### Note
     ///
-    /// Replaces the dataset of the same type if it is already inserted.
+    /// Replaces the dataset for the same type if it is already inserted.
     /// Does not move items from the replaced `Dataset`.
     ///
     /// If the handler requests for a [`Dataset`] of a specific type, but  no `Dataset` of
@@ -132,11 +136,11 @@ impl<B, W> Daemon<B, W> {
         self
     }
 
-    /// Returns the [`Dataset`] of the requested type.
+    /// Returns the [`Dataset`] for the requested type.
     ///
     /// ### Note
     ///
-    /// Inserts and returns the [`InMemDataset`] if none was found.
+    /// Inserts and returns the [`InMemDataset`] if none were found.
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
     pub fn dataset<T>(&self) -> BoxCloneDataset<T, Error>
@@ -165,42 +169,59 @@ impl<B, S> fmt::Debug for Daemon<B, S> {
 #[cfg(test)]
 mod test {
     use http::Request;
+    use tracing_test::traced_test;
 
-    use crate::backend::DebugEntity;
+    use crate::backend::util::TraceEntity;
     use crate::dataset::InMemDataset;
+    use crate::{Daemon, Result};
 
-    #[test]
-    fn with_entity() {
-        let entity = crate::backend::TraceEntity::default();
+    #[tokio::test]
+    #[cfg_attr(feature = "tracing", traced_test)]
+    async fn with_entity() -> Result<()> {
+        let entity = TraceEntity::default();
         let request = Request::get("https://example.com/").body(());
 
-        let _ = crate::Daemon::new(entity, DebugEntity::new())
+        let daemon = Daemon::new(entity.clone(), entity)
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new())
             .with_initial_request(request.unwrap());
+
+        let _ = daemon.dataset::<u64>();
+        let _ = daemon.run().await?;
+        Ok(())
     }
 
-    #[test]
+    #[tokio::test]
+    #[cfg_attr(feature = "tracing", traced_test)]
     #[cfg(feature = "client")]
-    fn with_client() {
-        let backend = crate::backend::HttpClient::default();
+    async fn with_client() -> Result<()> {
+        use crate::backend::HttpClient;
+
+        let backend = TraceEntity::new(HttpClient::default());
         let request = Request::get("https://example.com/").body(());
 
-        let _ = crate::Daemon::new(backend, DebugEntity::new())
+        let _ = Daemon::new(backend, TraceEntity::default())
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new())
             .with_initial_request(request.unwrap());
+
+        Ok(())
     }
 
-    #[test]
+    #[tokio::test]
+    #[cfg_attr(feature = "tracing", traced_test)]
     #[cfg(feature = "driver")]
-    fn with_driver() {
-        let backend = crate::backend::BrowserPool::default();
+    async fn with_driver() -> Result<()> {
+        use crate::backend::BrowserPool;
+
+        let backend = TraceEntity::new(BrowserPool::default());
         let request = Request::get("https://example.com/").body(());
 
-        let _ = crate::Daemon::new(backend, DebugEntity::new())
+        let _ = Daemon::new(backend, TraceEntity::default())
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new())
             .with_initial_request(request.unwrap());
+
+        Ok(())
     }
 }

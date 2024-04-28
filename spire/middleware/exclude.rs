@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll, ready};
 
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
@@ -140,9 +140,9 @@ where
 mod test {
     use tower::Layer;
 
+    use crate::Daemon;
     use crate::handler::HandlerService;
     use crate::middleware::ExcludeLayer;
-    use crate::Daemon;
 
     async fn handler() {}
 

@@ -34,24 +34,13 @@ pub enum Tag {
     /// Explicitly calls the fallback handler.
     #[default]
     Fallback,
-    /// TODO.
+    /// Unique identifier used for routing.
     Sequence(String),
-    /// TODO.
+    /// Unique identifier used for routing.
     Rehash(u64),
 }
 
 impl Tag {
-    pub fn fallback() -> Self {
-        Self::Fallback
-    }
-
-    pub fn sequence<T>(seq: T) -> Self
-    where
-        T: AsRef<str>,
-    {
-        Tag::Sequence(seq.as_ref().to_owned())
-    }
-
     /// Returns `true` if the [`Tag`] is an explicit fallback.
     pub fn is_fallback(&self) -> bool {
         matches!(self, Tag::Fallback)
@@ -161,9 +150,9 @@ mod test {
     #[test]
     fn with_tag() {
         let request = make_request(|x| x);
-        assert_eq!(request.tag(), &Tag::fallback());
-        let request = make_request(|x| x.tag(Tag::sequence("")));
-        assert_eq!(request.tag(), &Tag::sequence(""));
+        assert_eq!(request.tag(), &Tag::Fallback);
+        let request = make_request(|x| x.tag(""));
+        assert_eq!(request.tag(), &"".into());
     }
 
     #[test]

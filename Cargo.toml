@@ -36,6 +36,3 @@ bytes = { version = "1.6.0" }
 futures = { version = "0.3.30" }
 async-trait = { version = "0.1.80" }
 pin-project-lite = { version = "0.2.14" }
-thiserror = { version = "1.0.58" }
-serde = { version = "1.0.197" }
-time = { version = "0.3.36" }

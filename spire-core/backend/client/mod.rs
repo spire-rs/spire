@@ -1,7 +1,3 @@
-//! TODO.
-//!
-//!
-
 use std::fmt;
 use std::future::{ready, Ready};
 use std::sync::Mutex;
@@ -27,10 +23,14 @@ impl HttpClient {
     /// Creates a new [`HttpClient`].
     pub fn new<S, E>(svc: S) -> Self
     where
-        S: Service<Request, Response = Response, Error = E> + Clone + Send + 'static,
+        S: Service<Request, Response = Response, Error = E>,
+        S: Clone + Send + 'static,
         S::Future: Send + 'static,
         E: Into<BoxError> + 'static,
     {
+        // TODO: Allow Request<B>, Response<B>.
+        // where B: From<Body> + Into<Body>.
+
         let svc = svc.map_err(Error::new);
         let inner = Mutex::new(BoxCloneService::new(svc));
         Self { inner }

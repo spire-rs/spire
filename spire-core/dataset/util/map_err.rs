@@ -2,7 +2,9 @@ use std::fmt;
 
 use crate::dataset::Dataset;
 
-/// Transforms the error type of the [`Dataset`]
+/// Transforms the error type of the [`Dataset`] for a [`map_err`] method.
+///
+/// [`map_err`]: crate::dataset::DatasetExt::map_err
 #[derive(Clone)]
 pub struct MapErr<D, F> {
     inner: D,

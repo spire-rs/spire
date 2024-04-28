@@ -9,7 +9,7 @@ use crate::backend::driver::BrowserProcess;
 use crate::backend::{BrowserClient, BrowserPool};
 use crate::Error;
 
-/// [`BrowserPool`] builder.
+/// [`BrowserPool`] builder. TODO.
 pub struct BrowserManager {
     // builder: ClientBuilder<()>,
     promised: HashMap<u32, ConnType>,
@@ -101,10 +101,16 @@ mod test {
     use crate::backend::driver::BrowserManager;
 
     #[test]
-    fn build() {
+    fn with_unmanaged() {
         let _ = BrowserManager::default()
             .with_unmanaged("127.0.0.1:4444")
             .with_unmanaged("127.0.0.1:4445")
             .build();
+    }
+
+    #[test]
+    fn with_managed() {
+        // TODO.
+        let _ = BrowserManager::default().build();
     }
 }
