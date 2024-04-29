@@ -1,4 +1,4 @@
-//! TODO.
+//! Routing between [`Handler`]s and `tower::`[`Service`]s.
 //!
 
 use std::convert::Infallible;
@@ -22,7 +22,7 @@ mod make_route;
 mod route;
 mod tag_router;
 
-/// TODO.
+/// Composes and routes [`Handler`]s and `tower::`[`Service`]s.
 #[must_use]
 pub struct Router<B = (), S = ()> {
     inner: TagRouter<B, S>,

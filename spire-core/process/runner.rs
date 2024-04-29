@@ -98,7 +98,7 @@ impl<B, W> Runner<B, W> {
                 Err(x) => (x.into_signal(), Tag::default()),
             };
 
-            self.notify_signal(signal, owner).await;
+            self.notify_signal(signal, owner);
         };
 
         let stream = dataset
@@ -126,7 +126,7 @@ impl<B, W> Runner<B, W> {
     }
 
     /// Applies the signal to the subsequent requests.
-    async fn notify_signal(&self, signal: Signal, owner: Tag) {
+     fn notify_signal(&self, signal: Signal, owner: Tag) {
         // TODO: Add Ok/Err counter.
         match signal {
             Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(owner, x, t),

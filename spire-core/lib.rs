@@ -3,6 +3,9 @@
 #![doc = include_str!("./README.md")]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
+#[doc(no_inline)]
+pub use async_trait::async_trait;
+
 pub use process::Client;
 
 use crate::context::{IntoSignal, Signal, TagQuery};
@@ -61,3 +64,4 @@ impl IntoSignal for Error {
 /// [`Result`]: std::result::Result
 /// [`Request`]: context::Request
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+

@@ -1,7 +1,5 @@
 //! Data collection with [`Dataset`] and its utilities.
 //!
-//! [`Datasets`], type-erased collection of `Dataset`s.
-//!
 //! ### Datasets
 //!
 //! - [`InMemDataset`] is a simple in-memory `FIFO` or `LIFO` `VecDeque`-based `Dataset`.
@@ -23,7 +21,7 @@
 //! [`MapErr`]: util::MapErr
 
 pub use memory::InMemDataset;
-pub use ttable::Datasets;
+pub(crate) use ttable::Datasets;
 #[doc(inline)]
 pub use util::DatasetExt;
 

@@ -1,11 +1,11 @@
 use std::fmt;
 use std::sync::Arc;
 
+use crate::{BoxError, Error, Result};
 use crate::backend::{Backend, Worker};
 use crate::context::{Body, Request};
-use crate::dataset::{util::BoxCloneDataset, Dataset};
+use crate::dataset::{Dataset, util::BoxCloneDataset};
 use crate::process::runner::Runner;
-use crate::{BoxError, Error, Result};
 
 mod runner;
 
@@ -167,13 +167,15 @@ mod test {
     use http::Request;
     use tracing_test::traced_test;
 
-    use crate::backend::util::TraceEntity;
-    use crate::dataset::InMemDataset;
     use crate::{Client, Result};
+    use crate::dataset::InMemDataset;
 
     #[tokio::test]
-    #[cfg_attr(feature = "tracing", traced_test)]
+    #[cfg(feature = "tracing")]
+    #[tracing_test::traced_test]
     async fn with_entity() -> Result<()> {
+        use crate::backend::util::TraceEntity;
+
         let entity = TraceEntity::default();
         let request = Request::get("https://example.com/").body(());
 
@@ -191,6 +193,7 @@ mod test {
     #[cfg_attr(feature = "tracing", traced_test)]
     #[cfg(feature = "client")]
     async fn with_client() -> Result<()> {
+        use crate::backend::util::TraceEntity;
         use crate::backend::HttpClient;
 
         let backend = TraceEntity::new(HttpClient::default());
@@ -210,6 +213,7 @@ mod test {
     #[cfg_attr(feature = "tracing", traced_test)]
     #[cfg(feature = "driver")]
     async fn with_driver() -> Result<()> {
+        use crate::backend::util::TraceEntity;
         use crate::backend::BrowserPool;
 
         let backend = TraceEntity::new(BrowserPool::default());

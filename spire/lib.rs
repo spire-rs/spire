@@ -3,6 +3,9 @@
 #![doc = include_str!("./README.md")]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
+#[doc(no_inline)]
+pub use async_trait::async_trait;
+
 #[doc(inline)]
 pub use routing::Router;
 pub use spire_core::{backend, context, dataset};
@@ -25,15 +28,16 @@ pub mod prelude {}
 
 #[cfg(test)]
 mod test {
+    use crate::{Client, Result, Router};
     use crate::context::RequestQueue;
     use crate::dataset::{Dataset, InMemDataset};
-    use crate::extract::Datastore;
-    use crate::{Client, Result, Router};
+    use crate::extract::Dataset2;
 
     #[test]
     #[cfg(feature = "client")]
     fn with_client() {
-        async fn handler(queue: RequestQueue, Datastore(dataset): Datastore<u64>) -> Result<()> {
+        async fn handler(queue: RequestQueue, Dataset2(dataset): Dataset2<u64>) -> Result<()> {
+
             let u = dataset.get().await?;
             dataset.add(1).await?;
 
@@ -56,7 +60,7 @@ mod test {
     #[test]
     #[cfg(feature = "driver")]
     fn with_driver() {
-        async fn handler(queue: RequestQueue, Datastore(dataset): Datastore<u64>) -> Result<()> {
+        async fn handler(queue: RequestQueue, Dataset2(dataset): Dataset2<u64>) -> Result<()> {
             let u = dataset.get().await?;
             dataset.add(1).await?;
 

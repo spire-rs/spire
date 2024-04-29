@@ -3,8 +3,8 @@ use std::ops::{Deref, DerefMut};
 
 use spire_core::backend::Client as CoreClient;
 use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::util::BoxCloneDataset;
 use spire_core::dataset::Dataset as CoreDataset;
+use spire_core::dataset::util::BoxCloneDataset;
 use spire_core::Error;
 
 use crate::extract::{FromContext, FromContextRef};
@@ -80,8 +80,8 @@ where
 
 /// TODO.
 ///
-/// TODO: Rename to dataset?
-pub struct Datastore<T>(pub BoxCloneDataset<T, Error>);
+/// TODO: Rename to dataset? Move to core and impl FromCtxRef here?
+pub struct Dataset2<T>(pub BoxCloneDataset<T, Error>);
 
 #[async_trait::async_trait]
 impl<B, S, T> FromContextRef<B, S> for BoxCloneDataset<T, Error>
@@ -97,7 +97,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContextRef<B, S> for Datastore<T>
+impl<B, S, T> FromContextRef<B, S> for Dataset2<T>
 where
     B: Sync,
     T: Sync + Send + 'static,
@@ -110,7 +110,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T> CoreDataset<T> for Datastore<T>
+impl<T> CoreDataset<T> for Dataset2<T>
 where
     T: Send + Sync + 'static,
 {
