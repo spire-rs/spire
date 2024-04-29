@@ -71,6 +71,7 @@ pub struct IncludeLayer {}
 
 impl IncludeLayer {
     /// Creates a new [`IncludeLayer`].
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

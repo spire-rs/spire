@@ -42,11 +42,11 @@ impl Client for DebugEntity {
 }
 
 #[async_trait::async_trait]
-impl<B> Worker<B> for DebugEntity
+impl<C> Worker<C> for DebugEntity
 where
-    B: Backend,
+    C: Client,
 {
-    async fn invoke(self, cx: Context<B>) -> Signal {
+    async fn invoke(self, cx: Context<C>) -> Signal {
         match self.always {
             Some(true) => return Signal::Continue,
             Some(false) => return Signal::Skip,

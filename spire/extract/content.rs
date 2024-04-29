@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use serde::de::DeserializeOwned;
 
-use spire_core::backend::Backend;
+use spire_core::backend::Client;
 use spire_core::context::Context;
 use spire_core::Error;
 
@@ -12,55 +12,59 @@ use crate::extract::FromContext;
 pub struct Body(pub Bytes);
 
 #[async_trait::async_trait]
-impl<B, S> FromContext<B, S> for Body
+impl<C, S> FromContext<C, S> for Body
 where
-    B: Backend,
+    C: Client,
     S: Sync,
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<B>, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
         let re = cx.resolve().await?;
         let _ = re.into_body();
         todo!()
     }
 }
 
-/// Plain text response extractor.
+/// Text [`Response`] extractor.
+///
+/// [`Response`]: crate::context::Response
 #[derive(Debug, Clone)]
 pub struct Text(pub String);
 
 #[async_trait::async_trait]
-impl<B, S> FromContext<B, S> for Text
+impl<C, S> FromContext<C, S> for Text
 where
-    B: Backend,
+    C: Client,
     S: Sync,
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         let Body(bytes) = Body::from_context(cx, state).await?;
         let inner = String::from_utf8(bytes.to_vec()).map_err(Error::new)?;
         Ok(Text(inner))
     }
 }
 
-/// JSON Response extractor.
+/// JSON [`Response`] extractor.
 ///
 /// Useful for API scraping.
+///
+/// [`Response`]: crate::context::Response
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Json<T>(pub T);
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContext<B, S> for Json<T>
+impl<C, S, T> FromContext<C, S> for Json<T>
 where
-    B: Backend,
+    C: Client,
     S: Sync,
     T: DeserializeOwned,
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<B>, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         let Body(bytes) = Body::from_context(cx, state).await?;
         let inner = serde_json::from_slice::<T>(bytes.as_ref()).map_err(Error::new)?;
         Ok(Json(inner))

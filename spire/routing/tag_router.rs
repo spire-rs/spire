@@ -10,7 +10,7 @@ use spire_core::context::{Context as Cx, Signal, Tag, Task};
 use crate::routing::{Endpoint, RouteFuture};
 
 pub struct TagRouter<B, S> {
-    tag_router: HashMap<Tag, Endpoint<B, S>>,
+    endpoints: HashMap<Tag, Endpoint<B, S>>,
     current_fallback: Option<Endpoint<B, S>>,
     default_fallback: Endpoint<B, ()>,
 }
@@ -22,7 +22,7 @@ impl<B, S> TagRouter<B, S> {
         B: 'static,
     {
         Self {
-            tag_router: HashMap::default(),
+            endpoints: HashMap::default(),
             current_fallback: None,
             default_fallback: Endpoint::default(),
         }
@@ -31,7 +31,7 @@ impl<B, S> TagRouter<B, S> {
     pub fn route(&mut self, tag: Tag, endpoint: Endpoint<B, S>) {
         if tag.is_fallback() {
             self.fallback(endpoint);
-        } else if self.tag_router.insert(tag, endpoint).is_some() {
+        } else if self.endpoints.insert(tag, endpoint).is_some() {
             panic!("should not override already routed tags")
         }
     }
@@ -46,17 +46,17 @@ impl<B, S> TagRouter<B, S> {
     where
         F: Fn(Tag, Endpoint<B, S>) -> (Tag, Endpoint<B, S>),
     {
-        let it = self.tag_router.into_iter();
-        self.tag_router = it.map(|(k, v)| func(k, v)).collect();
+        let it = self.endpoints.into_iter();
+        self.endpoints = it.map(|(k, v)| func(k, v)).collect();
         self
     }
 
-    pub fn merge(&mut self, other: TagRouter<B, S>) {
+    pub fn merge(&mut self, other: Self) {
         if let Some(x) = other.current_fallback {
             self.fallback(x);
         }
 
-        for (tag, endpoint) in other.tag_router {
+        for (tag, endpoint) in other.endpoints {
             self.route(tag, endpoint);
         }
     }
@@ -67,7 +67,7 @@ impl<B, S> TagRouter<B, S> {
     {
         let remap = |(k, v): (Tag, Endpoint<B, S>)| (k, v.with_state(state.clone()));
         TagRouter {
-            tag_router: self.tag_router.into_iter().map(remap).collect(),
+            endpoints: self.endpoints.into_iter().map(remap).collect(),
             current_fallback: self.current_fallback.map(|x| x.with_state(state)),
             default_fallback: self.default_fallback,
         }
@@ -77,7 +77,7 @@ impl<B, S> TagRouter<B, S> {
 impl<B, S> Clone for TagRouter<B, S> {
     fn clone(&self) -> Self {
         Self {
-            tag_router: self.tag_router.clone(),
+            endpoints: self.endpoints.clone(),
             current_fallback: self.current_fallback.clone(),
             default_fallback: self.default_fallback.clone(),
         }
@@ -107,7 +107,7 @@ impl<B> Service<Cx<B>> for TagRouter<B, ()> {
             None => self.default_fallback.clone(),
         };
 
-        let tagged = self.tag_router.get(cx.get_ref().tag()).cloned();
+        let tagged = self.endpoints.get(cx.get_ref().tag()).cloned();
         let mut endpoint = tagged.unwrap_or_else(fallback);
         endpoint.call(cx)
     }

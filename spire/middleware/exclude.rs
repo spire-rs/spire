@@ -70,6 +70,7 @@ pub struct ExcludeLayer {}
 
 impl ExcludeLayer {
     /// Creates a new [`ExcludeLayer`].
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

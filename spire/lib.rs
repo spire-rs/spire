@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 #[doc(inline)]
 pub use routing::Router;

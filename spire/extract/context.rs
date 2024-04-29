@@ -1,19 +1,46 @@
 use std::convert::Infallible;
+use std::ops::{Deref, DerefMut};
 
+use spire_core::backend::Client as CoreClient;
 use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::{util::BoxCloneDataset, Dataset};
+use spire_core::dataset::util::BoxCloneDataset;
+use spire_core::dataset::Dataset as CoreDataset;
 use spire_core::Error;
 
-#[cfg(feature = "client")]
-pub use crate::extract::context::client::Html;
-#[cfg(feature = "driver")]
-pub use crate::extract::context::driver::{Browser, BrowserHandle, View};
 use crate::extract::{FromContext, FromContextRef};
 
-#[cfg(feature = "client")]
-mod client;
-#[cfg(feature = "driver")]
-mod driver;
+/// TODO.
+#[derive(Clone)]
+pub struct Client<C>(pub C);
+
+#[async_trait::async_trait]
+impl<C, S> FromContextRef<C, S> for Client<C>
+where
+    C: CoreClient + Sync + Clone,
+{
+    type Rejection = Infallible;
+
+    #[inline]
+    async fn from_context_parts(cx: &Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
+        Ok(Client(cx.client()))
+    }
+}
+
+impl<C> Deref for Client<C> {
+    type Target = C;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<C> DerefMut for Client<C> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 #[async_trait::async_trait]
 impl<B, S> FromContext<B, S> for Context<B>
@@ -51,7 +78,9 @@ where
     }
 }
 
-/// TODO. Dataset?
+/// TODO.
+///
+/// TODO: Rename to dataset?
 pub struct Datastore<T>(pub BoxCloneDataset<T, Error>);
 
 #[async_trait::async_trait]
@@ -81,7 +110,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T> Dataset<T> for Datastore<T>
+impl<T> CoreDataset<T> for Datastore<T>
 where
     T: Send + Sync + 'static,
 {

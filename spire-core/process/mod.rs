@@ -10,17 +10,18 @@ use crate::{BoxError, Error, Result};
 mod runner;
 
 /// Orchestrates the processing of [`Request`]s using provided [`Backend`] and [`Worker`].
+#[must_use]
 pub struct Client<B, W> {
     inner: Arc<Runner<B, W>>,
 }
 
-impl<B, W> Client<B, W> {
+impl<B, W> Client<B, W>
+where
+    B: Backend,
+    W: Worker<B::Client>,
+{
     /// Creates a new [`Client`] with provided [`Backend`] and [`Worker`].
-    pub fn new(backend: B, inner: W) -> Self
-    where
-        B: Backend,
-        W: Worker<B>,
-    {
+    pub fn new(backend: B, inner: W) -> Self {
         let inner = Arc::new(Runner::new(backend, inner));
         Self { inner }
     }
@@ -28,11 +29,7 @@ impl<B, W> Client<B, W> {
     /// Processes [`Request`]s with a provided [`Worker`] until the [`RequestQueue`] is empty.
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
-    pub async fn run(&self) -> Result<usize>
-    where
-        B: Backend,
-        W: Worker<B>,
-    {
+    pub async fn run(&self) -> Result<usize> {
         self.inner.run_until_empty().await
     }
 
@@ -45,15 +42,13 @@ impl<B, W> Client<B, W> {
     /// Does not process the [`RequestQueue`].
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
-    pub async fn run_once(&self, request: Request) -> Result<()>
-    where
-        B: Backend,
-        W: Worker<B>,
-    {
-        self.inner.call_service(request).await;
+    pub async fn run_once(&self, request: Request) -> Result<()> {
+        self.inner.call_service(request).await?;
         Ok(())
     }
+}
 
+impl<B, W> Client<B, W> {
     /// Replaces the [`Dataset`] used by the [`RequestQueue`].
     ///
     /// If the `Dataset` for the `RequestQueue` is not provided, then

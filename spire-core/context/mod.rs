@@ -9,7 +9,7 @@ pub use extend::{Tag, Task, TaskBuilder};
 pub use queue::RequestQueue;
 pub use signal::{IntoSignal, Signal, TagQuery};
 
-use crate::backend::{Backend, Client};
+use crate::backend::Client;
 use crate::dataset::util::BoxCloneDataset;
 use crate::dataset::Datasets;
 use crate::{Error, Result};
@@ -19,28 +19,44 @@ mod extend;
 mod queue;
 mod signal;
 
-// TODO: Shouldn't backend be a client here?
-
 /// Framework-specific context of the [`Request`].
-pub struct Context<B> {
+pub struct Context<C> {
     request: Request,
-    backend: B,
+    client: C,
     datasets: Datasets,
 }
 
-impl<B> Context<B> {
+impl<C> Context<C>
+where
+    C: Client,
+{
     /// Creates a new [`Context`].
-    pub fn new(request: Request, backend: B, datasets: Datasets) -> Self
-    where
-        B: Backend,
-    {
+    pub fn new(request: Request, client: C, datasets: Datasets) -> Self {
         Self {
             request,
-            backend,
+            client,
             datasets,
         }
     }
 
+    /// Resolves the [`Request`] and returns [`Response`] or [`Error`].
+    pub async fn resolve(self) -> Result<Response> {
+        let response = self.client.resolve(self.request).await?;
+        Ok(response)
+    }
+
+    /// Returns the [`Backend`]'s client.
+    ///
+    /// [`Backend`]: crate::backend::Backend
+    pub fn client(&self) -> C
+    where
+        C: Clone,
+    {
+        self.client.clone()
+    }
+}
+
+impl<C> Context<C> {
     /// Returns the reference to the inner [`Request`].
     ///
     /// Used by extractors to access extensions.
@@ -53,24 +69,6 @@ impl<B> Context<B> {
     /// Used by extractors to access extensions.
     pub fn get_mut(&mut self) -> &mut Request {
         &mut self.request
-    }
-
-    /// Resolves the [`Request`] and returns [`Response`] or [`Error`].
-    pub async fn resolve(self) -> Result<Response>
-    where
-        B: Backend,
-    {
-        let client: B::Client = self.backend.client().await?;
-        let response: Response = client.resolve(self.request).await?;
-        Ok(response)
-    }
-
-    /// Returns the [`Backend`]'s client.
-    pub async fn client(&self) -> Result<B::Client>
-    where
-        B: Backend,
-    {
-        self.backend.client().await
     }
 
     /// Initializes and returns the [`RequestQueue`].

@@ -8,6 +8,7 @@ use crate::dataset::{Dataset, DatasetExt, InMemDataset};
 use crate::{BoxError, Error};
 
 /// Type-erased collection of `Dataset`s.
+#[must_use]
 #[derive(Clone, Default)]
 pub struct Datasets {
     inner: Arc<DatasetsInner>,
@@ -75,12 +76,14 @@ impl Datasets {
     }
 
     /// Returns the total amount of inserted [`Dataset`]s.
+    #[must_use]
     pub fn len(&self) -> usize {
         let guard = self.inner.mx.lock().unwrap();
         guard.len()
     }
 
     /// Returns `true` if no [`Dataset`]s were inserted.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

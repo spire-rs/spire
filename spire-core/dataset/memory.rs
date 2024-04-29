@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::dataset::Dataset;
 
 /// Simple in-memory `FIFO` or `LIFO` [`VecDeque`]-based [`Dataset`].
+#[must_use]
 pub struct InMemDataset<T> {
     inner: Arc<InMemDatasetInner<T>>,
 }

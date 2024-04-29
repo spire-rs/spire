@@ -1,5 +1,6 @@
 use std::fmt;
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use deadpool::managed::Object;
@@ -16,13 +17,14 @@ use crate::{Error, Result};
 /// Implements [`Deref`] and [`DerefMut`] to `fantoccini::`[`Client`].
 ///
 /// [`BrowserPool`]: crate::backend::BrowserPool
-pub struct BrowserClient(Object<BrowserManager>);
+#[derive(Clone)]
+pub struct BrowserClient(Arc<Object<BrowserManager>>);
 
 impl BrowserClient {
     /// Creates a new [`BrowserClient`].
     #[inline]
     pub(crate) fn new(inner: Object<BrowserManager>) -> Self {
-        Self(inner)
+        Self(Arc::new(inner))
     }
 }
 
@@ -38,13 +40,6 @@ impl Deref for BrowserClient {
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0.client
-    }
-}
-
-impl DerefMut for BrowserClient {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0.client
     }
 }
 

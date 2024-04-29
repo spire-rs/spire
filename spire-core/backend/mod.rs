@@ -103,21 +103,21 @@ where
 ///
 /// [`Context`]: crate::context::Context
 #[async_trait::async_trait]
-pub trait Worker<B>: Clone + Send + 'static {
+pub trait Worker<C>: Clone + Send + 'static {
     /// TODO: Remove Clone + replace self with &self.
-    async fn invoke(self, cx: Context<B>) -> Signal;
+    async fn invoke(self, cx: Context<C>) -> Signal;
 }
 
 #[async_trait::async_trait]
-impl<S, B> Worker<B> for S
+impl<S, C> Worker<C> for S
 where
-    S: Service<Context<B>, Response = Signal, Error = Infallible>,
+    S: Service<Context<C>, Response = Signal, Error = Infallible>,
     S: Clone + Send + 'static,
     S::Future: Send + 'static,
-    B: Send + 'static,
+    C: Send + 'static,
 {
     #[inline]
-    async fn invoke(self, cx: Context<B>) -> Signal {
+    async fn invoke(self, cx: Context<C>) -> Signal {
         let mut copy = self.clone();
         let ready = copy.ready().await.unwrap();
         ready.call(cx).await.unwrap()

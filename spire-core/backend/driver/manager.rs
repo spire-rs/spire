@@ -34,11 +34,10 @@ impl BrowserManager {
     }
 
     /// TODO.
-    pub fn with_unmanaged(mut self, webdriver: impl AsRef<str>) -> Self {
-        {
-            let mut guard = self.inner.unmanaged_free.lock().unwrap();
-            guard.push(webdriver.as_ref().to_owned());
-        }
+    pub fn with_unmanaged(self, webdriver: impl AsRef<str>) -> Self {
+        let mut guard = self.inner.unmanaged_free.lock().unwrap();
+        guard.push(webdriver.as_ref().to_owned());
+        drop(guard);
 
         self
     }

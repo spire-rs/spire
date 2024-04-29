@@ -30,7 +30,7 @@ impl<B, W> Runner<B, W> {
     pub fn new(backend: B, inner: W) -> Self
     where
         B: Backend,
-        W: Worker<B>,
+        W: Worker<B::Client>,
     {
         Self {
             service: inner,
@@ -57,7 +57,7 @@ impl<B, W> Runner<B, W> {
     pub async fn run_until_empty(&self) -> Result<usize>
     where
         B: Backend,
-        W: Worker<B>,
+        W: Worker<B::Client>,
     {
         let mut total = 0;
         loop {
@@ -76,7 +76,7 @@ impl<B, W> Runner<B, W> {
     async fn run_until_signal(&self) -> Result<usize>
     where
         B: Backend,
-        W: Worker<B>,
+        W: Worker<B::Client>,
     {
         let mut requests: Vec<_> = {
             let mut initial = self.inits.lock().unwrap();
@@ -88,13 +88,17 @@ impl<B, W> Runner<B, W> {
             dataset.add(request).await?;
         }
 
+        // TODO.
         let try_call_service = |x: Result<Request>| async {
             let (signal, owner) = match x {
-                Ok(x) => self.call_service(x).await,
+                Ok(x) => self
+                    .call_service(x)
+                    .await
+                    .unwrap_or_else(|x| (x.into_signal(), Tag::default())),
                 Err(x) => (x.into_signal(), Tag::default()),
             };
 
-            self.notify_signal(signal, owner).await
+            self.notify_signal(signal, owner).await;
         };
 
         let stream = dataset
@@ -106,19 +110,19 @@ impl<B, W> Runner<B, W> {
         Ok(stream.await)
     }
 
-    pub async fn call_service(&self, request: Request) -> (Signal, Tag)
+    pub async fn call_service(&self, request: Request) -> Result<(Signal, Tag)>
     where
         B: Backend,
-        W: Worker<B>,
+        W: Worker<B::Client>,
     {
         let owner = request.tag().clone();
-
-        let backend = self.backend.clone();
         let datasets = self.datasets.clone();
 
-        let cx = Context::new(request, backend, datasets);
+        let client: B::Client = self.backend.client().await?;
+        let cx: Context<B::Client> = Context::new(request, client, datasets);
         let signal = self.service.clone().invoke(cx).await;
-        (signal, owner)
+
+        Ok((signal, owner))
     }
 
     /// Applies the signal to the subsequent requests.
@@ -152,10 +156,15 @@ impl<B, W> Runner<B, W> {
         let now = Instant::now();
 
         let defer = self.defer.lock().unwrap();
-        let until = match defer.get(owner).cloned() {
-            None => defer.get(&Tag::Fallback).cloned(),
-            Some(x) => Some(x),
-        };
+        // let until = match defer.get(owner).cloned() {
+        //     None => defer.get(&Tag::Fallback).cloned(),
+        //     Some(x) => Some(x),
+        // };
+
+        let until = defer
+            .get(owner)
+            .copied()
+            .map_or_else(|| defer.get(&Tag::Fallback).cloned(), Some);
 
         until.unwrap_or(now)
     }

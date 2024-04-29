@@ -23,6 +23,7 @@ mod route;
 mod tag_router;
 
 /// TODO.
+#[must_use]
 pub struct Router<B = (), S = ()> {
     inner: TagRouter<B, S>,
 }
@@ -100,7 +101,7 @@ impl<B, S> Router<B, S> {
     }
 
     /// Merges with another [`Router`] by appending all [`Handler`]s to matching [`Tag`]s.
-    pub fn merge(mut self, other: Router<B, S>) -> Self {
+    pub fn merge(mut self, other: Self) -> Self {
         self.inner.merge(other.inner);
         self
     }
