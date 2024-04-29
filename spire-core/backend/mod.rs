@@ -34,8 +34,8 @@ pub use client::HttpClient;
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub use driver::{BrowserClient, BrowserManager, BrowserPool};
 
-use crate::{Error, Result};
 use crate::context::{Context, Request, Response, Signal};
+use crate::{Error, Result};
 
 #[cfg(feature = "client")]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]

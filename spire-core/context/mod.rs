@@ -19,6 +19,8 @@ mod extend;
 mod queue;
 mod signal;
 
+// TODO: Shouldn't backend be a client here?
+
 /// Framework-specific context of the [`Request`].
 pub struct Context<B> {
     request: Request,

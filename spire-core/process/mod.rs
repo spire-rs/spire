@@ -152,6 +152,7 @@ impl<B, W> Client<B, W> {
 }
 
 impl<B, S> Clone for Client<B, S> {
+    #[inline]
     fn clone(&self) -> Self {
         let inner = self.inner.clone();
         Self { inner }

@@ -16,7 +16,7 @@ use crate::handler::Handler;
 
 /// Implementation of a `tower::`[`Service`] for a [`Handler`].
 ///
-/// Automatically implements [`Worker`] if `H` is a [`Handler`].
+/// Automatically implements [`Worker`].
 ///
 /// [`Worker`]: crate::backend::Worker
 pub struct HandlerService<H, V, S> {
@@ -132,8 +132,8 @@ where
 #[cfg(test)]
 mod test {
     use crate::backend::Worker;
-    use crate::Client;
     use crate::handler::HandlerService;
+    use crate::Client;
 
     fn service<B: Send + 'static>() -> impl Worker<B> {
         async fn handler() {}

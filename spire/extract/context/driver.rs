@@ -10,10 +10,7 @@ use spire_macros::extract::{Elements, Select};
 
 use crate::extract::FromContextRef;
 
-// TODO: pub struct Snapshot {}
-// TODO: pub struct Screen {}
-// TODO: pub struct Color {}
-// TODO: pub struct Capture {}
+// TODO: Snapshot, Screen, Color, Capture.
 
 #[async_trait::async_trait]
 impl<S> FromContextRef<BrowserPool, S> for BrowserClient {
@@ -28,21 +25,23 @@ impl<S> FromContextRef<BrowserPool, S> for BrowserClient {
 }
 
 pub struct BrowserHandle<T> {
-    // client:
+    client: BrowserClient,
     marker: PhantomData<T>,
 }
 
 impl<T> Deref for BrowserHandle<T> {
-    type Target = ();
+    type Target = BrowserClient;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
-        todo!()
+        &self.client
     }
 }
 
 impl<T> DerefMut for BrowserHandle<T> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        todo!()
+        &mut self.client
     }
 }
 

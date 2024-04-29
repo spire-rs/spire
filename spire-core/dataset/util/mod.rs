@@ -37,10 +37,12 @@ impl<T, D> DatasetExt<T> for D
 where
     D: Dataset<T>,
 {
+    #[inline]
     fn boxed(self) -> BoxDataset<T, Self::Error> {
         BoxDataset::new(self)
     }
 
+    #[inline]
     fn boxed_clone(self) -> BoxCloneDataset<T, Self::Error>
     where
         Self: Clone,
@@ -48,6 +50,7 @@ where
         BoxCloneDataset::new(self)
     }
 
+    #[inline]
     fn map_data<F, F2>(self, to: F, from: F2) -> MapData<Self, F, F2>
     where
         Self: Sized,
@@ -55,6 +58,7 @@ where
         MapData::new(self, to, from)
     }
 
+    #[inline]
     fn map_err<F>(self, from: F) -> MapErr<Self, F>
     where
         Self: Sized,

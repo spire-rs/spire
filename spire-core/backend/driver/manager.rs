@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::fmt;
-use std::future::Future;
 use std::sync::{Arc, Mutex};
 
 use deadpool::managed::{Manager, Metrics, Pool, RecycleResult};
@@ -9,20 +8,22 @@ use fantoccini::Client as WebClient;
 use crate::backend::BrowserPool;
 use crate::Error;
 
+#[derive(Debug, Clone)]
+pub struct BrowserConn {
+    pub id: String,
+    pub client: WebClient,
+}
+
 /// [`BrowserPool`] builder. Manages browser connection and/or process.
+#[derive(Clone)]
 pub struct BrowserManager {
     inner: Arc<BrowserManagerInner>,
 }
 
 struct BrowserManagerInner {
+    // builder: ClientBuilder<()>,
     unmanaged_free: Mutex<Vec<String>>,
     unmanaged_conn: Mutex<VecDeque<BrowserConn>>,
-    // builder: ClientBuilder<()>,
-}
-
-pub struct BrowserConn {
-    pub id: String,
-    pub client: WebClient,
 }
 
 impl BrowserManager {

@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 pub use process::Client;
 
@@ -35,6 +36,8 @@ impl Error {
     }
 
     /// Returns inner error.
+    #[inline]
+    #[must_use]
     pub fn into_inner(self) -> BoxError {
         self.inner
     }

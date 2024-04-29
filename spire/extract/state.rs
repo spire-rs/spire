@@ -21,7 +21,7 @@ where
     }
 }
 
-/// TODO.
+/// State extractor.
 ///
 /// ```rust
 /// use spire::extract::FromRef;

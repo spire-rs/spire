@@ -10,13 +10,13 @@
 //! ### Extractors
 //!
 //! - [`Context`] to access [`Request`], and [`Response`] for granular control over data fetching.
-//! - [`Body`], [`Text`], and [`Json`]
+//! - [`Body`], [`Text`], and [`Json`] for response body extraction.
+//!
+//! - [`State`] and [`FromRef`] trait for state extraction.
 //!
 //! - [`Html`] (for [`HttpClient`]) or [`View`] (for [`BrowserPool`]) for direct markup access,
 //! or [`Elements`] and [`Select`] trait for declarative markup extraction.
-//! - [`RequestQueue`], and [`Data`] for creating new requests and saving scraped data.
-//! - [`State`] and [`FromRef`] trait for state extraction.
-//!
+//! - [`RequestQueue`], and [`Datastore`] for enqueuing new requests and saving response data.
 //! - [`Backend`]-specific [`HttpClient`] and [`BrowserClient`] (for [`BrowserPool`]).
 //!
 //! [`Backend`]: spire_core::backend::Backend

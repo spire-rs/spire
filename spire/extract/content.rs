@@ -26,7 +26,7 @@ where
     }
 }
 
-/// TODO.
+/// Plain text response extractor.
 #[derive(Debug, Clone)]
 pub struct Text(pub String);
 
@@ -45,8 +45,9 @@ where
     }
 }
 
-/// TODO.
-/// Mostly used for API scraping.
+/// JSON Response extractor.
+///
+/// Useful for API scraping.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Json<T>(pub T);
 

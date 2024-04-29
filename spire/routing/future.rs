@@ -30,7 +30,7 @@ pin_project! {
 
 impl<B, E> RouteFuture<B, E> {
     /// Creates a new [` RouteFuture`].
-    pub fn new(fut: Fut<B, E>) -> Self {
+    pub(crate) fn new(fut: Fut<B, E>) -> Self {
         let kind = RouteFutureKind::Future { fut };
         Self { kind }
     }

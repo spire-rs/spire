@@ -51,7 +51,7 @@ impl<B, W> Runner<B, W> {
     }
 
     pub fn with_concurrency_limit(&self, limit: usize) {
-        self.limit.store(max(limit, 1), Ordering::SeqCst)
+        self.limit.store(max(limit, 1), Ordering::SeqCst);
     }
 
     pub async fn run_until_empty(&self) -> Result<usize>
