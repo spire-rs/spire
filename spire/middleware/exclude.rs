@@ -45,13 +45,13 @@ impl<S> fmt::Debug for Exclude<S> {
     }
 }
 
-impl<B, S> Service<Cx<B>> for Exclude<S>
+impl<C, S> Service<Cx<C>> for Exclude<S>
 where
-    S: Service<Cx<B>, Response = Signal, Error = Infallible> + Clone,
+    S: Service<Cx<C>, Response = Signal, Error = Infallible> + Clone,
 {
     type Response = Signal;
     type Error = Infallible;
-    type Future = ExcludeFuture<S::Future, B, S>;
+    type Future = ExcludeFuture<S::Future, C, S>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -59,7 +59,7 @@ where
     }
 
     #[inline]
-    fn call(&mut self, cx: Cx<B>) -> Self::Future {
+    fn call(&mut self, cx: Cx<C>) -> Self::Future {
         ExcludeFuture::new(cx, self.inner.clone())
     }
 }
@@ -86,26 +86,26 @@ impl<S> Layer<S> for ExcludeLayer {
 
 pin_project! {
     /// Response [`Future`] for [`Exclude`].
-    pub struct ExcludeFuture<F, B, S> {
-        #[pin] kind: ExcludeFutureKind<F, B, S>,
+    pub struct ExcludeFuture<F, C, S> {
+        #[pin] kind: ExcludeFutureKind<F, C, S>,
     }
 }
 
 pin_project! {
     #[project = ExcludeFutureKindProj]
-    enum ExcludeFutureKind<F, B, S> {
-        Resolve { #[pin] fut: F, cx: Cx<B>, inner: S, },
+    enum ExcludeFutureKind<F, C, S> {
+        Resolve { #[pin] fut: F, cx: Cx<C>, inner: S, },
         Call { #[pin] fut: F, },
     }
 }
 
-impl<F, B, S> ExcludeFuture<F, B, S>
+impl<F, C, S> ExcludeFuture<F, C, S>
 where
-    S: Service<Cx<B>, Response = Signal, Error = Infallible, Future = F>,
+    S: Service<Cx<C>, Response = Signal, Error = Infallible, Future = F>,
     F: Future<Output = Result<Signal, Infallible>>,
 {
     /// Creates a new [`ExcludeFuture`].
-    pub fn new(cx: Cx<B>, mut inner: S) -> Self {
+    pub fn new(cx: Cx<C>, mut inner: S) -> Self {
         // TODO. Check if req in cached, use special dataset?.
 
         let fut = inner.call(cx);
@@ -120,9 +120,9 @@ impl<F, B, S> fmt::Debug for ExcludeFuture<F, B, S> {
     }
 }
 
-impl<F, B, S> Future for ExcludeFuture<F, B, S>
+impl<F, C, S> Future for ExcludeFuture<F, C, S>
 where
-    S: Service<Cx<B>, Response = Signal, Error = Infallible, Future = F>,
+    S: Service<Cx<C>, Response = Signal, Error = Infallible, Future = F>,
     F: Future<Output = Result<Signal, Infallible>>,
 {
     type Output = Result<Signal, Infallible>;

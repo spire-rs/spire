@@ -8,6 +8,7 @@ pub use async_trait::async_trait;
 
 #[doc(inline)]
 pub use routing::Router;
+use spire_core::backend::Backend;
 pub use spire_core::{backend, context, dataset};
 pub use spire_core::{Error, Result};
 
@@ -19,25 +20,22 @@ pub mod routing;
 /// Orchestrates the processing of [`Request`]s using provided [`Backend`] and [`Worker`].
 ///
 /// [`Request`]: crate::context::Request
-/// [`Backend`]: crate::backend::Backend
 /// [`Worker`]: crate::backend::Worker
-pub type Client<B, W = Router<B>> = spire_core::Client<B, W>;
+pub type Client<B, W = Router<<B as Backend>::Client>> = spire_core::Client<B, W>;
 
 #[doc(hidden)]
 pub mod prelude {}
 
 #[cfg(test)]
 mod test {
-    use crate::{Client, Result, Router};
     use crate::context::RequestQueue;
-    use crate::dataset::{Dataset, InMemDataset};
-    use crate::extract::Dataset2;
+    use crate::dataset::{Data, Dataset, InMemDataset};
+    use crate::{Client, Result, Router};
 
     #[test]
     #[cfg(feature = "client")]
     fn with_client() {
-        async fn handler(queue: RequestQueue, Dataset2(dataset): Dataset2<u64>) -> Result<()> {
-
+        async fn handler(queue: RequestQueue, dataset: Data<u64>) -> Result<()> {
             let u = dataset.get().await?;
             dataset.add(1).await?;
 
@@ -60,7 +58,7 @@ mod test {
     #[test]
     #[cfg(feature = "driver")]
     fn with_driver() {
-        async fn handler(queue: RequestQueue, Dataset2(dataset): Dataset2<u64>) -> Result<()> {
+        async fn handler(queue: RequestQueue, Dataset3(dataset): Dataset3<u64>) -> Result<()> {
             let u = dataset.get().await?;
             dataset.add(1).await?;
 

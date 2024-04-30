@@ -84,7 +84,7 @@ where
     B: Send + 'static,
 {
     async fn invoke(self, cx: Context<B>) -> Signal {
-        let requests = cx.dataset::<Request>();
+        let requests = cx.dataset::<Request>().into_inner();
 
         tracing::trace!(
             depth = cx.get_ref().depth(),

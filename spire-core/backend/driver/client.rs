@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 

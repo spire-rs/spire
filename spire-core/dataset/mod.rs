@@ -1,5 +1,7 @@
 //! Data collection with [`Dataset`] and its utilities.
 //!
+//! [`Data`] is TODO.
+//!
 //! ### Datasets
 //!
 //! - [`InMemDataset`] is a simple in-memory `FIFO` or `LIFO` `VecDeque`-based `Dataset`.
@@ -20,16 +22,21 @@
 //! [`MapData`]: util::MapData
 //! [`MapErr`]: util::MapErr
 
+use std::fmt;
+
 pub use memory::InMemDataset;
-pub(crate) use ttable::Datasets;
+pub(crate) use sets::Datasets;
 #[doc(inline)]
 pub use util::DatasetExt;
 
+use crate::dataset::util::BoxCloneDataset;
+use crate::{Error, Result};
+
 mod memory;
-mod ttable;
+mod sets;
 pub mod util;
 
-/// Basic expandable collection of items with a defined size.
+/// Expandable collection of items with a defined size.
 ///
 /// Features a mirrored async API from `burn::data::dataset::`[`Dataset`].
 ///
@@ -50,5 +57,47 @@ pub trait Dataset<T>: Send + Sync + 'static {
     /// Returns `true` if the dataset is empty.
     fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+/// TODO.
+#[derive(Clone)]
+pub struct Data<T>(BoxCloneDataset<T, Error>)
+where
+    T: 'static;
+
+impl<T> Data<T>
+where
+    T: Send + Sync + 'static,
+{
+    /// Creates a new [`Data`].
+    #[inline]
+    pub fn new(inner: BoxCloneDataset<T, Error>) -> Self {
+        Self(inner)
+    }
+
+    /// TODO.
+    #[inline]
+    pub async fn read(&self) -> Result<Option<T>> {
+        self.0.get().await
+    }
+
+    /// TODO.
+    #[inline]
+    pub async fn write(&self, data: T) -> Result<()> {
+        self.0.add(data).await
+    }
+
+    /// TODO.
+    #[inline]
+    pub fn into_inner(self) -> BoxCloneDataset<T, Error> {
+        self.0
+    }
+}
+
+impl<T> fmt::Debug for Data<T> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Dataset").finish_non_exhaustive()
     }
 }

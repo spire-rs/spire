@@ -64,4 +64,3 @@ impl IntoSignal for Error {
 /// [`Result`]: std::result::Result
 /// [`Request`]: context::Request
 pub type Result<T, E = Error> = std::result::Result<T, E>;
-

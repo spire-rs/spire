@@ -18,7 +18,7 @@ pin_project! {
 }
 
 /// Underlying [`Future`] type.
-type Fut<B, E> = Oneshot<BoxCloneService<Cx<B>, Signal, E>, Cx<B>>;
+type Fut<C, E> = Oneshot<BoxCloneService<Cx<C>, Signal, E>, Cx<C>>;
 
 pin_project! {
     #[project = RouteFutureKindProj]

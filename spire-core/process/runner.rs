@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use futures::stream::StreamExt;
+use futures::StreamExt;
 
 use crate::backend::{Backend, Worker};
 use crate::context::{Context, Tag, TagQuery, Task};
@@ -126,7 +126,7 @@ impl<B, W> Runner<B, W> {
     }
 
     /// Applies the signal to the subsequent requests.
-     fn notify_signal(&self, signal: Signal, owner: Tag) {
+    fn notify_signal(&self, signal: Signal, owner: Tag) {
         // TODO: Add Ok/Err counter.
         match signal {
             Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(owner, x, t),
@@ -154,8 +154,8 @@ impl<B, W> Runner<B, W> {
     // TODO.
     fn find_defer(&self, owner: &Tag) -> Instant {
         let now = Instant::now();
-
         let defer = self.defer.lock().unwrap();
+
         // let until = match defer.get(owner).cloned() {
         //     None => defer.get(&Tag::Fallback).cloned(),
         //     Some(x) => Some(x),

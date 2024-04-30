@@ -1,11 +1,11 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::{BoxError, Error, Result};
 use crate::backend::{Backend, Worker};
 use crate::context::{Body, Request};
-use crate::dataset::{Dataset, util::BoxCloneDataset};
+use crate::dataset::{Data, Dataset};
 use crate::process::runner::Runner;
+use crate::{BoxError, Result};
 
 mod runner;
 
@@ -138,11 +138,13 @@ impl<B, W> Client<B, W> {
     /// Inserts and returns the [`InMemDataset`] if none were found.
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
-    pub fn dataset<T>(&self) -> BoxCloneDataset<T, Error>
+    #[inline]
+    #[must_use]
+    pub fn dataset<T>(&self) -> Data<T>
     where
         T: Send + Sync + 'static,
     {
-        self.inner.datasets.get::<T>()
+        Data::new(self.inner.datasets.get::<T>())
     }
 }
 
@@ -167,8 +169,8 @@ mod test {
     use http::Request;
     use tracing_test::traced_test;
 
-    use crate::{Client, Result};
     use crate::dataset::InMemDataset;
+    use crate::{Client, Result};
 
     #[tokio::test]
     #[cfg(feature = "tracing")]

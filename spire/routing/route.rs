@@ -12,15 +12,15 @@ use spire_core::context::{IntoSignal, Signal};
 use crate::routing::RouteFuture;
 
 /// Provides type-erasure for the underlying `tower::`[`Service`].
-pub struct Route<B, E> {
-    inner: Mutex<BoxCloneService<Cx<B>, Signal, E>>,
+pub struct Route<C, E> {
+    inner: Mutex<BoxCloneService<Cx<C>, Signal, E>>,
 }
 
-impl<B, E> Route<B, E> {
+impl<C, E> Route<C, E> {
     /// Creates a new [`Route`].
     pub fn new<T>(svc: T) -> Self
     where
-        T: Service<Cx<B>, Error = E> + Clone + Send + 'static,
+        T: Service<Cx<C>, Error = E> + Clone + Send + 'static,
         T::Response: IntoSignal + 'static,
         T::Future: Send + 'static,
     {
@@ -34,19 +34,19 @@ impl<B, E> Route<B, E> {
     /// Calls the underlying `tower::`[`Service`] with a provided [`Context`].
     ///
     /// [`Context`]: Cx
-    fn oneshot_inner(&mut self, cx: Cx<B>) -> Oneshot<BoxCloneService<Cx<B>, Signal, E>, Cx<B>> {
+    fn oneshot_inner(&mut self, cx: Cx<C>) -> Oneshot<BoxCloneService<Cx<C>, Signal, E>, Cx<C>> {
         let svc = self.inner.lock().unwrap();
         svc.clone().oneshot(cx)
     }
 
     /// Applies a `tower::`[`Layer`] to the [`Route`].
-    pub fn layer<L, E2>(self, layer: L) -> Route<B, E2>
+    pub fn layer<L, E2>(self, layer: L) -> Route<C, E2>
     where
-        L: Layer<Route<B, E>> + Clone + Send + 'static,
-        L::Service: Service<Cx<B>> + Clone + Send + 'static,
-        <L::Service as Service<Cx<B>>>::Response: IntoSignal + 'static,
-        <L::Service as Service<Cx<B>>>::Error: Into<E2> + 'static,
-        <L::Service as Service<Cx<B>>>::Future: Send + 'static,
+        L: Layer<Self> + Clone + Send + 'static,
+        L::Service: Service<Cx<C>> + Clone + Send + 'static,
+        <L::Service as Service<Cx<C>>>::Response: IntoSignal + 'static,
+        <L::Service as Service<Cx<C>>>::Error: Into<E2> + 'static,
+        <L::Service as Service<Cx<C>>>::Future: Send + 'static,
         E2: 'static,
     {
         let layer = (
@@ -59,7 +59,7 @@ impl<B, E> Route<B, E> {
     }
 }
 
-impl<B, E> Clone for Route<B, E> {
+impl<C, E> Clone for Route<C, E> {
     fn clone(&self) -> Self {
         let svc = self.inner.lock().unwrap();
         let inner = Mutex::new(svc.clone());
@@ -67,16 +67,16 @@ impl<B, E> Clone for Route<B, E> {
     }
 }
 
-impl<B, E> fmt::Debug for Route<B, E> {
+impl<C, E> fmt::Debug for Route<C, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Route").finish_non_exhaustive()
     }
 }
 
-impl<B, E> Service<Cx<B>> for Route<B, E> {
+impl<C, E> Service<Cx<C>> for Route<C, E> {
     type Response = Signal;
     type Error = E;
-    type Future = RouteFuture<B, E>;
+    type Future = RouteFuture<C, E>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -84,7 +84,7 @@ impl<B, E> Service<Cx<B>> for Route<B, E> {
     }
 
     #[inline]
-    fn call(&mut self, cx: Cx<B>) -> Self::Future {
+    fn call(&mut self, cx: Cx<C>) -> Self::Future {
         RouteFuture::new(self.oneshot_inner(cx))
     }
 }

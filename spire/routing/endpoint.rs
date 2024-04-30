@@ -10,17 +10,17 @@ use spire_core::context::{IntoSignal, Signal};
 use crate::handler::Handler;
 use crate::routing::{MakeRoute, Route, RouteFuture};
 
-pub enum Endpoint<B, S> {
+pub enum Endpoint<C, S> {
     /// Cloneable [`Service`].
-    Route(Route<B, Infallible>),
+    Route(Route<C, Infallible>),
     /// [`Handler`] without state.
-    Handler(MakeRoute<B, S, Infallible>),
+    Handler(MakeRoute<C, S, Infallible>),
 }
 
-impl<B, S> Endpoint<B, S> {
+impl<C, S> Endpoint<C, S> {
     pub fn from_service<T>(service: T) -> Self
     where
-        T: Service<Cx<B>, Error = Infallible> + Clone + Send + 'static,
+        T: Service<Cx<C>, Error = Infallible> + Clone + Send + 'static,
         T::Response: IntoSignal + 'static,
         T::Future: Send + 'static,
     {
@@ -29,9 +29,9 @@ impl<B, S> Endpoint<B, S> {
 
     pub fn from_handler<H, V>(handler: H) -> Self
     where
-        B: 'static,
+        C: 'static,
         S: Clone + Send + 'static,
-        H: Handler<B, V, S>,
+        H: Handler<C, V, S>,
         H::Future: Send + 'static,
         V: Send + 'static,
     {
@@ -40,13 +40,13 @@ impl<B, S> Endpoint<B, S> {
 
     pub fn layer<L>(self, layer: L) -> Self
     where
-        B: 'static,
+        C: 'static,
         S: Clone + Send + 'static,
-        L: Layer<Route<B, Infallible>> + Clone + Send + 'static,
-        L::Service: Service<Cx<B>> + Clone + Send + 'static,
-        <L::Service as Service<Cx<B>>>::Response: IntoSignal + 'static,
-        <L::Service as Service<Cx<B>>>::Error: Into<Infallible> + 'static,
-        <L::Service as Service<Cx<B>>>::Future: Send + 'static,
+        L: Layer<Route<C, Infallible>> + Clone + Send + 'static,
+        L::Service: Service<Cx<C>> + Clone + Send + 'static,
+        <L::Service as Service<Cx<C>>>::Response: IntoSignal + 'static,
+        <L::Service as Service<Cx<C>>>::Error: Into<Infallible> + 'static,
+        <L::Service as Service<Cx<C>>>::Future: Send + 'static,
     {
         match self {
             Self::Route(x) => Self::Route(x.layer(layer)),
@@ -54,7 +54,7 @@ impl<B, S> Endpoint<B, S> {
         }
     }
 
-    pub fn with_state<S2>(self, state: S) -> Endpoint<B, S2> {
+    pub fn with_state<S2>(self, state: S) -> Endpoint<C, S2> {
         match self {
             Self::Route(x) => Endpoint::Route(x),
             Self::Handler(x) => Endpoint::Route(x.into_route(state)),
@@ -67,16 +67,16 @@ async fn default_fallback() -> Signal {
     Signal::Continue
 }
 
-impl<B> Default for Endpoint<B, ()>
+impl<C> Default for Endpoint<C, ()>
 where
-    B: 'static,
+    C: 'static,
 {
     fn default() -> Self {
         Self::from_handler(default_fallback)
     }
 }
 
-impl<B, S> Clone for Endpoint<B, S> {
+impl<C, S> Clone for Endpoint<C, S> {
     fn clone(&self) -> Self {
         match self {
             Self::Route(x) => Self::Route(x.clone()),
@@ -85,7 +85,7 @@ impl<B, S> Clone for Endpoint<B, S> {
     }
 }
 
-impl<B, S> fmt::Debug for Endpoint<B, S> {
+impl<C, S> fmt::Debug for Endpoint<C, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Route(x) => x.fmt(f),
@@ -94,10 +94,10 @@ impl<B, S> fmt::Debug for Endpoint<B, S> {
     }
 }
 
-impl<B> Service<Cx<B>> for Endpoint<B, ()> {
+impl<C> Service<Cx<C>> for Endpoint<C, ()> {
     type Response = Signal;
     type Error = Infallible;
-    type Future = RouteFuture<B, Infallible>;
+    type Future = RouteFuture<C, Infallible>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -105,7 +105,7 @@ impl<B> Service<Cx<B>> for Endpoint<B, ()> {
     }
 
     #[inline]
-    fn call(&mut self, cx: Cx<B>) -> Self::Future {
+    fn call(&mut self, cx: Cx<C>) -> Self::Future {
         match self {
             Self::Route(x) => x.call(cx),
             Self::Handler(x) => x.clone().into_route(()).call(cx),

@@ -3,9 +3,9 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::{BoxError, Error};
-use crate::dataset::{Dataset, DatasetExt, InMemDataset};
 use crate::dataset::util::BoxCloneDataset;
+use crate::dataset::{Dataset, DatasetExt, InMemDataset};
+use crate::{BoxError, Error};
 
 /// Type-erased collection of `Dataset`s.
 #[must_use]

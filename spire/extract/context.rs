@@ -3,9 +3,7 @@ use std::ops::{Deref, DerefMut};
 
 use spire_core::backend::Client as CoreClient;
 use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::Dataset as CoreDataset;
-use spire_core::dataset::util::BoxCloneDataset;
-use spire_core::Error;
+use spire_core::dataset::{Data, Dataset as CoreDataset};
 
 use crate::extract::{FromContext, FromContextRef};
 
@@ -78,13 +76,8 @@ where
     }
 }
 
-/// TODO.
-///
-/// TODO: Rename to dataset? Move to core and impl FromCtxRef here?
-pub struct Dataset2<T>(pub BoxCloneDataset<T, Error>);
-
 #[async_trait::async_trait]
-impl<B, S, T> FromContextRef<B, S> for BoxCloneDataset<T, Error>
+impl<B, S, T> FromContextRef<B, S> for Data<T>
 where
     B: Sync,
     T: Sync + Send + 'static,
@@ -93,38 +86,5 @@ where
 
     async fn from_context_parts(cx: &Context<B>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.dataset::<T>())
-    }
-}
-
-#[async_trait::async_trait]
-impl<B, S, T> FromContextRef<B, S> for Dataset2<T>
-where
-    B: Sync,
-    T: Sync + Send + 'static,
-{
-    type Rejection = Infallible;
-
-    async fn from_context_parts(cx: &Context<B>, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(cx.dataset::<T>()))
-    }
-}
-
-#[async_trait::async_trait]
-impl<T> CoreDataset<T> for Dataset2<T>
-where
-    T: Send + Sync + 'static,
-{
-    type Error = Error;
-
-    async fn add(&self, data: T) -> Result<(), Self::Error> {
-        self.0.add(data).await
-    }
-
-    async fn get(&self) -> Result<Option<T>, Self::Error> {
-        self.0.get().await
-    }
-
-    fn len(&self) -> usize {
-        self.0.len()
     }
 }

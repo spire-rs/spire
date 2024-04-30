@@ -14,7 +14,7 @@
 //! - [`Html`] (for [`HttpClient`]) or [`View`] (for [`BrowserClient`]) for direct markup access.
 //! - [`Elements`] and [`Select`] trait for declarative markup extraction.
 //!
-//! - [`RequestQueue`], and [`Dataset2`] for enqueuing new requests and saving response data.
+//! - [`RequestQueue`], and [`Datastore`] for enqueuing new requests and saving response data.
 //! - [`Client`] to access [`Backend`]-specific [`HttpClient`] or [`BrowserClient`].
 //! - [`State`] and [`FromRef`] trait for state extraction.
 //!
@@ -25,6 +25,7 @@
 //! [`Request`]: spire_core::context::Request
 //! [`Response`]: spire_core::context::Response
 //! [`RequestQueue`]: spire_core::context::RequestQueue
+//! [`Datastore`]: spire_core::dataset::Data
 //!
 //! [`Html`]: client::Html
 //! [`View`]: driver::View
@@ -37,7 +38,7 @@ use spire_core::context::{Context, IntoSignal};
 pub use spire_macros::extract::{Elements, Select};
 
 pub use crate::extract::content::{Body, Json, Text};
-pub use crate::extract::context::{Client, Dataset2};
+pub use crate::extract::context::Client;
 pub use crate::extract::state::{FromRef, State};
 
 mod content;

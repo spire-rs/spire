@@ -24,27 +24,28 @@ mod tag_router;
 
 /// Composes and routes [`Handler`]s and `tower::`[`Service`]s.
 #[must_use]
-pub struct Router<B = (), S = ()> {
-    inner: TagRouter<B, S>,
+pub struct Router<C = (), S = ()> {
+    // TODO: Use Arc<TagRouter<C, S>>.
+    inner: TagRouter<C, S>,
 }
 
-impl<B, S> Router<B, S> {
+impl<C, S> Router<C, S> {
     /// Creates a new [`Router`] of the specified [`Backend`] type.
     ///
     /// [`Backend`]: crate::backend::Backend
     pub fn new() -> Self
     where
-        B: 'static,
+        C: 'static,
     {
-        let inner = TagRouter::<B, S>::new();
+        let inner = TagRouter::<C, S>::new();
         Self { inner }
     }
 
     pub fn route<H, V>(mut self, tag: impl Into<Tag>, handler: H) -> Self
     where
-        B: 'static,
+        C: 'static,
         S: Send + Clone + 'static,
-        H: Handler<B, V, S>,
+        H: Handler<C, V, S>,
         H::Future: Send + 'static,
         V: Send + 'static,
     {
@@ -55,9 +56,9 @@ impl<B, S> Router<B, S> {
 
     pub fn route_service<H>(mut self, tag: impl Into<Tag>, service: H) -> Self
     where
-        B: 'static,
+        C: 'static,
         S: Send + Clone + 'static,
-        H: Service<Cx<B>, Error = Infallible> + Clone + Send + 'static,
+        H: Service<Cx<C>, Error = Infallible> + Clone + Send + 'static,
         H::Response: IntoSignal + 'static,
         H::Future: Send + 'static,
     {
@@ -72,9 +73,9 @@ impl<B, S> Router<B, S> {
     /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
     pub fn fallback<H, V>(mut self, handler: H) -> Self
     where
-        B: 'static,
+        C: 'static,
         S: Send + Clone + 'static,
-        H: Handler<B, V, S>,
+        H: Handler<C, V, S>,
         H::Future: Send + 'static,
         V: Send + 'static,
     {
@@ -89,9 +90,9 @@ impl<B, S> Router<B, S> {
     /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
     pub fn fallback_service<H>(mut self, service: H) -> Self
     where
-        B: 'static,
+        C: 'static,
         S: Send + Clone + 'static,
-        H: Service<Cx<B>, Error = Infallible> + Clone + Send + 'static,
+        H: Service<Cx<C>, Error = Infallible> + Clone + Send + 'static,
         H::Response: IntoSignal + 'static,
         H::Future: Send + 'static,
     {
@@ -108,21 +109,21 @@ impl<B, S> Router<B, S> {
 
     pub fn layer<L>(self, layer: L) -> Self
     where
-        B: 'static,
+        C: 'static,
         S: Clone + Send + 'static,
-        L: Layer<Route<B, Infallible>> + Clone + Send + 'static,
-        L::Service: Service<Cx<B>> + Clone + Send + 'static,
-        <L::Service as Service<Cx<B>>>::Response: IntoSignal + 'static,
-        <L::Service as Service<Cx<B>>>::Error: Into<Infallible> + 'static,
-        <L::Service as Service<Cx<B>>>::Future: Send + 'static,
+        L: Layer<Route<C, Infallible>> + Clone + Send + 'static,
+        L::Service: Service<Cx<C>> + Clone + Send + 'static,
+        <L::Service as Service<Cx<C>>>::Response: IntoSignal + 'static,
+        <L::Service as Service<Cx<C>>>::Error: Into<Infallible> + 'static,
+        <L::Service as Service<Cx<C>>>::Future: Send + 'static,
     {
-        let remap = |k: Tag, v: Endpoint<B, S>| (k, v.layer(layer.clone()));
+        let remap = |k: Tag, v: Endpoint<C, S>| (k, v.layer(layer.clone()));
         Self {
             inner: self.inner.layer(remap),
         }
     }
 
-    pub fn with_state<S2>(self, state: S) -> Router<B, S2>
+    pub fn with_state<S2>(self, state: S) -> Router<C, S2>
     where
         S: Clone,
     {
@@ -131,14 +132,14 @@ impl<B, S> Router<B, S> {
     }
 }
 
-impl<B, S> Clone for Router<B, S> {
+impl<C, S> Clone for Router<C, S> {
     fn clone(&self) -> Self {
         let inner = self.inner.clone();
         Self { inner }
     }
 }
 
-impl<B, S> fmt::Display for Router<B, S> {
+impl<C, S> fmt::Display for Router<C, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Router").finish_non_exhaustive()
     }
@@ -153,10 +154,10 @@ where
     }
 }
 
-impl<B> Service<Cx<B>> for Router<B, ()> {
+impl<C> Service<Cx<C>> for Router<C, ()> {
     type Response = Signal;
     type Error = Infallible;
-    type Future = RouteFuture<B, Infallible>;
+    type Future = RouteFuture<C, Infallible>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -164,7 +165,7 @@ impl<B> Service<Cx<B>> for Router<B, ()> {
     }
 
     #[inline]
-    fn call(&mut self, cx: Cx<B>) -> Self::Future {
+    fn call(&mut self, cx: Cx<C>) -> Self::Future {
         self.inner.call(cx)
     }
 }

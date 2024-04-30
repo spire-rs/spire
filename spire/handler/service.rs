@@ -27,9 +27,9 @@ pub struct HandlerService<H, V, S> {
 
 impl<H, V, S> HandlerService<H, V, S> {
     /// Creates a new [`HandlerService`].
-    pub fn new<B>(handler: H, state: S) -> Self
+    pub fn new<C>(handler: H, state: S) -> Self
     where
-        H: Handler<B, V, S>,
+        H: Handler<C, V, S>,
     {
         Self {
             marker: PhantomData,
@@ -55,9 +55,9 @@ impl<H, V, S> fmt::Debug for HandlerService<H, V, S> {
     }
 }
 
-impl<B, H, V, S> Service<Cx<B>> for HandlerService<H, V, S>
+impl<C, H, V, S> Service<Cx<C>> for HandlerService<H, V, S>
 where
-    H: Handler<B, V, S>,
+    H: Handler<C, V, S>,
     S: Clone,
 {
     type Response = Signal;
@@ -70,7 +70,7 @@ where
     }
 
     #[inline]
-    fn call(&mut self, cx: Cx<B>) -> Self::Future {
+    fn call(&mut self, cx: Cx<C>) -> Self::Future {
         let handler = self.handler.clone();
         let future = handler.call(cx, self.state.clone());
         HandlerFuture::new(future)

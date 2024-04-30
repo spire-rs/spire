@@ -41,14 +41,14 @@ where
 pub struct State<T>(pub T);
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContextRef<B, S> for State<T>
+impl<C, S, T> FromContextRef<C, S> for State<T>
 where
     S: Send + Sync + 'static,
     T: FromRef<S>,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(_cx: &Context<B>, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(_cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(T::from_ref(state)))
     }
 }

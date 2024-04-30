@@ -10,9 +10,8 @@ pub use queue::RequestQueue;
 pub use signal::{IntoSignal, Signal, TagQuery};
 
 use crate::backend::Client;
-use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::Datasets;
-use crate::{Error, Result};
+use crate::dataset::{Data, Datasets};
+use crate::Result;
 
 mod body;
 mod extend;
@@ -80,11 +79,11 @@ impl<C> Context<C> {
     /// Initializes and returns the boxed [`Dataset`] of type `T`.
     ///
     /// [`Dataset`]: crate::dataset::Dataset
-    pub fn dataset<T>(&self) -> BoxCloneDataset<T, Error>
+    pub fn dataset<T>(&self) -> Data<T>
     where
         T: Send + Sync + 'static,
     {
-        self.datasets.get::<T>()
+        Data::new(self.datasets.get::<T>())
     }
 }
 

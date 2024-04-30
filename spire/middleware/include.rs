@@ -46,13 +46,13 @@ impl<S> fmt::Debug for Include<S> {
     }
 }
 
-impl<B, S> Service<Cx<B>> for Include<S>
+impl<C, S> Service<Cx<C>> for Include<S>
 where
-    S: Service<Cx<B>, Response = Signal, Error = Infallible> + Clone,
+    S: Service<Cx<C>, Response = Signal, Error = Infallible> + Clone,
 {
     type Response = Signal;
     type Error = Infallible;
-    type Future = IncludeFuture<S::Future, B, S>;
+    type Future = IncludeFuture<S::Future, C, S>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -60,7 +60,7 @@ where
     }
 
     #[inline]
-    fn call(&mut self, cx: Cx<B>) -> Self::Future {
+    fn call(&mut self, cx: Cx<C>) -> Self::Future {
         IncludeFuture::new(cx, self.inner.clone())
     }
 }
@@ -87,26 +87,26 @@ impl<S> Layer<S> for IncludeLayer {
 
 pin_project! {
     /// Response [`Future`] for [`Include`].
-    pub struct IncludeFuture<F, B, S> {
-        #[pin] kind: IncludeFutureKind<F, B, S>,
+    pub struct IncludeFuture<F, C, S> {
+        #[pin] kind: IncludeFutureKind<F, C, S>,
     }
 }
 
 pin_project! {
     #[project = IncludeFutureKindProj]
-    enum IncludeFutureKind<F, B, S> {
-        Resolve { #[pin] fut: F, cx: Cx<B>, inner: S, },
+    enum IncludeFutureKind<F, C, S> {
+        Resolve { #[pin] fut: F, cx: Cx<C>, inner: S, },
         Call { #[pin] fut: F, },
     }
 }
 
-impl<F, B, S> IncludeFuture<F, B, S>
+impl<F, C, S> IncludeFuture<F, C, S>
 where
-    S: Service<Cx<B>, Response = Signal, Error = Infallible, Future = F>,
+    S: Service<Cx<C>, Response = Signal, Error = Infallible, Future = F>,
     F: Future<Output = Result<Signal, Infallible>>,
 {
     /// Creates a new [`IncludeFuture`].
-    pub fn new(cx: Cx<B>, mut inner: S) -> Self {
+    pub fn new(cx: Cx<C>, mut inner: S) -> Self {
         // TODO. Check if req in cached.
 
         let fut = inner.call(cx);
@@ -115,15 +115,15 @@ where
     }
 }
 
-impl<F, B, S> fmt::Debug for IncludeFuture<F, B, S> {
+impl<F, C, S> fmt::Debug for IncludeFuture<F, C, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("IncludeFuture").finish_non_exhaustive()
     }
 }
 
-impl<F, B, S> Future for IncludeFuture<F, B, S>
+impl<F, C, S> Future for IncludeFuture<F, C, S>
 where
-    S: Service<Cx<B>, Response = Signal, Error = Infallible, Future = F>,
+    S: Service<Cx<C>, Response = Signal, Error = Infallible, Future = F>,
     F: Future<Output = Result<Signal, Infallible>>,
 {
     type Output = Result<Signal, Infallible>;

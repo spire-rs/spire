@@ -39,21 +39,21 @@ mod service;
 /// ```
 ///
 /// [`Request`]: crate::context::Request
-pub trait Handler<B, V, S>: Clone + Send + Sized + 'static {
+pub trait Handler<C, V, S>: Clone + Send + Sized + 'static {
     type Future: Future<Output = Signal>;
 
     /// Calls the [`Handler`] with the given [`Context`] and user-provided state `S`.
-    fn call(self, cx: Context<B>, state: S) -> Self::Future;
+    fn call(self, cx: Context<C>, state: S) -> Self::Future;
 
     /// Converts the [`Handler`] into a [`Service`] by providing the state.
     ///
     /// [`Service`]: tower::Service
     fn with_state(self, state: S) -> HandlerService<Self, V, S> {
-        HandlerService::new::<B>(self, state)
+        HandlerService::new::<C>(self, state)
     }
 }
 
-impl<B, S, F, Fut, Ret> Handler<B, ((),), S> for F
+impl<C, S, F, Fut, Ret> Handler<C, ((),), S> for F
 where
     F: FnOnce() -> Fut + Clone + Send + 'static,
     Fut: Future<Output = Ret> + Send,
@@ -61,7 +61,7 @@ where
 {
     type Future = Pin<Box<dyn Future<Output = Signal> + Send>>;
 
-    fn call(self, _cx: Context<B>, _state: S) -> Self::Future {
+    fn call(self, _cx: Context<C>, _state: S) -> Self::Future {
         Box::pin(async move { self().await.into_signal() })
     }
 }
@@ -71,13 +71,13 @@ mod sealed {
     pub enum IntoSignal {}
 }
 
-impl<B, S, T> Handler<B, sealed::IntoSignal, S> for T
+impl<C, S, T> Handler<C, sealed::IntoSignal, S> for T
 where
     T: IntoSignal + Clone + Send + 'static,
 {
     type Future = Ready<Signal>;
 
-    fn call(self, _cx: Context<B>, _state: S) -> Self::Future {
+    fn call(self, _cx: Context<C>, _state: S) -> Self::Future {
         ready(self.into_signal())
     }
 }
@@ -90,19 +90,19 @@ macro_rules! impl_handler {
         [$($ty:ident),*], $last:ident
     ) => {
         #[allow(non_snake_case)]
-        impl<B, S, F, Fut, Ret, M, $($ty,)* $last> Handler<B, (M, $($ty,)* $last,), S> for F
+        impl<C, S, F, Fut, Ret, M, $($ty,)* $last> Handler<C, (M, $($ty,)* $last,), S> for F
         where
-            B: Send + Sync + 'static,
+            C: Send + Sync + 'static,
             S: Send + Sync + 'static,
             F: FnOnce($($ty,)* $last,) -> Fut + Clone + Send + 'static,
             Fut: Future<Output = Ret> + Send,
             Ret: IntoSignal,
-            $( $ty: FromContextRef<B, S> + Send, )*
-            $last: FromContext<B,S, M> + Send,
+            $( $ty: FromContextRef<C, S> + Send, )*
+            $last: FromContext<C, S, M> + Send,
         {
             type Future = Pin<Box<dyn Future<Output = Signal> + Send>>;
 
-            fn call(self, cx: Context<B>, state: S) -> Self::Future {
+            fn call(self, cx: Context<C>, state: S) -> Self::Future {
                 Box::pin(async move {
                     $(
                         let $ty = match $ty::from_context_parts(&cx, &state).await {
