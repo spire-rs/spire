@@ -8,9 +8,9 @@ use fantoccini::Client;
 use futures::future::BoxFuture;
 use tower::Service;
 
-use crate::{Error, Result};
 use crate::backend::BrowserManager;
 use crate::context::{Request, Response};
+use crate::{Error, Result};
 
 /// [`BrowserPool`] client.
 ///

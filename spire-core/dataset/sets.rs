@@ -92,11 +92,10 @@ impl Datasets {
 fn boxed<D, T, E>(dataset: D) -> BoxCloneDataset<T, Error>
 where
     D: Dataset<T, Error = E> + Clone,
-    E: Into<BoxError>,
+    E: Into<BoxError> ,
     T: Send + Sync + 'static,
 {
-    let f = |x: E| Error::new(x);
-    dataset.map_err(f).boxed_clone()
+    dataset.map_err(|x| Error::new(x)).boxed_clone()
 }
 
 #[cfg(test)]

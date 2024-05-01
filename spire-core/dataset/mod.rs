@@ -1,13 +1,13 @@
 //! Data collection with [`Dataset`] and its utilities.
 //!
-//! [`Data`] is a [`BoxCloneDataset`] wrapper. TODO.
+//! - [`Data`] is a [`BoxDataset`] wrapper.
+//! - [`DataStream`] is a `futures::`[`Stream`] for `Dataset`s.
 //!
 //! ### Datasets
 //!
 //! - [`InMemDataset`] is a simple in-memory `FIFO` or `LIFO` `VecDeque`-based `Dataset`.
 //! - `RedbDataset`
 //! - `PersyDataset`
-//! - `SqliteDataset`
 //! - `SqlxDataset`
 //!
 //! ### Utility
@@ -18,7 +18,6 @@
 //! - [`MapErr`] transforms the error type of the `Dataset`.
 //!
 //! [`BoxDataset`]: util::BoxDataset
-//! [`BoxCloneDataset`]: util::BoxCloneDataset
 //! [`MapData`]: util::MapData
 //! [`MapErr`]: util::MapErr
 
@@ -26,7 +25,9 @@ use std::fmt;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::Stream;
+use async_stream::try_stream;
+use futures::{Stream, StreamExt};
+use futures::stream::BoxStream;
 
 pub use memory::InMemDataset;
 pub(crate) use sets::Datasets;
@@ -41,12 +42,9 @@ mod sets;
 pub mod util;
 
 /// Expandable collection of items with a defined size.
-///
-/// Features a mirrored async API from `burn::data::dataset::`[`Dataset`].
-///
-/// [`Dataset`]: https://docs.rs/burn/0.12.1/burn/data/dataset/trait.Dataset.html
 #[async_trait::async_trait]
-pub trait Dataset<T>:   Send + Sync + 'static  { // TODO: Add CLone.
+pub trait Dataset<T>: Send + Sync + 'static {
+    /// Unrecoverable `Dataset` failure.
     type Error;
 
     /// Inserts another item into the collection.
@@ -63,34 +61,55 @@ pub trait Dataset<T>:   Send + Sync + 'static  { // TODO: Add CLone.
         self.len() == 0
     }
 
-    // fn into_stream(self) -> DataStream<T, Self::Error> {
-    //     // DataStream::new(self)
-    //     todo!()
-    // }
+    /// Returns a new [`DataStream`].
+    fn into_stream(self) -> DataStream<T, Self::Error>
+    where
+        Self: Sized,
+        T: Send + 'static,
+        Self::Error: Send + 'static,
+    {
+        DataStream::new(self)
+    }
 }
 
-/// TODO.
-pub struct DataStream<T, E>(BoxCloneDataset<T, E>)
-where
-    T: 'static;
+/// [`DataStream`] is a `futures::`[`Stream`] for `Dataset`s.
+#[must_use = "streams do nothing unless polled"]
+pub struct DataStream<T, E> {
+    inner: BoxStream<'static, Result<T, E>>,
+}
 
 impl<T, E> DataStream<T, E> {
-    /// Creates a new [`DataStream`].
-    #[inline]
-    pub fn new(inner: BoxCloneDataset<T, E>) -> Self {
-        Self(inner)
+    fn new<D>(dataset: D) -> Self
+    where
+        D: Dataset<T, Error = E>,
+        T: Send + 'static,
+        E: Send + 'static,
+    {
+        let stream = try_stream! {
+            while !dataset.is_empty() {
+                let item = dataset.get().await?;
+                if let Some(item) = item {
+                    yield item;
+                }
+            }
+        };
+
+        DataStream {
+            inner: stream.boxed(),
+        }
     }
 }
 
-impl <T, E> Stream for DataStream<T, E> {
+impl<T, E> Stream for DataStream<T, E> {
     type Item = Result<T, E>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        todo!()
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let pin = Pin::new(&mut self.inner);
+        pin.poll_next(cx)
     }
 }
 
-/// [`Data`] is a [`BoxCloneDataset`] wrapper. TODO.
+/// [`Data`] is a [`BoxCloneDataset`] wrapper.
 #[derive(Clone)]
 pub struct Data<T>(BoxCloneDataset<T, Error>)
 where
@@ -122,6 +141,12 @@ where
     #[inline]
     pub fn into_inner(self) -> BoxCloneDataset<T, Error> {
         self.0
+    }
+
+    /// Returns a new [`DataStream`].
+    #[inline]
+    pub fn into_stream(self) -> DataStream<T, Error> {
+        self.0.into_stream()
     }
 }
 
