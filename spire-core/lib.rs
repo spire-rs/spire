@@ -59,12 +59,14 @@ impl Error {
 }
 
 impl From<BoxError> for Error {
+    #[inline]
     fn from(value: BoxError) -> Self {
         Self::new(value)
     }
 }
 
 impl From<Infallible> for Error {
+    #[inline]
     fn from(_: Infallible) -> Self {
         unreachable!()
     }

@@ -1,9 +1,9 @@
 use std::fmt;
 
-use crate::{Error, Result};
 use crate::context::{Depth, Request, Tag};
-use crate::dataset::Dataset;
 use crate::dataset::util::BoxCloneDataset;
+use crate::dataset::Dataset;
+use crate::{Error, Result};
 
 /// [`Request`] queue backed by the [`Dataset`]<`Request`>.
 ///

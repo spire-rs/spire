@@ -15,13 +15,13 @@
 //!
 //! ### Utility
 //!
-//! - [`TraceEntity`] is a tracing wrapper for [`Backend`]s, [`Client`]s and [`Worker`]s,
+//! - [`WithTrace`] is a tracing wrapper for [`Backend`]s, [`Client`]s and [`Worker`]s,
 //! used for improved observability.
-//! - [`DebugEntity`] is a no-op [`Backend`], [`Client`] and [`Worker`], used for
+//! - [`WithDebug`] is a no-op [`Backend`], [`Client`] and [`Worker`], used for
 //! testing and debugging.
 //!
-//! [`TraceEntity`]: util::TraceEntity
-//! [`DebugEntity`]: util::DebugEntity
+//! [`WithTrace`]: util::WithTrace
+//! [`WithDebug`]: util::WithDebug
 
 use std::convert::Infallible;
 

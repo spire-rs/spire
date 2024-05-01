@@ -95,31 +95,44 @@ impl Service<Request> for HttpClient {
 
 #[cfg(test)]
 mod test {
-    use reqwest::{Client, Error};
-    use reqwest::{Request as RwRequest, Response as RwResponse};
+    use reqwest::{Client as RwClient, Request as RwRequest};
+    use reqwest::{Error as RwError, Response as RwResponse};
     use tower::ServiceBuilder;
 
-    use crate::backend::HttpClient;
+    use crate::backend::{util::WithTrace, HttpClient};
     use crate::context::{Request, Response};
-    use crate::BoxError;
-
-    #[test]
-    fn hyper() {
-        let _ = HttpClient::default();
-    }
+    use crate::dataset::InMemDataset;
+    use crate::{BoxError, Client, Result};
 
     #[test]
     fn service() {
-        // TODO.
         // BLOCKED: https://github.com/seanmonstar/reqwest/issues/2039
         // BLOCKED: https://github.com/seanmonstar/reqwest/pull/2060
 
         let svc = ServiceBuilder::default()
             .map_request(|_x: Request| -> RwRequest { unreachable!() })
             .map_response(|_x: RwResponse| -> Response { unreachable!() })
-            .map_err(|x: Error| -> BoxError { x.into() })
-            .service(Client::default());
+            .map_err(|x: RwError| -> BoxError { x.into() })
+            .service(RwClient::default());
 
         let _ = HttpClient::new(svc);
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "tracing")]
+    #[tracing_test::traced_test]
+    async fn noop() -> Result<()> {
+        let backend = WithTrace::new(HttpClient::default());
+        let worker = WithTrace::default();
+
+        let request = Request::get("https://example.com/").body(());
+        let client = Client::new(backend, worker)
+            .with_request_queue(InMemDataset::stack())
+            .with_dataset(InMemDataset::<u64>::new())
+            .with_initial_request(request.unwrap());
+
+        let _ = client.dataset::<u64>();
+        let _ = client.run().await?;
+        Ok(())
     }
 }

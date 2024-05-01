@@ -26,16 +26,16 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use async_stream::try_stream;
-use futures::{Stream, StreamExt};
 use futures::stream::BoxStream;
+use futures::{Stream, StreamExt};
 
 pub use memory::InMemDataset;
 pub(crate) use sets::Datasets;
 #[doc(inline)]
 pub use util::DatasetExt;
 
-use crate::{Error, Result};
 use crate::dataset::util::BoxCloneDataset;
+use crate::{Error, Result};
 
 mod memory;
 mod sets;
