@@ -12,8 +12,8 @@ pin_project! {
     /// Response [`Future`] for [`Route`].
     ///
     /// [`Route`]: crate::routing::Route
-    pub struct RouteFuture<B, E> {
-        #[pin] kind: RouteFutureKind<B, E>,
+    pub struct RouteFuture<C, E> {
+        #[pin] kind: RouteFutureKind<C, E>,
     }
 }
 
@@ -22,27 +22,27 @@ type Fut<C, E> = Oneshot<BoxCloneService<Cx<C>, Signal, E>, Cx<C>>;
 
 pin_project! {
     #[project = RouteFutureKindProj]
-    enum RouteFutureKind<B, E> {
-        Future { #[pin] fut: Fut<B, E>, },
+    enum RouteFutureKind<C, E> {
+        Future { #[pin] fut: Fut<C, E>, },
         Signal { signal: Option<Signal>, },
     }
 }
 
-impl<B, E> RouteFuture<B, E> {
+impl<C, E> RouteFuture<C, E> {
     /// Creates a new [` RouteFuture`].
-    pub(crate) fn new(fut: Fut<B, E>) -> Self {
+    pub(crate) fn new(fut: Fut<C, E>) -> Self {
         let kind = RouteFutureKind::Future { fut };
         Self { kind }
     }
 }
 
-impl<B, E> fmt::Debug for RouteFuture<B, E> {
+impl<C, E> fmt::Debug for RouteFuture<C, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RouteFuture").finish_non_exhaustive()
     }
 }
 
-impl<B, E> Future for RouteFuture<B, E> {
+impl<C, E> Future for RouteFuture<C, E> {
     type Output = Result<Signal, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

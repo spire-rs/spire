@@ -3,24 +3,26 @@ use std::ops::{Deref, DerefMut};
 
 use spire_core::backend::Client as CoreClient;
 use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::{Data, Dataset as CoreDataset};
+use spire_core::dataset::Data;
 
 use crate::extract::{FromContext, FromContextRef};
 
-/// TODO.
+/// [`Backend`]-specific client extractor.
+///
+/// [`Backend`]: crate::backend::Backend
 #[derive(Clone)]
 pub struct Client<C>(pub C);
 
 #[async_trait::async_trait]
 impl<C, S> FromContextRef<C, S> for Client<C>
 where
-    C: CoreClient + Sync + Clone,
+    C: CoreClient + Clone + Sync,
 {
     type Rejection = Infallible;
 
     #[inline]
     async fn from_context_parts(cx: &Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Client(cx.client()))
+        Ok(Self(cx.client()))
     }
 }
 
@@ -41,50 +43,50 @@ impl<C> DerefMut for Client<C> {
 }
 
 #[async_trait::async_trait]
-impl<B, S> FromContext<B, S> for Context<B>
+impl<C, S> FromContext<C, S> for Context<C>
 where
-    B: Send + Sync,
+    C: Send + Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context(cx: Context<B>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Self, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx)
     }
 }
 
 #[async_trait::async_trait]
-impl<B, S> FromContextRef<B, S> for RequestQueue
+impl<C, S> FromContextRef<C, S> for RequestQueue
 where
-    B: Sync,
+    C: Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<B>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.queue())
     }
 }
 
 #[async_trait::async_trait]
-impl<B, S> FromContextRef<B, S> for Tag
+impl<C, S> FromContextRef<C, S> for Tag
 where
-    B: Sync,
+    C: Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<B>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.get_ref().tag().clone())
     }
 }
 
 #[async_trait::async_trait]
-impl<B, S, T> FromContextRef<B, S> for Data<T>
+impl<C, S, T> FromContextRef<C, S> for Data<T>
 where
-    B: Sync,
+    C: Sync,
     T: Sync + Send + 'static,
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<B>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.dataset::<T>())
     }
 }

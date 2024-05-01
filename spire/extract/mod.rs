@@ -74,7 +74,7 @@ pub trait FromContextRef<C, S>: Sized {
     async fn from_context_parts(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection>;
 }
 
-/// Core trait for a non-consuming extractor.
+/// Core trait for a consuming extractor.
 #[async_trait::async_trait]
 pub trait FromContext<C, S, V = sealed::ViaRequest>: Sized {
     /// Extraction failure type.

@@ -62,8 +62,10 @@ impl<C, E> Route<C, E> {
 impl<C, E> Clone for Route<C, E> {
     fn clone(&self) -> Self {
         let svc = self.inner.lock().unwrap();
-        let inner = Mutex::new(svc.clone());
-        Self { inner }
+
+        Self {
+            inner: Mutex::new(svc.clone()),
+        }
     }
 }
 

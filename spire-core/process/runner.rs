@@ -164,7 +164,7 @@ impl<B, W> Runner<B, W> {
         let until = defer
             .get(owner)
             .copied()
-            .map_or_else(|| defer.get(&Tag::Fallback).cloned(), Some);
+            .map_or_else(|| defer.get(&Tag::Fallback).copied(), Some);
 
         until.unwrap_or(now)
     }

@@ -5,9 +5,9 @@ use spire_core::context::Context;
 
 use crate::extract::FromContextRef;
 
-/// Used to do reference-to-value conversions thus not consuming the input value.
+/// Used to do reference-to-value conversion.
 pub trait FromRef<T> {
-    /// Converts to the type from a reference to the input type.
+    /// Converts to the `self` from an input reference.
     fn from_ref(input: &T) -> Self;
 }
 

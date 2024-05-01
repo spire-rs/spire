@@ -13,7 +13,9 @@ use crate::extract::FromContextRef;
 
 // TODO: Snapshot, Screen, Color, Capture, View.
 
-/// TODO.
+/// [`Backend`]-specific direct markup extractor.
+///
+/// [`Backend`]: crate::backend::Backend
 #[derive(Debug, Clone)]
 pub struct View(pub ());
 

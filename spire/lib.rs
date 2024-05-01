@@ -29,15 +29,15 @@ pub mod prelude {}
 #[cfg(test)]
 mod test {
     use crate::context::RequestQueue;
-    use crate::dataset::{Data, Dataset, InMemDataset};
+    use crate::dataset::{Data, InMemDataset};
     use crate::{Client, Result, Router};
 
     #[test]
     #[cfg(feature = "client")]
     fn with_client() {
         async fn handler(queue: RequestQueue, dataset: Data<u64>) -> Result<()> {
-            let u = dataset.get().await?;
-            dataset.add(1).await?;
+            dataset.write(1).await?;
+            let _ = dataset.read().await?;
 
             Ok(())
         }
@@ -58,9 +58,9 @@ mod test {
     #[test]
     #[cfg(feature = "driver")]
     fn with_driver() {
-        async fn handler(queue: RequestQueue, Dataset3(dataset): Dataset3<u64>) -> Result<()> {
-            let u = dataset.get().await?;
-            dataset.add(1).await?;
+        async fn handler(queue: RequestQueue, dataset: Data<u64>) -> Result<()> {
+            dataset.write(1).await?;
+            let _ = dataset.read().await?;
 
             Ok(())
         }

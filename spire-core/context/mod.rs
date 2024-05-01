@@ -39,6 +39,8 @@ where
     }
 
     /// Resolves the [`Request`] and returns [`Response`] or [`Error`].
+    ///
+    /// [`Error`]: crate::Error
     pub async fn resolve(self) -> Result<Response> {
         let response = self.client.resolve(self.request).await?;
         Ok(response)

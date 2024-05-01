@@ -11,7 +11,7 @@ use crate::handler::Handler;
 use crate::routing::Route;
 
 /// Provides type-erasure for [`Handler`]s.
-pub struct MakeRoute<B, S, E>(Mutex<Box<dyn EraseRoute<B, S, E>>>);
+pub struct MakeRoute<C, S, E>(Mutex<Box<dyn EraseRoute<C, S, E>>>);
 
 impl<C, S> MakeRoute<C, S, Infallible> {
     /// Creates a [`MakeRoute`] from a [`Handler`].

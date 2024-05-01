@@ -1,6 +1,6 @@
 //! Data collection with [`Dataset`] and its utilities.
 //!
-//! [`Data`] is TODO.
+//! [`Data`] is a [`BoxCloneDataset`] wrapper. TODO.
 //!
 //! ### Datasets
 //!
@@ -23,14 +23,18 @@
 //! [`MapErr`]: util::MapErr
 
 use std::fmt;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use futures::Stream;
 
 pub use memory::InMemDataset;
 pub(crate) use sets::Datasets;
 #[doc(inline)]
 pub use util::DatasetExt;
 
-use crate::dataset::util::BoxCloneDataset;
 use crate::{Error, Result};
+use crate::dataset::util::BoxCloneDataset;
 
 mod memory;
 mod sets;
@@ -42,7 +46,7 @@ pub mod util;
 ///
 /// [`Dataset`]: https://docs.rs/burn/0.12.1/burn/data/dataset/trait.Dataset.html
 #[async_trait::async_trait]
-pub trait Dataset<T>: Send + Sync + 'static {
+pub trait Dataset<T>:   Send + Sync + 'static  { // TODO: Add CLone.
     type Error;
 
     /// Inserts another item into the collection.
@@ -58,9 +62,35 @@ pub trait Dataset<T>: Send + Sync + 'static {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    // fn into_stream(self) -> DataStream<T, Self::Error> {
+    //     // DataStream::new(self)
+    //     todo!()
+    // }
 }
 
 /// TODO.
+pub struct DataStream<T, E>(BoxCloneDataset<T, E>)
+where
+    T: 'static;
+
+impl<T, E> DataStream<T, E> {
+    /// Creates a new [`DataStream`].
+    #[inline]
+    pub fn new(inner: BoxCloneDataset<T, E>) -> Self {
+        Self(inner)
+    }
+}
+
+impl <T, E> Stream for DataStream<T, E> {
+    type Item = Result<T, E>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        todo!()
+    }
+}
+
+/// [`Data`] is a [`BoxCloneDataset`] wrapper. TODO.
 #[derive(Clone)]
 pub struct Data<T>(BoxCloneDataset<T, Error>)
 where
@@ -76,19 +106,19 @@ where
         Self(inner)
     }
 
-    /// TODO.
+    /// Reads another item from the underlying [`Dataset`].
     #[inline]
     pub async fn read(&self) -> Result<Option<T>> {
         self.0.get().await
     }
 
-    /// TODO.
+    /// Writes another item into the underlying [`Dataset`].
     #[inline]
     pub async fn write(&self, data: T) -> Result<()> {
         self.0.add(data).await
     }
 
-    /// TODO.
+    /// Returns the underlying [`Dataset`].
     #[inline]
     pub fn into_inner(self) -> BoxCloneDataset<T, Error> {
         self.0

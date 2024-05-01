@@ -1,11 +1,11 @@
 use std::fmt;
 use std::sync::Arc;
 
+use crate::{BoxError, Result};
 use crate::backend::{Backend, Worker};
 use crate::context::{Body, Request};
 use crate::dataset::{Data, Dataset};
 use crate::process::runner::Runner;
-use crate::{BoxError, Result};
 
 mod runner;
 
@@ -127,6 +127,7 @@ impl<B, W> Client<B, W> {
         E: Into<BoxError>,
         T: Send + Sync + 'static,
     {
+        // TODO: Shouldn't `E` be Into<Error>?
         self.inner.datasets.set(dataset);
         self
     }
@@ -169,8 +170,8 @@ mod test {
     use http::Request;
     use tracing_test::traced_test;
 
-    use crate::dataset::InMemDataset;
     use crate::{Client, Result};
+    use crate::dataset::InMemDataset;
 
     #[tokio::test]
     #[cfg(feature = "tracing")]

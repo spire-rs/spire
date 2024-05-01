@@ -23,19 +23,26 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// Unrecoverable failure during [`Request`] processing.
 ///
 /// [`Request`]: context::Request
+#[must_use]
 #[derive(Debug, thiserror::Error)]
-#[error(transparent)]
+#[error("{inner}")]
 pub struct Error {
-    #[from]
     inner: BoxError,
     // fatal: bool,
+    tag_query: TagQuery,
 }
 
 impl Error {
     /// Creates a new [`Error`] from a boxable error.
     pub fn new(error: impl Into<BoxError>) -> Self {
-        let inner: BoxError = error.into();
-        Self { inner }
+        Self { inner: error.into(), tag_query: TagQuery::Owner }
+    }
+
+    /// Overrides the current [`TagQuery`].
+    #[inline]
+    pub fn with_query(mut self, query: impl Into<TagQuery>) -> Self {
+        self.tag_query = query.into();
+        self
     }
 
     /// Returns inner error.
@@ -46,16 +53,21 @@ impl Error {
     }
 }
 
+impl From<BoxError> for Error {
+    fn from(value: BoxError) -> Self {
+        Self::new(value)
+    }
+}
+
 impl From<http::Error> for Error {
     fn from(error: http::Error) -> Self {
         todo!()
     }
 }
 
-// TODO: Use Error::signal.
 impl IntoSignal for Error {
     fn into_signal(self) -> Signal {
-        Signal::Fail(TagQuery::Owner, self.into_inner())
+        Signal::Fail(self.tag_query, self.inner)
     }
 }
 

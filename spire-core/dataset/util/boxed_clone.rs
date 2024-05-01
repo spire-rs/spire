@@ -18,7 +18,7 @@ trait CloneDataset<T>: Dataset<T> {
 
 impl<D, T> CloneDataset<T> for D
 where
-    D: Dataset<T> + Send + Clone + 'static,
+    D: Dataset<T> + Send + Clone + 'static, // TODO: Send? Clone?
 {
     fn clone_box(&self) -> Box<dyn CloneDataset<T, Error = D::Error> + Send> {
         Box::new(self.clone())

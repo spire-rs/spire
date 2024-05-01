@@ -145,9 +145,9 @@ impl<C, S> fmt::Display for Router<C, S> {
     }
 }
 
-impl<B, S> Default for Router<B, S>
+impl<C, S> Default for Router<C, S>
 where
-    B: 'static,
+    C: 'static,
 {
     fn default() -> Self {
         Self::new()

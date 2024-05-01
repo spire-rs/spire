@@ -13,7 +13,9 @@ use spire_macros::extract::{Elements, Select};
 
 use crate::extract::{FromContext, Text};
 
-/// TODO.
+/// [`Backend`]-specific direct markup extractor.
+///
+/// [`Backend`]: crate::backend::Backend
 #[derive(Debug, Clone)]
 pub struct Html(pub HtmlDoc);
 
@@ -28,7 +30,7 @@ where
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         let Text(text) = Text::from_context(cx, state).await?;
         let html = HtmlDoc::parse_document(&text);
-        Ok(Html(html))
+        Ok(Self(html))
     }
 }
 
@@ -57,8 +59,8 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<HttpClient>, _state: &S) -> Result<Self, Self::Rejection> {
-        // let Html(html) = Html::from_context(cx, state).await?;
+    async fn from_context(cx: Context<HttpClient>, state: &S) -> Result<Self, Self::Rejection> {
+        let Html(html) = Html::from_context(cx, state).await?;
         todo!()
     }
 }

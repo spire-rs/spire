@@ -4,8 +4,8 @@ use std::task::{Context, Poll};
 
 use tower::{Layer, Service};
 
-use spire_core::context::Context as Cx;
 use spire_core::context::{IntoSignal, Signal};
+use spire_core::context::Context as Cx;
 
 use crate::handler::Handler;
 use crate::routing::{MakeRoute, Route, RouteFuture};
@@ -16,6 +16,7 @@ pub enum Endpoint<C, S> {
     /// [`Handler`] without state.
     Handler(MakeRoute<C, S, Infallible>),
 }
+
 
 impl<C, S> Endpoint<C, S> {
     pub fn from_service<T>(service: T) -> Self
@@ -93,6 +94,8 @@ impl<C, S> fmt::Debug for Endpoint<C, S> {
         }
     }
 }
+
+// TODO: fn invoke(&self, Cx<C>) -> Signal
 
 impl<C> Service<Cx<C>> for Endpoint<C, ()> {
     type Response = Signal;

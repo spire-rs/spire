@@ -7,7 +7,9 @@ use spire_core::Error;
 
 use crate::extract::FromContext;
 
-/// TODO.
+/// Bytes [`Response`] body extractor.
+///
+/// [`Response`]: crate::context::Response
 #[derive(Debug, Clone)]
 pub struct Body(pub Bytes);
 
@@ -26,7 +28,7 @@ where
     }
 }
 
-/// Text [`Response`] extractor.
+/// Text [`Response`] body extractor.
 ///
 /// [`Response`]: crate::context::Response
 #[derive(Debug, Clone)]
@@ -43,13 +45,13 @@ where
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         let Body(bytes) = Body::from_context(cx, state).await?;
         let inner = String::from_utf8(bytes.to_vec()).map_err(Error::new)?;
-        Ok(Text(inner))
+        Ok(Self(inner))
     }
 }
 
-/// JSON [`Response`] extractor.
+/// JSON [`Response`] body extractor.
 ///
-/// Useful for API scraping.
+/// Useful for the API scraping.
 ///
 /// [`Response`]: crate::context::Response
 #[derive(Debug, Default, Clone, Copy)]
@@ -66,7 +68,7 @@ where
 
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         let Body(bytes) = Body::from_context(cx, state).await?;
-        let inner = serde_json::from_slice::<T>(bytes.as_ref()).map_err(Error::new)?;
-        Ok(Json(inner))
+        let inner = serde_json::from_slice::<T>(&bytes).map_err(Error::new)?;
+        Ok(Self(inner))
     }
 }
