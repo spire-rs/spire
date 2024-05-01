@@ -1,14 +1,13 @@
 //! Data collection with [`Dataset`] and its utilities.
 //!
-//! - [`Data`] is a [`BoxDataset`] wrapper.
+//! - [`Data`] is a [`BoxDataset`] wrapper to avoid the [`Dataset`].
 //! - [`DataStream`] is a `futures::`[`Stream`] for `Dataset`s.
 //!
 //! ### Datasets
 //!
-//! - [`InMemDataset`] is a simple in-memory `FIFO` or `LIFO` `VecDeque`-based `Dataset`.
-//! - `RedbDataset`
-//! - `PersyDataset`
-//! - `SqlxDataset`
+//! - [`InMemDataset`] is a simple in-memory `FIFO` or `LIFO` `Dataset`.
+//! - `RedbDataset` is an embedded key-value store backed by the `redb` crate.
+//! - `SqlxDataset` is an asynchronous `SQL` store backed by the `sqlx` crate.
 //!
 //! ### Utility
 //!
@@ -18,6 +17,7 @@
 //! - [`MapErr`] transforms the error type of the `Dataset`.
 //!
 //! [`BoxDataset`]: util::BoxDataset
+//! [`BoxCloneDataset`]: util::BoxCloneDataset
 //! [`MapData`]: util::MapData
 //! [`MapErr`]: util::MapErr
 
@@ -47,11 +47,11 @@ pub trait Dataset<T>: Send + Sync + 'static {
     /// Unrecoverable `Dataset` failure.
     type Error;
 
-    /// Inserts another item into the collection.
-    async fn add(&self, data: T) -> Result<(), Self::Error>;
+    /// Writes another item into the collection.
+    async fn write(&self, data: T) -> Result<(), Self::Error>;
 
-    /// Removes and returns the next item from the collection.
-    async fn get(&self) -> Result<Option<T>, Self::Error>;
+    /// Reads and returns the next item from the collection.
+    async fn read(&self) -> Result<Option<T>, Self::Error>;
 
     /// Returns the number of items in the dataset.
     fn len(&self) -> usize;
@@ -72,7 +72,7 @@ pub trait Dataset<T>: Send + Sync + 'static {
     }
 }
 
-/// [`DataStream`] is a `futures::`[`Stream`] for `Dataset`s.
+/// [`DataStream`] is a `futures::`[`Stream`] for [`Dataset`]s.
 #[must_use = "streams do nothing unless polled"]
 pub struct DataStream<T, E> {
     inner: BoxStream<'static, Result<T, E>>,
@@ -87,7 +87,7 @@ impl<T, E> DataStream<T, E> {
     {
         let stream = try_stream! {
             while !dataset.is_empty() {
-                let item = dataset.get().await?;
+                let item = dataset.read().await?;
                 if let Some(item) = item {
                     yield item;
                 }
@@ -109,9 +109,10 @@ impl<T, E> Stream for DataStream<T, E> {
     }
 }
 
-/// [`Data`] is a [`BoxCloneDataset`] wrapper.
+/// [`Data`] is a [`BoxCloneDataset`] wrapper to avoid the [`Dataset`].
+#[must_use]
 #[derive(Clone)]
-pub struct Data<T>(BoxCloneDataset<T, Error>)
+pub struct Data<T>(pub BoxCloneDataset<T, Error>)
 where
     T: 'static;
 
@@ -125,16 +126,16 @@ where
         Self(inner)
     }
 
-    /// Reads another item from the underlying [`Dataset`].
+    /// Reads and returns another item from the underlying [`Dataset`].
     #[inline]
     pub async fn read(&self) -> Result<Option<T>> {
-        self.0.get().await
+        self.0.read().await
     }
 
     /// Writes another item into the underlying [`Dataset`].
     #[inline]
     pub async fn write(&self, data: T) -> Result<()> {
-        self.0.add(data).await
+        self.0.write(data).await
     }
 
     /// Returns the underlying [`Dataset`].

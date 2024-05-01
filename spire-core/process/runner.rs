@@ -85,7 +85,7 @@ impl<B, W> Runner<B, W> {
 
         let dataset = self.datasets.get::<Request>();
         while let Some(request) = requests.pop() {
-            dataset.add(request).await?;
+            dataset.write(request).await?;
         }
 
         // TODO.

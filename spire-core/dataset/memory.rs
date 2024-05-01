@@ -78,13 +78,13 @@ where
 {
     type Error = Infallible;
 
-    async fn add(&self, data: T) -> Result<(), Self::Error> {
+    async fn write(&self, data: T) -> Result<(), Self::Error> {
         let mut guard = self.inner.buffer.lock().unwrap();
         guard.push_back(data);
         Ok(())
     }
 
-    async fn get(&self) -> Result<Option<T>, Self::Error> {
+    async fn read(&self) -> Result<Option<T>, Self::Error> {
         let mut guard = self.inner.buffer.lock().unwrap();
         if self.inner.is_fifo {
             Ok(guard.pop_front())
@@ -96,5 +96,37 @@ where
     fn len(&self) -> usize {
         let guard = self.inner.buffer.lock().unwrap();
         guard.len()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::dataset::{Dataset, InMemDataset};
+    use crate::Result;
+
+    #[tokio::test]
+    async fn queue() -> Result<()> {
+        let dataset = InMemDataset::queue();
+
+        dataset.write(1).await?;
+        dataset.write(2).await?;
+
+        let data = dataset.read().await?;
+        assert_eq!(data, Some(1));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn stack() -> Result<()> {
+        let dataset = InMemDataset::stack();
+
+        dataset.write(1).await?;
+        dataset.write(2).await?;
+
+        let data = dataset.read().await?;
+        assert_eq!(data, Some(2));
+
+        Ok(())
     }
 }

@@ -3,6 +3,8 @@
 #![doc = include_str!("./README.md")]
 #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
+use std::convert::Infallible;
+
 #[doc(no_inline)]
 pub use async_trait::async_trait;
 
@@ -59,6 +61,12 @@ impl Error {
 impl From<BoxError> for Error {
     fn from(value: BoxError) -> Self {
         Self::new(value)
+    }
+}
+
+impl From<Infallible> for Error {
+    fn from(_: Infallible) -> Self {
+        unreachable!()
     }
 }
 

@@ -34,14 +34,17 @@ where
 {
     type Error = E;
 
-    async fn add(&self, data: T) -> Result<(), Self::Error> {
-        self.dataset.add(data).await
+    #[inline]
+    async fn write(&self, data: T) -> Result<(), Self::Error> {
+        self.dataset.write(data).await
     }
 
-    async fn get(&self) -> Result<Option<T>, Self::Error> {
-        self.dataset.get().await
+    #[inline]
+    async fn read(&self) -> Result<Option<T>, Self::Error> {
+        self.dataset.read().await
     }
 
+    #[inline]
     fn len(&self) -> usize {
         self.dataset.len()
     }

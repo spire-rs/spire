@@ -36,14 +36,15 @@ where
 {
     type Error = E2;
 
-    async fn add(&self, data: T) -> Result<(), Self::Error> {
-        self.inner.add(data).await.map_err(self.f.clone())
+    async fn write(&self, data: T) -> Result<(), Self::Error> {
+        self.inner.write(data).await.map_err(self.f.clone())
     }
 
-    async fn get(&self) -> Result<Option<T>, Self::Error> {
-        self.inner.get().await.map_err(self.f.clone())
+    async fn read(&self) -> Result<Option<T>, Self::Error> {
+        self.inner.read().await.map_err(self.f.clone())
     }
 
+    #[inline]
     fn len(&self) -> usize {
         self.inner.len()
     }

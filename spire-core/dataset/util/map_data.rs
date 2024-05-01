@@ -43,16 +43,17 @@ where
 {
     type Error = D::Error;
 
-    async fn add(&self, data: T2) -> Result<(), Self::Error> {
+    async fn write(&self, data: T2) -> Result<(), Self::Error> {
         let data = self.f_2inner.clone()(data);
-        self.inner.add(data).await
+        self.inner.write(data).await
     }
 
-    async fn get(&self) -> Result<Option<T2>, Self::Error> {
-        let data = self.inner.get().await;
+    async fn read(&self) -> Result<Option<T2>, Self::Error> {
+        let data = self.inner.read().await;
         data.map(|x| x.map(self.f_inner2.clone()))
     }
 
+    #[inline]
     fn len(&self) -> usize {
         self.inner.len()
     }
