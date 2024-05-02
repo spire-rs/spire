@@ -11,6 +11,7 @@ Thumbs.db
 # Lang: Rust
 debug/
 target/
+Cargo.lock
 **/*.rs.bk
 
 # Output
