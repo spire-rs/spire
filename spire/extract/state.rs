@@ -1,8 +1,7 @@
 use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
-use spire_core::context::Context;
-
+use crate::context::Context;
 use crate::extract::FromContextRef;
 
 /// Used to do reference-to-value conversion.

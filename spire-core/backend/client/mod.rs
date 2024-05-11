@@ -23,15 +23,14 @@ impl HttpClient {
     /// Creates a new [`HttpClient`].
     pub fn new<S, B, E>(svc: S) -> Self
     where
-        S: Service<Request<B>, Response = Response<B>, Error = E>,
+        S: Service<Request<B>, Response = Response<B>, Error = E> + Clone + Send + 'static,
         B: From<Body> + Into<Body>,
-        S: Clone + Send + 'static,
         S::Future: Send + 'static,
         E: Into<BoxError> + 'static,
     {
         let svc = svc
-            .map_request(|x: Request| -> Request<B> { x.map(|x| x.into()) })
-            .map_response(|x: Response<B>| -> Response { x.map(|x| x.into()) })
+            .map_request(|x: Request| -> Request<B> { x.map(Into::into) })
+            .map_response(|x: Response<B>| -> Response { x.map(Into::into) })
             .map_err(Error::new);
 
         let inner = Mutex::new(BoxCloneService::new(svc));
@@ -47,8 +46,11 @@ impl Default for HttpClient {
 
 impl Clone for HttpClient {
     fn clone(&self) -> Self {
-        let svc = self.inner.lock().unwrap();
-        let inner = Mutex::new(svc.clone());
+        let inner = {
+            let svc = self.inner.lock().unwrap();
+            Mutex::new(svc.clone())
+        };
+
         Self { inner }
     }
 }
@@ -60,7 +62,7 @@ impl fmt::Debug for HttpClient {
 }
 
 impl Service<()> for HttpClient {
-    type Response = HttpClient;
+    type Response = Self;
     type Error = Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
 
@@ -99,7 +101,7 @@ mod test {
     use reqwest::{Error as RwError, Response as RwResponse};
     use tower::ServiceBuilder;
 
-    use crate::backend::{util::WithTrace, HttpClient};
+    use crate::backend::HttpClient;
     use crate::context::{Request, Response};
     use crate::dataset::InMemDataset;
     use crate::{BoxError, Client, Result};
@@ -122,6 +124,8 @@ mod test {
     #[cfg(feature = "tracing")]
     #[tracing_test::traced_test]
     async fn noop() -> Result<()> {
+        use crate::backend::util::WithTrace;
+
         let backend = WithTrace::new(HttpClient::default());
         let worker = WithTrace::default();
 

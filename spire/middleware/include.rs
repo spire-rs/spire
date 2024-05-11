@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll, ready};
 
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
@@ -14,18 +14,19 @@ use crate::context::{Context as Cx, Signal};
 /// [`RequestQueue`]: crate::context::RequestQueue
 /// [`Request`]: crate::context::Request
 #[derive(Clone)]
+#[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct Include<S> {
     inner: S,
 }
 
 impl<S> Include<S> {
     /// Creates a new [`Include`] with a provided inner service.
-    pub fn new(inner: S) -> Self {
+    pub const fn new(inner: S) -> Self {
         Self { inner }
     }
 
     /// Returns a reference to the inner service.
-    pub fn get_ref(&self) -> &S {
+    pub const fn get_ref(&self) -> &S {
         &self.inner
     }
 
@@ -67,11 +68,11 @@ where
 
 /// A `tower::`[`Layer`] that produces a [`Include`] service.
 #[derive(Debug, Default, Clone)]
+#[must_use = "layers do nothing unless you `.layer` them"]
 pub struct IncludeLayer {}
 
 impl IncludeLayer {
     /// Creates a new [`IncludeLayer`].
-    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -87,6 +88,7 @@ impl<S> Layer<S> for IncludeLayer {
 
 pin_project! {
     /// Response [`Future`] for [`Include`].
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct IncludeFuture<F, C, S> {
         #[pin] kind: IncludeFutureKind<F, C, S>,
     }
@@ -144,9 +146,9 @@ where
 mod test {
     use tower::Layer;
 
+    use crate::Client;
     use crate::handler::HandlerService;
     use crate::middleware::IncludeLayer;
-    use crate::Client;
 
     async fn handler() {}
 

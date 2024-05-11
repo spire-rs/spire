@@ -18,25 +18,25 @@
 //! - [`Client`] to access [`Backend`]-specific [`HttpClient`] or [`BrowserClient`].
 //! - [`State`] and [`FromRef`] trait for state extraction.
 //!
-//! [`Backend`]: spire_core::backend::Backend
-//! [`HttpClient`]: spire_core::backend::HttpClient
-//! [`BrowserClient`]: spire_core::backend::BrowserClient
+//! [`Backend`]: crate::backend::Backend
+//! [`HttpClient`]: crate::backend::HttpClient
+//! [`BrowserClient`]: crate::backend::BrowserClient
 //!
-//! [`Request`]: spire_core::context::Request
-//! [`Response`]: spire_core::context::Response
-//! [`RequestQueue`]: spire_core::context::RequestQueue
-//! [`Datastore`]: spire_core::dataset::Data
+//! [`Request`]: crate::context::Request
+//! [`Response`]: crate::context::Response
+//! [`RequestQueue`]: crate::context::RequestQueue
+//! [`Datastore`]: crate::dataset::Data
 //!
 //! [`Html`]: client::Html
 //! [`View`]: driver::View
 
 use std::convert::Infallible;
 
-use spire_core::context::{Context, IntoSignal};
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 pub use spire_macros::extract::{Elements, Select};
 
+use crate::context::{Context, IntoSignal};
 pub use crate::extract::content::{Body, Json, Text};
 pub use crate::extract::context::Client;
 pub use crate::extract::state::{FromRef, State};
@@ -91,8 +91,8 @@ pub trait FromContext<C, S, V = sealed::ViaRequest>: Sized {
 #[async_trait::async_trait]
 impl<C, S, T> FromContext<C, S, sealed::ViaParts> for T
 where
-    C: Sync + Send + 'static,
-    S: Sync + Send + 'static,
+    C: Send + Sync + 'static,
+    S: Send + Sync + 'static,
     T: FromContextRef<C, S>,
 {
     type Rejection = <Self as FromContextRef<C, S>>::Rejection;
@@ -105,8 +105,8 @@ where
 #[async_trait::async_trait]
 impl<C, S, T> FromContextRef<C, S> for Option<T>
 where
-    C: Sync + Send + 'static,
-    S: Sync + Send + 'static,
+    C: Send + Sync + 'static,
+    S: Send + Sync + 'static,
     T: FromContextRef<C, S>,
 {
     type Rejection = Infallible;
@@ -119,8 +119,8 @@ where
 #[async_trait::async_trait]
 impl<C, S, T> FromContext<C, S> for Option<T>
 where
-    C: Sync + Send + 'static,
-    S: Sync + Send + 'static,
+    C: Send + Sync + 'static,
+    S: Send + Sync + 'static,
     T: FromContext<C, S>,
 {
     type Rejection = Infallible;
@@ -133,8 +133,8 @@ where
 #[async_trait::async_trait]
 impl<C, S, T> FromContextRef<C, S> for Result<T, T::Rejection>
 where
-    C: Sync + Send + 'static,
-    S: Sync + Send + 'static,
+    C: Send + Sync + 'static,
+    S: Send + Sync + 'static,
     T: FromContextRef<C, S>,
 {
     type Rejection = Infallible;
@@ -147,8 +147,8 @@ where
 #[async_trait::async_trait]
 impl<C, S, T> FromContext<C, S> for Result<T, T::Rejection>
 where
-    C: Sync + Send + 'static,
-    S: Sync + Send + 'static,
+    C: Send + Sync + 'static,
+    S: Send + Sync + 'static,
     T: FromContext<C, S>,
 {
     type Rejection = Infallible;

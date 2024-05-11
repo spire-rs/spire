@@ -15,6 +15,7 @@ pub struct BrowserConn {
 }
 
 /// [`BrowserPool`] builder. Manages browser connection and/or process.
+#[must_use]
 #[derive(Clone)]
 pub struct BrowserManager {
     inner: Arc<BrowserManagerInner>,
@@ -33,8 +34,11 @@ impl BrowserManager {
         todo!()
     }
 
-    /// TODO.
-    pub fn with_unmanaged(self, webdriver: impl AsRef<str>) -> Self {
+    /// Adds an unmanaged webdriver connection to the pool.
+    pub fn with_unmanaged<T>(self, webdriver: T) -> Self
+    where
+        T: AsRef<str>,
+    {
         let mut guard = self.inner.unmanaged_free.lock().unwrap();
         guard.push(webdriver.as_ref().to_owned());
         drop(guard);
@@ -42,15 +46,15 @@ impl BrowserManager {
         self
     }
 
-    /// TODO.
-    pub fn with_managed<F, Fut>(self, f: F) -> Self {
+    /// Adds a managed process and webdriver connection to the pool.
+    pub fn with_managed(self, command: &str, connect: &str) -> Self {
         todo!()
     }
 
     /// Constructs a new [`BrowserPool`].
     pub fn build(self) -> BrowserPool {
         let pool = Pool::builder(self).build();
-        BrowserPool::new(pool.expect("should not require runtime"))
+        pool.expect("should not require runtime").into()
     }
 }
 
@@ -107,7 +111,7 @@ mod test {
 
     #[test]
     fn with_managed() {
-        // TODO.
         let _ = BrowserManager::default().build();
+        todo!()
     }
 }

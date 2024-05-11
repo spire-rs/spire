@@ -25,12 +25,9 @@ pub struct Context<C> {
     datasets: Datasets,
 }
 
-impl<C> Context<C>
-where
-    C: Client,
-{
+impl<C> Context<C> {
     /// Creates a new [`Context`].
-    pub fn new(request: Request, client: C, datasets: Datasets) -> Self {
+    pub const fn new(request: Request, client: C, datasets: Datasets) -> Self {
         Self {
             request,
             client,
@@ -41,27 +38,18 @@ where
     /// Resolves the [`Request`] and returns [`Response`] or [`Error`].
     ///
     /// [`Error`]: crate::Error
-    pub async fn resolve(self) -> Result<Response> {
+    pub async fn resolve(self) -> Result<Response>
+    where
+        C: Client,
+    {
         let response = self.client.resolve(self.request).await?;
         Ok(response)
     }
 
-    /// Returns the [`Backend`]'s client.
-    ///
-    /// [`Backend`]: crate::backend::Backend
-    pub fn client(&self) -> C
-    where
-        C: Clone,
-    {
-        self.client.clone()
-    }
-}
-
-impl<C> Context<C> {
     /// Returns the reference to the inner [`Request`].
     ///
     /// Used by extractors to access extensions.
-    pub fn get_ref(&self) -> &Request {
+    pub const fn get_ref(&self) -> &Request {
         &self.request
     }
 
@@ -70,6 +58,20 @@ impl<C> Context<C> {
     /// Used by extractors to access extensions.
     pub fn get_mut(&mut self) -> &mut Request {
         &mut self.request
+    }
+
+    /// Returns the reference to the [`Backend`]'s client.
+    ///
+    /// [`Backend`]: crate::backend::Backend
+    pub const fn as_client_ref(&self) -> &C {
+        &self.client
+    }
+
+    /// Returns the mutable reference to the [`Backend`]'s client.
+    ///
+    /// [`Backend`]: crate::backend::Backend
+    pub fn as_client_mut(&mut self) -> &mut C {
+        &mut self.client
     }
 
     /// Initializes and returns the [`RequestQueue`].

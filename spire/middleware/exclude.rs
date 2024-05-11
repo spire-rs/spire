@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll, ready};
 
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
@@ -13,18 +13,19 @@ use crate::context::{Context as Cx, Signal};
 ///
 /// [`Request`]: crate::context::Request
 #[derive(Clone)]
+#[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct Exclude<S> {
     inner: S,
 }
 
 impl<S> Exclude<S> {
     /// Creates a new [`Exclude`] with a provided inner service.
-    pub fn new(inner: S) -> Self {
+    pub const fn new(inner: S) -> Self {
         Self { inner }
     }
 
     /// Returns a reference to the inner service.
-    pub fn get_ref(&self) -> &S {
+    pub const fn get_ref(&self) -> &S {
         &self.inner
     }
 
@@ -66,11 +67,11 @@ where
 
 /// A `tower::`[`Layer`] that produces a [`Exclude`] service.
 #[derive(Debug, Default, Clone)]
+#[must_use = "layers do nothing unless you `.layer` them"]
 pub struct ExcludeLayer {}
 
 impl ExcludeLayer {
     /// Creates a new [`ExcludeLayer`].
-    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -86,6 +87,7 @@ impl<S> Layer<S> for ExcludeLayer {
 
 pin_project! {
     /// Response [`Future`] for [`Exclude`].
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct ExcludeFuture<F, C, S> {
         #[pin] kind: ExcludeFutureKind<F, C, S>,
     }
@@ -143,9 +145,9 @@ where
 mod test {
     use tower::Layer;
 
+    use crate::Client;
     use crate::handler::HandlerService;
     use crate::middleware::ExcludeLayer;
-    use crate::Client;
 
     async fn handler() {}
 

@@ -18,7 +18,6 @@ mod trace;
 mod test {
     use http::Request;
 
-    use crate::backend::util::WithTrace;
     use crate::dataset::InMemDataset;
     use crate::{Client, Result};
 
@@ -26,6 +25,8 @@ mod test {
     #[cfg(feature = "tracing")]
     #[tracing_test::traced_test]
     async fn noop() -> Result<()> {
+        use crate::backend::util::WithTrace;
+
         let entity = WithTrace::default();
 
         let request = Request::get("https://example.com/").body(());

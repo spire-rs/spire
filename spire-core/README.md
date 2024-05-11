@@ -5,7 +5,7 @@
 [![Crate Version][crates-badge]][crates-url]
 [![Crate Coverage][coverage-badge]][coverage-url]
 
-**Also check out other `spire` projects [here](https://github.com/spire-rs).**
+**Check out other `spire` projects [here](https://github.com/spire-rs).**
 
 [action-badge]: https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yaml?branch=main&label=build&logo=github&style=flat-square
 [action-url]: https://github.com/spire-rs/spire/actions/workflows/build.yaml

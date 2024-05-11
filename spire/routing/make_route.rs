@@ -4,9 +4,7 @@ use std::sync::Mutex;
 
 use tower::{Layer, Service};
 
-use spire_core::context::Context as Cx;
-use spire_core::context::IntoSignal;
-
+use crate::context::{Context as Cx, IntoSignal};
 use crate::handler::Handler;
 use crate::routing::Route;
 

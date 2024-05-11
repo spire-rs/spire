@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use deadpool::managed::Object;
+use fantoccini::error::CmdError;
 use fantoccini::Client;
 use futures::future::BoxFuture;
 use tower::Service;
@@ -20,11 +21,12 @@ use crate::{Error, Result};
 #[derive(Clone)]
 pub struct BrowserClient(Arc<Object<BrowserManager>>);
 
-impl BrowserClient {
-    /// Creates a new [`BrowserClient`].
+impl BrowserClient {}
+
+impl From<Object<BrowserManager>> for BrowserClient {
     #[inline]
-    pub(crate) fn new(inner: Object<BrowserManager>) -> Self {
-        Self(Arc::new(inner))
+    fn from(value: Object<BrowserManager>) -> Self {
+        Self(Arc::new(value))
     }
 }
 
@@ -55,6 +57,19 @@ impl Service<Request> for BrowserClient {
 
     #[inline]
     fn call(&mut self, req: Request) -> Self::Future {
+        let path = req.uri().to_string();
+
+        let fut = async {
+            self.goto(&path).await?;
+            Ok::<(), Error>(())
+        };
+
+        todo!()
+    }
+}
+
+impl From<CmdError> for Error {
+    fn from(value: CmdError) -> Self {
         todo!()
     }
 }

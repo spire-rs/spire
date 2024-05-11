@@ -5,6 +5,7 @@ use crate::dataset::Dataset;
 /// Transforms the error type of the [`Dataset`] for a [`map_err`] method.
 ///
 /// [`map_err`]: crate::dataset::DatasetExt::map_err
+#[must_use]
 #[derive(Clone)]
 pub struct MapErr<D, F> {
     inner: D,
@@ -13,7 +14,7 @@ pub struct MapErr<D, F> {
 
 impl<D, F> MapErr<D, F> {
     /// Creates a new [`MapErr`].
-    pub fn new(inner: D, f: F) -> Self {
+    pub const fn new(inner: D, f: F) -> Self {
         Self { inner, f }
     }
 }

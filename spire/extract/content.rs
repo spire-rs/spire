@@ -1,11 +1,10 @@
 use bytes::Bytes;
 use serde::de::DeserializeOwned;
 
-use spire_core::backend::Client;
-use spire_core::context::Context;
-use spire_core::Error;
-
+use crate::backend::Client;
+use crate::context::Context;
 use crate::extract::FromContext;
+use crate::Error;
 
 /// Bytes [`Response`] body extractor.
 ///

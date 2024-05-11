@@ -1,10 +1,8 @@
 use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
-use spire_core::backend::Client as CoreClient;
-use spire_core::context::{Context, RequestQueue, Tag, Task};
-use spire_core::dataset::Data;
-
+use crate::context::{Context, RequestQueue, Tag, Task};
+use crate::dataset::Data;
 use crate::extract::{FromContext, FromContextRef};
 
 /// [`Backend`]-specific client extractor.
@@ -16,13 +14,13 @@ pub struct Client<C>(pub C);
 #[async_trait::async_trait]
 impl<C, S> FromContextRef<C, S> for Client<C>
 where
-    C: CoreClient + Clone + Sync,
+    C: Clone + Sync,
 {
     type Rejection = Infallible;
 
     #[inline]
     async fn from_context_parts(cx: &Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(cx.client()))
+        Ok(Self(cx.as_client_ref().clone()))
     }
 }
 
@@ -82,7 +80,7 @@ where
 impl<C, S, T> FromContextRef<C, S> for Data<T>
 where
     C: Sync,
-    T: Sync + Send + 'static,
+    T: Send + Sync + 'static,
 {
     type Rejection = Infallible;
 

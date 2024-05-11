@@ -42,8 +42,9 @@ pub enum Tag {
 
 impl Tag {
     /// Returns `true` if the [`Tag`] is an explicit fallback.
-    pub fn is_fallback(&self) -> bool {
-        matches!(self, Tag::Fallback)
+    #[must_use]
+    pub const fn is_fallback(&self) -> bool {
+        matches!(self, Self::Fallback)
     }
 }
 
@@ -55,13 +56,13 @@ impl From<&str> for Tag {
 
 impl From<String> for Tag {
     fn from(value: String) -> Self {
-        Tag::Sequence(value)
+        Self::Sequence(value)
     }
 }
 
 impl From<u64> for Tag {
     fn from(value: u64) -> Self {
-        Tag::Rehash(value)
+        Self::Rehash(value)
     }
 }
 
@@ -71,7 +72,7 @@ pub struct Depth(pub NonZeroUsize);
 
 impl Depth {
     /// The smallest recursive [`Depth`] value.
-    const MIN: Depth = Depth(NonZeroUsize::MIN);
+    const MIN: Self = Self(NonZeroUsize::MIN);
 
     /// Creates a new [`Depth`] extension.
     pub fn new(depth: usize) -> Self {
@@ -79,14 +80,14 @@ impl Depth {
     }
 
     /// Returns the depth as a primitive type.
-    pub fn get(&self) -> usize {
+    pub const fn get(self) -> usize {
         self.0.get()
     }
 }
 
 impl Default for Depth {
     fn default() -> Self {
-        Depth::MIN
+        Self::MIN
     }
 }
 
@@ -120,9 +121,11 @@ impl<B> Task for Request<B> {
 /// Extension trait for `http::request::`[`Builder`].
 pub trait TaskBuilder {
     /// Attaches a [`Tag`] to this [`Builder`].
+    #[must_use]
     fn tag(self, tag: impl Into<Tag>) -> Self;
 
     /// Attaches a depth value to this [`Builder`].
+    #[must_use]
     fn depth(self, depth: usize) -> Self;
 }
 

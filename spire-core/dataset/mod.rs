@@ -1,6 +1,7 @@
 //! Data collection with [`Dataset`] and its utilities.
 //!
-//! - [`Data`] is a [`BoxDataset`] wrapper to avoid the [`Dataset`].
+//! - [`DatasetExt`] is an extension trait for `Dataset`s.
+//! - [`Data`] is a [`BoxDataset`] wrapper to avoid name collision.
 //! - [`DataStream`] is a `futures::`[`Stream`] for `Dataset`s.
 //!
 //! ### Datasets
@@ -79,6 +80,7 @@ pub struct DataStream<T, E> {
 }
 
 impl<T, E> DataStream<T, E> {
+    /// Creates a new [`DataStream`].
     fn new<D>(dataset: D) -> Self
     where
         D: Dataset<T, Error = E>,
@@ -94,7 +96,7 @@ impl<T, E> DataStream<T, E> {
             }
         };
 
-        DataStream {
+        Self {
             inner: stream.boxed(),
         }
     }
@@ -103,13 +105,13 @@ impl<T, E> DataStream<T, E> {
 impl<T, E> Stream for DataStream<T, E> {
     type Item = Result<T, E>;
 
+    #[inline]
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let pin = Pin::new(&mut self.inner);
-        pin.poll_next(cx)
+        Pin::new(&mut self.inner).poll_next(cx)
     }
 }
 
-/// [`Data`] is a [`BoxCloneDataset`] wrapper to avoid the [`Dataset`].
+/// [`Data`] is a [`BoxCloneDataset`] wrapper to avoid name collision.
 #[must_use]
 #[derive(Clone)]
 pub struct Data<T>(pub BoxCloneDataset<T, Error>)
@@ -122,7 +124,7 @@ where
 {
     /// Creates a new [`Data`].
     #[inline]
-    pub fn new(inner: BoxCloneDataset<T, Error>) -> Self {
+    pub const fn new(inner: BoxCloneDataset<T, Error>) -> Self {
         Self(inner)
     }
 
@@ -138,7 +140,7 @@ where
         self.0.write(data).await
     }
 
-    /// Returns the underlying [`Dataset`].
+    /// Returns the underlying [`BoxCloneDataset`].
     #[inline]
     pub fn into_inner(self) -> BoxCloneDataset<T, Error> {
         self.0

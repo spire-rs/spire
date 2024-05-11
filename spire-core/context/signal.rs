@@ -29,10 +29,10 @@ impl TagQuery {
     /// Matches a [`Tag`] to the owned [`TagQuery`].
     pub(crate) fn is_match(&self, tag: &Tag, owner: &Tag) -> bool {
         match self {
-            TagQuery::Owner => !owner.is_fallback() && tag == owner,
-            TagQuery::Single(x) => x == tag,
-            TagQuery::List(x) => x.contains(tag),
-            TagQuery::Every => true,
+            Self::Owner => !owner.is_fallback() && tag == owner,
+            Self::Single(x) => x == tag,
+            Self::List(x) => x.contains(tag),
+            Self::Every => true,
         }
     }
 }
@@ -44,6 +44,7 @@ impl TagQuery {
 ///
 /// [`Request`]: crate::context::Request
 /// [`ControlFlow`]: std::ops::ControlFlow
+#[must_use]
 #[derive(Debug, Default)]
 pub enum Signal {
     /// Task succeeded, immediately proceed with another task.
@@ -68,20 +69,19 @@ impl Signal {
     }
 
     /// Returns the [`Duration`] if applicable, default otherwise.
+    #[must_use]
     pub fn duration(&self) -> Duration {
         match self {
-            Signal::Wait(_, x) => *x,
-            Signal::Hold(_, x) => *x,
+            Self::Wait(_, x) | Self::Hold(_, x) => *x,
             _ => Duration::default(),
         }
     }
 
-    // Returns the [`TagQuery`] if applicable, default otherwise.
+    /// Returns the [`TagQuery`] if applicable, default otherwise.
+    #[must_use]
     pub fn query(&self) -> TagQuery {
         match self {
-            Signal::Wait(x, _) => x.clone(),
-            Signal::Hold(x, _) => x.clone(),
-            Signal::Fail(x, _) => x.clone(),
+            Self::Wait(x, _) | Self::Hold(x, _) | Self::Fail(x, _) => x.clone(),
             _ => TagQuery::default(),
         }
     }
@@ -133,10 +133,7 @@ where
     T: IntoSignal,
 {
     fn into_signal(self) -> Signal {
-        match self {
-            Some(x) => x.into_signal(),
-            None => ().into_signal(),
-        }
+        self.map_or_else(|| ().into_signal(), IntoSignal::into_signal)
     }
 }
 

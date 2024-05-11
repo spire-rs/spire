@@ -5,6 +5,7 @@ use crate::dataset::Dataset;
 /// Cloneable type-erased [`Dataset`] for a [`boxed_clone`] method.
 ///
 /// [`boxed_clone`]: crate::dataset::DatasetExt::boxed_clone
+#[must_use]
 pub struct BoxCloneDataset<T, E> {
     dataset: Box<dyn CloneDataset<T, Error = E>>,
 }

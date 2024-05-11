@@ -5,6 +5,7 @@ use crate::dataset::Dataset;
 /// Type-erased [`Dataset`] for a [`boxed`] method.
 ///
 /// [`boxed`]: crate::dataset::DatasetExt::boxed
+#[must_use]
 pub struct BoxDataset<T, E> {
     dataset: Box<dyn Dataset<T, Error = E>>,
 }

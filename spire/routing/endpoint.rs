@@ -4,9 +4,7 @@ use std::task::{Context, Poll};
 
 use tower::{Layer, Service};
 
-use spire_core::context::Context as Cx;
-use spire_core::context::{IntoSignal, Signal};
-
+use crate::context::{Context as Cx, IntoSignal, Signal};
 use crate::handler::Handler;
 use crate::routing::{MakeRoute, Route, RouteFuture};
 
@@ -71,6 +69,7 @@ impl<C> Default for Endpoint<C, ()>
 where
     C: 'static,
 {
+    #[inline]
     fn default() -> Self {
         Self::from_handler(default_fallback)
     }

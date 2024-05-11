@@ -5,14 +5,14 @@ use std::task::{Context, Poll};
 
 use tower::Service;
 
-use spire_core::context::{Context as Cx, Signal, Tag, Task};
-
+use crate::context::{Context as Cx, Signal, Tag, Task};
 use crate::routing::{Endpoint, RouteFuture};
 
+/// TODO.
+#[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct TagRouter<C, S> {
     endpoints: HashMap<Tag, Endpoint<C, S>>,
-    current_fallback: Option<Endpoint<C, S>>,
-    default_fallback: Endpoint<C, ()>,
+    fallback: Option<Endpoint<C, S>>,
 }
 
 impl<C, S> TagRouter<C, S> {
@@ -23,8 +23,7 @@ impl<C, S> TagRouter<C, S> {
     {
         Self {
             endpoints: HashMap::default(),
-            current_fallback: None,
-            default_fallback: Endpoint::default(),
+            fallback: None,
         }
     }
 
@@ -42,8 +41,8 @@ impl<C, S> TagRouter<C, S> {
 
     pub fn fallback(&mut self, endpoint: Endpoint<C, S>) {
         assert!(
-            self.current_fallback.replace(endpoint).is_none(),
-            "should not override already routed tags"
+            self.fallback.replace(endpoint).is_none(),
+            "should not override fallback route"
         );
     }
 
@@ -57,7 +56,7 @@ impl<C, S> TagRouter<C, S> {
     }
 
     pub fn merge(&mut self, other: Self) {
-        if let Some(x) = other.current_fallback {
+        if let Some(x) = other.fallback {
             self.fallback(x);
         }
 
@@ -73,9 +72,23 @@ impl<C, S> TagRouter<C, S> {
         let remap = |(k, v): (Tag, Endpoint<C, S>)| (k, v.with_state(state.clone()));
         TagRouter {
             endpoints: self.endpoints.into_iter().map(remap).collect(),
-            current_fallback: self.current_fallback.map(|x| x.with_state(state)),
-            default_fallback: self.default_fallback,
+            fallback: self.fallback.map(|x| x.with_state(state)),
         }
+    }
+}
+
+impl<C> TagRouter<C, ()>
+where
+    C: 'static,
+{
+    fn clone_route(&self, tag: &Tag) -> Option<Endpoint<C, ()>> {
+        self.endpoints.get(tag).cloned()
+    }
+
+    fn clone_fallback(&self) -> Endpoint<C, ()> {
+        self.fallback
+            .as_ref()
+            .map_or_else(Endpoint::default, Clone::clone)
     }
 }
 
@@ -83,8 +96,7 @@ impl<C, S> Clone for TagRouter<C, S> {
     fn clone(&self) -> Self {
         Self {
             endpoints: self.endpoints.clone(),
-            current_fallback: self.current_fallback.clone(),
-            default_fallback: self.default_fallback.clone(),
+            fallback: self.fallback.clone(),
         }
     }
 }
@@ -95,7 +107,10 @@ impl<C, S> fmt::Debug for TagRouter<C, S> {
     }
 }
 
-impl<C> Service<Cx<C>> for TagRouter<C, ()> {
+impl<C> Service<Cx<C>> for TagRouter<C, ()>
+where
+    C: 'static,
+{
     type Response = Signal;
     type Error = Infallible;
     type Future = RouteFuture<C, Infallible>;
@@ -107,13 +122,8 @@ impl<C> Service<Cx<C>> for TagRouter<C, ()> {
 
     #[inline]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
-        let fallback = || match &self.current_fallback {
-            Some(user_fallback) => user_fallback.clone(),
-            None => self.default_fallback.clone(),
-        };
-
-        let tagged = self.endpoints.get(cx.get_ref().tag()).cloned();
-        let mut endpoint = tagged.unwrap_or_else(fallback);
-        endpoint.call(cx)
+        self.clone_route(cx.get_ref().tag())
+            .unwrap_or_else(|| self.clone_fallback())
+            .call(cx)
     }
 }

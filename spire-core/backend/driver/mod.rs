@@ -19,27 +19,29 @@ mod process;
 ///
 /// [`Backend`]: crate::backend::Backend
 /// [`Client`]: crate::backend::Client
+#[must_use]
 #[derive(Clone)]
 pub struct BrowserPool {
     pool: Pool<BrowserManager>,
 }
 
 impl BrowserPool {
-    /// Creates a new [`BrowserPool`].
-    pub(crate) fn new(pool: Pool<BrowserManager>) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn get(&self) -> Result<BrowserClient> {
         // BoxFuture::new()
 
         let inner = self.pool.get().await.unwrap(); // TODO.
-        Ok(BrowserClient::new(inner))
+        Ok(inner.into())
     }
 
     /// Creates a new [`BrowserManager`].
     pub fn builder() -> BrowserManager {
         BrowserManager::new()
+    }
+}
+
+impl From<Pool<BrowserManager>> for BrowserPool {
+    fn from(pool: Pool<BrowserManager>) -> Self {
+        Self { pool }
     }
 }
 
@@ -61,7 +63,7 @@ impl Service<()> for BrowserPool {
     }
 
     #[inline]
-    fn call(&mut self, req: ()) -> Self::Future {
+    fn call(&mut self, _req: ()) -> Self::Future {
         // self.pool.get().await
         todo!()
     }
@@ -69,7 +71,7 @@ impl Service<()> for BrowserPool {
 
 #[cfg(test)]
 mod test {
-    use crate::backend::{util::WithTrace, BrowserManager};
+    use crate::backend::BrowserManager;
     use crate::context::Request;
     use crate::dataset::InMemDataset;
     use crate::{BoxError, Client, Result};
@@ -84,6 +86,8 @@ mod test {
     #[cfg(feature = "tracing")]
     #[tracing_test::traced_test]
     async fn noop() -> crate::Result<()> {
+        use crate::backend::util::WithTrace;
+
         let pool = BrowserManager::default()
             .with_unmanaged("127.0.0.1:4444")
             .with_unmanaged("127.0.0.1:4445")

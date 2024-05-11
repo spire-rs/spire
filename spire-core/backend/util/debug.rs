@@ -5,6 +5,7 @@ use crate::context::{Body, Context, IntoSignal, Request, Response, Signal};
 use crate::Result;
 
 /// No-op [`Backend`], [`Client`] and [`Worker`] used for testing and debugging.
+#[must_use]
 #[derive(Clone, Default)]
 pub struct WithDebug {
     always: Option<bool>,
@@ -12,7 +13,7 @@ pub struct WithDebug {
 
 impl WithDebug {
     /// Creates a new [`WithDebug`] with an `always` rule.
-    pub fn new(always: Option<bool>) -> Self {
+    pub const fn new(always: Option<bool>) -> Self {
         Self { always }
     }
 }
@@ -25,7 +26,7 @@ impl fmt::Debug for WithDebug {
 
 #[async_trait::async_trait]
 impl Backend for WithDebug {
-    type Client = WithDebug;
+    type Client = Self;
 
     #[inline]
     async fn client(&self) -> Result<Self::Client> {

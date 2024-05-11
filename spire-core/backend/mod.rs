@@ -111,8 +111,7 @@ pub trait Worker<C>: Clone + Send + 'static {
 #[async_trait::async_trait]
 impl<S, C> Worker<C> for S
 where
-    S: Service<Context<C>, Response = Signal, Error = Infallible>,
-    S: Clone + Send + 'static,
+    S: Service<Context<C>, Response = Signal, Error = Infallible> + Clone + Send + 'static,
     S::Future: Send + 'static,
     C: Send + 'static,
 {

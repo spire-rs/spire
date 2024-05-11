@@ -9,9 +9,7 @@ use futures::{future::Map, FutureExt};
 use pin_project_lite::pin_project;
 use tower::Service;
 
-use spire_core::context::Context as Cx;
-use spire_core::context::Signal;
-
+use crate::context::{Context as Cx, Signal};
 use crate::handler::Handler;
 
 /// Implementation of a `tower::`[`Service`] for a [`Handler`].
@@ -19,6 +17,7 @@ use crate::handler::Handler;
 /// Automatically implements [`Worker`].
 ///
 /// [`Worker`]: crate::backend::Worker
+#[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct HandlerService<H, V, S> {
     marker: PhantomData<V>,
     handler: H,
@@ -27,7 +26,7 @@ pub struct HandlerService<H, V, S> {
 
 impl<H, V, S> HandlerService<H, V, S> {
     /// Creates a new [`HandlerService`].
-    pub fn new<C>(handler: H, state: S) -> Self
+    pub const fn new<C>(handler: H, state: S) -> Self
     where
         H: Handler<C, V, S>,
     {
@@ -39,11 +38,13 @@ impl<H, V, S> HandlerService<H, V, S> {
     }
 
     /// Gets a reference to the state.
-    pub fn state_ref(&self) -> &S {
+    #[inline]
+    pub const fn state_ref(&self) -> &S {
         &self.state
     }
 
     /// Gets a mutable reference to the state.
+    #[inline]
     pub fn state_mut(&mut self) -> &mut S {
         &mut self.state
     }
@@ -94,6 +95,7 @@ where
 pin_project! {
     /// Opaque [`Future`] return type for [`Handler::call`].
     #[derive(Debug)]
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct HandlerFuture<F>
     where
         F: Future<Output = Signal>
@@ -132,8 +134,8 @@ where
 #[cfg(test)]
 mod test {
     use crate::backend::Worker;
-    use crate::handler::HandlerService;
     use crate::Client;
+    use crate::handler::HandlerService;
 
     fn service<B: Send + 'static>() -> impl Worker<B> {
         async fn handler() {}

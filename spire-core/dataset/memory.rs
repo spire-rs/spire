@@ -71,6 +71,21 @@ impl<T> Default for InMemDataset<T> {
     }
 }
 
+impl<V, T> From<V> for InMemDataset<T>
+where
+    V: IntoIterator<Item = T>,
+{
+    fn from(value: V) -> Self {
+        let vec: VecDeque<_> = value.into_iter().collect();
+        let inner = Arc::new(InMemDatasetInner {
+            buffer: Mutex::new(vec),
+            is_fifo: true,
+        });
+
+        Self { inner }
+    }
+}
+
 #[async_trait::async_trait]
 impl<T> Dataset<T> for InMemDataset<T>
 where
@@ -79,8 +94,7 @@ where
     type Error = Infallible;
 
     async fn write(&self, data: T) -> Result<(), Self::Error> {
-        let mut guard = self.inner.buffer.lock().unwrap();
-        guard.push_back(data);
+        self.inner.buffer.lock().unwrap().push_back(data);
         Ok(())
     }
 

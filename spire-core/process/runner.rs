@@ -1,4 +1,5 @@
 use std::cmp::max;
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -78,6 +79,9 @@ impl<B, W> Runner<B, W> {
         B: Backend,
         W: Worker<B::Client>,
     {
+        // TODO: Requests are lost in case of error.
+        // Use tokio::Mutex instead?
+
         let mut requests: Vec<_> = {
             let mut initial = self.inits.lock().unwrap();
             initial.drain(..).collect()
@@ -88,19 +92,14 @@ impl<B, W> Runner<B, W> {
             dataset.write(request).await?;
         }
 
-        // TODO.
         let try_call_service = |x: Result<Request>| async {
-            let (signal, owner) = match x {
-                Ok(x) => self
-                    .call_service(x)
-                    .await
-                    .unwrap_or_else(|x| (x.into_signal(), Tag::default())),
-                Err(x) => (x.into_signal(), Tag::default()),
+            match x {
+                Ok(x) => self.run_once(x).await,
+                Err(x) => self.notify_signal(x.into_signal(), Tag::default()),
             };
-
-            self.notify_signal(signal, owner);
         };
 
+        // TODO: Abortable.
         let stream = dataset
             .into_stream()
             .map(try_call_service)
@@ -110,7 +109,18 @@ impl<B, W> Runner<B, W> {
         Ok(stream.await)
     }
 
-    pub async fn call_service(&self, request: Request) -> Result<(Signal, Tag)>
+    pub async fn run_once(&self, request: Request)
+    where
+        B: Backend,
+        W: Worker<B::Client>,
+    {
+        match self.call_service(request).await {
+            Ok((w, t)) => self.notify_signal(w, t),
+            Err(x) => self.notify_signal(x.into_signal(), Tag::default()),
+        }
+    }
+
+    async fn call_service(&self, request: Request) -> Result<(Signal, Tag)>
     where
         B: Backend,
         W: Worker<B::Client>,
@@ -129,64 +139,62 @@ impl<B, W> Runner<B, W> {
     fn notify_signal(&self, signal: Signal, owner: Tag) {
         // TODO: Add Ok/Err counter.
         match signal {
-            Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(owner, x, t),
-            Signal::Fail(x, e) => self.apply_block(owner, x),
+            Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(x, owner, t),
+            Signal::Fail(x, _) => self.apply_block(x, owner),
             _ => { /* Ignore */ }
         };
     }
 
-    // TODO.
-    fn apply_defer(&self, owner: Tag, query: TagQuery, duration: Duration) {
-        let until = Instant::now() + duration;
+    /// Applies defer to all all [`Tag`]s as specified per [`TagQuery`].
+    fn apply_defer(&self, query: TagQuery, owner: Tag, duration: Duration) {
+        let minimum = Instant::now() + duration;
+        let mut defer = self.defer.lock().unwrap();
 
-        let defer = self.defer.lock().unwrap();
-        match query {
-            TagQuery::Owner => {}
-            TagQuery::Single(_) => {}
+        let apply_one = |x: Entry<Tag, Instant>| match x {
+            Entry::Occupied(mut x) => x.insert(max(*x.get() + duration, minimum)),
+            Entry::Vacant(x) => *x.insert(minimum),
+        };
 
-            TagQuery::Every => {}
-            TagQuery::List(_) => {}
-        }
-
-        todo!()
+        let _ = match query {
+            TagQuery::Owner => apply_one(defer.entry(owner)),
+            TagQuery::Single(x) => apply_one(defer.entry(x)),
+            TagQuery::Every => todo!(),
+            TagQuery::List(_) => todo!(),
+        };
     }
 
-    // TODO.
-    fn find_defer(&self, owner: &Tag) -> Instant {
+    /// Returns the currently applied [`Instant`].
+    fn find_defer(&self, tag: &Tag) -> Instant {
         let now = Instant::now();
         let defer = self.defer.lock().unwrap();
 
-        // let until = match defer.get(owner).cloned() {
-        //     None => defer.get(&Tag::Fallback).cloned(),
-        //     Some(x) => Some(x),
-        // };
-
-        let until = defer
-            .get(owner)
-            .copied()
-            .map_or_else(|| defer.get(&Tag::Fallback).copied(), Some);
+        let until = match defer.get(tag).copied() {
+            None => defer.get(&Tag::Fallback).copied(),
+            Some(x) => Some(x),
+        };
 
         until.unwrap_or(now)
     }
 
-    // TODO.
-    fn apply_block(&self, owner: Tag, query: TagQuery) {
-        let block = |x| {
-            let mut guard = self.block.lock().unwrap();
+    /// Blocks all [`Tag`]s as specified per [`TagQuery`].
+    fn apply_block(&self, query: TagQuery, owner: Tag) {
+        let mut guard = self.block.lock().unwrap();
+        let mut block_one = |x| {
             guard.insert(x);
         };
 
         match query {
-            TagQuery::Owner => block(owner),
-            TagQuery::Every => block(Tag::default()),
-            TagQuery::Single(x) => block(x),
-            TagQuery::List(x) => x.into_iter().for_each(block),
+            TagQuery::Owner => block_one(owner),
+            TagQuery::Every => block_one(Tag::default()),
+            TagQuery::Single(x) => block_one(x),
+            TagQuery::List(x) => x.into_iter().for_each(block_one),
         }
     }
 
-    // TODO.
-    fn find_block(&self, owner: &Tag) -> bool {
+    /// Returns `true` if the given [`Tag`] is blocked.
+    fn find_block(&self, tag: &Tag) -> bool {
+        // TODO: All, not just unknown.
         let block = self.block.lock().unwrap();
-        block.contains(owner)
+        block.contains(tag)
     }
 }

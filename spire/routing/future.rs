@@ -6,12 +6,13 @@ use std::task::{Context, Poll};
 use pin_project_lite::pin_project;
 use tower::util::{BoxCloneService, Oneshot};
 
-use spire_core::context::{Context as Cx, Signal};
+use crate::context::{Context as Cx, Signal};
 
 pin_project! {
     /// Response [`Future`] for [`Route`].
     ///
     /// [`Route`]: crate::routing::Route
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct RouteFuture<C, E> {
         #[pin] kind: RouteFutureKind<C, E>,
     }
@@ -30,7 +31,7 @@ pin_project! {
 
 impl<C, E> RouteFuture<C, E> {
     /// Creates a new [` RouteFuture`].
-    pub(crate) fn new(fut: Fut<C, E>) -> Self {
+    pub(crate) const fn new(fut: Fut<C, E>) -> Self {
         let kind = RouteFutureKind::Future { fut };
         Self { kind }
     }

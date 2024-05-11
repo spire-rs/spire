@@ -8,6 +8,7 @@ use crate::dataset::Dataset;
 use crate::Result;
 
 /// Tracing [`Backend`], [`Client`] or [`Worker`] for improved observability.
+#[must_use]
 #[derive(Clone)]
 pub struct WithTrace<T> {
     entity: T,
@@ -15,7 +16,7 @@ pub struct WithTrace<T> {
 
 impl<T> WithTrace<T> {
     /// Creates a new [`WithTrace`].
-    pub fn new(entity: T) -> Self {
+    pub const fn new(entity: T) -> Self {
         Self { entity }
     }
 }

@@ -10,6 +10,7 @@ use crate::{Error, Result};
 /// See [`Daemon::with_queue`].
 ///
 /// [`Daemon::with_queue`]: crate::Client::with_request_queue
+#[must_use]
 #[derive(Clone)]
 pub struct RequestQueue {
     inner: BoxCloneDataset<Request, Error>,
@@ -18,7 +19,7 @@ pub struct RequestQueue {
 
 impl RequestQueue {
     /// Creates a new [`RequestQueue`].
-    pub fn new(inner: BoxCloneDataset<Request, Error>, depth: usize) -> Self {
+    pub const fn new(inner: BoxCloneDataset<Request, Error>, depth: usize) -> Self {
         Self { inner, depth }
     }
 

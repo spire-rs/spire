@@ -3,13 +3,13 @@
 
 use std::ops::{Deref, DerefMut};
 
-use spire_core::backend::{BrowserClient, BrowserPool};
-use spire_core::context::Context;
-use spire_core::Error;
 #[cfg(feature = "macros")]
 use spire_macros::extract::{Elements, Select};
 
+use crate::backend::{BrowserClient, BrowserPool};
+use crate::context::Context;
 use crate::extract::FromContextRef;
+use crate::Error;
 
 // TODO: Snapshot, Screen, Color, Capture, View.
 

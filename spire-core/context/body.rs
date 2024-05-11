@@ -40,7 +40,7 @@ impl Body {
         B::Error: Into<BoxError> + Send + Sync + 'static,
     {
         try_downcast(body).unwrap_or_else(|x| {
-            let boxed = x.map_err(|x| x.into()).boxed();
+            let boxed = x.map_err(Into::into).boxed();
             Self(boxed)
         })
     }
@@ -55,7 +55,7 @@ impl Default for Body {
 
 impl From<()> for Body {
     #[inline]
-    fn from(_: ()) -> Self {
+    fn from((): ()) -> Self {
         Self::default()
     }
 }
@@ -90,7 +90,7 @@ impl From<String> for Body {
 
 impl From<&'static str> for Body {
     #[inline]
-    fn from(slice: &'static str) -> Body {
+    fn from(slice: &'static str) -> Self {
         slice.as_bytes().into()
     }
 }

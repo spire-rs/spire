@@ -8,9 +8,8 @@ use std::convert::Infallible;
 #[doc(no_inline)]
 pub use async_trait::async_trait;
 
-pub use process::Client;
-
 use crate::context::{IntoSignal, Signal, TagQuery};
+pub use crate::process::Client;
 
 pub mod backend;
 pub mod context;
@@ -31,7 +30,7 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 pub struct Error {
     inner: BoxError,
     // fatal: bool,
-    tag_query: TagQuery,
+    query: TagQuery,
 }
 
 impl Error {
@@ -39,14 +38,14 @@ impl Error {
     pub fn new(error: impl Into<BoxError>) -> Self {
         Self {
             inner: error.into(),
-            tag_query: TagQuery::Owner,
+            query: TagQuery::Owner,
         }
     }
 
     /// Overrides the current [`TagQuery`].
     #[inline]
     pub fn with_query(mut self, query: impl Into<TagQuery>) -> Self {
-        self.tag_query = query.into();
+        self.query = query.into();
         self
     }
 
@@ -73,6 +72,7 @@ impl From<Infallible> for Error {
 }
 
 impl From<http::Error> for Error {
+    #[inline]
     fn from(error: http::Error) -> Self {
         todo!()
     }
@@ -80,7 +80,7 @@ impl From<http::Error> for Error {
 
 impl IntoSignal for Error {
     fn into_signal(self) -> Signal {
-        Signal::Fail(self.tag_query, self.inner)
+        Signal::Fail(self.query, self.inner)
     }
 }
 

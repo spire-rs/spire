@@ -5,6 +5,7 @@ use crate::dataset::Dataset;
 /// Transforms the data type of the [`Dataset`] for a [`map_data`] method.
 ///
 /// [`map_data`]: crate::dataset::DatasetExt::map_data
+#[must_use]
 #[derive(Clone)]
 pub struct MapData<D, F, F2> {
     inner: D,
@@ -14,7 +15,7 @@ pub struct MapData<D, F, F2> {
 
 impl<D, F, F2> MapData<D, F, F2> {
     /// Creates a new [`MapData`].
-    pub fn new(inner: D, to: F, from: F2) -> Self {
+    pub const fn new(inner: D, to: F, from: F2) -> Self {
         Self {
             inner,
             f_2inner: to,

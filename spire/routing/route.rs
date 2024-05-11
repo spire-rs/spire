@@ -6,9 +6,7 @@ use tower::util::{BoxCloneService, Oneshot};
 use tower::util::{MapErrLayer, MapResponseLayer};
 use tower::{Layer, Service, ServiceExt};
 
-use spire_core::context::Context as Cx;
-use spire_core::context::{IntoSignal, Signal};
-
+use crate::context::{Context as Cx, IntoSignal, Signal};
 use crate::routing::RouteFuture;
 
 /// Provides type-erasure for the underlying `tower::`[`Service`].

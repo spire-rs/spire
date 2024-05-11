@@ -8,7 +8,6 @@ pub use async_trait::async_trait;
 
 #[doc(inline)]
 pub use routing::Router;
-use spire_core::backend::Backend;
 pub use spire_core::{backend, context, dataset};
 pub use spire_core::{Error, Result};
 
@@ -21,7 +20,7 @@ pub mod routing;
 ///
 /// [`Request`]: crate::context::Request
 /// [`Worker`]: crate::backend::Worker
-pub type Client<B, W = Router<<B as Backend>::Client>> = spire_core::Client<B, W>;
+pub type Client<B, W = Router<<B as backend::Backend>::Client>> = spire_core::Client<B, W>;
 
 #[doc(hidden)]
 pub mod prelude {}

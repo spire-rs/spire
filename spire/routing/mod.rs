@@ -11,9 +11,9 @@ use endpoint::Endpoint;
 pub use future::RouteFuture;
 use make_route::MakeRoute;
 pub use route::Route;
-use spire_core::context::{Context as Cx, IntoSignal, Signal, Tag};
 use tag_router::TagRouter;
 
+use crate::context::{Context as Cx, IntoSignal, Signal, Tag};
 pub use crate::handler::{Handler, HandlerService};
 
 mod endpoint;
@@ -23,7 +23,7 @@ mod route;
 mod tag_router;
 
 /// Composes and routes [`Handler`]s and `tower::`[`Service`]s.
-#[must_use]
+#[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct Router<C = (), S = ()> {
     // TODO: Use Arc<TagRouter<C, S>>.
     inner: TagRouter<C, S>,
@@ -154,7 +154,10 @@ where
     }
 }
 
-impl<C> Service<Cx<C>> for Router<C, ()> {
+impl<C> Service<Cx<C>> for Router<C, ()>
+where
+    C: 'static,
+{
     type Response = Signal;
     type Error = Infallible;
     type Future = RouteFuture<C, Infallible>;

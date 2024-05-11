@@ -30,7 +30,8 @@ where
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub async fn run(&self) -> Result<usize> {
-        self.inner.run_until_empty().await
+        let total = self.inner.run_until_empty().await?;
+        Ok(total)
     }
 
     /// Processes a single provided [`Request`].
@@ -43,7 +44,7 @@ where
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub async fn run_once(&self, request: Request) -> Result<()> {
-        self.inner.call_service(request).await?;
+        self.inner.run_once(request).await;
         Ok(())
     }
 }
@@ -69,7 +70,7 @@ impl<B, W> Client<B, W> {
         self
     }
 
-    /// Adds a single [`Request`] to the [`RequestQueue`] when a [`Client::run`] is invoked.
+    /// Adds a single [`Request`] to the [`RequestQueue`] when [`Client::run`] is called.
     ///
     /// # Note
     ///
@@ -84,7 +85,7 @@ impl<B, W> Client<B, W> {
         self
     }
 
-    /// Adds a set of [`Request`]s to the [`RequestQueue`] when a [`Client::run`] is invoked.
+    /// Adds a set of [`Request`]s to the [`RequestQueue`] when [`Client::run`] is called.
     ///
     /// # Note
     ///
@@ -103,7 +104,9 @@ impl<B, W> Client<B, W> {
         self
     }
 
-    /// Limits a number of buffered (or in-flight) futures.
+    /// Limits a number of buffered (or in-flight) [`Future`]s.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn with_concurrency_limit(self, limit: usize) -> Self {
         self.inner.with_concurrency_limit(limit);
         self
@@ -139,7 +142,6 @@ impl<B, W> Client<B, W> {
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
     #[inline]
-    #[must_use]
     pub fn dataset<T>(&self) -> Data<T>
     where
         T: Send + Sync + 'static,

@@ -3,8 +3,8 @@ use std::pin::Pin;
 
 use macros::all_the_tuples;
 pub use service::HandlerService;
-use spire_core::context::{Context, IntoSignal, Signal};
 
+use crate::context::{Context, IntoSignal, Signal};
 use crate::extract::{FromContext, FromContextRef};
 
 mod macros;
@@ -17,7 +17,7 @@ mod service;
 ///
 /// ```rust
 /// # use spire::routing::Router;
-/// # use spire_core::context::Tag;
+/// # use spire::context::Tag;
 ///
 /// async fn handler() {}
 ///
@@ -32,7 +32,7 @@ mod service;
 ///
 /// ```rust
 /// # use spire::routing::Router;
-/// # use spire_core::context::{Tag, Signal};
+/// # use spire::context::{Tag, Signal};
 ///
 /// let router: Router = Router::new()
 ///     .route(Tag::default(), Signal::Continue);

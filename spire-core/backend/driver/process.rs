@@ -42,13 +42,17 @@ impl BrowserDriver for BoxBrowserDriver {
     }
 }
 
+#[must_use]
 pub struct BrowserProcess {
     driver: Mutex<BoxBrowserDriver>,
 }
 
 impl BrowserProcess {
     /// Creates a new [`BrowserProcess`].
-    pub fn new(driver: impl BrowserDriver + Send + 'static) -> Self {
+    pub fn new<T>(driver: T) -> Self
+    where
+        T: BrowserDriver + Send + 'static,
+    {
         // let boxed: BoxBrowserDriver = Box::new(driver);
         // let driver = Mutex::new(boxed);
         // Self { driver }
