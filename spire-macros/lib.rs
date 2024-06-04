@@ -5,7 +5,7 @@
 use proc_macro::TokenStream;
 
 use quote::quote;
-use syn::{DeriveInput, GenericParam, parse_macro_input, parse_quote};
+use syn::{parse_macro_input, parse_quote, DeriveInput, GenericParam};
 
 // use proc_macro2::TokenStream as TokenStream2;
 

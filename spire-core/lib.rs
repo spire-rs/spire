@@ -29,7 +29,7 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 #[error("{inner}")]
 pub struct Error {
     inner: BoxError,
-    // TODO. fatal: bool,
+    fatal: Option<bool>,
     query: TagQuery,
 }
 
@@ -38,14 +38,24 @@ impl Error {
     pub fn new(error: impl Into<BoxError>) -> Self {
         Self {
             inner: error.into(),
+            fatal: None,
             query: TagQuery::Owner,
         }
     }
 
     /// Overrides the current [`TagQuery`].
+    ///
+    /// [`TagQuery::Owner`] by default.
     #[inline]
     pub fn with_query(mut self, query: impl Into<TagQuery>) -> Self {
         self.query = query.into();
+        self
+    }
+
+    /// Marks the error as [`fatal`].
+    #[inline]
+    pub fn with_fatal(mut self, fatal: bool) -> Self {
+        self.fatal = Some(fatal);
         self
     }
 

@@ -1,10 +1,11 @@
 use std::cmp::max;
-use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::Entry;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use futures::stream::{Abortable, AbortHandle};
 use futures::StreamExt;
 
 use crate::backend::{Backend, Worker};
@@ -22,7 +23,8 @@ pub struct Runner<B, W> {
 
     pub initial: Mutex<Vec<Request>>,
     pub limit: AtomicUsize,
-    pub notify: TagData,
+    // Fallback means all not-yet encountered tags.
+    defer: Mutex<HashMap<Tag, Instant>>,
 }
 
 impl<B, W> Runner<B, W> {
@@ -39,10 +41,13 @@ impl<B, W> Runner<B, W> {
 
             initial: Mutex::new(Vec::new()),
             limit: AtomicUsize::new(8),
-            notify: TagData::new(),
+            defer: Mutex::new(HashMap::new()),
         }
     }
 
+    /// Repeatedly call the used [`Backend`] until the [`Request`] queue is empty.
+    ///
+    /// Returns the total amount of processed `Request`s.
     pub async fn run_until_empty(&self) -> Result<usize>
     where
         B: Backend,
@@ -62,6 +67,10 @@ impl<B, W> Runner<B, W> {
         Ok(total)
     }
 
+    /// Repeatedly call the used [`Backend`] until the [`Request`] queue is empty or
+    /// the stream is aborted with a [`Signal`].
+    ///
+    /// Returns the total amount of processed `Request`s.
     async fn run_until_signal(&self) -> Result<usize>
     where
         B: Backend,
@@ -80,34 +89,45 @@ impl<B, W> Runner<B, W> {
             dataset.write(request).await?;
         }
 
-        let try_call_service = |x: Result<Request>| async {
-            match x {
-                Ok(x) => self.run_once(x).await,
-                Err(x) => self.notify.notify(x.into_signal(), Tag::default()),
+        let concurrent_limit = self.limit.load(Ordering::SeqCst);
+        let (handle, registration) = AbortHandle::new_pair();
+        let stream = Abortable::new(dataset.into_stream(), registration);
+
+        let try_run_once = |x| async {
+            let result = match x {
+                Ok(req) => self.run_once(req).await,
+                Err(x) => self.notify(x.into_signal(), Tag::Fallback),
             };
+
+            if result.is_err() {
+                handle.abort();
+            }
         };
 
-        // TODO: Abortable.
-        let stream = dataset
-            .into_stream()
-            .map(try_call_service)
-            .buffered(self.limit.load(Ordering::SeqCst))
-            .count();
+        let stream = stream.map(try_run_once).buffered(concurrent_limit).count();
 
         Ok(stream.await)
     }
 
+    /// Calls the used [`Backend`] once with a provided [`Request`].
+    ///
+    /// # Errors
+    ///
+    /// Only if the `Request` stream should be aborted.
     pub async fn run_once(&self, request: Request) -> Result<()>
     where
         B: Backend,
         W: Worker<B::Client>,
     {
         match self.call_service(request).await {
-            Ok((w, t)) => self.notify.notify(w, t),
-            Err(x) => self.notify.notify(x.into_signal(), Tag::default()),
+            Ok((signal, owner)) => self.notify(signal, owner),
+            Err(x) => self.notify(x.into_signal(), Tag::Fallback),
         }
     }
 
+    /// Creates the [`Context`] and calls the used [`Backend`] with it.
+    ///
+    /// Returns [`Signal`] and owner [`Tag`].
     async fn call_service(&self, request: Request) -> Result<(Signal, Tag)>
     where
         B: Backend,
@@ -123,28 +143,26 @@ impl<B, W> Runner<B, W> {
         Ok((signal, owner))
     }
 
-    // // Applies the signal to the subsequent requests.
-    // fn notify_signal(&self, signal: Signal, owner: Tag) {
-    //     match signal {
-    //         Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(x, owner, t),
-    //         Signal::Fail(x, _) => self.apply_block(x, owner),
-    //         _ => { /* Ignore */ }
-    //     };
-    // }
+    /// Applies the [`Signal`] to the subsequent [`Request`]s.
+    ///
+    /// # Errors
+    ///
+    /// Only if the `Request` stream should be aborted.
+    pub fn notify(&self, signal: Signal, owner: Tag) -> Result<()> {
+        match signal {
+            Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(x, owner, t),
+            Signal::Fail(x, _) => self.apply_block(x, owner),
+            Signal::Continue | Signal::Skip => Ok(()),
+        }
+    }
 
-    // // Returns the currently applied [`Instant`].
-    // fn find_defer(&self, tag: &Tag) -> Option<Instant> {
-    //     let defer = self.defer.lock().unwrap();
-    //     defer
-    //         .get(tag)
-    //         .map_or_else(|| defer.get(&Tag::Fallback), Some)
-    //         .copied()
-    // }
-    //
-    // // Returns `true` if the given [`Tag`] is blocked.
-    // fn find_block(&self, tag: &Tag) -> bool {
-    //     // TODO: All, not just unknown.
-    //     let block = self.block.lock().unwrap();
-    //     block.contains(tag)
-    // }
+    /// Defers all [`Tag`]s as specified per [`TagQuery`].
+    fn apply_defer(&self, query: TagQuery, owner: Tag, duration: Duration) -> Result<()> {
+        todo!("apply_defer not implemented")
+    }
+
+    /// Blocks all [`Tag`]s as specified per [`TagQuery`].
+    fn apply_block(&self, query: TagQuery, owner: Tag) -> Result<()> {
+        todo!("apply_block not implemented")
+    }
 }

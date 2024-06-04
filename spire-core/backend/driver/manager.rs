@@ -111,7 +111,10 @@ mod test {
 
     #[test]
     fn with_managed() {
-        let _ = BrowserManager::default().build();
+        let _ = BrowserManager::default()
+            .with_unmanaged("127.0.0.1:4444")
+            .with_unmanaged("127.0.0.1:4445")
+            .build();
         todo!()
     }
 }

@@ -59,7 +59,6 @@ impl<T> Deref for Elements<T> {
 }
 
 impl<T> DerefMut for Elements<T> {
-
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0

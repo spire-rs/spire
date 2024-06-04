@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
 use crate::context::{Context, RequestQueue, Tag, Task};
-use crate::dataset::{Data, future::DataSink, future::DataStream};
+use crate::dataset::{future::DataSink, future::DataStream, Data};
 use crate::extract::{FromContext, FromContextRef};
 
 /// [`Backend`]-specific client extractor.
