@@ -15,13 +15,11 @@
 //!
 //! ### Utility
 //!
-//! - [`WithTrace`] is a tracing wrapper for [`Backend`]s, [`Client`]s and [`Worker`]s,
-//! used for improved observability.
-//! - [`WithDebug`] is a no-op [`Backend`], [`Client`] and [`Worker`], used for
-//! testing and debugging.
+//! - [`Trace`] is a tracing middleware for [`Backend`]s, [`Client`]s, and [`Worker`]s.
+//! - [`Noop`] is a no-op [`Backend`], [`Client`] and [`Worker`] for testing and debugging.
 //!
-//! [`WithTrace`]: util::WithTrace
-//! [`WithDebug`]: util::WithDebug
+//! [`Trace`]: util::Trace
+//! [`Noop`]: util::Noop
 
 use std::convert::Infallible;
 

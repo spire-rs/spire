@@ -11,19 +11,18 @@ use crate::backend::{Backend, Worker};
 use crate::context::{Context, Tag, TagQuery, Task};
 use crate::context::{IntoSignal, Request, Signal};
 use crate::dataset::{Dataset, Datasets};
+use crate::process::notify::TagData;
 use crate::Result;
 
+/// TODO.
 pub struct Runner<B, W> {
-    pub(crate) service: W,
-    pub(crate) datasets: Datasets,
-    pub(crate) backend: B,
+    pub service: W,
+    pub datasets: Datasets,
+    pub backend: B,
 
-    inits: Mutex<Vec<Request>>,
-    limit: AtomicUsize,
-
-    // Fallback means all not-yet encountered tags.
-    defer: Mutex<HashMap<Tag, Instant>>,
-    block: Mutex<HashSet<Tag>>,
+    pub initial: Mutex<Vec<Request>>,
+    pub limit: AtomicUsize,
+    pub notify: TagData,
 }
 
 impl<B, W> Runner<B, W> {
@@ -38,21 +37,10 @@ impl<B, W> Runner<B, W> {
             datasets: Datasets::new(),
             backend,
 
-            inits: Mutex::new(Vec::new()),
+            initial: Mutex::new(Vec::new()),
             limit: AtomicUsize::new(8),
-
-            defer: Mutex::new(HashMap::new()),
-            block: Mutex::new(HashSet::new()),
+            notify: TagData::new(),
         }
-    }
-
-    pub fn with_initial_request(&self, request: Request) {
-        let mut initial = self.inits.lock().unwrap();
-        initial.push(request);
-    }
-
-    pub fn with_concurrency_limit(&self, limit: usize) {
-        self.limit.store(max(limit, 1), Ordering::SeqCst);
     }
 
     pub async fn run_until_empty(&self) -> Result<usize>
@@ -83,7 +71,7 @@ impl<B, W> Runner<B, W> {
         // Use tokio::Mutex instead?
 
         let mut requests: Vec<_> = {
-            let mut initial = self.inits.lock().unwrap();
+            let mut initial = self.initial.lock().unwrap();
             initial.drain(..).collect()
         };
 
@@ -95,7 +83,7 @@ impl<B, W> Runner<B, W> {
         let try_call_service = |x: Result<Request>| async {
             match x {
                 Ok(x) => self.run_once(x).await,
-                Err(x) => self.notify_signal(x.into_signal(), Tag::default()),
+                Err(x) => self.notify.notify(x.into_signal(), Tag::default()),
             };
         };
 
@@ -109,14 +97,14 @@ impl<B, W> Runner<B, W> {
         Ok(stream.await)
     }
 
-    pub async fn run_once(&self, request: Request)
+    pub async fn run_once(&self, request: Request) -> Result<()>
     where
         B: Backend,
         W: Worker<B::Client>,
     {
         match self.call_service(request).await {
-            Ok((w, t)) => self.notify_signal(w, t),
-            Err(x) => self.notify_signal(x.into_signal(), Tag::default()),
+            Ok((w, t)) => self.notify.notify(w, t),
+            Err(x) => self.notify.notify(x.into_signal(), Tag::default()),
         }
     }
 
@@ -135,66 +123,28 @@ impl<B, W> Runner<B, W> {
         Ok((signal, owner))
     }
 
-    /// Applies the signal to the subsequent requests.
-    fn notify_signal(&self, signal: Signal, owner: Tag) {
-        // TODO: Add Ok/Err counter.
-        match signal {
-            Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(x, owner, t),
-            Signal::Fail(x, _) => self.apply_block(x, owner),
-            _ => { /* Ignore */ }
-        };
-    }
+    // // Applies the signal to the subsequent requests.
+    // fn notify_signal(&self, signal: Signal, owner: Tag) {
+    //     match signal {
+    //         Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(x, owner, t),
+    //         Signal::Fail(x, _) => self.apply_block(x, owner),
+    //         _ => { /* Ignore */ }
+    //     };
+    // }
 
-    /// Applies defer to all all [`Tag`]s as specified per [`TagQuery`].
-    fn apply_defer(&self, query: TagQuery, owner: Tag, duration: Duration) {
-        let minimum = Instant::now() + duration;
-        let mut defer = self.defer.lock().unwrap();
-
-        let apply_one = |x: Entry<Tag, Instant>| match x {
-            Entry::Occupied(mut x) => x.insert(max(*x.get() + duration, minimum)),
-            Entry::Vacant(x) => *x.insert(minimum),
-        };
-
-        let _ = match query {
-            TagQuery::Owner => apply_one(defer.entry(owner)),
-            TagQuery::Single(x) => apply_one(defer.entry(x)),
-            TagQuery::Every => todo!(),
-            TagQuery::List(_) => todo!(),
-        };
-    }
-
-    /// Returns the currently applied [`Instant`].
-    fn find_defer(&self, tag: &Tag) -> Instant {
-        let now = Instant::now();
-        let defer = self.defer.lock().unwrap();
-
-        let until = match defer.get(tag).copied() {
-            None => defer.get(&Tag::Fallback).copied(),
-            Some(x) => Some(x),
-        };
-
-        until.unwrap_or(now)
-    }
-
-    /// Blocks all [`Tag`]s as specified per [`TagQuery`].
-    fn apply_block(&self, query: TagQuery, owner: Tag) {
-        let mut guard = self.block.lock().unwrap();
-        let mut block_one = |x| {
-            guard.insert(x);
-        };
-
-        match query {
-            TagQuery::Owner => block_one(owner),
-            TagQuery::Every => block_one(Tag::default()),
-            TagQuery::Single(x) => block_one(x),
-            TagQuery::List(x) => x.into_iter().for_each(block_one),
-        }
-    }
-
-    /// Returns `true` if the given [`Tag`] is blocked.
-    fn find_block(&self, tag: &Tag) -> bool {
-        // TODO: All, not just unknown.
-        let block = self.block.lock().unwrap();
-        block.contains(tag)
-    }
+    // // Returns the currently applied [`Instant`].
+    // fn find_defer(&self, tag: &Tag) -> Option<Instant> {
+    //     let defer = self.defer.lock().unwrap();
+    //     defer
+    //         .get(tag)
+    //         .map_or_else(|| defer.get(&Tag::Fallback), Some)
+    //         .copied()
+    // }
+    //
+    // // Returns `true` if the given [`Tag`] is blocked.
+    // fn find_block(&self, tag: &Tag) -> bool {
+    //     // TODO: All, not just unknown.
+    //     let block = self.block.lock().unwrap();
+    //     block.contains(tag)
+    // }
 }

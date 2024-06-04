@@ -50,14 +50,15 @@ impl<C, S> TagRouter<C, S> {
     where
         F: Fn(Tag, Endpoint<C, S>) -> (Tag, Endpoint<C, S>),
     {
+        // TODO??
         let it = self.endpoints.into_iter();
         self.endpoints = it.map(|(k, v)| func(k, v)).collect();
         self
     }
 
     pub fn merge(&mut self, other: Self) {
-        if let Some(x) = other.fallback {
-            self.fallback(x);
+        if let Some(endpoint) = other.fallback {
+            self.fallback(endpoint);
         }
 
         for (tag, endpoint) in other.endpoints {

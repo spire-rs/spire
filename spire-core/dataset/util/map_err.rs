@@ -33,16 +33,16 @@ impl<T, D, F, E2> Dataset<T> for MapErr<D, F>
 where
     T: Send + Sync + 'static,
     D: Dataset<T>,
-    F: FnOnce(D::Error) -> E2 + Clone + Send + Sync + 'static,
+    F: Fn(D::Error) -> E2 + Send + Sync + 'static,
 {
     type Error = E2;
 
     async fn write(&self, data: T) -> Result<(), Self::Error> {
-        self.inner.write(data).await.map_err(self.f.clone())
+        self.inner.write(data).await.map_err(&self.f)
     }
 
     async fn read(&self) -> Result<Option<T>, Self::Error> {
-        self.inner.read().await.map_err(self.f.clone())
+        self.inner.read().await.map_err(&self.f)
     }
 
     #[inline]

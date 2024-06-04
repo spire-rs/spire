@@ -124,10 +124,10 @@ mod test {
     #[cfg(feature = "tracing")]
     #[tracing_test::traced_test]
     async fn noop() -> Result<()> {
-        use crate::backend::util::WithTrace;
+        use crate::backend::util::Trace;
 
-        let backend = WithTrace::new(HttpClient::default());
-        let worker = WithTrace::default();
+        let backend = Trace::new(HttpClient::default());
+        let worker = Trace::default();
 
         let request = Request::get("https://example.com/").body(());
         let client = Client::new(backend, worker)

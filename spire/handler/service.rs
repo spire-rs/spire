@@ -134,8 +134,8 @@ where
 #[cfg(test)]
 mod test {
     use crate::backend::Worker;
-    use crate::Client;
     use crate::handler::HandlerService;
+    use crate::Client;
 
     fn service<B: Send + 'static>() -> impl Worker<B> {
         async fn handler() {}

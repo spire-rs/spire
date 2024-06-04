@@ -4,31 +4,45 @@
 //! [`Client`]: crate::backend::Client
 //! [`Worker`]: crate::backend::Worker
 
-pub use debug::WithDebug;
-#[cfg(feature = "tracing")]
-#[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
-pub use trace::WithTrace;
+pub use debug::Noop;
+#[cfg(feature = "trace")]
+#[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
+pub use trace::{Trace, TraceLayer};
 
 mod debug;
-#[cfg(feature = "tracing")]
-#[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
+#[cfg(feature = "trace")]
+#[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
 mod trace;
 
 #[cfg(test)]
 mod test {
     use http::Request;
 
+    use crate::backend::util::Noop;
     use crate::dataset::InMemDataset;
     use crate::{Client, Result};
 
     #[tokio::test]
-    #[cfg(feature = "tracing")]
-    #[tracing_test::traced_test]
     async fn noop() -> Result<()> {
-        use crate::backend::util::WithTrace;
+        let entity = Noop::default();
+        let request = Request::get("https://example.com/").body(());
+        let client = Client::new(entity.clone(), entity)
+            .with_request_queue(InMemDataset::stack())
+            .with_dataset(InMemDataset::<u64>::new())
+            .with_initial_request(request.unwrap());
 
-        let entity = WithTrace::default();
+        let _ = client.dataset::<u64>();
+        let _ = client.run().await?;
+        Ok(())
+    }
 
+    #[tokio::test]
+    #[cfg(feature = "trace")]
+    #[tracing_test::traced_test]
+    async fn noop_trace() -> Result<()> {
+        use crate::backend::util::Trace;
+
+        let entity = Trace::default();
         let request = Request::get("https://example.com/").body(());
         let client = Client::new(entity.clone(), entity)
             .with_request_queue(InMemDataset::stack())

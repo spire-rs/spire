@@ -23,18 +23,20 @@ where
 /// State extractor.
 ///
 /// ```rust
-/// use spire::extract::FromRef;
+/// use spire::extract::{FromRef, State};
 ///
 /// #[derive(Debug, Clone)]
-/// struct State {
+/// struct AppState {
 ///     port: u16,
 /// }
 ///
-/// impl FromRef<State> for u16 {
-///     fn from_ref(input: &State) -> Self {
+/// impl FromRef<AppState> for u16 {
+///     fn from_ref(input: &AppState) -> Self {
 ///         input.port
 ///     }
 /// }
+///
+/// async fn handler(State(port): State<u16>) {}
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
 pub struct State<T>(pub T);

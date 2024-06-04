@@ -3,18 +3,15 @@
 //! ### Intro
 //!
 //! A [`Handler`] function is an async function that takes any number of extractors as arguments.
+//!
 //! An extractor is a type that implements [`FromContextRef`] or [`FromContext`].
 //!
 //! [`Handler`]: crate::handler::Handler
 //!
-//! ### Extractors
+//! ### [`Context`] extractors
 //!
-//! - [`Context`] to access [`Request`] or [`Response`] for granular control over data fetching.
-//! - [`Body`], [`Text`], and [`Json`] for response body extraction.
-//! - [`Html`] (for [`HttpClient`]) or [`View`] (for [`BrowserClient`]) for direct markup access.
-//! - [`Elements`] and [`Select`] trait for declarative markup extraction.
-//!
-//! - [`RequestQueue`], and [`Datastore`] for enqueuing new requests and saving response data.
+//! - [`RequestQueue`] for enqueuing new requests.
+//! - [`Data`], [`DataStream`] and [`DataSink`] for reading and writing response data.
 //! - [`Client`] to access [`Backend`]-specific [`HttpClient`] or [`BrowserClient`].
 //! - [`State`] and [`FromRef`] trait for state extraction.
 //!
@@ -22,11 +19,19 @@
 //! [`HttpClient`]: crate::backend::HttpClient
 //! [`BrowserClient`]: crate::backend::BrowserClient
 //!
+//! [`Data`]: crate::dataset::Data
+//! [`DataStream`]: crate::dataset::DataStream
+//! [`DataSink`]: crate::dataset::DataSink
+//! [`RequestQueue`]: crate::context::RequestQueue
+//!
+//! ### [`Request`] and [`Response`] extractors
+//!
+//! - [`Body`], [`Text`], and [`Json`] for response body extraction.
+//! - [`Html`] (for [`HttpClient`]) or [`View`] (for [`BrowserClient`]) for direct markup access.
+//! - [`Elements`] and [`Select`] trait for declarative markup extraction.
+//!
 //! [`Request`]: crate::context::Request
 //! [`Response`]: crate::context::Response
-//! [`RequestQueue`]: crate::context::RequestQueue
-//! [`Datastore`]: crate::dataset::Data
-//!
 //! [`Html`]: client::Html
 //! [`View`]: driver::View
 
@@ -34,11 +39,12 @@ use std::convert::Infallible;
 
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-pub use spire_macros::extract::{Elements, Select};
+pub use spire_macros::Select;
 
 use crate::context::{Context, IntoSignal};
 pub use crate::extract::content::{Body, Json, Text};
 pub use crate::extract::context::Client;
+pub use crate::extract::select::{AttrData, AttrTag, Elements, Select};
 pub use crate::extract::state::{FromRef, State};
 
 mod content;
@@ -51,6 +57,7 @@ pub mod client;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 pub mod driver;
+pub mod select;
 
 mod sealed {
     #[derive(Debug, Clone, Copy)]

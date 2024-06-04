@@ -86,15 +86,15 @@ mod test {
     #[cfg(feature = "tracing")]
     #[tracing_test::traced_test]
     async fn noop() -> crate::Result<()> {
-        use crate::backend::util::WithTrace;
+        use crate::backend::util::Trace;
 
         let pool = BrowserManager::default()
             .with_unmanaged("127.0.0.1:4444")
             .with_unmanaged("127.0.0.1:4445")
             .build();
 
-        let backend = WithTrace::new(pool);
-        let worker = WithTrace::default();
+        let backend = Trace::new(pool);
+        let worker = Trace::default();
 
         let request = Request::get("https://example.com/").body(());
         let client = crate::Client::new(backend, worker)

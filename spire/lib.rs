@@ -16,11 +16,11 @@ mod handler;
 pub mod middleware;
 pub mod routing;
 
-/// Orchestrates the processing of [`Request`]s using provided [`Backend`] and [`Worker`].
+/// Orchestrates the processing of [`Request`]s using provided [`Backend`] and `State`.
 ///
-/// [`Request`]: crate::context::Request
-/// [`Worker`]: crate::backend::Worker
-pub type Client<B, W = Router<<B as backend::Backend>::Client>> = spire_core::Client<B, W>;
+/// [`Request`]: context::Request
+/// [`Backend`]: backend::Backend
+pub type Client<B, S = ()> = spire_core::Client<B, Router<<B as backend::Backend>::Client, S>>;
 
 #[doc(hidden)]
 pub mod prelude {}

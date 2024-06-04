@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::context::Tag;
 use crate::{BoxError, Error};
 
-/// Defines a way to select or filter out [`Tag`]s.
+/// Defines a way to select or filter [`Tag`]s.
 #[derive(Debug, Default, Clone)]
 pub enum TagQuery {
     /// Matches the same [`Tag`] as used by the [`Request`].

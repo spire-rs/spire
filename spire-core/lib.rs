@@ -29,7 +29,7 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 #[error("{inner}")]
 pub struct Error {
     inner: BoxError,
-    // fatal: bool,
+    // TODO. fatal: bool,
     query: TagQuery,
 }
 
@@ -84,7 +84,7 @@ impl IntoSignal for Error {
     }
 }
 
-/// Specialized [`Result`] type for [`Request`] processing.
+/// Specialized [`Result`] type for the [`Request`] processing.
 ///
 /// [`Result`]: std::result::Result
 /// [`Request`]: context::Request

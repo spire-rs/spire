@@ -20,7 +20,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         let re = cx.resolve().await?;
         let _ = re.into_body();
         todo!()
@@ -51,6 +51,10 @@ where
 /// JSON [`Response`] body extractor.
 ///
 /// Useful for the API scraping.
+///
+/// ⚠️ Since parsing JSON requires consuming the response body,
+/// the Json extractor must be last if there are multiple extractors
+/// in a handler.
 ///
 /// [`Response`]: crate::context::Response
 #[derive(Debug, Default, Clone, Copy)]

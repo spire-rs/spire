@@ -1,4 +1,6 @@
+use std::cmp::max;
 use std::fmt;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::backend::{Backend, Worker};
@@ -7,6 +9,7 @@ use crate::dataset::{Data, Dataset};
 use crate::process::runner::Runner;
 use crate::{Error, Result};
 
+mod notify;
 mod runner;
 
 /// Orchestrates the processing of [`Request`]s using provided [`Backend`] and [`Worker`].
@@ -30,8 +33,7 @@ where
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub async fn run(&self) -> Result<usize> {
-        let total = self.inner.run_until_empty().await?;
-        Ok(total)
+        self.inner.run_until_empty().await
     }
 
     /// Processes a single provided [`Request`].
@@ -44,8 +46,7 @@ where
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub async fn run_once(&self, request: Request) -> Result<()> {
-        self.inner.run_once(request).await;
-        Ok(())
+        self.inner.run_once(request).await
     }
 }
 
@@ -81,7 +82,8 @@ impl<B, W> Client<B, W> {
     where
         R: Into<Body>,
     {
-        self.inner.with_initial_request(request.map(Into::into));
+        let request = request.map(Into::into);
+        self.inner.initial.lock().unwrap().push(request);
         self
     }
 
@@ -97,10 +99,12 @@ impl<B, W> Client<B, W> {
         T: IntoIterator<Item = Request<R>>,
         R: Into<Body>,
     {
-        requests.into_iter().for_each(|request| {
-            self.inner.with_initial_request(request.map(Into::into));
-        });
+        let mut requests: Vec<_> = requests
+            .into_iter()
+            .map(|request| request.map(Into::into))
+            .collect();
 
+        self.inner.initial.lock().unwrap().append(&mut requests);
         self
     }
 
@@ -108,7 +112,7 @@ impl<B, W> Client<B, W> {
     ///
     /// [`Future`]: std::future::Future
     pub fn with_concurrency_limit(self, limit: usize) -> Self {
-        self.inner.with_concurrency_limit(limit);
+        self.inner.limit.store(max(limit, 1), Ordering::SeqCst);
         self
     }
 

@@ -2,12 +2,13 @@ use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
 use crate::context::{Context, RequestQueue, Tag, Task};
-use crate::dataset::Data;
+use crate::dataset::{Data, future::DataSink, future::DataStream};
 use crate::extract::{FromContext, FromContextRef};
 
 /// [`Backend`]-specific client extractor.
 ///
 /// [`Backend`]: crate::backend::Backend
+#[must_use]
 #[derive(Clone)]
 pub struct Client<C>(pub C);
 
@@ -86,5 +87,31 @@ where
 
     async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.dataset::<T>())
+    }
+}
+
+#[async_trait::async_trait]
+impl<C, S, T> FromContextRef<C, S> for DataStream<T>
+where
+    C: Sync,
+    T: Send + Sync + 'static,
+{
+    type Rejection = Infallible;
+
+    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
+        Ok(cx.dataset::<T>().into_stream())
+    }
+}
+
+#[async_trait::async_trait]
+impl<C, S, T> FromContextRef<C, S> for DataSink<T>
+where
+    C: Sync,
+    T: Send + Sync + 'static,
+{
+    type Rejection = Infallible;
+
+    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
+        Ok(cx.dataset::<T>().into_sink())
     }
 }

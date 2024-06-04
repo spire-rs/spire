@@ -5,12 +5,9 @@ use std::ops::{Deref, DerefMut};
 
 use scraper::Html as HtmlDoc;
 
-#[cfg(feature = "macros")]
-use spire_macros::extract::{Elements, Select};
-
 use crate::backend::{Client, HttpClient};
 use crate::context::Context;
-use crate::extract::{FromContext, Text};
+use crate::extract::{Elements, FromContext, Select, Text};
 use crate::Error;
 
 /// [`Backend`]-specific direct markup extractor.

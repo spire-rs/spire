@@ -3,12 +3,9 @@
 
 use std::ops::{Deref, DerefMut};
 
-#[cfg(feature = "macros")]
-use spire_macros::extract::{Elements, Select};
-
 use crate::backend::{BrowserClient, BrowserPool};
 use crate::context::Context;
-use crate::extract::FromContextRef;
+use crate::extract::{Elements, FromContextRef, Select};
 use crate::Error;
 
 // TODO: Snapshot, Screen, Color, Capture, View.
@@ -25,7 +22,7 @@ impl<S> FromContextRef<BrowserPool, S> for View {
 
     async fn from_context_parts(
         cx: &Context<BrowserPool>,
-        _state: &S,
+        state: &S,
     ) -> Result<Self, Self::Rejection> {
         todo!()
     }
@@ -56,7 +53,7 @@ where
 
     async fn from_context_parts(
         cx: &Context<BrowserClient>,
-        _state: &S,
+        state: &S,
     ) -> Result<Self, Self::Rejection> {
         todo!()
     }

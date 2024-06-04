@@ -12,6 +12,10 @@ pub use exclude::{Exclude, ExcludeLayer};
 #[cfg(feature = "include")]
 #[cfg_attr(docsrs, doc(cfg(feature = "include")))]
 pub use include::{Include, IncludeLayer};
+use spire_core::backend::{Backend, Client, Worker};
+
+#[cfg(feature = "trace")]
+use crate::backend::util::TraceLayer;
 
 #[cfg(feature = "exclude")]
 mod exclude;
@@ -38,6 +42,11 @@ pub mod futures {
 
 /// Extension trait for `tower::`[`ServiceBuilder`].
 pub trait ServiceBuilderExt<L> {
+    /// Enables tracing middleware for improved observability.
+    #[cfg(feature = "trace")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
+    fn trace(self) -> ServiceBuilder<Stack<TraceLayer, L>>;
+
     /// Conditionally rejects [`Request`]s based on a retrieved `robots.txt` file.
     ///
     /// [`Request`]: crate::context::Request
@@ -45,7 +54,7 @@ pub trait ServiceBuilderExt<L> {
     #[cfg_attr(docsrs, doc(cfg(feature = "exclude")))]
     fn exclude(self) -> ServiceBuilder<Stack<ExcludeLayer, L>>;
 
-    /// Populates [`RequestQueue`] with [`Request`]s from a retrieved `sitemap.xml`.
+    /// Populates [`RequestQueue`] with [`Request`]s from a retrieved `sitemap.xml` file.
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
     /// [`Request`]: crate::context::Request
@@ -55,6 +64,11 @@ pub trait ServiceBuilderExt<L> {
 }
 
 impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
+    #[cfg(feature = "trace")]
+    fn trace(self) -> ServiceBuilder<Stack<TraceLayer, L>> {
+        self.layer(TraceLayer::new())
+    }
+
     #[cfg(feature = "exclude")]
     fn exclude(self) -> ServiceBuilder<Stack<ExcludeLayer, L>> {
         self.layer(ExcludeLayer::new())

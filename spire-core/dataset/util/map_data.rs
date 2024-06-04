@@ -9,8 +9,8 @@ use crate::dataset::Dataset;
 #[derive(Clone)]
 pub struct MapData<D, F, F2> {
     inner: D,
-    f_2inner: F,
-    f_inner2: F2,
+    to_inner: F,
+    from_inner: F2,
 }
 
 impl<D, F, F2> MapData<D, F, F2> {
@@ -18,8 +18,8 @@ impl<D, F, F2> MapData<D, F, F2> {
     pub const fn new(inner: D, to: F, from: F2) -> Self {
         Self {
             inner,
-            f_2inner: to,
-            f_inner2: from,
+            to_inner: to,
+            from_inner: from,
         }
     }
 }
@@ -39,19 +39,19 @@ where
     T: Send + Sync + 'static,
     T2: Send + Sync + 'static,
     D: Dataset<T>,
-    F: FnOnce(T2) -> T + Clone + Send + Sync + 'static,
-    F2: FnOnce(T) -> T2 + Clone + Send + Sync + 'static,
+    F: Fn(T2) -> T + Send + Sync + 'static,
+    F2: Fn(T) -> T2 + Send + Sync + 'static,
 {
     type Error = D::Error;
 
     async fn write(&self, data: T2) -> Result<(), Self::Error> {
-        let data = self.f_2inner.clone()(data);
+        let data = (self.to_inner)(data);
         self.inner.write(data).await
     }
 
     async fn read(&self) -> Result<Option<T2>, Self::Error> {
         let data = self.inner.read().await;
-        data.map(|x| x.map(self.f_inner2.clone()))
+        data.map(|x| x.map(&self.from_inner))
     }
 
     #[inline]
