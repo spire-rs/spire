@@ -8,7 +8,9 @@ use tower::Service;
 use crate::context::{Context as Cx, Signal, Tag, Task};
 use crate::routing::{Endpoint, RouteFuture};
 
-/// TODO.
+/// Routes [`Context`]s according to [`Tag`]s associated with a [`Request`].
+///
+/// [`Request`]: crate::context::Request
 #[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct TagRouter<C, S> {
     endpoints: HashMap<Tag, Endpoint<C, S>>,
@@ -82,11 +84,11 @@ impl<C> TagRouter<C, ()>
 where
     C: 'static,
 {
-    fn clone_route(&self, tag: &Tag) -> Option<Endpoint<C, ()>> {
+    fn route_cloned(&self, tag: &Tag) -> Option<Endpoint<C, ()>> {
         self.endpoints.get(tag).cloned()
     }
 
-    fn clone_fallback(&self) -> Endpoint<C, ()> {
+    fn fallback_cloned(&self) -> Endpoint<C, ()> {
         self.fallback
             .as_ref()
             .map_or_else(Endpoint::default, Clone::clone)
@@ -123,8 +125,8 @@ where
 
     #[inline]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
-        self.clone_route(cx.get_ref().tag())
-            .unwrap_or_else(|| self.clone_fallback())
+        self.route_cloned(cx.get_ref().tag())
+            .unwrap_or_else(|| self.fallback_cloned())
             .call(cx)
     }
 }

@@ -20,7 +20,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
         let re = cx.resolve().await?;
         let _ = re.into_body();
         todo!()
@@ -43,8 +43,9 @@ where
 
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         let Body(bytes) = Body::from_context(cx, state).await?;
-        let inner = String::from_utf8(bytes.to_vec()).map_err(Error::new)?;
-        Ok(Self(inner))
+        String::from_utf8(bytes.to_vec())
+            .map(Self)
+            .map_err(Error::new)
     }
 }
 
@@ -71,7 +72,8 @@ where
 
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         let Body(bytes) = Body::from_context(cx, state).await?;
-        let inner = serde_json::from_slice::<T>(&bytes).map_err(Error::new)?;
-        Ok(Self(inner))
+        serde_json::from_slice::<T>(&bytes)
+            .map(Self)
+            .map_err(Error::new)
     }
 }

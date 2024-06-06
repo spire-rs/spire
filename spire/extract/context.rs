@@ -20,7 +20,7 @@ where
     type Rejection = Infallible;
 
     #[inline]
-    async fn from_context_parts(cx: &Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_ref(cx: &Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(cx.as_client_ref().clone()))
     }
 }
@@ -60,7 +60,7 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.queue())
     }
 }
@@ -72,7 +72,7 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.get_ref().tag().clone())
     }
 }
@@ -85,7 +85,7 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.dataset::<T>())
     }
 }
@@ -98,7 +98,7 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.dataset::<T>().into_stream())
     }
 }
@@ -111,7 +111,7 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.dataset::<T>().into_sink())
     }
 }

@@ -8,13 +8,14 @@ use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
 use crate::context::{Body, Request, Response};
-use crate::{BoxError, Error, Result};
+use crate::{Error, Result};
 
 /// Simple `http` client backed by the underlying [`Service`].
 /// It is both [`Backend`] and [`Client`].
 ///
 /// [`Backend`]: crate::backend::Backend
 /// [`Client`]: crate::backend::Client
+#[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct HttpClient {
     inner: Mutex<BoxCloneService<Request, Response, Error>>,
 }
@@ -26,12 +27,12 @@ impl HttpClient {
         S: Service<Request<B>, Response = Response<B>, Error = E> + Clone + Send + 'static,
         B: From<Body> + Into<Body>,
         S::Future: Send + 'static,
-        E: Into<BoxError> + 'static,
+        E: Into<Error> + 'static,
     {
         let svc = svc
             .map_request(|x: Request| -> Request<B> { x.map(Into::into) })
             .map_response(|x: Response<B>| -> Response { x.map(Into::into) })
-            .map_err(Error::new);
+            .map_err(|x: E| -> Error { x.into() });
 
         let inner = Mutex::new(BoxCloneService::new(svc));
         Self { inner }
@@ -101,6 +102,7 @@ mod test {
     use reqwest::{Error as RwError, Response as RwResponse};
     use tower::ServiceBuilder;
 
+    use crate::backend::util::Noop;
     use crate::backend::HttpClient;
     use crate::context::{Request, Response};
     use crate::dataset::InMemDataset;
@@ -127,7 +129,7 @@ mod test {
         use crate::backend::util::Trace;
 
         let backend = Trace::new(HttpClient::default());
-        let worker = Trace::default();
+        let worker = Trace::new(Noop::default());
 
         let request = Request::get("https://example.com/").body(());
         let client = Client::new(backend, worker)

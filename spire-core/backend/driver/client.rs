@@ -1,16 +1,15 @@
-use std::fmt;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use deadpool::managed::Object;
-use fantoccini::error::CmdError;
-use fantoccini::Client;
+use fantoccini::Client as WebClient;
 use futures::future::BoxFuture;
+use futures::FutureExt;
 use tower::Service;
 
-use crate::backend::BrowserManager;
-use crate::context::{Request, Response};
+use crate::backend::driver::BrowserManager;
+use crate::context::{Body, Request, Response};
 use crate::{Error, Result};
 
 /// [`BrowserPool`] client.
@@ -30,25 +29,19 @@ impl From<Object<BrowserManager>> for BrowserClient {
     }
 }
 
-impl fmt::Debug for BrowserClient {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.0.client, f)
-    }
-}
-
 impl Deref for BrowserClient {
-    type Target = Client;
+    type Target = WebClient;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.0.client
+        &self.0
     }
 }
 
 impl Service<Request> for BrowserClient {
     type Response = Response;
     type Error = Error;
-    type Future = BoxFuture<'static, Result<Response>>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -57,19 +50,11 @@ impl Service<Request> for BrowserClient {
 
     #[inline]
     fn call(&mut self, req: Request) -> Self::Future {
-        let path = req.uri().to_string();
-
         let fut = async {
-            self.goto(&path).await?;
-            Ok::<(), Error>(())
+            let response = Response::new(Body::default());
+            Ok::<Response, Error>(response)
         };
 
-        todo!()
-    }
-}
-
-impl From<CmdError> for Error {
-    fn from(value: CmdError) -> Self {
-        todo!()
+        fut.boxed()
     }
 }

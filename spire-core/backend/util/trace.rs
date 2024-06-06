@@ -5,8 +5,9 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt};
 use http_body::Body;
-use tower::{Layer, Service};
+use tower::{Layer, Service, ServiceExt};
 
 use crate::backend::util::Noop;
 use crate::context::{Context as Cx, Request, Response, Signal, Task};
@@ -14,29 +15,20 @@ use crate::dataset::Dataset;
 use crate::{Error, Result};
 
 /// Tracing [`Backend`], [`Client`] and [`Worker`] middleware for improved observability.
+///
+/// [`Backend`]: crate::backend::Backend
+/// [`Client`]: crate::backend::Client
+/// [`Worker`]: crate::backend::Worker
 #[derive(Clone)]
 #[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct Trace<S> {
     inner: S,
-    success_counter: Arc<AtomicUsize>,
-    failure_counter: Arc<AtomicUsize>,
 }
 
 impl<S> Trace<S> {
     /// Creates a new [`Trace`].
     pub fn new(inner: S) -> Self {
-        Self {
-            inner,
-            success_counter: Arc::new(AtomicUsize::new(0)),
-            failure_counter: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-}
-
-impl Default for Trace<Noop> {
-    #[inline]
-    fn default() -> Self {
-        Self::new(Noop::default())
+        Self { inner }
     }
 }
 
@@ -45,18 +37,15 @@ where
     T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TraceWorker")
-            .field("entity", &self.inner)
-            .field("success", &self.success_counter.load(Ordering::SeqCst))
-            .field("failure", &self.failure_counter.load(Ordering::SeqCst))
-            .finish()
+        f.debug_struct("Trace").field("inner", &self.inner).finish()
     }
 }
 
 impl<S> Service<()> for Trace<S>
 where
-    S: Service<(), Error = Error>,
+    S: Service<(), Error = Error> + Clone + Send + 'static,
     S::Response: Service<Request, Response = Response, Error = Error>,
+    S::Future: Send + 'static,
 {
     type Response = Trace<S::Response>;
     type Error = S::Error;
@@ -69,23 +58,25 @@ where
 
     #[inline]
     fn call(&mut self, req: ()) -> Self::Future {
-        let fut = async {
-            let client = self.inner.call(req).await?;
+        let mut inner = self.inner.clone();
+        let fut = async move {
+            let client = inner.call(req).await?;
             tracing::trace!("initialized new client");
             Ok::<_, Error>(Trace::new(client))
         };
 
-        todo!()
+        fut.boxed()
     }
 }
 
 impl<S> Service<Request> for Trace<S>
 where
-    S: Service<Request, Response = Response, Error = Error>,
+    S: Service<Request, Response = Response, Error = Error> + Clone + Send + 'static,
+    S::Future: Send + 'static,
 {
     type Response = Response;
     type Error = Error;
-    type Future = S::Future;
+    type Future = BoxFuture<'static, Result<S::Response, S::Error>>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -94,15 +85,15 @@ where
 
     #[inline]
     fn call(&mut self, req: Request) -> Self::Future {
-        let fut = async {
+        let mut inner = self.inner.clone();
+        let fut = async move {
             tracing::trace!(
                 lower = req.body().size_hint().lower(),
                 upper = req.body().size_hint().upper(),
                 "request body"
             );
 
-            let resp = self.inner.call(req).await?;
-
+            let resp = inner.call(req).await?;
             tracing::trace!(
                 status = resp.status().as_u16(),
                 lower = resp.body().size_hint().lower(),
@@ -113,17 +104,19 @@ where
             Ok::<_, Error>(resp)
         };
 
-        todo!()
+        fut.boxed()
     }
 }
 
-impl<S, B> Service<Cx<B>> for Trace<S>
+impl<S, C> Service<Cx<C>> for Trace<S>
 where
-    S: Service<Cx<B>, Response = Signal, Error = Infallible>,
+    S: Service<Cx<C>, Response = Signal, Error = Infallible> + Clone + Send + 'static,
+    C: Service<Request, Response = Response, Error = Error> + Send + 'static,
+    S::Future: Send + 'static,
 {
     type Response = Signal;
     type Error = Infallible;
-    type Future = S::Future;
+    type Future = BoxFuture<'static, Result<Signal, Infallible>>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -131,36 +124,28 @@ where
     }
 
     #[inline]
-    fn call(&mut self, req: Cx<B>) -> Self::Future {
-        let fut = async {
-            let requests = req.dataset::<Request>().into_inner();
+    fn call(&mut self, cx: Cx<C>) -> Self::Future {
+        let mut inner = self.inner.clone();
 
+        let fut = async move {
+            let requests = cx.dataset::<Request>().into_inner();
             tracing::trace!(
-                depth = req.get_ref().depth(),
+                depth = cx.get_ref().depth(),
                 requests = requests.len(),
-                "invoked handler"
+                "handler requested"
             );
 
-            let signal = self.inner.call(req).await.unwrap();
-            match &signal {
-                Signal::Continue | Signal::Wait(..) => {
-                    self.success_counter.fetch_add(1, Ordering::SeqCst);
-                }
-                Signal::Skip | Signal::Hold(..) | Signal::Fail(..) => {
-                    self.failure_counter.fetch_add(1, Ordering::SeqCst);
-                }
-            };
-
+            let signal = inner.call(cx).await;
             tracing::trace!(
                 // signal = signal.as_str(),
                 requests = requests.len(),
-                "returned handler"
+                "handler responded"
             );
 
             signal
         };
 
-        todo!()
+        fut.boxed()
     }
 }
 

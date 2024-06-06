@@ -16,9 +16,12 @@
 //! ### Utility
 //!
 //! - [`Trace`] is a tracing middleware for [`Backend`]s, [`Client`]s, and [`Worker`]s.
+//! - [`Metric`] is a [`Worker`] middleware for metrics collection. Implements `tower::`[`Load`].
 //! - [`Noop`] is a no-op [`Backend`], [`Client`] and [`Worker`] for testing and debugging.
 //!
 //! [`Trace`]: util::Trace
+//! [`Metric`]: util::Metric
+//! [`Load`]: tower::load::Load
 //! [`Noop`]: util::Noop
 
 use std::convert::Infallible;
@@ -30,7 +33,7 @@ use tower::{Service, ServiceExt};
 pub use client::HttpClient;
 #[cfg(feature = "driver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
-pub use driver::{BrowserClient, BrowserManager, BrowserPool};
+pub use driver::{BrowserBuilder, BrowserClient, BrowserPool};
 
 use crate::context::{Context, Request, Response, Signal};
 use crate::{Error, Result};

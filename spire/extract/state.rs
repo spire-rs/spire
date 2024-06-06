@@ -49,7 +49,7 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(_cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context_ref(_cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(T::from_ref(state)))
     }
 }

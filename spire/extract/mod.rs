@@ -78,7 +78,7 @@ pub trait FromContextRef<C, S>: Sized {
     type Rejection: IntoSignal;
 
     /// Extracts the value from the reference to the context.
-    async fn from_context_parts(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection>;
+    async fn from_context_ref(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection>;
 }
 
 /// Core trait for a consuming extractor.
@@ -105,7 +105,7 @@ where
     type Rejection = <Self as FromContextRef<C, S>>::Rejection;
 
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        Self::from_context_parts(&cx, state).await
+        Self::from_context_ref(&cx, state).await
     }
 }
 
@@ -118,8 +118,8 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        Ok(T::from_context_parts(cx, state).await.ok())
+    async fn from_context_ref(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
+        Ok(T::from_context_ref(cx, state).await.ok())
     }
 }
 
@@ -146,8 +146,8 @@ where
 {
     type Rejection = Infallible;
 
-    async fn from_context_parts(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        Ok(T::from_context_parts(cx, state).await)
+    async fn from_context_ref(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
+        Ok(T::from_context_ref(cx, state).await)
     }
 }
 

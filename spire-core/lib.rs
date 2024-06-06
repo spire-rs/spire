@@ -52,9 +52,9 @@ impl Error {
         self
     }
 
-    /// Marks the error as [`fatal`].
+    /// Marks the error as `fatal`. TODO.
     #[inline]
-    pub fn with_fatal(mut self, fatal: bool) -> Self {
+    pub const fn with_fatal(mut self, fatal: bool) -> Self {
         self.fatal = Some(fatal);
         self
     }
@@ -84,7 +84,7 @@ impl From<Infallible> for Error {
 impl From<http::Error> for Error {
     #[inline]
     fn from(error: http::Error) -> Self {
-        todo!()
+        Self::from(BoxError::from(error))
     }
 }
 

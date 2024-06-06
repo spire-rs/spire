@@ -1,120 +1,60 @@
-use std::collections::VecDeque;
-use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 
-use deadpool::managed::{Manager, Metrics, Pool, RecycleResult};
-use fantoccini::Client as WebClient;
+use deadpool::managed::{Manager, Metrics, PoolError, RecycleResult as RecResult};
 
-use crate::backend::BrowserPool;
-use crate::Error;
+use crate::backend::driver::BrowserConnection;
+use crate::backend::BrowserClient;
+use crate::{Error, Result};
 
-#[derive(Debug, Clone)]
-pub struct BrowserConn {
-    pub id: String,
-    pub client: WebClient,
-}
-
-/// [`BrowserPool`] builder. Manages browser connection and/or process.
+/// [`BrowserPool`] manager. Creates browser process and establishes connection.
 #[must_use]
-#[derive(Clone)]
 pub struct BrowserManager {
-    inner: Arc<BrowserManagerInner>,
-}
-
-struct BrowserManagerInner {
-    // builder: ClientBuilder<()>,
-    unmanaged_free: Mutex<Vec<String>>,
-    unmanaged_conn: Mutex<VecDeque<BrowserConn>>,
+    connections: HashMap<u64, BrowserConnection>,
 }
 
 impl BrowserManager {
     /// Creates a new [`BrowserManager`].
+    #[inline]
     pub fn new() -> Self {
-        // BLOCKED: https://github.com/jonhoo/fantoccini/pull/245
+        Self::default()
+    }
+
+    /// TODO.
+    pub fn with(&self, conn: BrowserConnection) -> Result<()> {
         todo!()
     }
 
-    /// Adds an unmanaged webdriver connection to the pool.
-    pub fn with_unmanaged<T>(self, webdriver: T) -> Self
-    where
-        T: AsRef<str>,
-    {
-        let mut guard = self.inner.unmanaged_free.lock().unwrap();
-        guard.push(webdriver.as_ref().to_owned());
-        drop(guard);
-
-        self
-    }
-
-    /// Adds a managed process and webdriver connection to the pool.
-    pub fn with_managed(self, command: &str, connect: &str) -> Self {
+    /// TODO.
+    fn autoscale(&self) -> Result<()> {
         todo!()
-    }
-
-    /// Constructs a new [`BrowserPool`].
-    pub fn build(self) -> BrowserPool {
-        let pool = Pool::builder(self).build();
-        pool.expect("should not require runtime").into()
     }
 }
 
 impl Default for BrowserManager {
     fn default() -> Self {
-        Self::new()
-    }
-}
+        // TODO: BLOCKED: https://github.com/jonhoo/fantoccini/pull/245
 
-impl fmt::Debug for BrowserManager {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BrowserManager").finish_non_exhaustive()
+        Self {
+            connections: HashMap::new(),
+        }
     }
 }
 
 impl Manager for BrowserManager {
-    type Type = BrowserConn;
+    type Type = BrowserClient;
     type Error = Error;
 
     async fn create(&self) -> Result<Self::Type, Self::Error> {
-        let mut guard = self.inner.unmanaged_conn.lock().unwrap();
-        let conn = guard.pop_front().unwrap();
-
-        Ok(conn)
+        todo!()
     }
 
-    async fn recycle(
-        &self,
-        client: &mut Self::Type,
-        metrics: &Metrics,
-    ) -> RecycleResult<Self::Error> {
-        // TODO: Metrics.
-        // let _ = metrics.recycled.unwrap_or_else(Instant::now);
-        //
-        // let inner = client.clone().into_inner();
-        // inner.close().await.map_err(Error::new)?;
-        // self.release(client.id());
-
-        Ok(())
+    async fn recycle(&self, obj: &mut Self::Type, metrics: &Metrics) -> RecResult<Self::Error> {
+        todo!()
     }
 }
 
-#[cfg(test)]
-mod test {
-    use crate::backend::driver::BrowserManager;
-
-    #[test]
-    fn with_unmanaged() {
-        let _ = BrowserManager::default()
-            .with_unmanaged("127.0.0.1:4444")
-            .with_unmanaged("127.0.0.1:4445")
-            .build();
-    }
-
-    #[test]
-    fn with_managed() {
-        let _ = BrowserManager::default()
-            .with_unmanaged("127.0.0.1:4444")
-            .with_unmanaged("127.0.0.1:4445")
-            .build();
+impl From<PoolError<Error>> for Error {
+    fn from(value: PoolError<Error>) -> Self {
         todo!()
     }
 }

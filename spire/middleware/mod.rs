@@ -1,8 +1,8 @@
-//! [`Worker`] middlewares.
+//! [`Backend`] and [`Worker`] middlewares.
 //!
+//! [`Backend`]: crate::backend::Backend
 //! [`Worker`]: crate::backend::Worker
 
-#[cfg(any(feature = "exclude", feature = "include"))]
 use tower::layer::util::Stack;
 use tower::ServiceBuilder;
 
@@ -12,8 +12,9 @@ pub use exclude::{Exclude, ExcludeLayer};
 #[cfg(feature = "include")]
 #[cfg_attr(docsrs, doc(cfg(feature = "include")))]
 pub use include::{Include, IncludeLayer};
-use spire_core::backend::{Backend, Client, Worker};
 
+#[cfg(feature = "metric")]
+use crate::backend::util::MetricLayer;
 #[cfg(feature = "trace")]
 use crate::backend::util::TraceLayer;
 
@@ -42,9 +43,13 @@ pub mod futures {
 
 /// Extension trait for `tower::`[`ServiceBuilder`].
 pub trait ServiceBuilderExt<L> {
+    #[cfg(feature = "metric")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric")))]
+    fn metric(self) -> ServiceBuilder<Stack<MetricLayer, L>>;
+
     /// Enables tracing middleware for improved observability.
     #[cfg(feature = "trace")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
     fn trace(self) -> ServiceBuilder<Stack<TraceLayer, L>>;
 
     /// Conditionally rejects [`Request`]s based on a retrieved `robots.txt` file.
@@ -64,6 +69,11 @@ pub trait ServiceBuilderExt<L> {
 }
 
 impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
+    #[cfg(feature = "metric")]
+    fn metric(self) -> ServiceBuilder<Stack<MetricLayer, L>> {
+        self.layer(MetricLayer::new())
+    }
+
     #[cfg(feature = "trace")]
     fn trace(self) -> ServiceBuilder<Stack<TraceLayer, L>> {
         self.layer(TraceLayer::new())

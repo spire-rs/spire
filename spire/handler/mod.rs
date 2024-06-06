@@ -105,7 +105,7 @@ macro_rules! impl_handler {
             fn call(self, cx: Context<C>, state: S) -> Self::Future {
                 Box::pin(async move {
                     $(
-                        let $ty = match $ty::from_context_parts(&cx, &state).await {
+                        let $ty = match $ty::from_context_ref(&cx, &state).await {
                             Ok(value) => value,
                             Err(rejection) => return rejection.into_signal(),
                         };

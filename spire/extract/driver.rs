@@ -3,9 +3,9 @@
 
 use std::ops::{Deref, DerefMut};
 
-use crate::backend::{BrowserClient, BrowserPool};
+use crate::backend::BrowserClient;
 use crate::context::Context;
-use crate::extract::{Elements, FromContextRef, Select};
+use crate::extract::{Elements, FromContext, FromContextRef, Select};
 use crate::Error;
 
 // TODO: Snapshot, Screen, Color, Capture, View.
@@ -17,11 +17,11 @@ use crate::Error;
 pub struct View(pub ());
 
 #[async_trait::async_trait]
-impl<S> FromContextRef<BrowserPool, S> for View {
+impl<S> FromContextRef<BrowserClient, S> for View {
     type Rejection = Error;
 
-    async fn from_context_parts(
-        cx: &Context<BrowserPool>,
+    async fn from_context_ref(
+        cx: &Context<BrowserClient>,
         state: &S,
     ) -> Result<Self, Self::Rejection> {
         todo!()
@@ -51,10 +51,11 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context_parts(
+    async fn from_context_ref(
         cx: &Context<BrowserClient>,
         state: &S,
     ) -> Result<Self, Self::Rejection> {
+        let View(view) = View::from_context_ref(cx, state).await?;
         todo!()
     }
 }

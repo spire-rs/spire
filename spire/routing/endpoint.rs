@@ -93,8 +93,6 @@ impl<C, S> fmt::Debug for Endpoint<C, S> {
     }
 }
 
-// TODO: fn invoke(&self, Cx<C>) -> Signal
-
 impl<C> Service<Cx<C>> for Endpoint<C, ()> {
     type Response = Signal;
     type Error = Infallible;

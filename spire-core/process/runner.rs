@@ -1,25 +1,23 @@
 use std::cmp::max;
-use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use futures::stream::{Abortable, AbortHandle};
+use futures::stream::{AbortHandle, Abortable};
 use futures::StreamExt;
 
 use crate::backend::{Backend, Worker};
 use crate::context::{Context, Tag, TagQuery, Task};
 use crate::context::{IntoSignal, Request, Signal};
 use crate::dataset::{Dataset, Datasets};
-use crate::process::notify::TagData;
 use crate::Result;
 
-/// TODO.
 pub struct Runner<B, W> {
-    pub service: W,
+    service: W,
     pub datasets: Datasets,
-    pub backend: B,
+    backend: B,
 
     pub initial: Mutex<Vec<Request>>,
     pub limit: AtomicUsize,
@@ -45,33 +43,11 @@ impl<B, W> Runner<B, W> {
         }
     }
 
-    /// Repeatedly call the used [`Backend`] until the [`Request`] queue is empty.
+    /// Repeatedly calls the used [`Backend`] until the [`Request`] queue is empty
+    /// or the stream is aborted with a [`Signal`].
     ///
     /// Returns the total amount of processed `Request`s.
-    pub async fn run_until_empty(&self) -> Result<usize>
-    where
-        B: Backend,
-        W: Worker<B::Client>,
-    {
-        let mut total = 0;
-        loop {
-            match self.run_until_signal().await? {
-                x if x > 0 => total += x,
-                _ => break,
-            }
-
-            #[cfg(feature = "tracing")]
-            tracing::info!(processed = total);
-        }
-
-        Ok(total)
-    }
-
-    /// Repeatedly call the used [`Backend`] until the [`Request`] queue is empty or
-    /// the stream is aborted with a [`Signal`].
-    ///
-    /// Returns the total amount of processed `Request`s.
-    async fn run_until_signal(&self) -> Result<usize>
+    pub async fn run(&self) -> Result<usize>
     where
         B: Backend,
         W: Worker<B::Client>,
@@ -93,18 +69,16 @@ impl<B, W> Runner<B, W> {
         let (handle, registration) = AbortHandle::new_pair();
         let stream = Abortable::new(dataset.into_stream(), registration);
 
-        let try_run_once = |x| async {
-            let result = match x {
-                Ok(req) => self.run_once(req).await,
-                Err(x) => self.notify(x.into_signal(), Tag::Fallback),
-            };
-
-            if result.is_err() {
-                handle.abort();
-            }
-        };
-
-        let stream = stream.map(try_run_once).buffered(concurrent_limit).count();
+        let stream = stream
+            // Abort on request queue/stream failures.
+            .filter_map(|x| async { x.inspect_err(|_| handle.abort()).ok() })
+            // Invoke the  underlying backend/worker.
+            .then(|x| async move { self.run_once(x).await })
+            // Abort on underlying backend/worker failures.
+            .map(|x| async { x.inspect_err(|_| handle.abort()) })
+            // Other.
+            .buffer_unordered(concurrent_limit)
+            .count();
 
         Ok(stream.await)
     }
@@ -114,12 +88,12 @@ impl<B, W> Runner<B, W> {
     /// # Errors
     ///
     /// Only if the `Request` stream should be aborted.
-    pub async fn run_once(&self, request: Request) -> Result<()>
+    pub async fn run_once(&self, req: Request) -> Result<()>
     where
         B: Backend,
         W: Worker<B::Client>,
     {
-        match self.call_service(request).await {
+        match self.call_service(req).await {
             Ok((signal, owner)) => self.notify(signal, owner),
             Err(x) => self.notify(x.into_signal(), Tag::Fallback),
         }
@@ -133,6 +107,8 @@ impl<B, W> Runner<B, W> {
         B: Backend,
         W: Worker<B::Client>,
     {
+        // TODO: Apply defer.
+
         let owner = request.tag().clone();
         let datasets = self.datasets.clone();
 
@@ -151,18 +127,37 @@ impl<B, W> Runner<B, W> {
     pub fn notify(&self, signal: Signal, owner: Tag) -> Result<()> {
         match signal {
             Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(x, owner, t),
-            Signal::Fail(x, _) => self.apply_block(x, owner),
-            Signal::Continue | Signal::Skip => Ok(()),
+            Signal::Fail(x, _) => self.apply_abort(x, owner)?,
+            Signal::Continue | Signal::Skip => {}
         }
+
+        Ok(())
     }
 
     /// Defers all [`Tag`]s as specified per [`TagQuery`].
-    fn apply_defer(&self, query: TagQuery, owner: Tag, duration: Duration) -> Result<()> {
-        todo!("apply_defer not implemented")
+    fn apply_defer(&self, query: TagQuery, owner: Tag, duration: Duration) {
+        let minimum = Instant::now() + duration;
+        let mut defer = self.defer.lock().unwrap();
+
+        let mut defer_one = |x: Tag| {
+            let _ = match defer.entry(x) {
+                Entry::Occupied(mut x) => x.insert(max(*x.get() + duration, minimum)),
+                Entry::Vacant(x) => *x.insert(minimum),
+            };
+        };
+
+        match query {
+            TagQuery::Owner => defer_one(owner),
+            TagQuery::Single(x) => defer_one(x),
+            TagQuery::Every => defer_one(Tag::Fallback),
+            TagQuery::List(x) => x.into_iter().for_each(defer_one),
+        };
     }
 
-    /// Blocks all [`Tag`]s as specified per [`TagQuery`].
-    fn apply_block(&self, query: TagQuery, owner: Tag) -> Result<()> {
-        todo!("apply_block not implemented")
+    /// Aborts all [`Tag`]s as specified per [`TagQuery`].
+    fn apply_abort(&self, query: TagQuery, owner: Tag) -> Result<()> {
+        // TODO: Implement `Runner::apply_abort`.
+
+        Ok(())
     }
 }

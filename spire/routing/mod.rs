@@ -25,14 +25,14 @@ mod tag_router;
 /// Composes and routes [`Handler`]s and `tower::`[`Service`]s.
 #[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct Router<C = (), S = ()> {
-    // TODO: Use Arc<TagRouter<C, S>>.
+    // TODO: Use Arc<TagRouter<C, S>>, reduce cloning.
     inner: TagRouter<C, S>,
 }
 
 impl<C, S> Router<C, S> {
-    /// Creates a new [`Router`] of the specified [`Backend`] type.
+    /// Creates a new [`Router`] of the specified [`Client`] type.
     ///
-    /// [`Backend`]: crate::backend::Backend
+    /// [`Client`]: crate::backend::Client
     pub fn new() -> Self
     where
         C: 'static,

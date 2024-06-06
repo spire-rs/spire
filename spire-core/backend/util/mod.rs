@@ -5,11 +5,17 @@
 //! [`Worker`]: crate::backend::Worker
 
 pub use debug::Noop;
+#[cfg(feature = "metric")]
+#[cfg_attr(docsrs, doc(cfg(feature = "metric")))]
+pub use metric::{Metric, MetricLayer};
 #[cfg(feature = "trace")]
 #[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
 pub use trace::{Trace, TraceLayer};
 
 mod debug;
+#[cfg(feature = "metric")]
+#[cfg_attr(docsrs, doc(cfg(feature = "metric")))]
+mod metric;
 #[cfg(feature = "trace")]
 #[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
 mod trace;

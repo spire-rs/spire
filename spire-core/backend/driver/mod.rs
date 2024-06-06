@@ -1,60 +1,63 @@
-use std::fmt;
-use std::future::Ready;
 use std::task::{Context, Poll};
 
 use deadpool::managed::Pool;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 use tower::Service;
 
+pub use builder::BrowserBuilder;
 pub use client::BrowserClient;
-pub use manager::BrowserManager;
+use connect::BrowserConnection;
+use manager::BrowserManager;
 
 use crate::{Error, Result};
 
+mod builder;
 mod client;
+mod connect;
 mod manager;
-mod process;
 
 /// Web-driver [`Backend`] built on top of [`fantoccini`] crate.
 /// Uses [`BrowserClient`] as a [`Client`].
 ///
 /// [`Backend`]: crate::backend::Backend
 /// [`Client`]: crate::backend::Client
-#[must_use]
+#[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 #[derive(Clone)]
 pub struct BrowserPool {
     pool: Pool<BrowserManager>,
 }
 
 impl BrowserPool {
-    pub(crate) async fn get(&self) -> Result<BrowserClient> {
-        // BoxFuture::new()
-
-        let inner = self.pool.get().await.unwrap(); // TODO.
-        Ok(inner.into())
+    /// Creates a new [`BrowserPool`].
+    #[inline]
+    pub fn new(pool: Pool<BrowserManager>) -> Self {
+        Self { pool }
     }
 
-    /// Creates a new [`BrowserManager`].
-    pub fn builder() -> BrowserManager {
-        BrowserManager::new()
+    /// Waits and returns an available [`BrowserClient`].
+    async fn client(&self) -> Result<BrowserClient> {
+        self.pool.get().await.map(Into::into).map_err(Into::into)
+    }
+
+    /// Creates a new [`BrowserBuilder`].
+    #[inline]
+    fn builder() -> BrowserBuilder {
+        BrowserBuilder::default()
     }
 }
 
 impl From<Pool<BrowserManager>> for BrowserPool {
+    #[inline]
     fn from(pool: Pool<BrowserManager>) -> Self {
-        Self { pool }
-    }
-}
-
-impl fmt::Debug for BrowserPool {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Driver").finish_non_exhaustive()
+        Self::new(pool)
     }
 }
 
 impl Service<()> for BrowserPool {
     type Response = BrowserClient;
     type Error = Error;
-    type Future = Ready<Result<Self::Response, Self::Error>>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -64,22 +67,20 @@ impl Service<()> for BrowserPool {
 
     #[inline]
     fn call(&mut self, _req: ()) -> Self::Future {
-        // self.pool.get().await
-        todo!()
+        let this = self.clone();
+        let fut = async move { this.client().await };
+
+        fut.boxed()
     }
 }
 
-#[cfg(test)]
+#[test]
 mod test {
-    use crate::backend::BrowserManager;
-    use crate::context::Request;
-    use crate::dataset::InMemDataset;
-    use crate::{BoxError, Client, Result};
+    use crate::backend::BrowserPool;
 
     #[test]
-    pub fn builder() {
-        let manager = BrowserManager::default();
-        let _ = manager.build();
+    fn build() {
+        let _ = BrowserPool::builder().build();
     }
 
     #[tokio::test]
@@ -88,13 +89,13 @@ mod test {
     async fn noop() -> crate::Result<()> {
         use crate::backend::util::Trace;
 
-        let pool = BrowserManager::default()
+        let pool = BrowserPool::builder()
             .with_unmanaged("127.0.0.1:4444")
             .with_unmanaged("127.0.0.1:4445")
             .build();
 
         let backend = Trace::new(pool);
-        let worker = Trace::default();
+        let worker = Trace::new(Noop::default());
 
         let request = Request::get("https://example.com/").body(());
         let client = crate::Client::new(backend, worker)

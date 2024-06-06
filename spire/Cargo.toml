@@ -32,7 +32,8 @@ full = ["client", "driver", "macros", "tracing"]
 tracing = ["dep:tracing", "spire-core/tracing"]
 macros = ["dep:spire-macros"]
 
-trace = []
+metric = ["spire-core/metric"]
+trace = ["spire-core/trace"]
 exclude = []
 include = []
 

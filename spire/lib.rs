@@ -10,6 +10,7 @@ pub use async_trait::async_trait;
 pub use routing::Router;
 pub use spire_core::{backend, context, dataset};
 pub use spire_core::{Error, Result};
+use spire_core::backend::Backend;
 
 pub mod extract;
 mod handler;
@@ -20,23 +21,26 @@ pub mod routing;
 ///
 /// [`Request`]: context::Request
 /// [`Backend`]: backend::Backend
-pub type Client<B, S = ()> = spire_core::Client<B, Router<<B as backend::Backend>::Client, S>>;
+pub type Client<B, W = Router<<B as Backend>::Client>> = spire_core::Client<B, W>;
 
 #[doc(hidden)]
 pub mod prelude {}
 
 #[cfg(test)]
 mod test {
-    use crate::context::RequestQueue;
-    use crate::dataset::{Data, InMemDataset};
+    use futures::SinkExt;
+
+    use spire_core::dataset::future::DataSink;
+
     use crate::{Client, Result, Router};
+    use crate::context::RequestQueue;
+    use crate::dataset::InMemDataset;
 
     #[test]
     #[cfg(feature = "client")]
     fn with_client() {
-        async fn handler(queue: RequestQueue, dataset: Data<u64>) -> Result<()> {
-            dataset.write(1).await?;
-            let _ = dataset.read().await?;
+        async fn handler(queue: RequestQueue, mut dataset: DataSink<u64>) -> Result<()> {
+            dataset.feed(1).await?;
 
             Ok(())
         }
@@ -57,9 +61,8 @@ mod test {
     #[test]
     #[cfg(feature = "driver")]
     fn with_driver() {
-        async fn handler(queue: RequestQueue, dataset: Data<u64>) -> Result<()> {
-            dataset.write(1).await?;
-            let _ = dataset.read().await?;
+        async fn handler(queue: RequestQueue, mut dataset: DataSink<u64>) -> Result<()> {
+            dataset.feed(1).await?;
 
             Ok(())
         }

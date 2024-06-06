@@ -9,7 +9,6 @@ use crate::dataset::{Data, Dataset};
 use crate::process::runner::Runner;
 use crate::{Error, Result};
 
-mod notify;
 mod runner;
 
 /// Orchestrates the processing of [`Request`]s using provided [`Backend`] and [`Worker`].
@@ -29,11 +28,14 @@ where
         Self { inner }
     }
 
-    /// Processes [`Request`]s with a provided [`Worker`] until the [`RequestQueue`] is empty.
+    /// Processes [`Request`]s with a provided [`Worker`] until the [`RequestQueue`] is empty
+    /// or the processing is aborted with a [`Signal`].
+    ///
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
+    /// [`Signal`]: crate::context::Signal
     pub async fn run(&self) -> Result<usize> {
-        self.inner.run_until_empty().await
+        self.inner.run().await
     }
 
     /// Processes a single provided [`Request`].
@@ -45,8 +47,8 @@ where
     /// Does not process the [`RequestQueue`].
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
-    pub async fn run_once(&self, request: Request) -> Result<()> {
-        self.inner.run_once(request).await
+    pub async fn run_once(&self, req: Request) -> Result<()> {
+        self.inner.run_once(req).await
     }
 }
 

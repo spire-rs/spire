@@ -1,12 +1,21 @@
+use std::convert::Infallible;
 use std::fmt;
+use std::future::{ready, Ready};
+use std::task::{Context, Poll};
 
-use crate::backend::{Backend, Client, Worker};
-use crate::context::{Body, Context, IntoSignal, Request, Response, Signal};
-use crate::Result;
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use tower::Service;
 
-// TODO: Make Debug into Service.
+use crate::context::{Body, IntoSignal, Signal};
+use crate::context::{Context as Cx, Request, Response};
+use crate::{Error, Result};
 
 /// No-op [`Backend`], [`Client`] and [`Worker`] used for testing and debugging.
+///
+/// [`Backend`]: crate::backend::Backend
+/// [`Client`]: crate::backend::Client
+/// [`Worker`]: crate::backend::Worker
 #[must_use]
 #[derive(Clone, Default)]
 pub struct Noop {
@@ -22,41 +31,73 @@ impl Noop {
 
 impl fmt::Debug for Noop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DebugEntity").finish_non_exhaustive()
+        f.debug_struct("Noop").finish_non_exhaustive()
     }
 }
 
-#[async_trait::async_trait]
-impl Backend for Noop {
-    type Client = Self;
+impl Service<()> for Noop {
+    type Response = Self;
+    type Error = Error;
+    type Future = Ready<Result<Self, Error>>;
 
     #[inline]
-    async fn client(&self) -> Result<Self::Client> {
-        Ok(self.clone())
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
-}
 
-#[async_trait::async_trait]
-impl Client for Noop {
     #[inline]
-    async fn resolve(self, _: Request) -> Result<Response> {
-        Ok(Response::new(Body::default()))
+    fn call(&mut self, _req: ()) -> Self::Future {
+        ready(Ok(self.clone()))
     }
 }
 
-#[async_trait::async_trait]
-impl<C> Worker<C> for Noop
+impl Service<Request> for Noop {
+    type Response = Response;
+    type Error = Error;
+    type Future = Ready<Result<Response, Error>>;
+
+    #[inline]
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn call(&mut self, _req: Request) -> Self::Future {
+        ready(Ok(Response::new(Body::default())))
+    }
+}
+
+impl<C> Service<Cx<C>> for Noop
 where
-    C: Client,
+    C: Service<Request, Response = Response, Error = Error> + Send + 'static,
+    C::Future: Send,
 {
-    async fn invoke(self, cx: Context<C>) -> Signal {
-        match self.always {
-            Some(true) => return Signal::Continue,
-            Some(false) => return Signal::Skip,
-            _ => {}
+    type Response = Signal;
+    type Error = Infallible;
+    type Future = BoxFuture<'static, Result<Signal, Infallible>>;
+
+    #[inline]
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline]
+    fn call(&mut self, cx: Cx<C>) -> Self::Future {
+        if let Some(always) = self.always {
+            let signal = if always {
+                Signal::Continue
+            } else {
+                Signal::Skip
+            };
+
+            return ready(Ok(signal)).boxed();
         }
 
-        let resp = cx.resolve().await;
-        resp.map_or_else(IntoSignal::into_signal, |_| Signal::default())
+        let fut = async {
+            let response = cx.resolve().await;
+            Ok(response.map_or_else(IntoSignal::into_signal, |_| Signal::Continue))
+        };
+
+        fut.boxed()
     }
 }
