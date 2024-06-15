@@ -1,4 +1,4 @@
-//! Various utility [`Backend`]s, [`Client`]s and [`Worker`]s.
+//! Various utility [`Backend`], [`Client`] and [`Worker`] middlewares.
 //!
 //! [`Backend`]: crate::backend::Backend
 //! [`Client`]: crate::backend::Client
@@ -19,6 +19,19 @@ mod metric;
 #[cfg(feature = "trace")]
 #[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
 mod trace;
+
+pub mod futures {
+    //! Future types for [`spire-core`] middlewares.
+    //!
+    //! [`spire-core`]: crate
+
+    #[cfg(feature = "metric")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric")))]
+    pub use crate::backend::util::metric::MetricFuture;
+    #[cfg(feature = "trace")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
+    pub use crate::backend::util::trace::TraceFuture;
+}
 
 #[cfg(test)]
 mod test {
@@ -48,7 +61,7 @@ mod test {
     async fn noop_trace() -> Result<()> {
         use crate::backend::util::Trace;
 
-        let entity = Trace::default();
+        let entity = Trace::new(Noop::default());
         let request = Request::get("https://example.com/").body(());
         let client = Client::new(entity.clone(), entity)
             .with_request_queue(InMemDataset::stack())

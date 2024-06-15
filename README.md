@@ -24,9 +24,6 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 
 #### Crates
 
-- [spire](./spire/): Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-  Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-- [spire-core](./spire-core/): Lorem ipsum dolor sit amet, consectetur
-  adipiscing elit. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-- [spire-macros](./spire-macros/): Lorem ipsum dolor sit amet, consectetur
-  adipiscing elit. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+- [spire](./spire/): extraction and routing utilities.
+- [spire-core](./spire-core/): core types and traits.
+- [spire-macros](./spire-macros/): procedural macros.

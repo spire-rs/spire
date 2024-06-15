@@ -7,18 +7,18 @@ use crate::dataset::Dataset;
 /// [`boxed_clone`]: crate::dataset::DatasetExt::boxed_clone
 #[must_use]
 pub struct BoxCloneDataset<T, E> {
-    dataset: Box<dyn CloneDataset<T, Error = E>>,
+    dataset: Box<dyn CloneBoxDataset<T, Error = E>>,
 }
 
-trait CloneDataset<T>: Dataset<T> {
-    fn clone_box(&self) -> Box<dyn CloneDataset<T, Error = Self::Error> + Send>;
+trait CloneBoxDataset<T>: Dataset<T> {
+    fn clone_box(&self) -> Box<dyn CloneBoxDataset<T, Error = Self::Error> + Send>;
 }
 
-impl<D, T> CloneDataset<T> for D
+impl<D, T> CloneBoxDataset<T> for D
 where
     D: Dataset<T> + Clone + 'static,
 {
-    fn clone_box(&self) -> Box<dyn CloneDataset<T, Error = D::Error> + Send> {
+    fn clone_box(&self) -> Box<dyn CloneBoxDataset<T, Error = D::Error> + Send> {
         Box::new(self.clone())
     }
 }

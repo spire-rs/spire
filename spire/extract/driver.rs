@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::backend::BrowserClient;
 use crate::context::Context;
-use crate::extract::{Elements, FromContext, FromContextRef, Select};
+use crate::extract::{Elements, FromContextRef, Select};
 use crate::Error;
 
 // TODO: Snapshot, Screen, Color, Capture, View.

@@ -13,7 +13,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.1-rc.1"
 edition = "2021"
 readme = "./README.md"
 license = "MIT"
@@ -24,12 +24,12 @@ homepage = "https://github.com/spire-rs/spire"
 documentation = "https://docs.rs/spire"
 
 [workspace.dependencies]
-spire = { path = "./spire", version = "0.1.1" }
-spire-core = { path = "./spire-core", version = "0.1.1" }
-spire-macros = { path = "./spire-macros", version = "0.1.1" }
+spire = { path = "./spire", version = "0.1.1-rc.1" }
+spire-core = { path = "./spire-core", version = "0.1.1-rc.1" }
+spire-macros = { path = "./spire-macros", version = "0.1.1-rc.1" }
 
-tower = { version = "0.4.13", default-features = false }
-bytes = { version = "1.6.0", default-features = false }
-futures = { version = "0.3.30", default-features = false }
-async-trait = { version = "0.1.80", default-features = false }
-
+tower = { version = "0.4", default-features = false }
+bytes = { version = "1.6", default-features = false }
+futures = { version = "0.3", default-features = false }
+async-trait = { version = "0.1", default-features = false }
+pin-project-lite = { version = "0.2", default-features = false }

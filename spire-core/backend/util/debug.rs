@@ -11,13 +11,15 @@ use crate::context::{Body, IntoSignal, Signal};
 use crate::context::{Context as Cx, Request, Response};
 use crate::{Error, Result};
 
-/// No-op [`Backend`], [`Client`] and [`Worker`] used for testing and debugging.
+/// No-op `tower::`[`Service`] used for testing and debugging.
+///
+/// Supports [`Backend`], [`Client`] and [`Worker`].
 ///
 /// [`Backend`]: crate::backend::Backend
 /// [`Client`]: crate::backend::Client
 /// [`Worker`]: crate::backend::Worker
-#[must_use]
 #[derive(Clone, Default)]
+#[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct Noop {
     always: Option<bool>,
 }
@@ -93,7 +95,7 @@ where
             return ready(Ok(signal)).boxed();
         }
 
-        let fut = async {
+        let fut = async move {
             let response = cx.resolve().await;
             Ok(response.map_or_else(IntoSignal::into_signal, |_| Signal::Continue))
         };

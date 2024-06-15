@@ -1,18 +1,21 @@
 use std::convert::Infallible;
 use std::fmt;
-use std::sync::Arc;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use tower::{Layer, Service};
+use pin_project_lite::pin_project;
 use tower::load::Load;
+use tower::{Layer, Service};
 
 use crate::context::{Context as Cx, Request, Response, Signal};
 use crate::Error;
 
-/// Metric collection [`Worker`] middleware.
+/// Metric collection `tower::`[`Service`] for [`Worker`]s.
 ///
 /// Implements `tower::`[`Load`].
 ///
@@ -62,7 +65,7 @@ where
 {
     type Response = Signal;
     type Error = Infallible;
-    type Future = BoxFuture<'static, Result<S::Response, S::Error>>;
+    type Future = MetricFuture;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -86,7 +89,7 @@ where
             Ok(signal)
         };
 
-        fut.boxed()
+        MetricFuture::new(fut.boxed())
     }
 }
 
@@ -97,6 +100,32 @@ impl<S> Load for Metric<S> {
         let success = self.metrics.success.load(Ordering::SeqCst);
         let failure = self.metrics.failure.load(Ordering::SeqCst);
         success - failure
+    }
+}
+
+pin_project! {
+    /// Response [`Future`] for [`Metric`].
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct MetricFuture {
+        #[pin] fut: BoxFuture<'static, Result<Signal, Infallible>>,
+    }
+}
+
+impl MetricFuture {
+    /// Creates a new [`MetricFuture`].
+    #[inline]
+    fn new(fut: BoxFuture<'static, crate::Result<Signal, Infallible>>) -> Self {
+        Self { fut }
+    }
+}
+
+impl Future for MetricFuture {
+    type Output = Result<Signal, Infallible>;
+
+    #[inline]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        this.fut.poll(cx)
     }
 }
 

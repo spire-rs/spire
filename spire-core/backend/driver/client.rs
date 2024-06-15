@@ -17,10 +17,9 @@ use crate::{Error, Result};
 /// Implements [`Deref`] to `fantoccini::`[`Client`].
 ///
 /// [`BrowserPool`]: crate::backend::BrowserPool
+/// [`Client`]: WebClient
 #[derive(Clone)]
 pub struct BrowserClient(Arc<Object<BrowserManager>>);
-
-impl BrowserClient {}
 
 impl From<Object<BrowserManager>> for BrowserClient {
     #[inline]
@@ -50,7 +49,7 @@ impl Service<Request> for BrowserClient {
 
     #[inline]
     fn call(&mut self, req: Request) -> Self::Future {
-        let fut = async {
+        let fut = async move {
             let response = Response::new(Body::default());
             Ok::<Response, Error>(response)
         };

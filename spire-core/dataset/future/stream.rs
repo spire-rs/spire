@@ -5,7 +5,7 @@ use futures::stream::{unfold, BoxStream};
 use futures::{Stream, StreamExt};
 
 use crate::dataset::Dataset;
-use crate::Error;
+use crate::{Error, Result};
 
 ///`futures::`[`Stream`] for [`Dataset`]s.
 ///
@@ -37,7 +37,7 @@ impl<T, E> DataStream<T, E> {
 }
 
 impl<T, E> Stream for DataStream<T, E> {
-    type Item = crate::Result<T, E>;
+    type Item = Result<T, E>;
 
     #[inline]
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

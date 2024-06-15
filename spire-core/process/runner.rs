@@ -156,7 +156,9 @@ impl<B, W> Runner<B, W> {
 
     /// Aborts all [`Tag`]s as specified per [`TagQuery`].
     fn apply_abort(&self, query: TagQuery, owner: Tag) -> Result<()> {
-        // TODO: Implement `Runner::apply_abort`.
+        // TODO: Implement `Runner::apply_abort`.]
+        let _ = query;
+        let _ = owner;
 
         Ok(())
     }

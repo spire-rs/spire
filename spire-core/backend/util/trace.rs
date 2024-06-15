@@ -1,20 +1,22 @@
 use std::convert::Infallible;
 use std::fmt;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::future::Future;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
-use futures::{FutureExt, StreamExt};
+use futures::FutureExt;
 use http_body::Body;
-use tower::{Layer, Service, ServiceExt};
+use pin_project_lite::pin_project;
+use tower::{Layer, Service};
 
-use crate::backend::util::Noop;
 use crate::context::{Context as Cx, Request, Response, Signal, Task};
 use crate::dataset::Dataset;
 use crate::{Error, Result};
 
-/// Tracing [`Backend`], [`Client`] and [`Worker`] middleware for improved observability.
+/// Tracing `tower::`[`Service`] for improved observability.
+///
+/// Supports [`Backend`], [`Client`] and [`Worker`].
 ///
 /// [`Backend`]: crate::backend::Backend
 /// [`Client`]: crate::backend::Client
@@ -49,7 +51,7 @@ where
 {
     type Response = Trace<S::Response>;
     type Error = S::Error;
-    type Future = BoxFuture<'static, Result<Trace<S::Response>, S::Error>>;
+    type Future = TraceFuture<Trace<S::Response>, S::Error>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -65,7 +67,7 @@ where
             Ok::<_, Error>(Trace::new(client))
         };
 
-        fut.boxed()
+        TraceFuture::new(fut.boxed())
     }
 }
 
@@ -76,7 +78,7 @@ where
 {
     type Response = Response;
     type Error = Error;
-    type Future = BoxFuture<'static, Result<S::Response, S::Error>>;
+    type Future = TraceFuture<S::Response, S::Error>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -104,7 +106,7 @@ where
             Ok::<_, Error>(resp)
         };
 
-        fut.boxed()
+        TraceFuture::new(fut.boxed())
     }
 }
 
@@ -116,7 +118,7 @@ where
 {
     type Response = Signal;
     type Error = Infallible;
-    type Future = BoxFuture<'static, Result<Signal, Infallible>>;
+    type Future = TraceFuture<S::Response, S::Error>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -145,7 +147,33 @@ where
             signal
         };
 
-        fut.boxed()
+        TraceFuture::new(fut.boxed())
+    }
+}
+
+pin_project! {
+    /// Response [`Future`] for [`Trace`].
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct TraceFuture<T, E> {
+        #[pin] fut: BoxFuture<'static, Result<T, E>>,
+    }
+}
+
+impl<T, E> TraceFuture<T, E> {
+    /// Creates a new [`TraceFuture`].
+    #[inline]
+    fn new(fut: BoxFuture<'static, Result<T, E>>) -> Self {
+        Self { fut }
+    }
+}
+
+impl<T, E> Future for TraceFuture<T, E> {
+    type Output = Result<T, E>;
+
+    #[inline]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        this.fut.poll(cx)
     }
 }
 

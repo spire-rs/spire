@@ -41,7 +41,7 @@ impl HttpClient {
 
 impl Default for HttpClient {
     fn default() -> Self {
-        todo!()
+        todo!("impl Default for HttpClient")
     }
 }
 
@@ -102,7 +102,7 @@ mod test {
     use reqwest::{Error as RwError, Response as RwResponse};
     use tower::ServiceBuilder;
 
-    use crate::backend::util::Noop;
+    use crate::backend::util::{Noop, Trace};
     use crate::backend::HttpClient;
     use crate::context::{Request, Response};
     use crate::dataset::InMemDataset;
@@ -123,11 +123,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(feature = "tracing")]
-    #[tracing_test::traced_test]
+    #[cfg_attr(feature = "tracing", tracing_test::traced_test)]
     async fn noop() -> Result<()> {
-        use crate::backend::util::Trace;
-
         let backend = Trace::new(HttpClient::default());
         let worker = Trace::new(Noop::default());
 
@@ -139,6 +136,7 @@ mod test {
 
         let _ = client.dataset::<u64>();
         let _ = client.run().await?;
+
         Ok(())
     }
 }

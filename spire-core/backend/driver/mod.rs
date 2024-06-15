@@ -31,7 +31,7 @@ pub struct BrowserPool {
 impl BrowserPool {
     /// Creates a new [`BrowserPool`].
     #[inline]
-    pub fn new(pool: Pool<BrowserManager>) -> Self {
+    fn new(pool: Pool<BrowserManager>) -> Self {
         Self { pool }
     }
 
@@ -42,7 +42,7 @@ impl BrowserPool {
 
     /// Creates a new [`BrowserBuilder`].
     #[inline]
-    fn builder() -> BrowserBuilder {
+    pub fn builder() -> BrowserBuilder {
         BrowserBuilder::default()
     }
 }
@@ -51,6 +51,12 @@ impl From<Pool<BrowserManager>> for BrowserPool {
     #[inline]
     fn from(pool: Pool<BrowserManager>) -> Self {
         Self::new(pool)
+    }
+}
+
+impl Default for BrowserPool {
+    fn default() -> Self {
+        todo!()
     }
 }
 
@@ -74,9 +80,13 @@ impl Service<()> for BrowserPool {
     }
 }
 
-#[test]
+#[cfg(test)]
 mod test {
+    use crate::backend::util::{Noop, Trace};
     use crate::backend::BrowserPool;
+    use crate::context::Request;
+    use crate::dataset::InMemDataset;
+    use crate::{Client, Result};
 
     #[test]
     fn build() {
@@ -84,11 +94,8 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(feature = "tracing")]
-    #[tracing_test::traced_test]
-    async fn noop() -> crate::Result<()> {
-        use crate::backend::util::Trace;
-
+    #[cfg_attr(feature = "tracing", tracing_test::traced_test)]
+    async fn noop() -> Result<()> {
         let pool = BrowserPool::builder()
             .with_unmanaged("127.0.0.1:4444")
             .with_unmanaged("127.0.0.1:4445")
@@ -98,13 +105,14 @@ mod test {
         let worker = Trace::new(Noop::default());
 
         let request = Request::get("https://example.com/").body(());
-        let client = crate::Client::new(backend, worker)
+        let client = Client::new(backend, worker)
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new())
             .with_initial_request(request.unwrap());
 
         let _ = client.dataset::<u64>();
         let _ = client.run().await?;
+
         Ok(())
     }
 }

@@ -8,9 +8,9 @@ pub use async_trait::async_trait;
 
 #[doc(inline)]
 pub use routing::Router;
+use spire_core::backend::Backend;
 pub use spire_core::{backend, context, dataset};
 pub use spire_core::{Error, Result};
-use spire_core::backend::Backend;
 
 pub mod extract;
 mod handler;
@@ -32,22 +32,21 @@ mod test {
 
     use spire_core::dataset::future::DataSink;
 
-    use crate::{Client, Result, Router};
     use crate::context::RequestQueue;
     use crate::dataset::InMemDataset;
+    use crate::{Client, Result, Router};
 
     #[test]
     #[cfg(feature = "client")]
     fn with_client() {
         async fn handler(queue: RequestQueue, mut dataset: DataSink<u64>) -> Result<()> {
             dataset.feed(1).await?;
-
             Ok(())
         }
 
         let router = Router::new()
-            .route("main$", handler)
-            .route("page*", handler)
+            .route("main", handler)
+            .route("page", handler)
             .fallback(handler);
 
         let backend = crate::backend::HttpClient::default();
@@ -63,13 +62,12 @@ mod test {
     fn with_driver() {
         async fn handler(queue: RequestQueue, mut dataset: DataSink<u64>) -> Result<()> {
             dataset.feed(1).await?;
-
             Ok(())
         }
 
         let router = Router::new()
-            .route("main$", handler)
-            .route("page*", handler)
+            .route("main", handler)
+            .route("page", handler)
             .fallback(handler);
 
         let backend = crate::backend::BrowserPool::builder().build();

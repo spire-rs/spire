@@ -7,6 +7,8 @@
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
 
+[!WARNING] Work in progress.
+
 [action-badge]: https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yaml?branch=main&label=build&logo=github&style=flat-square
 [action-url]: https://github.com/spire-rs/spire/actions/workflows/build.yaml
 [crates-badge]: https://img.shields.io/crates/v/spire.svg?logo=rust&style=flat-square
@@ -48,6 +50,6 @@ fn main() {
 
 #### Notes
 
-- `routing` uses Extract as Argument pattern from [axum][tokio-rs/axum].
+- `routing` uses `extract as argument` pattern from [axum][tokio-rs/axum].
 
 [tokio-rs/axum]: https://github.com/tokio-rs/axum/

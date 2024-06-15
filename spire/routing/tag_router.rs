@@ -29,6 +29,11 @@ impl<C, S> TagRouter<C, S> {
         }
     }
 
+    /// Inserts a routed endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Panics if overrides an already inserted route.
     pub fn route(&mut self, tag: Tag, endpoint: Endpoint<C, S>) {
         if tag.is_fallback() {
             self.fallback(endpoint);
@@ -41,6 +46,11 @@ impl<C, S> TagRouter<C, S> {
         );
     }
 
+    /// Inserts a fallback endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Panics if overrides an already inserted fallback.
     pub fn fallback(&mut self, endpoint: Endpoint<C, S>) {
         assert!(
             self.fallback.replace(endpoint).is_none(),
@@ -48,7 +58,8 @@ impl<C, S> TagRouter<C, S> {
         );
     }
 
-    pub fn layer<F>(mut self, func: F) -> Self
+    /// TODO.
+    pub fn map<F>(mut self, func: F) -> Self
     where
         F: Fn(Tag, Endpoint<C, S>) -> (Tag, Endpoint<C, S>),
     {
@@ -58,6 +69,7 @@ impl<C, S> TagRouter<C, S> {
         self
     }
 
+    /// TODO.
     pub fn merge(&mut self, other: Self) {
         if let Some(endpoint) = other.fallback {
             self.fallback(endpoint);
@@ -68,6 +80,7 @@ impl<C, S> TagRouter<C, S> {
         }
     }
 
+    /// TODO.
     pub fn with_state<S2>(self, state: S) -> TagRouter<C, S2>
     where
         S: Clone,

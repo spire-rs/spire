@@ -1,9 +1,10 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
-#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+// #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 use std::convert::Infallible;
+use std::time::Duration;
 
 #[doc(no_inline)]
 pub use async_trait::async_trait;
@@ -29,8 +30,7 @@ pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 #[error("{inner}")]
 pub struct Error {
     inner: BoxError,
-    fatal: Option<bool>,
-    query: TagQuery,
+    query: Option<TagQuery>,
 }
 
 impl Error {
@@ -38,28 +38,22 @@ impl Error {
     pub fn new(error: impl Into<BoxError>) -> Self {
         Self {
             inner: error.into(),
-            fatal: None,
-            query: TagQuery::Owner,
+            query: None,
         }
     }
 
     /// Overrides the current [`TagQuery`].
     ///
-    /// [`TagQuery::Owner`] by default.
+    /// Terminates all collector tasks with matching [`Tag`]s.
+    ///
+    /// [`Tag`]: crate::context::Tag
     #[inline]
-    pub fn with_query(mut self, query: impl Into<TagQuery>) -> Self {
-        self.query = query.into();
+    pub fn with_query(mut self, query: TagQuery) -> Self {
+        self.query = Some(query);
         self
     }
 
-    /// Marks the error as `fatal`. TODO.
-    #[inline]
-    pub const fn with_fatal(mut self, fatal: bool) -> Self {
-        self.fatal = Some(fatal);
-        self
-    }
-
-    /// Returns inner error.
+    /// Returns the inner error.
     #[inline]
     #[must_use]
     pub fn into_inner(self) -> BoxError {
@@ -90,7 +84,10 @@ impl From<http::Error> for Error {
 
 impl IntoSignal for Error {
     fn into_signal(self) -> Signal {
-        Signal::Fail(self.query, self.inner)
+        match self.query {
+            Some(query) => Signal::Fail(query, self.inner),
+            None => Signal::Hold(TagQuery::Owner, Duration::default()),
+        }
     }
 }
 
@@ -99,3 +96,5 @@ impl IntoSignal for Error {
 /// [`Result`]: std::result::Result
 /// [`Request`]: context::Request
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+// TODO: better oneshot request client

@@ -41,6 +41,11 @@ impl<C, S> Router<C, S> {
         Self { inner }
     }
 
+    /// Inserts a routed endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Panics if overrides an already inserted route.
     pub fn route<H, V>(mut self, tag: impl Into<Tag>, handler: H) -> Self
     where
         C: 'static,
@@ -54,6 +59,11 @@ impl<C, S> Router<C, S> {
         self
     }
 
+    /// Inserts a routed endpoint with a provided `tower::`[`Service`].
+    ///
+    /// # Errors
+    ///
+    /// Panics if overrides an already inserted route.
     pub fn route_service<H>(mut self, tag: impl Into<Tag>, service: H) -> Self
     where
         C: 'static,
@@ -67,10 +77,15 @@ impl<C, S> Router<C, S> {
         self
     }
 
-    /// Replaces the current fallback [`Handler`].
+    /// Replaces the default fallback [`Handler`].
+    ///
     /// Fallback handler processes all tasks without matching [`Tag`]s.
     ///
     /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
+    ///
+    /// # Errors
+    ///
+    /// Panics if overrides an already inserted fallback.
     pub fn fallback<H, V>(mut self, handler: H) -> Self
     where
         C: 'static,
@@ -84,10 +99,15 @@ impl<C, S> Router<C, S> {
         self
     }
 
-    /// Replaces the current fallback [`Handler`] with a provided `tower::`[`Service`].
+    /// Replaces the default fallback [`Handler`] with a provided `tower::`[`Service`].
+    ///
     /// Fallback handler processes all tasks without matching [`Tag`]s.
     ///
     /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
+    ///
+    /// # Errors
+    ///
+    /// Panics if overrides an already inserted fallback.
     pub fn fallback_service<H>(mut self, service: H) -> Self
     where
         C: 'static,
@@ -107,6 +127,7 @@ impl<C, S> Router<C, S> {
         self
     }
 
+    /// TODO.
     pub fn layer<L>(self, layer: L) -> Self
     where
         C: 'static,
@@ -119,10 +140,11 @@ impl<C, S> Router<C, S> {
     {
         let remap = |k: Tag, v: Endpoint<C, S>| (k, v.layer(layer.clone()));
         Self {
-            inner: self.inner.layer(remap),
+            inner: self.inner.map(remap),
         }
     }
 
+    /// TODO.
     pub fn with_state<S2>(self, state: S) -> Router<C, S2>
     where
         S: Clone,

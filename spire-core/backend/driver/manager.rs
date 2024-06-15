@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use deadpool::managed::{Manager, Metrics, PoolError, RecycleResult as RecResult};
 
 use crate::backend::driver::BrowserConnection;
-use crate::backend::BrowserClient;
 use crate::{Error, Result};
 
 /// [`BrowserPool`] manager. Creates browser process and establishes connection.
@@ -41,7 +40,7 @@ impl Default for BrowserManager {
 }
 
 impl Manager for BrowserManager {
-    type Type = BrowserClient;
+    type Type = BrowserConnection;
     type Error = Error;
 
     async fn create(&self) -> Result<Self::Type, Self::Error> {
