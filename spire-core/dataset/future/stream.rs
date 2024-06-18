@@ -21,7 +21,7 @@ impl<T, E> DataStream<T, E> {
     /// Creates a new [`DataStream`].
     pub(crate) fn new<D>(dataset: D) -> Self
     where
-        D: Dataset<T, Error = E>,
+        D: Dataset<T, Error = E> + 'static,
         T: Send + 'static,
         E: Send + 'static,
     {

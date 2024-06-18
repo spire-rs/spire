@@ -7,7 +7,7 @@ pub use sink::DataSink;
 pub use stream::DataStream;
 
 use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::Dataset;
+use crate::dataset::DatasetExt;
 use crate::Error;
 
 mod sink;
@@ -64,7 +64,7 @@ impl<T> fmt::Debug for Data<T> {
 mod test {
     use futures::{SinkExt, StreamExt};
 
-    use crate::dataset::{Dataset, InMemDataset};
+    use crate::dataset::{DatasetExt, InMemDataset};
     use crate::Result;
 
     #[tokio::test]

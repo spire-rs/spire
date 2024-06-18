@@ -3,6 +3,12 @@
 //! [`Backend`]: crate::backend::Backend
 //! [`Worker`]: crate::backend::Worker
 
+#[cfg(any(
+    feature = "exclude",
+    feature = "include",
+    feature = "metric",
+    feature = "trace"
+))]
 use tower::layer::util::Stack;
 use tower::ServiceBuilder;
 

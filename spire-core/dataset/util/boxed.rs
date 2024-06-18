@@ -12,6 +12,7 @@ pub struct BoxDataset<T, E> {
 
 impl<T, E> BoxDataset<T, E> {
     /// Creates a new [`BoxDataset`].
+    #[inline]
     pub fn new<D>(dataset: D) -> Self
     where
         D: Dataset<T, Error = E> + 'static,
@@ -22,6 +23,7 @@ impl<T, E> BoxDataset<T, E> {
 }
 
 impl<T, E> fmt::Debug for BoxDataset<T, E> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BoxDataset").finish_non_exhaustive()
     }

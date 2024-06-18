@@ -14,6 +14,7 @@ pub struct MapErr<D, F> {
 
 impl<D, F> MapErr<D, F> {
     /// Creates a new [`MapErr`].
+    #[inline]
     pub const fn new(inner: D, f: F) -> Self {
         Self { inner, f }
     }
@@ -23,6 +24,7 @@ impl<D, F> fmt::Debug for MapErr<D, F>
 where
     D: fmt::Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.inner, f)
     }
@@ -32,7 +34,7 @@ where
 impl<T, D, F, E2> Dataset<T> for MapErr<D, F>
 where
     T: Send + Sync + 'static,
-    D: Dataset<T>,
+    D: Dataset<T> + 'static,
     F: Fn(D::Error) -> E2 + Send + Sync + 'static,
 {
     type Error = E2;

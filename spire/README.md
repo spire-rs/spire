@@ -35,17 +35,13 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 - `spire::backend::HttpClient`:
 
 ```rust
-fn main() {
-    println!("Hello!");
-}
+println!("Hello!");
 ```
 
 - `spire::backend::BrowserPool`:
 
 ```rust
-fn main() {
-    println!("Hello!");
-}
+println!("Hello!");
 ```
 
 #### Notes

@@ -10,7 +10,7 @@ pub struct BoxCloneDataset<T, E> {
     dataset: Box<dyn CloneBoxDataset<T, Error = E>>,
 }
 
-trait CloneBoxDataset<T>: Dataset<T> {
+trait CloneBoxDataset<T>: Dataset<T> + 'static {
     fn clone_box(&self) -> Box<dyn CloneBoxDataset<T, Error = Self::Error> + Send>;
 }
 
@@ -18,6 +18,7 @@ impl<D, T> CloneBoxDataset<T> for D
 where
     D: Dataset<T> + Clone + 'static,
 {
+    #[inline]
     fn clone_box(&self) -> Box<dyn CloneBoxDataset<T, Error = D::Error> + Send> {
         Box::new(self.clone())
     }
@@ -25,9 +26,10 @@ where
 
 impl<T, E> BoxCloneDataset<T, E> {
     /// Creates a new [`BoxCloneDataset`].
+    #[inline]
     pub fn new<D>(dataset: D) -> Self
     where
-        D: Dataset<T, Error = E> + Clone,
+        D: Dataset<T, Error = E> + Clone + 'static,
     {
         let dataset = Box::new(dataset);
         Self { dataset }
@@ -46,6 +48,7 @@ where
 }
 
 impl<T, E> fmt::Debug for BoxCloneDataset<T, E> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BoxCloneDataset").finish_non_exhaustive()
     }

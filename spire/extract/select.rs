@@ -10,6 +10,8 @@ pub struct AttrTag(String);
 #[derive(Debug, Clone)]
 pub struct AttrData(String);
 
+// TODO: Vec<AttrTag> to &'static [AttrTag].
+
 /// TODO.
 ///
 /// Can be automatically generated with a `Select` derive macro:
@@ -22,10 +24,10 @@ pub struct AttrData(String);
 /// ```
 pub trait Select {
     /// Returns a list of selectable attributes required to build [`Self`].
-    fn list_required_attributes() -> &'static [AttrTag];
+    fn list_required_attributes() -> Vec<AttrTag>;
 
     /// Returns a list of selectable attributes optional to build [`Self`].
-    fn list_optional_attributes() -> &'static [AttrTag];
+    fn list_optional_attributes() -> Vec<AttrTag>;
 
     /// Builds a new [`Self`] from the selectable attributes.
     fn parse_from_attributes(attr: HashMap<AttrTag, AttrData>) -> Self;

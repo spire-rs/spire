@@ -66,7 +66,7 @@ impl<B, W> Client<B, W> {
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub fn with_request_queue<D, E>(self, dataset: D) -> Self
     where
-        D: Dataset<Request, Error = E> + Clone,
+        D: Dataset<Request, Error = E> + Clone + 'static,
         Error: From<E>,
     {
         self.inner.datasets.set(dataset);
@@ -132,7 +132,7 @@ impl<B, W> Client<B, W> {
     /// [`InMemDataset`]: crate::dataset::InMemDataset
     pub fn with_dataset<D, E, T>(self, dataset: D) -> Self
     where
-        D: Dataset<T, Error = E> + Clone,
+        D: Dataset<T, Error = E> + Clone + 'static,
         Error: From<E>,
         T: Send + Sync + 'static,
     {

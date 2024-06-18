@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
-#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
+// #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 #[doc(no_inline)]
 pub use async_trait::async_trait;

@@ -15,6 +15,7 @@ pub struct MapData<D, F, F2> {
 
 impl<D, F, F2> MapData<D, F, F2> {
     /// Creates a new [`MapData`].
+    #[inline]
     pub const fn new(inner: D, to: F, from: F2) -> Self {
         Self {
             inner,
@@ -28,6 +29,7 @@ impl<D, F, F2> fmt::Debug for MapData<D, F, F2>
 where
     D: fmt::Debug,
 {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.inner, f)
     }
@@ -38,7 +40,7 @@ impl<D, F, F2, T, T2> Dataset<T2> for MapData<D, F, F2>
 where
     T: Send + Sync + 'static,
     T2: Send + Sync + 'static,
-    D: Dataset<T>,
+    D: Dataset<T> + 'static,
     F: Fn(T2) -> T + Send + Sync + 'static,
     F2: Fn(T) -> T2 + Send + Sync + 'static,
 {

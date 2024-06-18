@@ -33,7 +33,7 @@ impl Datasets {
     /// Does not move items from the replaced `Dataset`.
     pub fn set<D, T, E>(&self, dataset: D)
     where
-        D: Dataset<T, Error = E> + Clone,
+        D: Dataset<T, Error = E> + Clone + 'static,
         Error: From<E>,
         T: Send + Sync + 'static,
     {
@@ -91,7 +91,7 @@ impl Datasets {
 
 fn boxed<D, T, E>(dataset: D) -> BoxCloneDataset<T, Error>
 where
-    D: Dataset<T, Error = E> + Clone,
+    D: Dataset<T, Error = E> + Clone + 'static,
     Error: From<E>,
     T: Send + Sync + 'static,
 {

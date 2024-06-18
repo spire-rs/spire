@@ -38,8 +38,6 @@ pub(crate) use sets::Datasets;
 #[doc(inline)]
 pub use util::DatasetExt;
 
-use crate::dataset::future::{DataSink, DataStream};
-
 pub mod future;
 mod memory;
 mod sets;
@@ -47,7 +45,7 @@ pub mod util;
 
 /// Expandable collection of items with a defined size.
 #[async_trait::async_trait]
-pub trait Dataset<T>: Send + Sync + 'static {
+pub trait Dataset<T>: Send + Sync {
     /// Unrecoverable `Dataset` failure.
     type Error;
 
@@ -63,35 +61,5 @@ pub trait Dataset<T>: Send + Sync + 'static {
     /// Returns `true` if the dataset is empty.
     fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    /// Returns both [`DataSink`] and [`DataStream`].
-    fn into_split(self) -> (DataSink<T, Self::Error>, DataStream<T, Self::Error>)
-    where
-        Self: Sized + Clone,
-        T: Send + 'static,
-        Self::Error: Send + 'static,
-    {
-        (self.clone().into_sink(), self.into_stream())
-    }
-
-    /// Returns a new [`DataStream`].
-    fn into_stream(self) -> DataStream<T, Self::Error>
-    where
-        Self: Sized,
-        T: Send + 'static,
-        Self::Error: Send + 'static,
-    {
-        DataStream::new(self)
-    }
-
-    /// Returns a new [`DataSink`].
-    fn into_sink(self) -> DataSink<T, Self::Error>
-    where
-        Self: Sized,
-        T: Send + 'static,
-        Self::Error: Send + 'static,
-    {
-        DataSink::new(self)
     }
 }

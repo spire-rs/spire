@@ -67,6 +67,7 @@ impl<T> Clone for InMemDataset<T> {
 }
 
 impl<T> Default for InMemDataset<T> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }

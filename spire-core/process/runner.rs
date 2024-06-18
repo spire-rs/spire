@@ -11,7 +11,7 @@ use futures::StreamExt;
 use crate::backend::{Backend, Worker};
 use crate::context::{Context, Tag, TagQuery, Task};
 use crate::context::{IntoSignal, Request, Signal};
-use crate::dataset::{Dataset, Datasets};
+use crate::dataset::{Dataset, DatasetExt, Datasets};
 use crate::Result;
 
 pub struct Runner<B, W> {

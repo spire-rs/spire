@@ -25,6 +25,7 @@
 //! [`Noop`]: util::Noop
 
 use std::convert::Infallible;
+use std::future::Future;
 
 use tower::{Service, ServiceExt};
 
@@ -45,6 +46,8 @@ mod client;
 #[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
 mod driver;
 pub mod util;
+
+// TODO: Remove #[async_trait::async_trait].
 
 /// Core trait used to instantiate [`Client`]s.
 ///
@@ -103,13 +106,11 @@ where
 /// It is automatically implemented for cloneable [`Service`]s that take [`Context`].
 ///
 /// [`Context`]: crate::context::Context
-#[async_trait::async_trait]
 pub trait Worker<C>: Clone + Send + 'static {
     /// TODO: Remove Clone + replace self with &self.
-    async fn invoke(self, cx: Context<C>) -> Signal;
+    fn invoke(self, cx: Context<C>) -> impl Future<Output = Signal>;
 }
 
-#[async_trait::async_trait]
 impl<S, C> Worker<C> for S
 where
     S: Service<Context<C>, Response = Signal, Error = Infallible> + Clone + Send + 'static,
@@ -118,8 +119,8 @@ where
 {
     #[inline]
     async fn invoke(self, cx: Context<C>) -> Signal {
-        let mut copy = self.clone();
-        let ready = copy.ready().await.unwrap();
-        ready.call(cx).await.unwrap()
+        let mut this = self.clone();
+        let ready = this.ready().await.expect("should be infallible");
+        ready.call(cx).await.expect("should be infallible")
     }
 }

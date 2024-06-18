@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("./README.md")]
+// #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 use proc_macro::TokenStream;
 
@@ -27,11 +28,11 @@ pub fn derive_select(input: TokenStream) -> TokenStream {
     // TODO: Implement extended macro.
     let expanded = quote! {
         impl #impl_ts spire::extract::Select for #name #ty_ts #where_clause {
-            fn list_required_attributes() -> &'static [AttrTag] {
+            fn list_required_attributes() -> Vec<AttrTag> {
                 todo!()
             }
 
-            fn list_optional_attributes() -> &'static [AttrTag] {
+            fn list_optional_attributes() -> Vec<AttrTag> {
                 todo!()
             }
 

@@ -37,11 +37,11 @@ client = ["dep:hyper", "dep:hyper-util"]
 driver = ["dep:fantoccini", "dep:deadpool"]
 
 [dependencies]
-bytes = { workspace = true }
-futures = { workspace = true }
-tower = { workspace = true, features = ["util"] }
-async-trait = { workspace = true }
-pin-project-lite = { workspace = true }
+tower = { version = "0.4", features = ["util"] }
+bytes = { version = "1.6" }
+futures = { version = "0.3" }
+async-trait = { version = "0.1" }
+pin-project-lite = { version = "0.2" }
 
 http = { version = "1.1" }
 http-body = { version = "1.0" }

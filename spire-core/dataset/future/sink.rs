@@ -24,7 +24,7 @@ impl<T, E> DataSink<T, E> {
     /// Creates a new [`DataSink`].
     pub(crate) fn new<D>(dataset: D) -> Self
     where
-        D: Dataset<T, Error = E>,
+        D: Dataset<T, Error = E> + 'static,
         T: Send + 'static,
         E: Send + 'static,
     {
