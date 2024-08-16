@@ -44,7 +44,7 @@ driver = ["spire-core/driver"]
 spire-core = { workspace = true }
 spire-macros = { workspace = true, optional = true }
 
-tower = { version = "0.4", features = ["util"] }
+tower = { version = "0.5", features = ["util"] }
 bytes = { version = "1.6" }
 futures = { version = "0.3" }
 async-trait = { version = "0.1" }
