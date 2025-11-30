@@ -1,10 +1,15 @@
+//! Signal-based flow control for web scraping tasks.
+//!
+//! This module provides the [`Signal`] type for controlling task execution flow,
+//! including success/failure handling, waiting, and aborting tasks based on tags.
+
 use std::convert::Infallible;
 use std::time::Duration;
 
 use crate::context::Tag;
 use crate::{BoxError, Error};
 
-/// Defines a way to select or filter [`Tag`]s.
+/// Defines a way to select or filter [`Tag`]s for signal operations.
 #[derive(Debug, Default, Clone)]
 pub enum TagQuery {
     /// Matches the same [`Tag`] as used by the [`Request`].

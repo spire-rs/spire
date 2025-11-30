@@ -1,64 +1,175 @@
-//! Data collection with [`Dataset`] and its utilities.
+//! Data collection and management with [`Dataset`] and its utilities.
 //!
-//! ### [`Dataset`]s
+//! This module provides abstractions for storing and retrieving data during web scraping
+//! operations. Datasets can be used to queue URLs for processing, store scraped results,
+//! or manage any other type of data flow in your scraping pipeline.
 //!
-//! - [`InMemDataset`] is a simple in-memory `FIFO` or `LIFO` `Dataset`.
-//! - `RedbDataset` is an embedded key-value store backed by the `redb` crate.
-//! - `SqlxDataset` is an asynchronous `SQL` store backed by the `sqlx` crate.
+//! # Core Concepts
 //!
-//! ### [`DatasetExt`] utilities
+//! ## [`Dataset`] Trait
 //!
-//! - [`BoxDataset`] is a type-erased `Dataset`.
-//! - [`BoxCloneDataset`] is a cloneable type-erased `Dataset`.
-//! - [`MapData`] transforms the data type of the `Dataset`.
-//! - [`MapErr`] transforms the error type of the `Dataset`.
+//! The fundamental trait for expandable collections with async read/write operations.
+//! All dataset implementations must provide:
+//! - [`write`](Dataset::write) - Add items to the collection
+//! - [`read`](Dataset::read) - Remove and return the next item
+//! - [`len`](Dataset::len) - Query collection size
+//!
+//! ## Built-in Implementations
+//!
+//! - [`InMemDataset`] - Simple in-memory FIFO queue or LIFO stack for fast local storage
+//! - Future: `RedbDataset` - Embedded key-value store (planned)
+//! - Future: `SqlxDataset` - SQL database backend (planned)
+//!
+//! ## Type Erasure Utilities ([`DatasetExt`])
+//!
+//! - [`BoxDataset`] - Type-erased dataset wrapper for heterogeneous collections
+//! - [`BoxCloneDataset`] - Cloneable type-erased dataset for shared ownership
+//! - [`MapData`] - Transform data types during read/write operations
+//! - [`MapErr`] - Convert error types between dataset implementations
 //!
 //! [`BoxDataset`]: util::BoxDataset
 //! [`BoxCloneDataset`]: util::BoxCloneDataset
 //! [`MapData`]: util::MapData
 //! [`MapErr`]: util::MapErr
 //!
-//! ### [`Stream`]s and [`Sink`]s
+//! ## Futures Integration
 //!
-//! - [`Data`] is a convenience [`BoxCloneDataset`] wrapper.
-//! - [`DataStream`] is a `futures::`[`Stream`] for `Dataset`s.
-//! - [`DataSink`] is a `futures::`[`Sink`] for `Dataset`s.
+//! - [`Data`] - Convenient wrapper around [`BoxCloneDataset`] for ergonomic usage
+//! - [`DataStream`] - Adapts datasets to `futures::`[`Stream`] for consumption
+//! - [`DataSink`] - Adapts datasets to `futures::`[`Sink`] for production
 //!
 //! [`Stream`]: futures::Stream
 //! [`Sink`]: futures::Sink
-//!
 //! [`Data`]: future::Data
 //! [`DataStream`]: future::DataStream
 //! [`DataSink`]: future::DataSink
+//!
+//! # Examples
+//!
+//! ## Basic Usage
+//!
+//! ```ignore
+//! use spire_core::dataset::{Dataset, InMemDataset};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create a FIFO queue for URLs
+//! let urls = InMemDataset::<String>::queue();
+//!
+//! // Add URLs to process
+//! urls.write("https://example.com".to_string()).await?;
+//! urls.write("https://example.com/page2".to_string()).await?;
+//!
+//! // Process URLs in order
+//! while let Some(url) = urls.read().await? {
+//!     println!("Processing: {}", url);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Using with Futures
+//!
+//! ```ignore
+//! use futures::{SinkExt, StreamExt};
+//! use spire_core::dataset::{DatasetExt, InMemDataset};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let dataset = InMemDataset::<i32>::queue();
+//! let (mut sink, mut stream) = dataset.into_split();
+//!
+//! // Producer
+//! sink.send(42).await?;
+//!
+//! // Consumer
+//! if let Some(Ok(value)) = stream.next().await {
+//!     println!("Received: {}", value);
+//! }
+//! # Ok(())
+//! # }
+//! ```
 
 #[doc(inline)]
 pub use future::Data;
 pub use memory::InMemDataset;
-pub(crate) use sets::Datasets;
+pub(crate) use registry::DatasetRegistry;
 #[doc(inline)]
-pub use util::DatasetExt;
+pub use utils::DatasetExt;
 
 pub mod future;
 mod memory;
-mod sets;
-pub mod util;
+mod registry;
+pub mod utils;
 
-/// Expandable collection of items with a defined size.
+/// An expandable, asynchronous collection of items with a queryable size.
+///
+/// `Dataset` provides a common interface for various storage backends used in
+/// web scraping workflows. Implementations can range from simple in-memory queues
+/// to persistent database-backed storage.
+///
+/// # Type Parameters
+///
+/// - `T` - The type of items stored in this dataset
+///
+/// # Associated Types
+///
+/// - [`Error`](Dataset::Error) - The error type for failed operations
+///
+/// # Thread Safety
+///
+/// All datasets must be `Send + Sync` to enable concurrent access across async tasks.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_core::dataset::{Dataset, InMemDataset};
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let dataset = InMemDataset::<i32>::queue();
+///
+/// // Write items
+/// dataset.write(1).await?;
+/// dataset.write(2).await?;
+///
+/// assert_eq!(dataset.len(), 2);
+///
+/// // Read items back
+/// assert_eq!(dataset.read().await?, Some(1));
+/// assert_eq!(dataset.read().await?, Some(2));
+/// assert_eq!(dataset.read().await?, None);
+/// # Ok(())
+/// # }
+/// ```
 #[async_trait::async_trait]
 pub trait Dataset<T>: Send + Sync {
-    /// Unrecoverable `Dataset` failure.
+    /// The error type returned by failed [`write`](Dataset::write) or
+    /// [`read`](Dataset::read) operations.
     type Error;
 
-    /// Writes another item into the collection.
+    /// Adds an item to the collection.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Self::Error`](Dataset::Error) if the write operation fails
+    /// (e.g., database connection error, insufficient storage).
     async fn write(&self, data: T) -> Result<(), Self::Error>;
 
-    /// Reads and returns the next item from the collection.
+    /// Removes and returns the next item from the collection.
+    ///
+    /// Returns `None` if the collection is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Self::Error`](Dataset::Error) if the read operation fails
+    /// (e.g., database connection error, deserialization failure).
     async fn read(&self) -> Result<Option<T>, Self::Error>;
 
-    /// Returns the number of items in the dataset.
+    /// Returns the number of items currently in the dataset.
+    ///
+    /// Note: For concurrent access patterns, the length may change between
+    /// when this is called and when the value is used.
     fn len(&self) -> usize;
 
-    /// Returns `true` if the dataset is empty.
+    /// Returns `true` if the dataset contains no items.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }

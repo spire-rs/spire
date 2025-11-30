@@ -25,6 +25,48 @@ homepage = "https://github.com/spire-rs/spire"
 documentation = "https://docs.rs/spire"
 
 [workspace.dependencies]
+# Workspace crates
 spire = { path = "./spire", version = "0.1.1-rc.1" }
 spire-core = { path = "./spire-core", version = "0.1.1-rc.1" }
 spire-macros = { path = "./spire-macros", version = "0.1.1-rc.1" }
+
+# Async runtime
+tokio = { version = "1.39", features = ["rt-multi-thread", "macros"] }
+futures = { version = "0.3" }
+async-trait = { version = "0.1" }
+
+# Tower ecosystem
+tower = { version = "0.4", features = ["util"] }
+
+# HTTP
+http = { version = "1.1" }
+http-body = { version = "1.0" }
+http-body-util = { version = "0.1" }
+
+# Utilities
+bytes = { version = "1.7" }
+pin-project-lite = { version = "0.2" }
+thiserror = { version = "1.0" }
+
+# Serialization
+serde = { version = "1.0" }
+serde_json = { version = "1.0" }
+
+# HTTP clients
+reqwest = { version = "0.12" }
+
+# Browser automation
+fantoccini = { version = "0.21" }
+deadpool = { version = "0.12" }
+
+# HTML parsing
+scraper = { version = "0.19" }
+
+# Tracing
+tracing = { version = "0.1" }
+tracing-test = { version = "0.2" }
+
+# Proc macros
+proc-macro2 = { version = "1.0" }
+quote = { version = "1.0" }
+syn = { version = "2.0" }

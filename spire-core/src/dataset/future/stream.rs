@@ -7,11 +7,61 @@ use futures::{Stream, StreamExt};
 use crate::dataset::Dataset;
 use crate::{Error, Result};
 
-///`futures::`[`Stream`] for [`Dataset`]s.
+/// A `futures::`[`Stream`] adapter for [`Dataset`]s.
 ///
-/// See [`Dataset::into_stream`] and [`Data::into_stream`].
+/// `DataStream` allows you to use datasets as streams in futures-based async code,
+/// enabling seamless integration with stream processing pipelines.
 ///
-/// [`Data::into_stream`]: crate::dataset::Data::into_stream
+/// Items are pulled from the underlying dataset using [`Dataset::read`].
+/// The stream terminates when the dataset returns `None`, indicating no more
+/// items are available.
+///
+/// # Creation
+///
+/// Create a `DataStream` using [`DatasetExt::into_stream`] or [`DatasetExt::into_split`]:
+///
+/// ```ignore
+/// use futures::StreamExt;
+/// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
+///
+/// # async fn example() -> Result<(), std::convert::Infallible> {
+/// let dataset = InMemDataset::<i32>::queue();
+/// dataset.write(1).await?;
+/// dataset.write(2).await?;
+/// dataset.write(3).await?;
+///
+/// let mut stream = dataset.into_stream();
+/// while let Some(Ok(item)) = stream.next().await {
+///     println!("Item: {}", item);
+/// }
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Stream Processing
+///
+/// ```ignore
+/// use futures::StreamExt;
+/// use spire_core::dataset::{DatasetExt, InMemDataset};
+///
+/// # async fn example() -> Result<(), std::convert::Infallible> {
+/// let dataset = InMemDataset::<i32>::queue();
+/// dataset.write(1).await?;
+/// dataset.write(2).await?;
+/// dataset.write(3).await?;
+///
+/// let sum: i32 = dataset.into_stream()
+///     .filter_map(|result| async move { result.ok() })
+///     .fold(0, |acc, x| async move { acc + x })
+///     .await;
+///
+/// println!("Sum: {}", sum);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [`DatasetExt::into_stream`]: crate::dataset::DatasetExt::into_stream
+/// [`DatasetExt::into_split`]: crate::dataset::DatasetExt::into_split
 #[must_use = "streams do nothing unless you poll them"]
 pub struct DataStream<T, E = Error> {
     inner: BoxStream<'static, Result<T, E>>,

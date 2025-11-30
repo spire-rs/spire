@@ -5,23 +5,37 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use tower::Service;
 
-pub use builder::BrowserBuilder;
-pub use client::BrowserClient;
-use connect::BrowserConnection;
-use manager::BrowserManager;
+use spire_core::{Error, Result};
 
-use crate::{Error, Result};
+use crate::builder::BrowserBuilder;
+use crate::client::BrowserClient;
+use crate::manager::BrowserManager;
 
-mod builder;
-mod client;
-mod connect;
-mod manager;
-
-/// Web-driver [`Backend`] built on top of [`fantoccini`] crate.
-/// Uses [`BrowserClient`] as a [`Client`].
+/// WebDriver backend built on top of [`fantoccini`] crate.
 ///
-/// [`Backend`]: crate::backend::Backend
-/// [`Client`]: crate::backend::Client
+/// `BrowserPool` manages a pool of browser instances for web scraping tasks
+/// that require JavaScript execution, dynamic content rendering, or user interaction
+/// simulation.
+///
+/// Uses [`BrowserClient`] as the client implementation.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_fantoccini::BrowserPool;
+/// use spire_core::Client;
+///
+/// let pool = BrowserPool::builder()
+///     .with_unmanaged("127.0.0.1:4444")
+///     .with_unmanaged("127.0.0.1:4445")
+///     .build();
+///
+/// let client = Client::new(pool, worker);
+/// client.run().await?;
+/// ```
+///
+/// [`Backend`]: spire_core::backend::Backend
+/// [`Client`]: spire_core::backend::Client
 #[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 #[derive(Clone)]
 pub struct BrowserPool {
@@ -31,16 +45,30 @@ pub struct BrowserPool {
 impl BrowserPool {
     /// Creates a new [`BrowserPool`].
     #[inline]
-    fn new(pool: Pool<BrowserManager>) -> Self {
+    pub(crate) fn new(pool: Pool<BrowserManager>) -> Self {
         Self { pool }
     }
 
     /// Waits and returns an available [`BrowserClient`].
     async fn client(&self) -> Result<BrowserClient> {
-        self.pool.get().await.map(Into::into).map_err(Into::into)
+        self.pool
+            .get()
+            .await
+            .map(Into::into)
+            .map_err(|e| Error::new(format!("Failed to get browser from pool: {}", e)))
     }
 
     /// Creates a new [`BrowserBuilder`].
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_fantoccini::BrowserPool;
+    ///
+    /// let pool = BrowserPool::builder()
+    ///     .with_unmanaged("127.0.0.1:4444")
+    ///     .build();
+    /// ```
     #[inline]
     pub fn builder() -> BrowserBuilder {
         BrowserBuilder::default()
@@ -55,8 +83,14 @@ impl From<Pool<BrowserManager>> for BrowserPool {
 }
 
 impl Default for BrowserPool {
+    /// Creates a default browser pool.
+    ///
+    /// ## Note
+    ///
+    /// This implementation is currently not available and will panic.
+    /// Use [`BrowserPool::builder`] instead.
     fn default() -> Self {
-        todo!()
+        todo!("impl Default for BrowserPool - use BrowserPool::builder() instead")
     }
 }
 
@@ -67,7 +101,7 @@ impl Service<()> for BrowserPool {
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // TODO: Check for available browsers.
+        // TODO: Check for available browsers in the pool
         Poll::Ready(Ok(()))
     }
 
@@ -82,11 +116,12 @@ impl Service<()> for BrowserPool {
 
 #[cfg(test)]
 mod test {
-    use crate::backend::util::{Noop, Trace};
-    use crate::backend::BrowserPool;
-    use crate::context::Request;
-    use crate::dataset::InMemDataset;
-    use crate::{Client, Result};
+    use spire_core::backend::utils::{Noop, Trace};
+    use spire_core::context::Request;
+    use spire_core::dataset::InMemDataset;
+    use spire_core::{Client, Result};
+
+    use crate::BrowserPool;
 
     #[test]
     fn build() {
@@ -94,7 +129,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "tracing", tracing_test::traced_test)]
     async fn noop() -> Result<()> {
         let pool = BrowserPool::builder()
             .with_unmanaged("127.0.0.1:4444")

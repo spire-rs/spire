@@ -13,7 +13,46 @@ use crate::{Error, Result};
 
 /// No-op `tower::`[`Service`] used for testing and debugging.
 ///
-/// Supports [`Backend`], [`Client`] and [`Worker`].
+/// `Noop` implements all three core traits ([`Backend`], [`Client`], and [`Worker`])
+/// with minimal behavior, making it useful for:
+///
+/// - Unit testing components without real backends
+/// - Prototyping scraping logic before implementing full backends
+/// - Debugging worker behavior in isolation
+///
+/// # Behavior
+///
+/// - **As Backend**: Returns a clone of itself as the client
+/// - **As Client**: Returns an empty response with default body
+/// - **As Worker**: Can be configured to always continue, skip, or resolve the request
+///
+/// # Examples
+///
+/// ## Basic Testing
+///
+/// ```ignore
+/// use spire_core::backend::utils::Noop;
+/// use spire_core::Client;
+///
+/// let backend = Noop::default();
+/// let worker = Noop::default();
+/// let client = Client::new(backend, worker);
+/// ```
+///
+/// ## Controlling Worker Behavior
+///
+/// ```ignore
+/// use spire_core::backend::utils::Noop;
+///
+/// // Always continue without resolving requests
+/// let worker = Noop::new(Some(true));
+///
+/// // Always skip
+/// let worker = Noop::new(Some(false));
+///
+/// // Resolve requests and continue on success
+/// let worker = Noop::new(None);
+/// ```
 ///
 /// [`Backend`]: crate::backend::Backend
 /// [`Client`]: crate::backend::Client
@@ -25,7 +64,16 @@ pub struct Noop {
 }
 
 impl Noop {
-    /// Creates a new [`Noop`] with an `always` rule.
+    /// Creates a new [`Noop`] with an `always` rule for worker behavior.
+    ///
+    /// # Parameters
+    ///
+    /// - `Some(true)` - Always returns [`Signal::Continue`] without resolving requests
+    /// - `Some(false)` - Always returns [`Signal::Skip`] without resolving requests
+    /// - `None` - Resolves requests and returns [`Signal::Continue`] on success
+    ///
+    /// [`Signal::Continue`]: crate::context::Signal::Continue
+    /// [`Signal::Skip`]: crate::context::Signal::Skip
     pub const fn new(always: Option<bool>) -> Self {
         Self { always }
     }

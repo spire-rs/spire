@@ -7,14 +7,60 @@ use futures::{Sink, SinkExt};
 use crate::dataset::Dataset;
 use crate::Error;
 
-/// Idk why it's not a part of `futures`.
+/// Type alias for boxed sinks to reduce repetition.
 type BoxSink<'a, T, E> = Pin<Box<dyn Sink<T, Error = E> + Send + 'a>>;
 
-/// `futures::`[`Sink`] for [`Dataset`]s.
+/// A `futures::`[`Sink`] adapter for [`Dataset`]s.
 ///
-/// See [`Dataset::into_sink`] and [`Data::into_sink`].
+/// `DataSink` allows you to use datasets as sinks in futures-based async code,
+/// enabling seamless integration with stream processing pipelines.
 ///
-/// [`Data::into_sink`]: crate::dataset::Data::into_sink
+/// Items sent to this sink are written to the underlying dataset using
+/// [`Dataset::write`]. The sink implementation handles buffering and
+/// error propagation automatically.
+///
+/// # Creation
+///
+/// Create a `DataSink` using [`DatasetExt::into_sink`] or [`DatasetExt::into_split`]:
+///
+/// ```ignore
+/// use futures::SinkExt;
+/// use spire_core::dataset::{DatasetExt, InMemDataset};
+///
+/// # async fn example() -> Result<(), std::convert::Infallible> {
+/// let dataset = InMemDataset::<i32>::queue();
+/// let mut sink = dataset.into_sink();
+///
+/// sink.send(42).await?;
+/// sink.send(100).await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Producer-Consumer Pattern
+///
+/// ```ignore
+/// use futures::SinkExt;
+/// use spire_core::dataset::{DatasetExt, InMemDataset};
+///
+/// # async fn example() -> Result<(), std::convert::Infallible> {
+/// let dataset = InMemDataset::<String>::queue();
+/// let (mut sink, stream) = dataset.into_split();
+///
+/// // Producer task
+/// tokio::spawn(async move {
+///     for i in 0..10 {
+///         sink.send(format!("item-{}", i)).await.unwrap();
+///     }
+/// });
+///
+/// // Consumer uses the stream...
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [`DatasetExt::into_sink`]: crate::dataset::DatasetExt::into_sink
+/// [`DatasetExt::into_split`]: crate::dataset::DatasetExt::into_split
 #[must_use = "sinks do nothing unless you poll them"]
 pub struct DataSink<T, E = Error> {
     inner: BoxSink<'static, T, E>,

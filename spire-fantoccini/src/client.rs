@@ -8,16 +8,33 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use tower::Service;
 
-use crate::backend::driver::BrowserManager;
-use crate::context::{Body, Request, Response};
-use crate::{Error, Result};
+use spire_core::context::{Body, Request, Response};
+use spire_core::{Error, Result};
 
-/// [`BrowserPool`] client.
+use crate::manager::BrowserManager;
+
+/// Client for interacting with a browser instance from the [`BrowserPool`].
 ///
-/// Implements [`Deref`] to `fantoccini::`[`Client`].
+/// This type wraps a pooled Fantoccini client and implements the Tower `Service`
+/// trait for processing HTTP requests. It automatically dereferences to the
+/// underlying `fantoccini::Client` for direct browser control.
 ///
-/// [`BrowserPool`]: crate::backend::BrowserPool
-/// [`Client`]: WebClient
+/// # Examples
+///
+/// ```ignore
+/// use spire_fantoccini::BrowserPool;
+/// use spire_core::backend::Backend;
+///
+/// let pool = BrowserPool::builder()
+///     .with_unmanaged("127.0.0.1:4444")
+///     .build();
+///
+/// let client = pool.client().await?;
+/// // Access fantoccini::Client methods directly
+/// client.goto("https://example.com").await?;
+/// ```
+///
+/// [`BrowserPool`]: crate::BrowserPool
 #[derive(Clone)]
 pub struct BrowserClient(Arc<Object<BrowserManager>>);
 
@@ -48,8 +65,9 @@ impl Service<Request> for BrowserClient {
     }
 
     #[inline]
-    fn call(&mut self, req: Request) -> Self::Future {
+    fn call(&mut self, _req: Request) -> Self::Future {
         let fut = async move {
+            // TODO: Implement actual browser navigation and response extraction
             let response = Response::new(Body::default());
             Ok::<Response, Error>(response)
         };

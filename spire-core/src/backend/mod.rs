@@ -1,27 +1,29 @@
-//! Types and traits for data retrieval [`Backend`]s.
+//! Core traits and utilities for data retrieval backends.
 //!
-//! ### Core
+//! This module provides the foundational traits for implementing backends and clients
+//! in the Spire web scraping framework.
 //!
-//! - [`Backend`] is a core trait used to instantiate [`Client`]s.
-//! - [`Client`] is a core trait used to fetch [`Response`]s with [`Request`]s.
-//! - [`Worker`] is a core trait used to process [`Context`]s and return [`Signal`]s.
+//! # Core Traits
 //!
-//! ### Backend
+//! - [`Backend`] - Creates and manages client instances
+//! - [`Client`] - Fetches responses for HTTP requests
+//! - [`Worker`] - Processes contexts and returns flow control signals
 //!
-//! - [`HttpClient`] is a simple `http` client backed by the underlying
-//!   `tower::`[`Service`]. It is both [`Backend`] and [`Client`].
-//! - [`BrowserPool`] is a [`Backend`] built on top of [`fantoccini`] crate.
-//!   Uses [`BrowserClient`] as a [`Client`].
+//! # Concrete Implementations
 //!
-//! ### Utility
+//! Concrete backend implementations are provided in separate crates:
 //!
-//! - [`Trace`] is a tracing middleware for [`Backend`]s, [`Client`]s, and [`Worker`]s.
-//! - [`Metric`] is a [`Worker`] middleware for metrics collection. Implements `tower::`[`Load`].
-//! - [`Noop`] is a no-op [`Backend`], [`Client`] and [`Worker`] for testing and debugging.
+//! - `spire-reqwest` - HTTP client backend using reqwest/Tower
+//! - `spire-fantoccini` - WebDriver browser automation backend
+//!
+//! # Utilities
+//!
+//! - [`Trace`] - Tracing middleware for backends, clients, and workers
+//! - [`Metric`] - Metrics collection middleware for workers
+//! - [`Noop`] - No-op implementations for testing and debugging
 //!
 //! [`Trace`]: util::Trace
 //! [`Metric`]: util::Metric
-//! [`Load`]: tower::load::Load
 //! [`Noop`]: util::Noop
 
 use std::convert::Infallible;
@@ -29,35 +31,33 @@ use std::future::Future;
 
 use tower::{Service, ServiceExt};
 
-#[cfg(feature = "client")]
-#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-pub use client::HttpClient;
-#[cfg(feature = "driver")]
-#[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
-pub use driver::{BrowserBuilder, BrowserClient, BrowserPool};
-
 use crate::context::{Context, Request, Response, Signal};
 use crate::{Error, Result};
 
-#[cfg(feature = "client")]
-#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-mod client;
-#[cfg(feature = "driver")]
-#[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
-mod driver;
-pub mod util;
+pub mod utils;
 
-// TODO: Remove #[async_trait::async_trait].
-
-/// Core trait used to instantiate [`Client`]s.
+/// Core trait for creating client instances.
 ///
-/// It is automatically implemented for cloneable [`Service`]s that return [`Client`]s.
+/// A `Backend` is responsible for managing and providing [`Client`] instances
+/// that can fetch HTTP responses. It is automatically implemented for cloneable
+/// Tower services that return clients.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_core::backend::Backend;
+///
+/// async fn use_backend<B: Backend>(backend: B) {
+///     let client = backend.client().await.unwrap();
+///     // Use the client to fetch responses
+/// }
+/// ```
 #[async_trait::async_trait]
 pub trait Backend: Clone + Send + Sized + 'static {
     /// Associated client type.
     type Client: Client;
 
-    /// Returns a [`Self::Client`] from the pool.
+    /// Returns a [`Self::Client`] from the backend.
     async fn client(&self) -> Result<Self::Client>;
 }
 
@@ -78,13 +78,26 @@ where
     }
 }
 
-/// Core trait used to retrieve [`Response`]s with [`Request`]s.
+/// Core trait for fetching HTTP responses.
 ///
-/// It is automatically implemented for cloneable [`Service`]s that take [`Request`]
-/// and return [`Result`]<[`Response`]>.
+/// A `Client` handles individual HTTP requests and returns responses.
+/// It is automatically implemented for cloneable Tower services that
+/// handle [`Request`]s and return [`Result`]<[`Response`]>.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_core::backend::Client;
+/// use spire_core::context::Request;
+///
+/// async fn fetch<C: Client>(client: C, request: Request) {
+///     let response = client.resolve(request).await.unwrap();
+///     // Process the response
+/// }
+/// ```
 #[async_trait::async_trait]
 pub trait Client: Send + Sized + 'static {
-    /// Tries to fetch the [`Response`].
+    /// Fetches the [`Response`] for the given request.
     async fn resolve(self, req: Request) -> Result<Response>;
 }
 
@@ -101,13 +114,37 @@ where
     }
 }
 
-/// Core trait used to process [`Context`]s and return [`Signal`]s.
+/// Core trait for processing scraping tasks.
 ///
-/// It is automatically implemented for cloneable [`Service`]s that take [`Context`].
+/// A `Worker` processes a [`Context`] (containing a request, client, and datasets)
+/// and returns a [`Signal`] that controls execution flow. It is automatically
+/// implemented for cloneable Tower services.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_core::backend::Worker;
+/// use spire_core::context::{Context, Signal};
+///
+/// #[derive(Clone)]
+/// struct MyWorker;
+///
+/// impl<C> Worker<C> for MyWorker {
+///     async fn invoke(self, cx: Context<C>) -> Signal {
+///         // Process the context
+///         Signal::Continue
+///     }
+/// }
+/// ```
 ///
 /// [`Context`]: crate::context::Context
 pub trait Worker<C>: Clone + Send + 'static {
-    /// TODO: Remove Clone + replace self with &self.
+    /// Processes the context and returns a flow control signal.
+    ///
+    /// ## Note
+    ///
+    /// This method consumes `self` due to current Tower service requirements.
+    /// Future versions may use `&self` instead.
     fn invoke(self, cx: Context<C>) -> impl Future<Output = Signal>;
 }
 
@@ -120,7 +157,7 @@ where
     #[inline]
     async fn invoke(self, cx: Context<C>) -> Signal {
         let mut this = self.clone();
-        let ready = this.ready().await.expect("should be infallible");
-        ready.call(cx).await.expect("should be infallible")
+        let ready = this.ready().await.expect("Worker should be infallible");
+        ready.call(cx).await.expect("Worker should be infallible")
     }
 }

@@ -14,9 +14,53 @@ use crate::context::{Context as Cx, Request, Response, Signal, Task};
 use crate::dataset::Dataset;
 use crate::{Error, Result};
 
-/// Tracing `tower::`[`Service`] for improved observability.
+/// Tracing middleware for [`Backend`], [`Client`], and [`Worker`] services.
 ///
-/// Supports [`Backend`], [`Client`] and [`Worker`].
+/// `Trace` wraps services with `tracing` instrumentation to provide detailed logs
+/// of operations during web scraping. It implements all three core traits and can
+/// be composed with any compatible service.
+///
+/// # What Gets Traced
+///
+/// - **Backend**: Client initialization events
+/// - **Client**: Request/response body sizes and HTTP status codes
+/// - **Worker**: Request depth, queue size, and signal outcomes
+///
+/// # Requirements
+///
+/// This middleware requires the `trace` feature to be enabled.
+///
+/// # Examples
+///
+/// ## Wrapping Individual Services
+///
+/// ```ignore
+/// use spire_core::backend::utils::Trace;
+///
+/// let backend = Trace::new(my_backend);
+/// let worker = Trace::new(my_worker);
+/// let client = Client::new(backend, worker);
+/// ```
+///
+/// ## Using with Tower Layers
+///
+/// ```ignore
+/// use spire_core::backend::utils::TraceLayer;
+/// use tower::ServiceBuilder;
+///
+/// let backend = ServiceBuilder::new()
+///     .layer(TraceLayer::new())
+///     .service(my_backend);
+/// ```
+///
+/// # Output Format
+///
+/// Trace events are emitted at the `TRACE` level with structured fields:
+///
+/// - Client init: `initialized new client`
+/// - Request: `request body` with `lower` and `upper` size hints
+/// - Response: `response body` with `status`, `lower`, and `upper` fields
+/// - Worker: `handler requested/responded` with `depth` and `requests` count
 ///
 /// [`Backend`]: crate::backend::Backend
 /// [`Client`]: crate::backend::Client
@@ -28,7 +72,15 @@ pub struct Trace<S> {
 }
 
 impl<S> Trace<S> {
-    /// Creates a new [`Trace`].
+    /// Creates a new [`Trace`] middleware wrapping the given service.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::backend::utils::Trace;
+    ///
+    /// let traced = Trace::new(my_service);
+    /// ```
     pub fn new(inner: S) -> Self {
         Self { inner }
     }
@@ -152,7 +204,11 @@ where
 }
 
 pin_project! {
-    /// Response [`Future`] for [`Trace`].
+    /// Response [`Future`] for [`Trace`] middleware.
+    ///
+    /// This future wraps the inner service's future and is returned by
+    /// [`Trace::call`]. It transparently polls the wrapped future without
+    /// adding additional tracing overhead.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct TraceFuture<T, E> {
         #[pin] fut: BoxFuture<'static, Result<T, E>>,
@@ -178,12 +234,36 @@ impl<T, E> Future for TraceFuture<T, E> {
 }
 
 /// A `tower::`[`Layer`] that produces a [`Trace`] service.
+///
+/// `TraceLayer` implements Tower's [`Layer`] trait, making it composable with
+/// other layers in a [`ServiceBuilder`] chain.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_core::backend::utils::TraceLayer;
+/// use tower::ServiceBuilder;
+///
+/// let service = ServiceBuilder::new()
+///     .layer(TraceLayer::new())
+///     .service(my_backend);
+/// ```
+///
+/// [`ServiceBuilder`]: tower::ServiceBuilder
 #[derive(Debug, Default, Clone)]
 #[must_use = "layers do nothing unless you `.layer` them"]
 pub struct TraceLayer {}
 
 impl TraceLayer {
     /// Creates a new [`TraceLayer`].
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::backend::utils::TraceLayer;
+    ///
+    /// let layer = TraceLayer::new();
+    /// ```
     pub fn new() -> Self {
         Self::default()
     }

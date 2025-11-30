@@ -2,9 +2,54 @@ use std::fmt;
 
 use crate::dataset::Dataset;
 
-/// Cloneable type-erased [`Dataset`] for a [`boxed_clone`] method.
+/// Cloneable type-erased wrapper for [`Dataset`] implementations.
+///
+/// `BoxCloneDataset` provides type erasure like [`BoxDataset`], but with the
+/// additional ability to clone the wrapper. This is particularly useful when
+/// you need to share datasets across multiple consumers or store them in
+/// cloneable contexts.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
+///
+/// # async fn example() -> Result<(), std::convert::Infallible> {
+/// let dataset = InMemDataset::<String>::queue().boxed_clone();
+///
+/// // Clone the dataset to share it
+/// let dataset_clone = dataset.clone();
+///
+/// dataset.write("hello".to_string()).await?;
+/// assert_eq!(dataset_clone.read().await?, Some("hello".to_string()));
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Sharing Across Threads
+///
+/// `BoxCloneDataset` can be cloned and sent across thread boundaries:
+///
+/// ```ignore
+/// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
+///
+/// # async fn example() -> Result<(), std::convert::Infallible> {
+/// let dataset = InMemDataset::<i32>::queue().boxed_clone();
+///
+/// let dataset_clone = dataset.clone();
+/// tokio::spawn(async move {
+///     dataset_clone.write(42).await.unwrap();
+/// });
+///
+/// // Original dataset shares the same underlying storage
+/// tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+/// assert_eq!(dataset.read().await?, Some(42));
+/// # Ok(())
+/// # }
+/// ```
 ///
 /// [`boxed_clone`]: crate::dataset::DatasetExt::boxed_clone
+/// [`BoxDataset`]: crate::dataset::BoxDataset
 #[must_use]
 pub struct BoxCloneDataset<T, E> {
     dataset: Box<dyn CloneBoxDataset<T, Error = E>>,

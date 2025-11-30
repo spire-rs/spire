@@ -13,11 +13,52 @@ use tower::load::Load;
 use tower::{Layer, Service};
 
 use crate::context::{Context as Cx, Request, Response, Signal};
-use crate::Error;
+use crate::{Error, Result};
 
-/// Metric collection `tower::`[`Service`] for [`Worker`]s.
+/// Metric collection middleware for [`Worker`] services.
 ///
-/// Implements `tower::`[`Load`].
+/// `Metric` wraps worker services to collect performance metrics including success
+/// and failure counts. It implements Tower's [`Load`] trait, making it compatible
+/// with load balancing strategies.
+///
+/// # Collected Metrics
+///
+/// - **Success count**: Number of successful worker invocations (Continue/Skip signals)
+/// - **Failure count**: Number of failed worker invocations (errors or Stop signals)
+///
+/// # Requirements
+///
+/// This middleware requires the `metric` feature to be enabled.
+///
+/// # Examples
+///
+/// ## Basic Usage
+///
+/// ```ignore
+/// use spire_core::backend::utils::Metric;
+///
+/// let worker = Metric::new(my_worker);
+///
+/// // After processing requests
+/// let load = worker.load();
+/// println!("Worker load: {}", load);
+/// ```
+///
+/// ## Using with Tower Layers
+///
+/// ```ignore
+/// use spire_core::backend::utils::MetricLayer;
+/// use tower::ServiceBuilder;
+///
+/// let worker = ServiceBuilder::new()
+///     .layer(MetricLayer::new())
+///     .service(my_worker);
+/// ```
+///
+/// # Load Calculation
+///
+/// The load is calculated as the total number of failures, making workers with
+/// fewer failures appear less loaded to load balancers.
 ///
 /// [`Worker`]: crate::backend::Worker
 #[derive(Clone)]
@@ -34,7 +75,17 @@ struct MetricInner {
 }
 
 impl<S> Metric<S> {
-    /// Creates a new [`Metric`].
+    /// Creates a new [`Metric`] middleware wrapping the given worker.
+    ///
+    /// Initializes success and failure counters to zero.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::backend::utils::Metric;
+    ///
+    /// let worker = Metric::new(my_worker);
+    /// ```
     pub fn new(inner: S) -> Self {
         let metrics = Arc::new(MetricInner::default());
         Self { inner, metrics }
@@ -104,7 +155,10 @@ impl<S> Load for Metric<S> {
 }
 
 pin_project! {
-    /// Response [`Future`] for [`Metric`].
+    /// Response [`Future`] for [`Metric`] middleware.
+    ///
+    /// This future wraps the worker's future and updates metrics based on
+    /// the returned signal when polled to completion.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct MetricFuture {
         #[pin] fut: BoxFuture<'static, Result<Signal, Infallible>>,
@@ -114,7 +168,7 @@ pin_project! {
 impl MetricFuture {
     /// Creates a new [`MetricFuture`].
     #[inline]
-    fn new(fut: BoxFuture<'static, crate::Result<Signal, Infallible>>) -> Self {
+    fn new(fut: BoxFuture<'static, Result<Signal, Infallible>>) -> Self {
         Self { fut }
     }
 }
@@ -130,12 +184,36 @@ impl Future for MetricFuture {
 }
 
 /// A `tower::`[`Layer`] that produces a [`Metric`] service.
+///
+/// `MetricLayer` implements Tower's [`Layer`] trait for composing metric
+/// collection into service builder chains.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_core::backend::utils::MetricLayer;
+/// use tower::ServiceBuilder;
+///
+/// let worker = ServiceBuilder::new()
+///     .layer(MetricLayer::new())
+///     .service(my_worker);
+/// ```
+///
+/// [`ServiceBuilder`]: tower::ServiceBuilder
 #[derive(Debug, Default, Clone)]
 #[must_use = "layers do nothing unless you `.layer` them"]
 pub struct MetricLayer {}
 
 impl MetricLayer {
     /// Creates a new [`MetricLayer`].
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::backend::utils::MetricLayer;
+    ///
+    /// let layer = MetricLayer::new();
+    /// ```
     pub fn new() -> Self {
         Self::default()
     }

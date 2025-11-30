@@ -1,64 +1,63 @@
-//! Implementation of [`futures`] traits.
+//! Futures integration for datasets via [`Stream`] and [`Sink`] adapters.
 //!
+//! This module provides integration between datasets and the `futures` crate's
+//! asynchronous stream and sink abstractions, enabling datasets to be used in
+//! async pipelines and reactive programming patterns.
+//!
+//! # Core Types
+//!
+//! - [`Data`] - Ergonomic wrapper around [`BoxCloneDataset`] for common use cases
+//! - [`DataStream`] - Adapts a dataset into a `futures::Stream` for consuming items
+//! - [`DataSink`] - Adapts a dataset into a `futures::Sink` for producing items
+//!
+//! # Examples
+//!
+//! ## Using DataStream
+//!
+//! ```ignore
+//! use futures::StreamExt;
+//! use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let dataset = InMemDataset::queue();
+//! dataset.write("item1").await?;
+//! dataset.write("item2").await?;
+//!
+//! let mut stream = dataset.into_stream();
+//! while let Some(Ok(item)) = stream.next().await {
+//!     println!("Received: {}", item);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Using DataSink
+//!
+//! ```ignore
+//! use futures::SinkExt;
+//! use spire_core::dataset::{DatasetExt, InMemDataset};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let dataset = InMemDataset::queue();
+//! let mut sink = dataset.into_sink();
+//!
+//! sink.send("item1").await?;
+//! sink.send("item2").await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! [`Stream`]: futures::Stream
+//! [`Sink`]: futures::Sink
+//! [`BoxCloneDataset`]: crate::dataset::utils::BoxCloneDataset
 
-use std::fmt;
-
-pub use sink::DataSink;
-pub use stream::DataStream;
-
-use crate::dataset::util::BoxCloneDataset;
-use crate::dataset::DatasetExt;
-use crate::Error;
-
+mod data;
 mod sink;
 mod stream;
 
-// TODO: Stream + Sink.
-
-/// Convenient [`BoxCloneDataset`] wrapper.
-#[must_use]
-#[derive(Clone)]
-pub struct Data<T, E = Error>(pub BoxCloneDataset<T, E>)
-where
-    T: 'static,
-    E: 'static;
-
-impl<T, E> Data<T, E>
-where
-    T: Send + Sync + 'static,
-    E: Send + Sync + 'static,
-{
-    /// Creates a new [`Data`].
-    #[inline]
-    pub const fn new(inner: BoxCloneDataset<T, E>) -> Self {
-        Self(inner)
-    }
-
-    /// Returns the underlying [`BoxCloneDataset`].
-    #[inline]
-    pub fn into_inner(self) -> BoxCloneDataset<T, E> {
-        self.0
-    }
-
-    /// Returns a new [`DataStream`].
-    #[inline]
-    pub fn into_stream(self) -> DataStream<T, E> {
-        self.into_inner().into_stream()
-    }
-
-    /// Returns a new [`DataSink`].
-    #[inline]
-    pub fn into_sink(self) -> DataSink<T, E> {
-        self.into_inner().into_sink()
-    }
-}
-
-impl<T> fmt::Debug for Data<T> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Dataset").finish_non_exhaustive()
-    }
-}
+pub use data::Data;
+pub use sink::DataSink;
+pub use stream::DataStream;
 
 #[cfg(test)]
 mod test {

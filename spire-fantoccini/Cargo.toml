@@ -1,21 +1,17 @@
-# https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [package]
-name = "spire-core"
+name = "spire-fantoccini"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
-readme = "./README.md"
-
 authors = { workspace = true }
 repository = { workspace = true }
 homepage = { workspace = true }
 documentation = { workspace = true }
 
+description = "Fantoccini-based browser automation backend for Spire web scraping framework"
+keywords = ["crawler", "scraper", "browser", "webdriver"]
 categories = ["asynchronous", "web-programming"]
-keywords = ["crawler", "scraper", "web", "framework"]
-description = "Core types and traits for Spire web scraping framework"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -24,16 +20,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [lib]
 path = "src/lib.rs"
 
-[features]
-default = []
-full = ["tracing", "metric"]
-
-# Observability
-tracing = ["trace", "dep:tracing"]
-metric = ["tower/load"]
-trace = ["dep:tracing"]
-
 [dependencies]
+# Spire
+spire-core = { workspace = true }
+
 # Tower ecosystem
 tower = { workspace = true }
 
@@ -41,20 +31,17 @@ tower = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }
 
+# Browser automation
+fantoccini = { workspace = true }
+deadpool = { workspace = true }
+
 # HTTP
 http = { workspace = true }
-http-body = { workspace = true }
 http-body-util = { workspace = true }
 
 # Utilities
 bytes = { workspace = true }
-pin-project-lite = { workspace = true }
-thiserror = { workspace = true }
-
-# Optional: Observability
-tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Testing
 tokio = { workspace = true }
-tracing-test = { workspace = true }

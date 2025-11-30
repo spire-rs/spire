@@ -1,15 +1,24 @@
+//! Request queue for managing web scraping tasks.
+//!
+//! This module provides the [`RequestQueue`] type for managing HTTP requests
+//! in a web scraping pipeline.
+
 use std::fmt;
 
 use crate::context::{Depth, Request, Tag};
-use crate::dataset::util::BoxCloneDataset;
+use crate::dataset::utils::BoxCloneDataset;
 use crate::dataset::Dataset;
 use crate::{Error, Result};
 
-/// [`Request`] queue backed by the [`Dataset`]<`Request`>.
+/// [`Request`] queue backed by a [`Dataset`].
 ///
-/// See [`Daemon::with_queue`].
+/// The queue manages requests and their metadata (tags, depth) for processing
+/// by the scraping engine.
 ///
-/// [`Daemon::with_queue`]: crate::Client::with_request_queue
+/// See [`Client::with_request_queue`].
+///
+/// [`Dataset`]: crate::dataset::Dataset
+/// [`Client::with_request_queue`]: crate::Client::with_request_queue
 #[must_use]
 #[derive(Clone)]
 pub struct RequestQueue {

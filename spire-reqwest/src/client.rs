@@ -7,21 +7,56 @@ use futures::future::BoxFuture;
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
-use crate::context::{Body, Request, Response};
-use crate::{Error, Result};
+use spire_core::context::{Body, Request, Response};
+use spire_core::{Error, Result};
 
-/// Simple `http` client backed by the underlying [`Service`].
-/// It is both [`Backend`] and [`Client`].
+/// Simple HTTP client backed by an underlying Tower [`Service`].
 ///
-/// [`Backend`]: crate::backend::Backend
-/// [`Client`]: crate::backend::Client
+/// `HttpClient` wraps any Tower service that can handle HTTP requests and responses,
+/// making it compatible with the Spire backend system. It implements both
+/// [`Backend`] and [`Client`] traits.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_reqwest::HttpClient;
+/// use reqwest::Client as ReqwestClient;
+/// use tower::ServiceBuilder;
+///
+/// // Wrap a reqwest client
+/// let svc = ServiceBuilder::default()
+///     .service(ReqwestClient::default());
+///
+/// let http_client = HttpClient::new(svc);
+/// ```
+///
+/// [`Backend`]: spire_core::backend::Backend
+/// [`Client`]: spire_core::backend::Client
 #[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct HttpClient {
     inner: Mutex<BoxCloneService<Request, Response, Error>>,
 }
 
 impl HttpClient {
-    /// Creates a new [`HttpClient`].
+    /// Creates a new [`HttpClient`] from a Tower service.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `S`: The underlying Tower service
+    /// - `B`: The body type used by the service
+    /// - `E`: The error type from the service (must convert to [`Error`])
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_reqwest::HttpClient;
+    /// use tower::ServiceBuilder;
+    ///
+    /// let svc = ServiceBuilder::default()
+    ///     .service(my_http_service);
+    ///
+    /// let client = HttpClient::new(svc);
+    /// ```
     pub fn new<S, B, E>(svc: S) -> Self
     where
         S: Service<Request<B>, Response = Response<B>, Error = E> + Clone + Send + 'static,
@@ -40,15 +75,21 @@ impl HttpClient {
 }
 
 impl Default for HttpClient {
+    /// Creates a default HTTP client.
+    ///
+    /// ## Note
+    ///
+    /// This implementation is currently not available and will panic.
+    /// Use [`HttpClient::new`] with a configured service instead.
     fn default() -> Self {
-        todo!("impl Default for HttpClient")
+        todo!("impl Default for HttpClient - use HttpClient::new() instead")
     }
 }
 
 impl Clone for HttpClient {
     fn clone(&self) -> Self {
         let inner = {
-            let svc = self.inner.lock().unwrap();
+            let svc = self.inner.lock().expect("HttpClient mutex poisoned");
             Mutex::new(svc.clone())
         };
 
@@ -85,13 +126,13 @@ impl Service<Request> for HttpClient {
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let mut guard = self.inner.lock().unwrap();
+        let mut guard = self.inner.lock().expect("HttpClient mutex poisoned");
         guard.poll_ready(cx)
     }
 
     #[inline]
     fn call(&mut self, req: Request) -> Self::Future {
-        let mut guard = self.inner.lock().unwrap();
+        let mut guard = self.inner.lock().expect("HttpClient mutex poisoned");
         guard.call(req)
     }
 }
@@ -102,11 +143,12 @@ mod test {
     use reqwest::{Error as RwError, Response as RwResponse};
     use tower::ServiceBuilder;
 
-    use crate::backend::util::{Noop, Trace};
-    use crate::backend::HttpClient;
-    use crate::context::{Request, Response};
-    use crate::dataset::InMemDataset;
-    use crate::{BoxError, Client, Result};
+    use spire_core::backend::utils::{Noop, Trace};
+    use spire_core::context::{Request, Response};
+    use spire_core::dataset::InMemDataset;
+    use spire_core::{BoxError, Client, Result};
+
+    use crate::HttpClient;
 
     #[test]
     fn service() {
@@ -123,7 +165,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "tracing", tracing_test::traced_test)]
     async fn noop() -> Result<()> {
         let backend = Trace::new(HttpClient::default());
         let worker = Trace::new(Noop::default());

@@ -1,3 +1,8 @@
+//! Internal runner for executing web scraping tasks.
+//!
+//! This module contains the [`Runner`] type which handles the low-level execution
+//! of requests, signal processing, and coordination between the backend and worker.
+
 use std::cmp::max;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -11,12 +16,19 @@ use futures::StreamExt;
 use crate::backend::{Backend, Worker};
 use crate::context::{Context, Tag, TagQuery, Task};
 use crate::context::{IntoSignal, Request, Signal};
-use crate::dataset::{Dataset, DatasetExt, Datasets};
+use crate::dataset::{Dataset, DatasetExt, DatasetRegistry};
 use crate::Result;
 
+/// Internal runner that executes web scraping tasks.
+///
+/// The `Runner` is responsible for:
+/// - Managing the request queue and datasets
+/// - Coordinating between backend and worker
+/// - Processing signals (wait, hold, fail, etc.)
+/// - Handling deferred and aborted requests
 pub struct Runner<B, W> {
     service: W,
-    pub datasets: Datasets,
+    pub datasets: DatasetRegistry,
     backend: B,
 
     pub initial: Mutex<Vec<Request>>,
@@ -34,7 +46,7 @@ impl<B, W> Runner<B, W> {
     {
         Self {
             service: inner,
-            datasets: Datasets::new(),
+            datasets: DatasetRegistry::new(),
             backend,
 
             initial: Mutex::new(Vec::new()),
@@ -47,16 +59,21 @@ impl<B, W> Runner<B, W> {
     /// or the stream is aborted with a [`Signal`].
     ///
     /// Returns the total amount of processed `Request`s.
+    ///
+    /// ## Note
+    ///
+    /// Initial requests are consumed when this method is called. If an error occurs
+    /// during processing, unconsumed requests in the dataset may be lost.
     pub async fn run(&self) -> Result<usize>
     where
         B: Backend,
         W: Worker<B::Client>,
     {
-        // TODO: Requests are lost in case of error.
-        // Use tokio::Mutex instead?
-
         let mut requests: Vec<_> = {
-            let mut initial = self.initial.lock().unwrap();
+            let mut initial = self
+                .initial
+                .lock()
+                .expect("Runner initial requests mutex poisoned");
             initial.drain(..).collect()
         };
 
@@ -102,13 +119,15 @@ impl<B, W> Runner<B, W> {
     /// Creates the [`Context`] and calls the used [`Backend`] with it.
     ///
     /// Returns [`Signal`] and owner [`Tag`].
+    ///
+    /// ## Note
+    ///
+    /// Deferred request handling is not yet implemented and will be added in a future version.
     async fn call_service(&self, request: Request) -> Result<(Signal, Tag)>
     where
         B: Backend,
         W: Worker<B::Client>,
     {
-        // TODO: Apply defer.
-
         let owner = request.tag().clone();
         let datasets = self.datasets.clone();
 
@@ -135,9 +154,12 @@ impl<B, W> Runner<B, W> {
     }
 
     /// Defers all [`Tag`]s as specified per [`TagQuery`].
+    ///
+    /// Marks tags to be delayed for the specified duration. Deferred tags will not
+    /// be processed until the delay expires.
     fn apply_defer(&self, query: TagQuery, owner: Tag, duration: Duration) {
         let minimum = Instant::now() + duration;
-        let mut defer = self.defer.lock().unwrap();
+        let mut defer = self.defer.lock().expect("Runner defer mutex poisoned");
 
         let mut defer_one = |x: Tag| {
             let _ = match defer.entry(x) {
@@ -155,8 +177,12 @@ impl<B, W> Runner<B, W> {
     }
 
     /// Aborts all [`Tag`]s as specified per [`TagQuery`].
+    ///
+    /// ## Note
+    ///
+    /// This functionality is not yet implemented. Currently this method does nothing
+    /// and always returns `Ok(())`. Full abort functionality will be added in a future version.
     fn apply_abort(&self, query: TagQuery, owner: Tag) -> Result<()> {
-        // TODO: Implement `Runner::apply_abort`.]
         let _ = query;
         let _ = owner;
 

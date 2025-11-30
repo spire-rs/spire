@@ -4,7 +4,61 @@ use std::sync::{Arc, Mutex};
 
 use crate::dataset::Dataset;
 
-/// Simple in-memory `FIFO` or `LIFO` [`Dataset`].
+/// A simple, thread-safe, in-memory dataset supporting both FIFO and LIFO ordering.
+///
+/// `InMemDataset` provides fast, lock-based storage for items that don't need
+/// persistence across application restarts. It's ideal for URL queues, temporary
+/// result buffers, or any ephemeral data during scraping operations.
+///
+/// # Ordering Modes
+///
+/// - **FIFO (First-In-First-Out)** - Created via [`queue()`](InMemDataset::queue),
+///   processes items in the order they were added. Useful for breadth-first traversal.
+/// - **LIFO (Last-In-First-Out)** - Created via [`stack()`](InMemDataset::stack),
+///   processes most recently added items first. Useful for depth-first traversal.
+///
+/// # Characteristics
+///
+/// - **Thread-safe**: Uses `Arc<Mutex<_>>` internally for concurrent access
+/// - **Cloneable**: Multiple handles can reference the same underlying storage
+/// - **Infallible**: Operations never fail (error type is [`Infallible`])
+/// - **Non-persistent**: Data is lost when the dataset is dropped
+///
+/// # Examples
+///
+/// ## FIFO Queue (Breadth-First)
+///
+/// ```ignore
+/// use spire_core::dataset::{Dataset, InMemDataset};
+///
+/// # async fn example() -> Result<(), std::convert::Infallible> {
+/// let queue = InMemDataset::<String>::queue();
+///
+/// queue.write("first".to_string()).await?;
+/// queue.write("second".to_string()).await?;
+///
+/// assert_eq!(queue.read().await?, Some("first".to_string()));
+/// assert_eq!(queue.read().await?, Some("second".to_string()));
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ## LIFO Stack (Depth-First)
+///
+/// ```ignore
+/// use spire_core::dataset::{Dataset, InMemDataset};
+///
+/// # async fn example() -> Result<(), std::convert::Infallible> {
+/// let stack = InMemDataset::<String>::stack();
+///
+/// stack.write("first".to_string()).await?;
+/// stack.write("second".to_string()).await?;
+///
+/// assert_eq!(stack.read().await?, Some("second".to_string()));
+/// assert_eq!(stack.read().await?, Some("first".to_string()));
+/// # Ok(())
+/// # }
+/// ```
 #[must_use]
 pub struct InMemDataset<T> {
     inner: Arc<InMemDatasetInner<T>>,
@@ -16,27 +70,70 @@ struct InMemDatasetInner<T> {
 }
 
 impl<T> InMemDataset<T> {
-    /// Creates an empty [`InMemDataset`].
+    /// Creates an empty FIFO (queue) dataset.
     ///
-    /// Same as [`InMemDataset::queue`].
+    /// This is an alias for [`queue()`](InMemDataset::queue). Items will be
+    /// processed in first-in-first-out order.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::dataset::InMemDataset;
+    ///
+    /// let dataset = InMemDataset::<String>::new();
+    /// ```
     #[inline]
     pub fn new() -> Self {
         Self::queue()
     }
 
-    /// Reserves capacity for at least `additional` more elements to be inserted.
+    /// Pre-allocates capacity for at least `additional` more elements.
+    ///
+    /// This can improve performance when you know approximately how many items
+    /// will be stored, avoiding repeated allocations as the dataset grows.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::dataset::InMemDataset;
+    ///
+    /// // Pre-allocate space for 1000 URLs
+    /// let dataset = InMemDataset::<String>::queue()
+    ///     .reserved(1000);
+    /// ```
     pub fn reserved(self, additional: usize) -> Self {
         {
-            let mut guard = self.inner.buffer.lock().unwrap();
+            let mut guard = self
+                .inner
+                .buffer
+                .lock()
+                .expect("InMemDataset mutex poisoned");
             guard.reserve(additional);
         }
 
         self
     }
 
-    /// Creates a `First-In First-Out` [`InMemDataset`].
+    /// Creates a FIFO (First-In-First-Out) dataset.
     ///
-    /// Used for breadth-first traversal.
+    /// Items are processed in the order they were added, making this suitable
+    /// for breadth-first traversal patterns in web scraping.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::dataset::{Dataset, InMemDataset};
+    ///
+    /// # async fn example() -> Result<(), std::convert::Infallible> {
+    /// let queue = InMemDataset::<&str>::queue();
+    ///
+    /// queue.write("first").await?;
+    /// queue.write("second").await?;
+    ///
+    /// assert_eq!(queue.read().await?, Some("first"));  // FIFO order
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn queue() -> Self {
         let inner = Arc::new(InMemDatasetInner {
             buffer: Mutex::new(VecDeque::new()),
@@ -46,9 +143,26 @@ impl<T> InMemDataset<T> {
         Self { inner }
     }
 
-    /// Creates a `Last-In First-Out` [`InMemDataset`].
+    /// Creates a LIFO (Last-In-First-Out) dataset.
     ///
-    /// Used for depth-first traversal.
+    /// Items are processed in reverse order (most recent first), making this
+    /// suitable for depth-first traversal patterns in web scraping.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::dataset::{Dataset, InMemDataset};
+    ///
+    /// # async fn example() -> Result<(), std::convert::Infallible> {
+    /// let stack = InMemDataset::<&str>::stack();
+    ///
+    /// stack.write("first").await?;
+    /// stack.write("second").await?;
+    ///
+    /// assert_eq!(stack.read().await?, Some("second"));  // LIFO order
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn stack() -> Self {
         let inner = Arc::new(InMemDatasetInner {
             buffer: Mutex::new(VecDeque::new()),
@@ -96,12 +210,20 @@ where
     type Error = Infallible;
 
     async fn write(&self, data: T) -> Result<(), Self::Error> {
-        self.inner.buffer.lock().unwrap().push_back(data);
+        self.inner
+            .buffer
+            .lock()
+            .expect("InMemDataset mutex poisoned")
+            .push_back(data);
         Ok(())
     }
 
     async fn read(&self) -> Result<Option<T>, Self::Error> {
-        let mut guard = self.inner.buffer.lock().unwrap();
+        let mut guard = self
+            .inner
+            .buffer
+            .lock()
+            .expect("InMemDataset mutex poisoned");
         if self.inner.is_fifo {
             Ok(guard.pop_front())
         } else {
@@ -110,7 +232,11 @@ where
     }
 
     fn len(&self) -> usize {
-        let guard = self.inner.buffer.lock().unwrap();
+        let guard = self
+            .inner
+            .buffer
+            .lock()
+            .expect("InMemDataset mutex poisoned");
         guard.len()
     }
 }

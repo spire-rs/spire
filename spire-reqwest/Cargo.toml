@@ -1,21 +1,17 @@
-# https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [package]
-name = "spire-core"
+name = "spire-reqwest"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
-readme = "./README.md"
-
 authors = { workspace = true }
 repository = { workspace = true }
 homepage = { workspace = true }
 documentation = { workspace = true }
 
+description = "Reqwest-based HTTP client backend for Spire web scraping framework"
+keywords = ["crawler", "scraper", "web", "reqwest"]
 categories = ["asynchronous", "web-programming"]
-keywords = ["crawler", "scraper", "web", "framework"]
-description = "Core types and traits for Spire web scraping framework"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -24,37 +20,25 @@ rustdoc-args = ["--cfg", "docsrs"]
 [lib]
 path = "src/lib.rs"
 
-[features]
-default = []
-full = ["tracing", "metric"]
-
-# Observability
-tracing = ["trace", "dep:tracing"]
-metric = ["tower/load"]
-trace = ["dep:tracing"]
-
 [dependencies]
+# Spire
+spire-core = { workspace = true }
+
 # Tower ecosystem
 tower = { workspace = true }
 
 # Async
 futures = { workspace = true }
-async-trait = { workspace = true }
 
 # HTTP
 http = { workspace = true }
 http-body = { workspace = true }
 http-body-util = { workspace = true }
+reqwest = { workspace = true }
 
 # Utilities
 bytes = { workspace = true }
-pin-project-lite = { workspace = true }
-thiserror = { workspace = true }
-
-# Optional: Observability
-tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Testing
 tokio = { workspace = true }
-tracing-test = { workspace = true }

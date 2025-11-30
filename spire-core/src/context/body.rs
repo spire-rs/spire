@@ -1,3 +1,8 @@
+//! HTTP request and response body handling.
+//!
+//! This module provides the [`Body`] type, a type-erased HTTP body implementation
+//! that supports various data sources (bytes, strings, streams, etc.).
+
 use std::any::Any;
 use std::fmt;
 use std::pin::Pin;
@@ -10,7 +15,9 @@ use http_body_util::{BodyExt, Empty, Full};
 
 use crate::BoxError;
 
-/// Forked from [`axum_core`]`::body::Body`.
+/// Forked from [`axum_core::body::Body`].
+///
+/// Attempts to downcast a type `K` to type `T` using runtime type information.
 ///
 /// [`axum_core`]: https://github.com/tokio-rs/axum
 fn try_downcast<T, K>(k: K) -> Result<T, K>
@@ -155,6 +162,6 @@ mod test {
 
     #[test]
     pub fn stream() {
-        // TODO: Streaming body.
+        // Streaming body support will be added when needed for specific use cases.
     }
 }

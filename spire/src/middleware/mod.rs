@@ -20,9 +20,9 @@ pub use exclude::{Exclude, ExcludeLayer};
 pub use include::{Include, IncludeLayer};
 
 #[cfg(feature = "metric")]
-use crate::backend::util::MetricLayer;
+use crate::backend::utils::MetricLayer;
 #[cfg(feature = "trace")]
-use crate::backend::util::TraceLayer;
+use crate::backend::utils::TraceLayer;
 
 #[cfg(feature = "exclude")]
 mod exclude;

@@ -1,3 +1,8 @@
+//! Request extensions for routing and depth tracking.
+//!
+//! This module provides extensions to HTTP requests for managing routing tags
+//! and tracking request depth in recursive scraping scenarios.
+
 use std::num::NonZeroUsize;
 
 use http::request::Builder;
@@ -75,8 +80,13 @@ impl Depth {
     const MIN: Self = Self(NonZeroUsize::MIN);
 
     /// Creates a new [`Depth`] extension.
+    ///
+    /// If `depth` is 0, uses the minimum value (1) instead.
     pub fn new(depth: usize) -> Self {
-        Self(NonZeroUsize::new(depth).unwrap_or(NonZeroUsize::MIN))
+        Self(NonZeroUsize::new(depth).unwrap_or_else(|| {
+            debug_assert!(false, "Depth::new called with 0, using MIN instead");
+            NonZeroUsize::MIN
+        }))
     }
 
     /// Returns the depth as a primitive type.
