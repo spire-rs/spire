@@ -1,4 +1,4 @@
-## spire
+# Spire
 
 [![Build Status][action-badge]][action-url]
 [![Crate Docs][docs-badge]][docs-url]
@@ -7,10 +7,11 @@
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
 
-[!WARNING] Work in progress.
+> [!WARNING]
+> Work in progress. The API is not yet stable and may change.
 
-[action-badge]: https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yaml?branch=main&label=build&logo=github&style=flat-square
-[action-url]: https://github.com/spire-rs/spire/actions/workflows/build.yaml
+[action-badge]: https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yml?branch=main&label=build&logo=github&style=flat-square
+[action-url]: https://github.com/spire-rs/spire/actions/workflows/build.yml
 [crates-badge]: https://img.shields.io/crates/v/spire.svg?logo=rust&style=flat-square
 [crates-url]: https://crates.io/crates/spire
 [docs-badge]: https://img.shields.io/docsrs/spire?logo=Docs.rs&style=flat-square
@@ -24,28 +25,172 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 [tokio-rs/tokio]: https://github.com/tokio-rs/tokio/
 [tower-rs/tower]: https://github.com/tower-rs/tower/
 
-#### Features
+## Features
 
-- Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-- Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-- Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+- **Flexible Architecture**: Built on tower's Service trait for composable middleware
+- **Multiple Backends**: Support for HTTP (reqwest) and WebDriver (fantoccini) backends
+- **Type-Safe Routing**: Tag-based routing with compile-time safety
+- **Async First**: Powered by tokio for high-performance concurrent scraping
+- **Ergonomic Extractors**: Extract data from requests with a clean, type-safe API
+- **Graceful Shutdown**: Built-in support for clean shutdown and resource cleanup
+- **Observability**: Optional tracing support for debugging and monitoring
 
-#### Examples
+## Installation
 
-- `spire::backend::HttpClient`:
+Add this to your `Cargo.toml`:
 
-```rust
-println!("Hello!");
+```toml
+[dependencies]
+spire = "0.1.1"
 ```
 
-- `spire::backend::BrowserPool`:
+### Feature Flags
+
+- **`reqwest`** - Enables the reqwest-based HTTP client backend
+- **`fantoccini`** - Enables the WebDriver/browser automation backend
+- **`macros`** - Enables procedural macros for deriving extractors
+- **`tracing`** - Enables tracing/logging support
+- **`trace`** - Enables detailed trace-level instrumentation
+- **`metric`** - Enables metrics collection
+- **`full`** - Enables all features (macros, tracing, reqwest, fantoccini)
+
+## Quick Start
+
+### HTTP Scraping with Reqwest
 
 ```rust
-println!("Hello!");
+use spire::prelude::*;
+use spire::extract::{Text, State};
+use spire::context::{RequestQueue, Tag};
+use spire::reqwest_backend::HttpClient;
+use spire::dataset::InMemDataset;
+
+#[derive(Clone)]
+struct AppState {
+    api_key: String,
+}
+
+async fn scrape_handler(
+    State(state): State<AppState>,
+    Text(html): Text,
+    queue: RequestQueue,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Scraped {} bytes with API key: {}", html.len(), state.api_key);
+    
+    // Queue more requests
+    queue.push(Tag::new("page2"), "https://example.com/page2").await?;
+    
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create router
+    let router = Router::new()
+        .route(Tag::new("main"), scrape_handler)
+        .with_state(AppState {
+            api_key: "my-api-key".to_string(),
+        });
+
+    // Create backend and client
+    let backend = HttpClient::default();
+    let client = Client::new(backend, router)
+        .with_request_queue(InMemDataset::stack())
+        .with_dataset(InMemDataset::<String>::new());
+
+    // Start initial request
+    client.queue()
+        .push(Tag::new("main"), "https://example.com")
+        .await?;
+
+    // Run the client
+    client.run().await?;
+
+    Ok(())
+}
 ```
 
-#### Notes
+### Browser Automation with Fantoccini
 
-- `routing` uses `extract as argument` pattern from [axum][tokio-rs/axum].
+```rust
+use spire::prelude::*;
+use spire::extract::State;
+use spire::context::{RequestQueue, Tag};
+use spire::fantoccini_backend::BrowserPool;
+use spire::dataset::InMemDataset;
+
+async fn browser_handler(
+    queue: RequestQueue,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Processing page with browser");
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create router
+    let router = Router::new()
+        .route(Tag::new("main"), browser_handler);
+
+    // Create browser pool backend
+    let backend = BrowserPool::builder().build();
+    
+    let client = Client::new(backend, router)
+        .with_request_queue(InMemDataset::stack())
+        .with_dataset(InMemDataset::<String>::new());
+
+    // Start initial request
+    client.queue()
+        .push(Tag::new("main"), "https://example.com")
+        .await?;
+
+    // Run the client
+    client.run().await?;
+
+    Ok(())
+}
+```
+
+## Architecture
+
+Spire is built on several key abstractions:
+
+- **Router**: Routes requests to handlers based on tags
+- **Handler**: Async functions that process requests and extract data
+- **Extractor**: Type-safe data extraction from request context
+- **Backend**: Pluggable backend for HTTP or browser automation
+- **Dataset**: Storage for scraped data and request queues
+
+## Middleware
+
+Spire integrates seamlessly with the tower ecosystem:
+
+```rust
+use tower::ServiceBuilder;
+use tower::timeout::TimeoutLayer;
+use std::time::Duration;
+
+let router = Router::new()
+    .route(Tag::new("main"), handler)
+    .layer(
+        ServiceBuilder::new()
+            .timeout(Duration::from_secs(30))
+            .into_inner()
+    );
+```
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+
+## Acknowledgments
+
+- Built on [tokio][tokio-rs/tokio] for async runtime
+- Uses [tower][tower-rs/tower] for middleware composition
+- Routing pattern inspired by [axum][tokio-rs/axum]
 
 [tokio-rs/axum]: https://github.com/tokio-rs/axum/

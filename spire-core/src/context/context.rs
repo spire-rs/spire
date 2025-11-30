@@ -1,11 +1,10 @@
 use std::fmt;
 
+use super::RequestQueue;
+use crate::Result;
 use crate::backend::Client;
 use crate::context::{Request, Response, Task};
 use crate::dataset::{Data, DatasetRegistry};
-use crate::Result;
-
-use super::RequestQueue;
 
 /// Framework-specific context of the [`Request`].
 pub struct Context<C> {

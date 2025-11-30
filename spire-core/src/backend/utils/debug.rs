@@ -1,14 +1,13 @@
 use std::convert::Infallible;
 use std::fmt;
-use std::future::{ready, Ready};
+use std::future::{Ready, ready};
 use std::task::{Context, Poll};
 
-use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures::future::BoxFuture;
 use tower::Service;
 
-use crate::context::{Body, IntoSignal, Signal};
-use crate::context::{Context as Cx, Request, Response};
+use crate::context::{Body, Context as Cx, IntoSignal, Request, Response, Signal};
 use crate::{Error, Result};
 
 /// No-op `tower::`[`Service`] used for testing and debugging.
@@ -86,9 +85,9 @@ impl fmt::Debug for Noop {
 }
 
 impl Service<()> for Noop {
-    type Response = Self;
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
+    type Response = Self;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -102,9 +101,9 @@ impl Service<()> for Noop {
 }
 
 impl Service<Request> for Noop {
-    type Response = Response;
     type Error = Error;
     type Future = Ready<Result<Response, Error>>;
+    type Response = Response;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -122,9 +121,9 @@ where
     C: Service<Request, Response = Response, Error = Error> + Send + 'static,
     C::Future: Send,
 {
-    type Response = Signal;
     type Error = Infallible;
     type Future = BoxFuture<'static, Result<Signal, Infallible>>;
+    type Response = Signal;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

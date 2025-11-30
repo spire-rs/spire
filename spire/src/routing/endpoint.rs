@@ -104,7 +104,14 @@ impl<C> Service<Cx<C>> for Endpoint<C, ()> {
     }
 
     #[inline]
+    #[cfg_attr(feature = "trace", tracing::instrument(skip_all, level = "trace"))]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
+        #[cfg(feature = "trace")]
+        tracing::trace!(endpoint_type = ?match self {
+            Self::Route(_) => "Route",
+            Self::Handler(_) => "Handler",
+        }, "executing endpoint");
+
         match self {
             Self::Route(x) => x.call(cx),
             Self::Handler(x) => x.clone().into_route(()).call(cx),

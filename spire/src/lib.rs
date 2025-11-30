@@ -1,6 +1,48 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
+//!
+//! # Feature Flags
+//!
+//! Spire uses feature flags to enable optional functionality:
+//!
+//! ## Backend Implementations
+//!
+//! - **`reqwest`** - Enables the reqwest-based HTTP client backend
+//! - **`fantoccini`** - Enables the WebDriver/browser automation backend
+//!
+//! ## Additional Features
+//!
+//! - **`macros`** - Enables procedural macros for deriving extractors
+//! - **`tracing`** - Enables tracing/logging support
+//! - **`trace`** - Enables detailed trace-level instrumentation
+//! - **`metric`** - Enables metrics collection
+//! - **`full`** - Enables all features (macros, tracing, reqwest, fantoccini)
+//!
+
+//!
+//! # Examples
+//!
+//! ## Using with Reqwest Backend
+//!
+//! ```toml
+//! [dependencies]
+//! spire = { version = "0.1", features = ["reqwest"] }
+//! ```
+//!
+//! ## Using with Fantoccini Backend
+//!
+//! ```toml
+//! [dependencies]
+//! spire = { version = "0.1", features = ["fantoccini"] }
+//! ```
+//!
+//! ## Using All Features
+//!
+//! ```toml
+//! [dependencies]
+//! spire = { version = "0.1", features = ["full"] }
+//! ```
 // #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 #[doc(no_inline)]
@@ -10,7 +52,16 @@ pub use async_trait::async_trait;
 pub use routing::Router;
 use spire_core::backend::Backend;
 pub use spire_core::{backend, context, dataset};
-pub use spire_core::{Error, Result};
+pub use spire_core::{Error, ErrorKind, Result};
+
+// Re-export backend implementations when their features are enabled
+#[cfg(feature = "reqwest")]
+#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
+pub use spire_reqwest as reqwest_backend;
+
+#[cfg(feature = "fantoccini")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fantoccini")))]
+pub use spire_fantoccini as fantoccini_backend;
 
 pub mod extract;
 mod handler;
@@ -37,8 +88,8 @@ mod test {
     use crate::{Client, Result, Router};
 
     #[test]
-    #[cfg(feature = "client")]
-    fn with_client() {
+    #[cfg(feature = "reqwest")]
+    fn with_reqwest_client() {
         async fn handler(queue: RequestQueue, mut dataset: DataSink<u64>) -> Result<()> {
             dataset.feed(1).await?;
             Ok(())
@@ -49,7 +100,7 @@ mod test {
             .route("page", handler)
             .fallback(handler);
 
-        let backend = crate::backend::HttpClient::default();
+        let backend = crate::reqwest_backend::HttpClient::default();
         let client = Client::new(backend, router)
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new());
@@ -58,8 +109,8 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "driver")]
-    fn with_driver() {
+    #[cfg(feature = "fantoccini")]
+    fn with_fantoccini_driver() {
         async fn handler(queue: RequestQueue, mut dataset: DataSink<u64>) -> Result<()> {
             dataset.feed(1).await?;
             Ok(())
@@ -70,7 +121,7 @@ mod test {
             .route("page", handler)
             .fallback(handler);
 
-        let backend = crate::backend::BrowserPool::builder().build();
+        let backend = crate::fantoccini_backend::BrowserPool::builder().build();
         let client = Client::new(backend, router)
             .with_request_queue(InMemDataset::stack())
             .with_dataset(InMemDataset::<u64>::new());

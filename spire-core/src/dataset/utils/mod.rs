@@ -46,8 +46,8 @@
 //!     );
 //! ```
 
-use crate::dataset::future::{DataSink, DataStream};
 use crate::dataset::Dataset;
+use crate::dataset::future::{DataSink, DataStream};
 
 mod boxed;
 mod boxed_clone;

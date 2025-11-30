@@ -1,3 +1,9 @@
+//! Type-erased handler construction.
+//!
+//! This module provides [`MakeRoute`], which enables type erasure for handlers
+//! that haven't been attached to state yet. This allows routers to store handlers
+//! before state is available, deferring the conversion to [`Route`] until later.
+
 use std::convert::Infallible;
 use std::fmt;
 use std::sync::Mutex;

@@ -4,8 +4,8 @@ use std::task::{Context, Poll};
 use futures::sink::unfold;
 use futures::{Sink, SinkExt};
 
-use crate::dataset::Dataset;
 use crate::Error;
+use crate::dataset::Dataset;
 
 /// Type alias for boxed sinks to reduce repetition.
 type BoxSink<'a, T, E> = Pin<Box<dyn Sink<T, Error = E> + Send + 'a>>;

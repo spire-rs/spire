@@ -31,34 +31,43 @@ impl<C, S> TagRouter<C, S> {
 
     /// Inserts a routed endpoint.
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Panics if overrides an already inserted route.
+    /// Panics if a route for this tag has already been inserted.
     pub fn route(&mut self, tag: Tag, endpoint: Endpoint<C, S>) {
         if tag.is_fallback() {
             self.fallback(endpoint);
             return;
         }
 
-        assert!(
-            self.endpoints.insert(tag, endpoint).is_none(),
-            "should not override already routed tags"
-        );
+        let tag_copy = tag.clone();
+        if let Some(_) = self.endpoints.insert(tag, endpoint) {
+            panic!(
+                "route conflict: tag '{:?}' has already been registered. \
+                 Each tag can only be used once per router.",
+                tag_copy
+            );
+        }
     }
 
     /// Inserts a fallback endpoint.
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Panics if overrides an already inserted fallback.
+    /// Panics if a fallback handler has already been set.
     pub fn fallback(&mut self, endpoint: Endpoint<C, S>) {
-        assert!(
-            self.fallback.replace(endpoint).is_none(),
-            "should not override fallback route"
-        );
+        if self.fallback.replace(endpoint).is_some() {
+            panic!(
+                "fallback conflict: a fallback handler has already been set. \
+                 Use Router::merge() to combine routers instead of setting multiple fallbacks."
+            );
+        }
     }
 
-    /// TODO.
+    /// Applies a transformation function to all endpoints.
+    ///
+    /// The function receives each `(Tag, Endpoint)` pair and returns a transformed pair.
+    /// This is useful for applying middleware or transformations to all routes at once.
     pub fn map<F>(mut self, func: F) -> Self
     where
         F: Fn(Tag, Endpoint<C, S>) -> (Tag, Endpoint<C, S>),
@@ -69,7 +78,13 @@ impl<C, S> TagRouter<C, S> {
         self
     }
 
-    /// TODO.
+    /// Merges another router's routes into this one.
+    ///
+    /// All routes and the fallback handler from `other` are added to this router.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any tags from `other` conflict with existing routes in this router.
     pub fn merge(&mut self, other: Self) {
         if let Some(endpoint) = other.fallback {
             self.fallback(endpoint);
@@ -80,7 +95,10 @@ impl<C, S> TagRouter<C, S> {
         }
     }
 
-    /// TODO.
+    /// Attaches state to all handlers in the router.
+    ///
+    /// Converts handlers from requiring state `S` to state `S2` by providing
+    /// the state value. This allows stateless routers to become stateful.
     pub fn with_state<S2>(self, state: S) -> TagRouter<C, S2>
     where
         S: Clone,
@@ -137,7 +155,11 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "trace", tracing::instrument(skip_all, level = "trace"))]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
+        #[cfg(feature = "trace")]
+        tracing::trace!(tag = ?cx.get_ref().tag(), "routing request");
+
         self.route_cloned(cx.get_ref().tag())
             .unwrap_or_else(|| self.fallback_cloned())
             .call(cx)

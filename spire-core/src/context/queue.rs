@@ -6,8 +6,8 @@
 use std::fmt;
 
 use crate::context::{Depth, Request, Tag};
-use crate::dataset::utils::BoxCloneDataset;
 use crate::dataset::Dataset;
+use crate::dataset::utils::BoxCloneDataset;
 use crate::{Error, Result};
 
 /// [`Request`] queue backed by a [`Dataset`].

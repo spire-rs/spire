@@ -1,11 +1,11 @@
 use std::any::{Any, TypeId};
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::sync::{Arc, Mutex};
 
+use crate::Error;
 use crate::dataset::utils::BoxCloneDataset;
 use crate::dataset::{Dataset, DatasetExt, InMemDataset};
-use crate::Error;
 
 /// Type alias for a thread-safe, type-erased boxed value.
 type AnyBox = Box<dyn Any + Send + Sync>;

@@ -174,3 +174,141 @@ pub trait Dataset<T>: Send + Sync {
         self.len() == 0
     }
 }
+
+/// Extension trait for bulk dataset operations.
+///
+/// This trait provides efficient batch read/write operations for datasets.
+/// It is automatically implemented for all types that implement [`Dataset`].
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire_core::dataset::{Dataset, DatasetBulkExt, InMemDataset};
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let dataset = InMemDataset::<i32>::queue();
+///
+/// // Write multiple items at once
+/// dataset.write_bulk(vec![1, 2, 3, 4, 5]).await?;
+///
+/// // Read multiple items at once
+/// let items = dataset.read_bulk(3).await?;
+/// assert_eq!(items, vec![1, 2, 3]);
+/// # Ok(())
+/// # }
+/// ```
+#[async_trait::async_trait]
+pub trait DatasetBulkExt<T>: Dataset<T>
+where
+    T: Send + 'static,
+{
+    /// Writes multiple items to the dataset in bulk.
+    ///
+    /// The default implementation calls [`write`](Dataset::write) for each item sequentially.
+    /// Implementations may override this to provide more efficient bulk operations.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Self::Error`](Dataset::Error) if any write operation fails.
+    /// On error, some items may have been written before the failure occurred.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::dataset::{Dataset, DatasetBulkExt, InMemDataset};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dataset = InMemDataset::<i32>::queue();
+    /// dataset.write_bulk(vec![1, 2, 3, 4, 5]).await?;
+    /// assert_eq!(dataset.len(), 5);
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn write_bulk(&self, items: Vec<T>) -> Result<(), Self::Error> {
+        for item in items {
+            self.write(item).await?;
+        }
+        Ok(())
+    }
+
+    /// Reads multiple items from the dataset in bulk.
+    ///
+    /// Returns up to `count` items from the dataset. May return fewer items if
+    /// the dataset becomes empty before reaching the requested count.
+    ///
+    /// The default implementation calls [`read`](Dataset::read) up to `count` times.
+    /// Implementations may override this to provide more efficient bulk operations.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Self::Error`](Dataset::Error) if any read operation fails.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::dataset::{Dataset, DatasetBulkExt, InMemDataset};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dataset = InMemDataset::<i32>::queue();
+    /// dataset.write_bulk(vec![1, 2, 3, 4, 5]).await?;
+    ///
+    /// let items = dataset.read_bulk(3).await?;
+    /// assert_eq!(items, vec![1, 2, 3]);
+    /// assert_eq!(dataset.len(), 2);
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn read_bulk(&self, count: usize) -> Result<Vec<T>, Self::Error> {
+        let mut items = Vec::with_capacity(count.min(self.len()));
+        for _ in 0..count {
+            match self.read().await? {
+                Some(item) => items.push(item),
+                None => break,
+            }
+        }
+        Ok(items)
+    }
+
+    /// Reads all items from the dataset.
+    ///
+    /// Continuously reads items until the dataset is empty. This is equivalent to
+    /// calling [`read_bulk`](DatasetBulkExt::read_bulk) with a count equal to the dataset length.
+    ///
+    /// The default implementation calls [`read`](Dataset::read) until it returns `None`.
+    /// Implementations may override this to provide more efficient bulk operations.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Self::Error`](Dataset::Error) if any read operation fails.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::dataset::{Dataset, DatasetBulkExt, InMemDataset};
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let dataset = InMemDataset::<i32>::queue();
+    /// dataset.write_bulk(vec![1, 2, 3]).await?;
+    ///
+    /// let all_items = dataset.read_all().await?;
+    /// assert_eq!(all_items, vec![1, 2, 3]);
+    /// assert!(dataset.is_empty());
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn read_all(&self) -> Result<Vec<T>, Self::Error> {
+        let mut items = Vec::with_capacity(self.len());
+        while let Some(item) = self.read().await? {
+            items.push(item);
+        }
+        Ok(items)
+    }
+}
+
+/// Blanket implementation of [`DatasetBulkExt`] for all [`Dataset`] types.
+impl<T, D> DatasetBulkExt<T> for D
+where
+    D: Dataset<T>,
+    T: Send + 'static,
+{
+}

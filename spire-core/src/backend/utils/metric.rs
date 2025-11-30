@@ -2,12 +2,12 @@ use std::convert::Infallible;
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::task::{Context, Poll};
 
-use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures::future::BoxFuture;
 use pin_project_lite::pin_project;
 use tower::load::Load;
 use tower::{Layer, Service};
@@ -114,9 +114,9 @@ where
     C: Service<Request, Response = Response, Error = Error> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = Signal;
     type Error = Infallible;
     type Future = MetricFuture;
+    type Response = Signal;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

@@ -1,10 +1,9 @@
 use std::fmt;
 
-use crate::dataset::utils::BoxCloneDataset;
-use crate::dataset::DatasetExt;
-use crate::Error;
-
 use super::{DataSink, DataStream};
+use crate::Error;
+use crate::dataset::DatasetExt;
+use crate::dataset::utils::BoxCloneDataset;
 
 /// Convenient wrapper around [`BoxCloneDataset`] for ergonomic dataset handling.
 ///
@@ -45,28 +44,28 @@ where
         Self(inner)
     }
 
-    /// Returns the underlying [`BoxCloneDataset`].
+    /// Returns a reference to the underlying [`BoxCloneDataset`].
     #[inline]
-    pub fn into_inner(self) -> BoxCloneDataset<T, E> {
-        self.0
+    pub const fn as_dataset(&self) -> &BoxCloneDataset<T, E> {
+        &self.0
     }
 
     /// Returns a new [`DataStream`].
     #[inline]
     pub fn into_stream(self) -> DataStream<T, E> {
-        self.into_inner().into_stream()
+        self.0.into_stream()
     }
 
     /// Returns a new [`DataSink`].
     #[inline]
     pub fn into_sink(self) -> DataSink<T, E> {
-        self.into_inner().into_sink()
+        self.0.into_sink()
     }
 }
 
 impl<T> fmt::Debug for Data<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Dataset").finish_non_exhaustive()
+        f.debug_struct("Data").finish_non_exhaustive()
     }
 }

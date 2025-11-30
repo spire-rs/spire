@@ -3,6 +3,7 @@
 
 use std::convert::Infallible;
 use std::fmt;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use tower::{Layer, Service};
@@ -23,10 +24,11 @@ mod route;
 mod tag_router;
 
 /// Composes and routes [`Handler`]s and `tower::`[`Service`]s.
+///
+/// The router uses `Arc` internally to make cloning cheap.
 #[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
 pub struct Router<C = (), S = ()> {
-    // TODO: Use Arc<TagRouter<C, S>>, reduce cloning.
-    inner: TagRouter<C, S>,
+    inner: Arc<TagRouter<C, S>>,
 }
 
 impl<C, S> Router<C, S> {
@@ -37,15 +39,15 @@ impl<C, S> Router<C, S> {
     where
         C: 'static,
     {
-        let inner = TagRouter::<C, S>::new();
+        let inner = Arc::new(TagRouter::<C, S>::new());
         Self { inner }
     }
 
     /// Inserts a routed endpoint.
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Panics if overrides an already inserted route.
+    /// Panics if a route for this tag has already been inserted.
     pub fn route<H, V>(mut self, tag: impl Into<Tag>, handler: H) -> Self
     where
         C: 'static,
@@ -55,15 +57,15 @@ impl<C, S> Router<C, S> {
         V: Send + 'static,
     {
         let endpoint = Endpoint::from_handler(handler);
-        self.inner.route(tag.into(), endpoint);
+        Arc::make_mut(&mut self.inner).route(tag.into(), endpoint);
         self
     }
 
     /// Inserts a routed endpoint with a provided `tower::`[`Service`].
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Panics if overrides an already inserted route.
+    /// Panics if a route for this tag has already been inserted.
     pub fn route_service<H>(mut self, tag: impl Into<Tag>, service: H) -> Self
     where
         C: 'static,
@@ -73,7 +75,7 @@ impl<C, S> Router<C, S> {
         H::Future: Send + 'static,
     {
         let endpoint = Endpoint::from_service(service);
-        self.inner.route(tag.into(), endpoint);
+        Arc::make_mut(&mut self.inner).route(tag.into(), endpoint);
         self
     }
 
@@ -83,9 +85,9 @@ impl<C, S> Router<C, S> {
     ///
     /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Panics if overrides an already inserted fallback.
+    /// Panics if a fallback handler has already been set.
     pub fn fallback<H, V>(mut self, handler: H) -> Self
     where
         C: 'static,
@@ -95,7 +97,7 @@ impl<C, S> Router<C, S> {
         V: Send + 'static,
     {
         let endpoint = Endpoint::from_handler(handler);
-        self.inner.fallback(endpoint);
+        Arc::make_mut(&mut self.inner).fallback(endpoint);
         self
     }
 
@@ -105,9 +107,9 @@ impl<C, S> Router<C, S> {
     ///
     /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Panics if overrides an already inserted fallback.
+    /// Panics if a fallback handler has already been set.
     pub fn fallback_service<H>(mut self, service: H) -> Self
     where
         C: 'static,
@@ -117,17 +119,31 @@ impl<C, S> Router<C, S> {
         H::Future: Send + 'static,
     {
         let endpoint = Endpoint::from_service(service);
-        self.inner.fallback(endpoint);
+        Arc::make_mut(&mut self.inner).fallback(endpoint);
         self
     }
 
     /// Merges with another [`Router`] by appending all [`Handler`]s to matching [`Tag`]s.
     pub fn merge(mut self, other: Self) -> Self {
-        self.inner.merge(other.inner);
+        let other_inner = Arc::try_unwrap(other.inner).unwrap_or_else(|arc| (*arc).clone());
+        Arc::make_mut(&mut self.inner).merge(other_inner);
         self
     }
 
-    /// TODO.
+    /// Applies a `tower::`[`Layer`] to all routes in the router.
+    ///
+    /// This allows you to add middleware to all handlers, such as logging,
+    /// rate limiting, or request transformation.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use tower::ServiceBuilder;
+    ///
+    /// let router = Router::new()
+    ///     .route(tag, handler)
+    ///     .layer(ServiceBuilder::new().layer(my_middleware));
+    /// ```
     pub fn layer<L>(self, layer: L) -> Self
     where
         C: 'static,
@@ -138,19 +154,44 @@ impl<C, S> Router<C, S> {
         <L::Service as Service<Cx<C>>>::Error: Into<Infallible> + 'static,
         <L::Service as Service<Cx<C>>>::Future: Send + 'static,
     {
+        let inner = Arc::try_unwrap(self.inner).unwrap_or_else(|arc| (*arc).clone());
         let remap = |k: Tag, v: Endpoint<C, S>| (k, v.layer(layer.clone()));
         Self {
-            inner: self.inner.map(remap),
+            inner: Arc::new(inner.map(remap)),
         }
     }
 
-    /// TODO.
+    /// Attaches state to all handlers in the router.
+    ///
+    /// This converts a stateless router into a stateful one by providing
+    /// state that can be extracted in handlers via the [`State`] extractor.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// #[derive(Clone)]
+    /// struct AppState {
+    ///     db: Database,
+    /// }
+    ///
+    /// async fn handler(State(state): State<AppState>) {
+    ///     // Use state.db
+    /// }
+    ///
+    /// let router = Router::new()
+    ///     .route(tag, handler)
+    ///     .with_state(AppState { db });
+    /// ```
+    ///
+    /// [`State`]: crate::extract::State
     pub fn with_state<S2>(self, state: S) -> Router<C, S2>
     where
         S: Clone,
     {
-        let inner = self.inner.with_state(state);
-        Router { inner }
+        let inner = Arc::try_unwrap(self.inner).unwrap_or_else(|arc| (*arc).clone());
+        Router {
+            inner: Arc::new(inner.with_state(state)),
+        }
     }
 }
 
@@ -190,8 +231,14 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "trace", tracing::instrument(skip_all, level = "trace"))]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
-        self.inner.call(cx)
+        #[cfg(feature = "trace")]
+        tracing::trace!("router calling inner tag router");
+
+        // Clone the Arc to get access to the inner TagRouter
+        let mut inner = (*self.inner).clone();
+        inner.call(cx)
     }
 }
 

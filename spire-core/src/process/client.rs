@@ -5,8 +5,8 @@
 
 use std::cmp::max;
 use std::fmt;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use crate::backend::{Backend, Worker};
 use crate::context::{Body, Request};
@@ -357,6 +357,38 @@ impl<B, W> Client<B, W> {
         T: Send + Sync + 'static,
     {
         Data::new(self.inner.datasets.get::<T>())
+    }
+
+    /// Returns a shutdown token for graceful shutdown.
+    ///
+    /// This token can be used to trigger graceful shutdown of the client from outside.
+    /// When cancelled, the runner will stop processing new requests and finish current ones.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use tokio::time::{sleep, Duration};
+    /// use spire_core::Client;
+    ///
+    /// let client = Client::new(backend, worker)
+    ///     .with_initial_request(request);
+    ///
+    /// let shutdown = client.shutdown_token();
+    ///
+    /// // Spawn runner in background
+    /// let handle = tokio::spawn(async move {
+    ///     client.run().await
+    /// });
+    ///
+    /// // Trigger shutdown after 5 seconds
+    /// sleep(Duration::from_secs(5)).await;
+    /// shutdown.cancel();
+    ///
+    /// // Wait for graceful shutdown
+    /// handle.await.unwrap().unwrap();
+    /// ```
+    pub fn shutdown_token(&self) -> tokio_util::sync::CancellationToken {
+        self.inner.shutdown_token()
     }
 }
 

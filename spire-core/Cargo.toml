@@ -40,6 +40,8 @@ tower = { workspace = true }
 # Async
 futures = { workspace = true }
 async-trait = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
 
 # HTTP
 http = { workspace = true }

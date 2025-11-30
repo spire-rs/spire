@@ -1,3 +1,8 @@
+//! Type-erased routing service.
+//!
+//! This module provides the [`Route`] type, which wraps a `tower::Service`
+//! with type erasure to allow heterogeneous collections of routes.
+
 use std::fmt;
 use std::sync::Mutex;
 use std::task::{Context, Poll};

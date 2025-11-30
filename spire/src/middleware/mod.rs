@@ -1,97 +1,44 @@
-//! [`Backend`] and [`Worker`] middlewares.
+//! Middleware for composing request processing pipelines.
 //!
-//! [`Backend`]: crate::backend::Backend
-//! [`Worker`]: crate::backend::Worker
+//! This module provides middleware components that can be applied to routes
+//! using the [`Router::layer`] method. Middleware can modify requests, responses,
+//! add logging, implement rate limiting, and more.
+//!
+//! # Using Middleware
+//!
+//! Middleware is applied using the [`Layer`] trait from the `tower` ecosystem:
+//!
+//! ```ignore
+//! use spire::Router;
+//! use tower::ServiceBuilder;
+//!
+//! let router = Router::new()
+//!     .route(tag, handler)
+//!     .layer(
+//!         ServiceBuilder::new()
+//!             .layer(my_middleware_layer)
+//!     );
+//! ```
+//!
+//! # Tower Ecosystem
+//!
+//! Spire is built on the [`tower`] service abstraction, which means you can use
+//! any middleware from the tower ecosystem:
+//!
+//! - [`tower::timeout`] - Request timeouts
+//! - [`tower::limit`] - Rate limiting and concurrency control
+//! - [`tower::buffer`] - Request buffering
+//! - [`tower::retry`] - Automatic retries
+//!
+//! # Custom Middleware
+//!
+//! You can create custom middleware by implementing the [`Layer`] and [`Service`]
+//! traits from tower. See the [tower documentation] for more details.
+//!
+//! [`Router::layer`]: crate::Router::layer
+//! [`Layer`]: tower::Layer
+//! [`Service`]: tower::Service
+//! [`tower`]: https://docs.rs/tower
+//! [tower documentation]: https://docs.rs/tower/latest/tower/
 
-#[cfg(any(
-    feature = "exclude",
-    feature = "include",
-    feature = "metric",
-    feature = "trace"
-))]
-use tower::layer::util::Stack;
-use tower::ServiceBuilder;
-
-#[cfg(feature = "exclude")]
-#[cfg_attr(docsrs, doc(cfg(feature = "exclude")))]
-pub use exclude::{Exclude, ExcludeLayer};
-#[cfg(feature = "include")]
-#[cfg_attr(docsrs, doc(cfg(feature = "include")))]
-pub use include::{Include, IncludeLayer};
-
-#[cfg(feature = "metric")]
-use crate::backend::utils::MetricLayer;
-#[cfg(feature = "trace")]
-use crate::backend::utils::TraceLayer;
-
-#[cfg(feature = "exclude")]
-mod exclude;
-#[cfg(feature = "include")]
-mod include;
-
-pub mod futures {
-    //! Future types for [`spire`] middlewares.
-    //!
-    //! [`spire`]: crate
-
-    #[cfg(feature = "exclude")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "exclude")))]
-    pub use exclude::ExcludeFuture;
-    #[cfg(feature = "include")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "include")))]
-    pub use include::IncludeFuture;
-
-    #[cfg(feature = "exclude")]
-    use crate::middleware::exclude;
-    #[cfg(feature = "include")]
-    use crate::middleware::include;
-}
-
-/// Extension trait for `tower::`[`ServiceBuilder`].
-pub trait ServiceBuilderExt<L> {
-    #[cfg(feature = "metric")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "metric")))]
-    fn metric(self) -> ServiceBuilder<Stack<MetricLayer, L>>;
-
-    /// Enables tracing middleware for improved observability.
-    #[cfg(feature = "trace")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
-    fn trace(self) -> ServiceBuilder<Stack<TraceLayer, L>>;
-
-    /// Conditionally rejects [`Request`]s based on a retrieved `robots.txt` file.
-    ///
-    /// [`Request`]: crate::context::Request
-    #[cfg(feature = "exclude")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "exclude")))]
-    fn exclude(self) -> ServiceBuilder<Stack<ExcludeLayer, L>>;
-
-    /// Populates [`RequestQueue`] with [`Request`]s from a retrieved `sitemap.xml` file.
-    ///
-    /// [`RequestQueue`]: crate::context::RequestQueue
-    /// [`Request`]: crate::context::Request
-    #[cfg(feature = "include")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "include")))]
-    fn include(self) -> ServiceBuilder<Stack<IncludeLayer, L>>;
-}
-
-impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
-    #[cfg(feature = "metric")]
-    fn metric(self) -> ServiceBuilder<Stack<MetricLayer, L>> {
-        self.layer(MetricLayer::new())
-    }
-
-    #[cfg(feature = "trace")]
-    fn trace(self) -> ServiceBuilder<Stack<TraceLayer, L>> {
-        self.layer(TraceLayer::new())
-    }
-
-    #[cfg(feature = "exclude")]
-    fn exclude(self) -> ServiceBuilder<Stack<ExcludeLayer, L>> {
-        self.layer(ExcludeLayer::new())
-    }
-
-    #[cfg(feature = "include")]
-    fn include(self) -> ServiceBuilder<Stack<IncludeLayer, L>> {
-        self.layer(IncludeLayer::new())
-    }
-}
+// Placeholder for future middleware implementations

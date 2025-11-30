@@ -7,20 +7,41 @@ Thumbs.db
 .vscode/
 .idea/
 .fleet/
+.zed/
 
-# Lang: Rust
+# Rust
 debug/
 target/
 Cargo.lock
 **/*.rs.bk
 *.pdb
 
-# Environment
-env/
-.env
+# Generated files
+*.backup
+coverage/
+*.lcov
+
+# Build output
+dist/
+build/
+output/
+
+# Environment files
 .env*
+!.env.example
 
 # Logs
 logs/
 *.log
 *.log*
+
+# Backup and temporary files
+*.bak
+*.backup
+*.tmp
+tmp/
+temp/
+
+# Other
+.ignore*/
+LLM.md

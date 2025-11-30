@@ -129,7 +129,7 @@ impl IntoSignal for Duration {
 impl IntoSignal for BoxError {
     #[inline]
     fn into_signal(self) -> Signal {
-        Error::new(self).into_signal()
+        Error::from_boxed(self).into_signal()
     }
 }
 

@@ -243,8 +243,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::dataset::{Dataset, InMemDataset};
     use crate::Result;
+    use crate::dataset::{Dataset, InMemDataset};
 
     #[tokio::test]
     async fn queue() -> Result<()> {

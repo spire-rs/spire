@@ -4,8 +4,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures::future::BoxFuture;
 use http_body::Body;
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
@@ -101,9 +101,9 @@ where
     S::Response: Service<Request, Response = Response, Error = Error>,
     S::Future: Send + 'static,
 {
-    type Response = Trace<S::Response>;
     type Error = S::Error;
     type Future = TraceFuture<Trace<S::Response>, S::Error>;
+    type Response = Trace<S::Response>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -128,9 +128,9 @@ where
     S: Service<Request, Response = Response, Error = Error> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = Response;
     type Error = Error;
     type Future = TraceFuture<S::Response, S::Error>;
+    type Response = Response;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -168,9 +168,9 @@ where
     C: Service<Request, Response = Response, Error = Error> + Send + 'static,
     S::Future: Send + 'static,
 {
-    type Response = Signal;
     type Error = Infallible;
     type Future = TraceFuture<S::Response, S::Error>;
+    type Response = Signal;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -182,7 +182,8 @@ where
         let mut inner = self.inner.clone();
 
         let fut = async move {
-            let requests = cx.dataset::<Request>().into_inner();
+            let dataset = cx.dataset::<Request>();
+            let requests = dataset.as_dataset();
             tracing::trace!(
                 depth = cx.get_ref().depth(),
                 requests = requests.len(),

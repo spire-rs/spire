@@ -63,8 +63,8 @@ pub use stream::DataStream;
 mod test {
     use futures::{SinkExt, StreamExt};
 
-    use crate::dataset::{DatasetExt, InMemDataset};
     use crate::Result;
+    use crate::dataset::{DatasetExt, InMemDataset};
 
     #[tokio::test]
     async fn memory() -> Result<()> {

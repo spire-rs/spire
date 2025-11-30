@@ -71,7 +71,11 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "trace", tracing::instrument(skip_all, level = "trace"))]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
+        #[cfg(feature = "trace")]
+        tracing::trace!("calling handler");
+
         let handler = self.handler.clone();
         let future = handler.call(cx, self.state.clone());
         HandlerFuture::new(future)
@@ -149,16 +153,16 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "client")]
-    fn with_client() {
-        let backend = crate::backend::HttpClient::default();
+    #[cfg(feature = "reqwest")]
+    fn with_reqwest() {
+        let backend = spire_reqwest::HttpClient::default();
         let _ = Client::new(backend, service());
     }
 
     #[test]
-    #[cfg(feature = "driver")]
-    fn with_driver() {
-        let backend = crate::backend::BrowserPool::default();
+    #[cfg(feature = "fantoccini")]
+    fn with_fantoccini() {
+        let backend = spire_fantoccini::BrowserPool::default();
         let _ = Client::new(backend, service());
     }
 }

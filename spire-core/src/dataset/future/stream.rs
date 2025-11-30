@@ -1,7 +1,7 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::stream::{unfold, BoxStream};
+use futures::stream::{BoxStream, unfold};
 use futures::{Stream, StreamExt};
 
 use crate::dataset::Dataset;

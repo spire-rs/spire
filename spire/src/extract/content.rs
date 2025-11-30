@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use crate::backend::Client;
 use crate::context::Context;
 use crate::extract::FromContext;
-use crate::Error;
+use crate::{Error, ErrorKind};
 
 /// Bytes [`Response`] body extractor.
 ///
@@ -43,9 +43,9 @@ where
 
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         let Body(bytes) = Body::from_context(cx, state).await?;
-        String::from_utf8(bytes.to_vec())
-            .map(Self)
-            .map_err(Error::new)
+        String::from_utf8(bytes.to_vec()).map(Self).map_err(|e| {
+            Error::with_source(ErrorKind::Context, "failed to parse UTF-8", Box::new(e))
+        })
     }
 }
 
@@ -72,8 +72,8 @@ where
 
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         let Body(bytes) = Body::from_context(cx, state).await?;
-        serde_json::from_slice::<T>(&bytes)
-            .map(Self)
-            .map_err(Error::new)
+        serde_json::from_slice::<T>(&bytes).map(Self).map_err(|e| {
+            Error::with_source(ErrorKind::Context, "failed to parse JSON", Box::new(e))
+        })
     }
 }

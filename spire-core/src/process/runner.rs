@@ -4,20 +4,20 @@
 //! of requests, signal processing, and coordination between the backend and worker.
 
 use std::cmp::max;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::collections::hash_map::Entry;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-use futures::stream::{AbortHandle, Abortable};
 use futures::StreamExt;
+use futures::stream::{AbortHandle, Abortable};
+use tokio_util::sync::CancellationToken;
 
-use crate::backend::{Backend, Worker};
-use crate::context::{Context, Tag, TagQuery, Task};
-use crate::context::{IntoSignal, Request, Signal};
-use crate::dataset::{Dataset, DatasetExt, DatasetRegistry};
 use crate::Result;
+use crate::backend::{Backend, Worker};
+use crate::context::{Context, IntoSignal, Request, Signal, Tag, TagQuery, Task};
+use crate::dataset::{Dataset, DatasetExt, DatasetRegistry};
 
 /// Internal runner that executes web scraping tasks.
 ///
@@ -26,6 +26,7 @@ use crate::Result;
 /// - Coordinating between backend and worker
 /// - Processing signals (wait, hold, fail, etc.)
 /// - Handling deferred and aborted requests
+/// - Graceful shutdown via cancellation token
 pub struct Runner<B, W> {
     service: W,
     pub datasets: DatasetRegistry,
@@ -35,6 +36,8 @@ pub struct Runner<B, W> {
     pub limit: AtomicUsize,
     // Fallback means all not-yet encountered tags.
     defer: Mutex<HashMap<Tag, Instant>>,
+    /// Cancellation token for graceful shutdown
+    shutdown: CancellationToken,
 }
 
 impl<B, W> Runner<B, W> {
@@ -52,7 +55,34 @@ impl<B, W> Runner<B, W> {
             initial: Mutex::new(Vec::new()),
             limit: AtomicUsize::new(8),
             defer: Mutex::new(HashMap::new()),
+            shutdown: CancellationToken::new(),
         }
+    }
+
+    /// Returns a clone of the shutdown token.
+    ///
+    /// This token can be used to trigger graceful shutdown of the runner from outside.
+    /// When cancelled, the runner will stop processing new requests and finish current ones.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use tokio::time::{sleep, Duration};
+    ///
+    /// let client = Client::new(backend, worker);
+    /// let shutdown = client.shutdown_token();
+    ///
+    /// // Spawn runner in background
+    /// tokio::spawn(async move {
+    ///     client.run().await
+    /// });
+    ///
+    /// // Trigger shutdown after 5 seconds
+    /// sleep(Duration::from_secs(5)).await;
+    /// shutdown.cancel();
+    /// ```
+    pub fn shutdown_token(&self) -> CancellationToken {
+        self.shutdown.clone()
     }
 
     /// Repeatedly calls the used [`Backend`] until the [`Request`] queue is empty
@@ -64,11 +94,17 @@ impl<B, W> Runner<B, W> {
     ///
     /// Initial requests are consumed when this method is called. If an error occurs
     /// during processing, unconsumed requests in the dataset may be lost.
+    #[cfg_attr(
+        feature = "trace",
+        tracing::instrument(skip(self), fields(concurrent_limit))
+    )]
     pub async fn run(&self) -> Result<usize>
     where
         B: Backend,
         W: Worker<B::Client>,
     {
+        #[cfg(feature = "trace")]
+        let start = Instant::now();
         let mut requests: Vec<_> = {
             let mut initial = self
                 .initial
@@ -83,8 +119,27 @@ impl<B, W> Runner<B, W> {
         }
 
         let concurrent_limit = self.limit.load(Ordering::SeqCst);
+
+        #[cfg(feature = "trace")]
+        tracing::Span::current().record("concurrent_limit", concurrent_limit);
+
+        #[cfg(feature = "trace")]
+        tracing::info!(initial_requests = requests.len(), "starting runner");
+
         let (handle, registration) = AbortHandle::new_pair();
         let stream = Abortable::new(dataset.into_stream(), registration);
+
+        // Clone shutdown token for monitoring
+        let shutdown = self.shutdown.clone();
+
+        // Spawn shutdown monitor task
+        let shutdown_handle = handle.clone();
+        tokio::spawn(async move {
+            shutdown.cancelled().await;
+            #[cfg(feature = "trace")]
+            tracing::info!("shutdown requested, stopping request processing");
+            shutdown_handle.abort();
+        });
 
         let stream = stream
             // Abort on request queue/stream failures.
@@ -97,7 +152,25 @@ impl<B, W> Runner<B, W> {
             .buffer_unordered(concurrent_limit)
             .count();
 
-        Ok(stream.await)
+        let total = stream.await;
+
+        #[cfg(feature = "trace")]
+        if self.shutdown.is_cancelled() {
+            tracing::info!("runner stopped due to shutdown request");
+        }
+
+        #[cfg(feature = "trace")]
+        {
+            let duration = start.elapsed();
+            tracing::info!(
+                total_requests = total,
+                duration_ms = duration.as_millis(),
+                requests_per_sec = (total as f64 / duration.as_secs_f64()) as u64,
+                "runner completed"
+            );
+        }
+
+        Ok(total)
     }
 
     /// Calls the used [`Backend`] once with a provided [`Request`].
@@ -105,14 +178,37 @@ impl<B, W> Runner<B, W> {
     /// # Errors
     ///
     /// Only if the `Request` stream should be aborted.
+    #[cfg_attr(feature = "trace", tracing::instrument(skip(self, req), fields(
+        uri = %req.uri(),
+        method = %req.method(),
+        depth = req.depth()
+    )))]
     pub async fn run_once(&self, req: Request) -> Result<()>
     where
         B: Backend,
         W: Worker<B::Client>,
     {
+        #[cfg(feature = "trace")]
+        tracing::debug!("processing request");
+
         match self.call_service(req).await {
-            Ok((signal, owner)) => self.notify(signal, owner),
-            Err(x) => self.notify(x.into_signal(), Tag::Fallback),
+            Ok((signal, owner)) => {
+                #[cfg(feature = "trace")]
+                tracing::debug!(
+                    signal = ?signal,
+                    owner = ?owner,
+                    "request completed"
+                );
+                self.notify(signal, owner)
+            }
+            Err(x) => {
+                #[cfg(feature = "trace")]
+                tracing::warn!(
+                    error = %x,
+                    "request failed"
+                );
+                self.notify(x.into_signal(), Tag::Fallback)
+            }
         }
     }
 
@@ -131,7 +227,14 @@ impl<B, W> Runner<B, W> {
         let owner = request.tag().clone();
         let datasets = self.datasets.clone();
 
+        #[cfg(feature = "trace")]
+        tracing::trace!("acquiring backend client");
+
         let client: B::Client = self.backend.client().await?;
+
+        #[cfg(feature = "trace")]
+        tracing::trace!("invoking worker");
+
         let cx: Context<B::Client> = Context::new(request, client, datasets);
         let signal = self.service.clone().invoke(cx).await;
 
@@ -143,7 +246,27 @@ impl<B, W> Runner<B, W> {
     /// # Errors
     ///
     /// Only if the `Request` stream should be aborted.
+    #[cfg_attr(feature = "trace", tracing::instrument(skip(self, signal), fields(owner = ?owner)))]
     pub fn notify(&self, signal: Signal, owner: Tag) -> Result<()> {
+        #[cfg(feature = "trace")]
+        match &signal {
+            Signal::Wait(query, duration) => {
+                tracing::debug!(query = ?query, duration_ms = duration.as_millis(), "deferring tags");
+            }
+            Signal::Hold(query, duration) => {
+                tracing::debug!(query = ?query, duration_ms = duration.as_millis(), "holding tags");
+            }
+            Signal::Fail(query, _) => {
+                tracing::warn!(query = ?query, "aborting tags");
+            }
+            Signal::Continue => {
+                tracing::trace!("continuing");
+            }
+            Signal::Skip => {
+                tracing::trace!("skipping");
+            }
+        }
+
         match signal {
             Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(x, owner, t),
             Signal::Fail(x, _) => self.apply_abort(x, owner)?,
@@ -157,6 +280,7 @@ impl<B, W> Runner<B, W> {
     ///
     /// Marks tags to be delayed for the specified duration. Deferred tags will not
     /// be processed until the delay expires.
+    #[cfg_attr(feature = "trace", tracing::instrument(skip(self), fields(query = ?query, owner = ?owner, duration_ms = duration.as_millis()), level = "trace"))]
     fn apply_defer(&self, query: TagQuery, owner: Tag, duration: Duration) {
         let minimum = Instant::now() + duration;
         let mut defer = self.defer.lock().expect("Runner defer mutex poisoned");
@@ -182,7 +306,11 @@ impl<B, W> Runner<B, W> {
     ///
     /// This functionality is not yet implemented. Currently this method does nothing
     /// and always returns `Ok(())`. Full abort functionality will be added in a future version.
+    #[cfg_attr(feature = "trace", tracing::instrument(skip(self), fields(query = ?query, owner = ?owner), level = "trace"))]
     fn apply_abort(&self, query: TagQuery, owner: Tag) -> Result<()> {
+        #[cfg(feature = "trace")]
+        tracing::warn!("abort functionality not yet implemented");
+
         let _ = query;
         let _ = owner;
 

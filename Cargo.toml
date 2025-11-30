@@ -13,9 +13,9 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.1.1-rc.1"
-edition = "2021"
-rust-version = "1.83"
+version = "0.1.1"
+edition = "2024"
+rust-version = "1.89"
 readme = "./README.md"
 license = "MIT"
 
@@ -26,12 +26,15 @@ documentation = "https://docs.rs/spire"
 
 [workspace.dependencies]
 # Workspace crates
-spire = { path = "./spire", version = "0.1.1-rc.1" }
-spire-core = { path = "./spire-core", version = "0.1.1-rc.1" }
-spire-macros = { path = "./spire-macros", version = "0.1.1-rc.1" }
+spire = { path = "./spire", version = "0.1.1" }
+spire-core = { path = "./spire-core", version = "0.1.1" }
+spire-fantoccini = { path = "./spire-fantoccini", version = "0.1.1" }
+spire-macros = { path = "./spire-macros", version = "0.1.1" }
+spire-reqwest = { path = "./spire-reqwest", version = "0.1.1" }
 
 # Async runtime
 tokio = { version = "1.39", features = ["rt-multi-thread", "macros"] }
+tokio-util = { version = "0.7" }
 futures = { version = "0.3" }
 async-trait = { version = "0.1" }
 

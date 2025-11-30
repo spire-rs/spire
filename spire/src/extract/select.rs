@@ -2,17 +2,24 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-/// TODO.
+/// Represents a tag identifier for selecting HTML attributes.
+///
+/// This is used as a key in attribute selection when parsing HTML elements.
 #[derive(Debug, Clone)]
 pub struct AttrTag(String);
 
-/// TODO.
+/// Represents the data extracted from an HTML attribute.
+///
+/// This is the value associated with an [`AttrTag`] after parsing.
 #[derive(Debug, Clone)]
 pub struct AttrData(String);
 
 // TODO: Vec<AttrTag> to &'static [AttrTag].
 
-/// TODO.
+/// Trait for types that can be constructed from selected HTML attributes.
+///
+/// This trait enables declarative extraction of structured data from HTML markup
+/// by defining required and optional attributes and how to parse them.
 ///
 /// Can be automatically generated with a `Select` derive macro:
 ///
@@ -33,13 +40,35 @@ pub trait Select {
     fn parse_from_attributes(attr: HashMap<AttrTag, AttrData>) -> Self;
 }
 
-/// Declarative markup extractor.
+/// Declarative markup extractor for structured HTML data.
+///
+/// `Elements<T>` extracts and parses HTML elements into a structured type `T`
+/// that implements the [`Select`] trait. This allows for type-safe extraction
+/// of data from HTML markup.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire::extract::{Elements, Select};
+///
+/// #[derive(Debug, Select)]
+/// struct Product {
+///     name: String,
+///     price: f64,
+/// }
+///
+/// async fn handler(Elements(product): Elements<Product>) {
+///     println!("Product: {} costs ${}", product.name, product.price);
+/// }
+/// ```
 #[must_use]
 #[derive(Clone)]
 pub struct Elements<T>(pub T);
 
 impl<T> Elements<T> {
-    /// Creates a new [`Elements`].
+    /// Creates a new [`Elements`] instance from an iterator of element tags.
+    ///
+    /// This method is used internally to construct the extractor from parsed HTML elements.
     pub fn new<U>(tags: U) -> Self
     where
         U: IntoIterator<Item = ()>,

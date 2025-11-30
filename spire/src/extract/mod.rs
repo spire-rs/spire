@@ -51,11 +51,11 @@ mod content;
 mod context;
 mod state;
 
-#[cfg(feature = "client")]
-#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+#[cfg(feature = "reqwest")]
+#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
 pub mod client;
-#[cfg(feature = "driver")]
-#[cfg_attr(docsrs, doc(cfg(feature = "driver")))]
+#[cfg(feature = "fantoccini")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fantoccini")))]
 pub mod driver;
 pub mod select;
 

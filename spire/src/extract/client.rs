@@ -1,18 +1,45 @@
 //! [`HttpClient`] extractors.
 //!
+//! This module provides extractors specifically designed for HTTP-based web scraping
+//! using the [`HttpClient`] backend. These extractors work with static HTML content
+//! fetched via HTTP requests.
+//!
+//! # Available Extractors
+//!
+//! - [`Html`] - Parsed HTML document for direct DOM queries
+//! - [`Elements`] - Declarative extraction of structured data from HTML
+//!
+//! [`HttpClient`]: spire_reqwest::HttpClient
 
 use std::ops::{Deref, DerefMut};
 
 use scraper::Html as HtmlDoc;
 
-use crate::backend::{Client, HttpClient};
+use crate::backend::Client;
 use crate::context::Context;
 use crate::extract::{Elements, FromContext, Select, Text};
 use crate::Error;
 
-/// [`Backend`]-specific direct markup extractor.
+/// Parsed HTML document extractor.
 ///
-/// [`Backend`]: crate::backend::Backend
+/// Extracts and parses the response body as HTML, providing access to the DOM
+/// structure for querying and data extraction. Built on top of the [`scraper`] crate.
+///
+/// # Examples
+///
+/// ```ignore
+/// use spire::extract::client::Html;
+/// use scraper::Selector;
+///
+/// async fn handler(Html(html): Html) {
+///     let selector = Selector::parse("h1").unwrap();
+///     for element in html.select(&selector) {
+///         println!("Title: {}", element.text().collect::<String>());
+///     }
+/// }
+/// ```
+///
+/// [`scraper`]: https://docs.rs/scraper
 #[derive(Debug, Clone)]
 pub struct Html(pub HtmlDoc);
 
@@ -47,17 +74,20 @@ impl DerefMut for Html {
     }
 }
 
-#[cfg(feature = "macros")]
+#[cfg(all(feature = "macros", feature = "reqwest"))]
 #[async_trait::async_trait]
-impl<S, T> FromContext<HttpClient, S> for Elements<T>
+impl<S, T> FromContext<spire_reqwest::HttpClient, S> for Elements<T>
 where
-    S: Sync,
-    T: Select,
+    S: Sync + Send + 'static,
+    T: Select + Send,
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<HttpClient>, state: &S) -> Result<Self, Self::Rejection> {
-        let Html(html) = Html::from_context(cx, state).await?;
-        todo!()
+    async fn from_context(
+        cx: Context<spire_reqwest::HttpClient>,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let Html(_html) = Html::from_context(cx, state).await?;
+        todo!("Elements extractor for HttpClient not yet implemented")
     }
 }

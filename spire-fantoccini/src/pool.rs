@@ -5,7 +5,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use tower::Service;
 
-use spire_core::{Error, Result};
+use spire_core::{Error, ErrorKind, Result};
 
 use crate::builder::BrowserBuilder;
 use crate::client::BrowserClient;
@@ -51,11 +51,12 @@ impl BrowserPool {
 
     /// Waits and returns an available [`BrowserClient`].
     async fn client(&self) -> Result<BrowserClient> {
-        self.pool
-            .get()
-            .await
-            .map(Into::into)
-            .map_err(|e| Error::new(format!("Failed to get browser from pool: {}", e)))
+        self.pool.get().await.map(Into::into).map_err(|e| {
+            Error::new(
+                ErrorKind::Backend,
+                format!("Failed to get browser from pool: {}", e),
+            )
+        })
     }
 
     /// Creates a new [`BrowserBuilder`].
