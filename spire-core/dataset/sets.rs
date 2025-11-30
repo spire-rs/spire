@@ -11,16 +11,17 @@ use crate::Error;
 #[must_use]
 #[derive(Clone, Default)]
 pub struct Datasets {
-    inner: Arc<DatasetsInner>,
+    inner: Arc<Mutex<DatasetsInner>>,
 }
 
 #[derive(Default)]
 struct DatasetsInner {
-    mx: Mutex<HashMap<TypeId, Box<dyn Any + Send + Sync>>>,
+    container: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl Datasets {
     /// Creates an empty collection of [`Dataset`]s.
+    #[inline]
     pub fn new() -> Self {
         Self::default()
     }
@@ -29,7 +30,7 @@ impl Datasets {
     ///
     /// ### Note
     ///
-    /// Replaces the dataset of the same type if it is already inserted.
+    /// Replaces the `Dataset` of the same type if it is already inserted.
     /// Does not move items from the replaced `Dataset`.
     pub fn set<D, T, E>(&self, dataset: D)
     where
@@ -37,9 +38,10 @@ impl Datasets {
         Error: From<E>,
         T: Send + Sync + 'static,
     {
+        let type_id = TypeId::of::<T>();
         let dataset = Box::new(boxed(dataset));
-        let mut guard = self.inner.mx.lock().unwrap();
-        let _ = guard.insert(TypeId::of::<T>(), dataset);
+        let mut guard = self.inner.lock().unwrap();
+        let _ = guard.container.insert(type_id, dataset);
     }
 
     /// Returns the [`Dataset`] of the requested type.
@@ -47,8 +49,8 @@ impl Datasets {
     where
         T: Send + Sync + 'static,
     {
-        let guard = self.inner.mx.lock().unwrap();
-        let dataset = guard.get(&TypeId::of::<T>());
+        let guard = self.inner.lock().unwrap();
+        let dataset = guard.container.get(&TypeId::of::<T>());
 
         type Ds<T> = BoxCloneDataset<T, Error>;
         dataset.and_then(|x| x.downcast_ref::<Ds<T>>()).cloned()
@@ -64,9 +66,9 @@ impl Datasets {
     where
         T: Send + Sync + 'static,
     {
-        let mut guard = self.inner.mx.lock().unwrap();
+        let mut guard = self.inner.lock().unwrap();
         let make_mem = || boxed(InMemDataset::<T>::queue());
-        let dataset = match guard.entry(TypeId::of::<T>()) {
+        let dataset = match guard.container.entry(TypeId::of::<T>()) {
             Entry::Occupied(x) => x.into_mut(),
             Entry::Vacant(x) => x.insert(Box::new(make_mem())),
         };
@@ -78,14 +80,15 @@ impl Datasets {
     /// Returns the total amount of inserted [`Dataset`]s.
     #[must_use]
     pub fn len(&self) -> usize {
-        let guard = self.inner.mx.lock().unwrap();
-        guard.len()
+        let guard = self.inner.lock().unwrap();
+        guard.container.len()
     }
 
     /// Returns `true` if no [`Dataset`]s were inserted.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        let guard = self.inner.lock().unwrap();
+        guard.container.is_empty()
     }
 }
 

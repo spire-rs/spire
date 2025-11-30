@@ -1,7 +1,6 @@
 # OS
 Thumbs.db
 .DS_Store
-*.pdb
 
 # Editors
 .vs/
@@ -14,6 +13,7 @@ debug/
 target/
 Cargo.lock
 **/*.rs.bk
+*.pdb
 
 # Environment
 env/

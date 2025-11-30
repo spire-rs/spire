@@ -27,3 +27,9 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 - [spire](./spire/): extraction and routing utilities.
 - [spire-core](./spire-core/): core types and traits.
 - [spire-macros](./spire-macros/): procedural macros.
+
+#### Usage:
+
+```rust
+fn main() {}
+```

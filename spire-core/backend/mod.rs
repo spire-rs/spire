@@ -9,9 +9,9 @@
 //! ### Backend
 //!
 //! - [`HttpClient`] is a simple `http` client backed by the underlying
-//! `tower::`[`Service`]. It is both [`Backend`] and [`Client`].
+//!   `tower::`[`Service`]. It is both [`Backend`] and [`Client`].
 //! - [`BrowserPool`] is a [`Backend`] built on top of [`fantoccini`] crate.
-//! Uses [`BrowserClient`] as a [`Client`].
+//!   Uses [`BrowserClient`] as a [`Client`].
 //!
 //! ### Utility
 //!

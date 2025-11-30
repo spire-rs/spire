@@ -2,11 +2,11 @@
 
 [package]
 name = "spire"
-
 version = { workspace = true }
 edition = { workspace = true }
-readme = { workspace = true }
+rust-version = { workspace = true }
 license = { workspace = true }
+readme = "./README.md"
 
 authors = { workspace = true }
 repository = { workspace = true }
@@ -45,7 +45,7 @@ spire-core = { workspace = true }
 spire-macros = { workspace = true, optional = true }
 
 tower = { version = "0.4", features = ["util"] }
-bytes = { version = "1.6" }
+bytes = { version = "1.7" }
 futures = { version = "0.3" }
 async-trait = { version = "0.1" }
 pin-project-lite = { version = "0.2" }
