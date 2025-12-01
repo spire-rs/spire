@@ -11,6 +11,10 @@
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 pub use spire_macros::Select as DeriveSelect;
 
+// Backend structs and configs (with feature gates)
+#[cfg(feature = "reqwest")]
+#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
+pub use crate::HttpClient;
 #[doc(hidden)]
 // Core async trait
 pub use crate::async_trait;
@@ -27,13 +31,12 @@ pub use crate::extract::{
     AttrData, AttrTag, Body as ExtractBody, Client as ExtractClient, Elements, FromContext,
     FromContextRef, Json, Select, State, Text,
 };
-// Backend implementations (with feature gates)
-#[cfg(feature = "reqwest")]
-#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-pub use crate::reqwest_backend;
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-pub use crate::thirtyfour_backend;
+pub use crate::{
+    BrowserClient, BrowserClientConfig, BrowserError, BrowserPool, BrowserType,
+    NavigationErrorType, PoolConfig, PoolConfigBuilder, WebDriverConfig, WebDriverConfigBuilder,
+};
 // Main types
 pub use crate::{Client, Router};
 // Core types and errors

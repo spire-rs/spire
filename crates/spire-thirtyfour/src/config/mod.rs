@@ -372,16 +372,32 @@ impl Default for PoolConfig {
 #[derive(Debug, Display)]
 pub enum ConfigError {
     #[display(fmt = "Invalid URL: {}", message)]
-    InvalidUrl { message: String },
+    /// Invalid URL provided in configuration
+    InvalidUrl {
+        /// Error message describing the invalid URL
+        message: String,
+    },
 
     #[display(fmt = "Invalid timeout: {}", message)]
-    InvalidTimeout { message: String },
+    /// Invalid timeout value provided in configuration
+    InvalidTimeout {
+        /// Error message describing the invalid timeout
+        message: String,
+    },
 
     #[display(fmt = "Invalid pool configuration: {}", message)]
-    InvalidPool { message: String },
+    /// Invalid pool configuration provided
+    InvalidPool {
+        /// Error message describing the invalid pool configuration
+        message: String,
+    },
 
     #[display(fmt = "Validation error: {}", message)]
-    Validation { message: String },
+    /// Configuration validation failed
+    Validation {
+        /// Error message describing the validation failure
+        message: String,
+    },
 }
 
 impl std::error::Error for ConfigError {}

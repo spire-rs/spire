@@ -27,7 +27,7 @@
 //!
 //! - [`tower::timeout`] - Request timeouts
 //! - [`tower::limit`] - Rate limiting and concurrency control
-//! - [`tower::buffer`] - Request buffering
+//! - `tower::buffer` - Request buffering
 //! - [`tower::retry`] - Automatic retries
 //!
 //! # Custom Middleware
@@ -40,5 +40,3 @@
 //! [`Service`]: tower::Service
 //! [`tower`]: https://docs.rs/tower
 //! [tower documentation]: https://docs.rs/tower/latest/tower/
-
-// Placeholder for future middleware implementations

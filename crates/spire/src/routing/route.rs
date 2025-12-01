@@ -105,7 +105,7 @@ mod test {
     fn basic_routing() {
         async fn handler() {}
 
-        let svc = Handler::<(), _, _>::with_state(handler, ());
+        let _svc = Handler::<(), _, _>::with_state(handler, ());
         // let cx = Context::new(());
         // let _ = Route::new(svc).call(cx);
     }
@@ -119,13 +119,13 @@ mod test {
 
         impl FromRef<AppState> for u32 {
             fn from_ref(input: &AppState) -> Self {
-                input.sub.clone()
+                input.sub
             }
         }
 
         async fn handler(_: State<AppState>, _: State<u32>) {}
 
-        let svc = Handler::<(), _, _>::with_state(handler, AppState::default());
+        let _svc = Handler::<(), _, _>::with_state(handler, AppState::default());
         // let cx = Context::new(());
         // let _ = Route::new(svc).call(cx);
     }

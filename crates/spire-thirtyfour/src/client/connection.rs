@@ -416,17 +416,6 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
-    use crate::config::WebDriverConfig;
-
-    // Helper function to create a mock WebDriver for testing
-    // Note: This would need to be implemented with proper mocking in real tests
-    fn create_mock_connection(_id: u64) -> BrowserConnection {
-        // This is a placeholder - in real tests you'd use a mock WebDriver
-        let _config = WebDriverConfig::new("http://localhost:4444");
-        // BrowserConnection::new(id, mock_webdriver, config)
-        // For now, we'll skip the actual WebDriver tests
-        todo!("Mock WebDriver for testing")
-    }
 
     #[test]
     fn connection_stats_error_rate() {

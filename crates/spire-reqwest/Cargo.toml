@@ -4,6 +4,8 @@ version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
+readme = "./README.md"
+
 authors = { workspace = true }
 repository = { workspace = true }
 homepage = { workspace = true }
@@ -17,28 +19,25 @@ categories = ["asynchronous", "web-programming"]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
-[lib]
-path = "src/lib.rs"
-
 [dependencies]
 # Spire
-spire-core = { workspace = true }
+spire-core = { workspace = true, features = [] }
 
 # Tower ecosystem
-tower = { workspace = true }
+tower = { workspace = true, features = [] }
 
 # Async
-futures = { workspace = true }
+futures = { workspace = true, features = [] }
 
 # HTTP
-http = { workspace = true }
-http-body = { workspace = true }
-http-body-util = { workspace = true }
-reqwest = { workspace = true }
+http = { workspace = true, features = [] }
+http-body = { workspace = true, features = [] }
+http-body-util = { workspace = true, features = [] }
+reqwest = { workspace = true, features = [] }
 
 # Utilities
-bytes = { workspace = true }
+bytes = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
-tokio = { workspace = true }
+tokio = { workspace = true, features = [] }

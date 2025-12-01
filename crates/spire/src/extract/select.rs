@@ -2,19 +2,13 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-/// Represents a tag identifier for selecting HTML attributes.
-///
-/// This is used as a key in attribute selection when parsing HTML elements.
-#[derive(Debug, Clone)]
-pub struct AttrTag(String);
+/// Type alias for HTML attribute tag identifiers.
+pub type AttrTag = String;
 
-/// Represents the data extracted from an HTML attribute.
-///
-/// This is the value associated with an [`AttrTag`] after parsing.
-#[derive(Debug, Clone)]
-pub struct AttrData(String);
+/// Type alias for HTML attribute data values.
+pub type AttrData = String;
 
-// TODO: Vec<AttrTag> to &'static [AttrTag].
+// TODO: AttrTag and AttrData
 
 /// Trait for types that can be constructed from selected HTML attributes.
 ///

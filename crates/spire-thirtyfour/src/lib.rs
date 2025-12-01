@@ -198,8 +198,8 @@ pub mod error;
 /// for managing collections of WebDriver browser instances. It includes:
 ///
 /// - [`BrowserPool`] - Main pool interface for acquiring browser connections
-/// - [`builder`] - Builder pattern for configuring browser pools
-/// - [`manager`] - Internal pool management and connection lifecycle
+/// - `builder` - Builder pattern for configuring browser pools
+/// - `manager` - Internal pool management and connection lifecycle
 pub mod pool;
 
 // Re-export core types for easy access

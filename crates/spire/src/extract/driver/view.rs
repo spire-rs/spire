@@ -1,28 +1,15 @@
-//! [`BrowserClient`] extractors.
-//!
-//! This module provides extractors specifically designed for browser automation
-//! using the [`BrowserClient`] backend. These extractors enable interaction with
-//! rendered web pages through a WebDriver interface.
-//!
-//! # Available Extractors
-//!
-//! - [`View`] - Direct access to the browser's DOM view
-//! - [`Elements`] - Declarative extraction of structured data from rendered pages
-//!
-//! [`BrowserClient`]: spire_thirtyfour::BrowserClient
-
 use std::ops::{Deref, DerefMut};
 
+use crate::Error;
 use crate::context::Context;
 use crate::extract::{Elements, FromContextRef, Select};
-use crate::Error;
 
 // TODO: Snapshot, Screen, Color, Capture extractors for browser screenshots and visual data.
 
 /// Browser view extractor for direct DOM access.
 ///
 /// Provides access to the rendered page's DOM structure when using the
-/// browser automation backend. This is analogous to [`Html`] for HTTP clients,
+/// browser automation backend. This is analogous to `Html` for HTTP clients,
 /// but works with dynamically rendered content.
 ///
 /// # Note
@@ -30,7 +17,7 @@ use crate::Error;
 /// Currently a placeholder implementation. Full functionality will be added
 /// in future versions.
 ///
-/// [`Html`]: super::client::Html
+
 #[derive(Debug, Clone)]
 pub struct View(pub ());
 

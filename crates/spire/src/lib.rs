@@ -8,13 +8,15 @@ pub use async_trait::async_trait;
 pub use routing::Router;
 use spire_core::backend::Backend;
 pub use spire_core::{Error, ErrorKind, Result, backend, context, dataset};
-// Re-export backend implementations when their features are enabled
 #[cfg(feature = "reqwest")]
 #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-pub use spire_reqwest as reqwest_backend;
+pub use spire_reqwest::HttpClient;
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-pub use spire_thirtyfour as thirtyfour_backend;
+pub use spire_thirtyfour::{
+    BrowserClient, BrowserError, BrowserPool, BrowserType, ClientConfig as BrowserClientConfig,
+    NavigationErrorType, PoolConfig, PoolConfigBuilder, WebDriverConfig, WebDriverConfigBuilder,
+};
 
 pub mod extract;
 mod handler;
@@ -45,23 +47,16 @@ mod tests {
     #[test]
     #[cfg(feature = "reqwest")]
     fn reqwest_backend_available() {
-        let _backend = crate::reqwest_backend::HttpClient::default();
+        let _backend = crate::HttpClient::default();
     }
 
     /// Test that thirtyfour backend is available when feature is enabled
     #[test]
     #[cfg(feature = "thirtyfour")]
     fn thirtyfour_backend_available() {
-        let _backend = crate::thirtyfour_backend::BrowserPool::default();
-    }
-
-    /// Test that essential modules are accessible
-    #[test]
-    fn modules_accessible() {
-        // Just test that we can access the module paths
-        #[allow(unused_imports)]
-        use crate::{extract, middleware, routing};
-
-        // If we can import these, the modules are properly exposed
+        let _backend = crate::BrowserPool::builder()
+            .with_unmanaged("http://127.0.0.1:4444")
+            .build()
+            .expect("Failed to build browser pool");
     }
 }

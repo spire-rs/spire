@@ -2,16 +2,16 @@
 
 [package]
 name = "spire-macros"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 readme = "./README.md"
 
-authors.workspace = true
-repository.workspace = true
-homepage.workspace = true
-documentation.workspace = true
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
 
 categories = ["asynchronous", "web-programming"]
 keywords = ["crawler", "scraper", "web", "framework"]
@@ -27,6 +27,6 @@ path = "src/lib.rs"
 
 [dependencies]
 # Proc macro utilities
-proc-macro2 = { workspace = true }
-syn = { workspace = true }
-quote = { workspace = true }
+proc-macro2 = { workspace = true, features = [] }
+syn = { workspace = true, features = [] }
+quote = { workspace = true, features = [] }

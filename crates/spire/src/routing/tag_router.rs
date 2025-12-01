@@ -103,10 +103,10 @@ impl<C, S> TagRouter<C, S> {
     where
         S: Clone,
     {
-        let remap = |(k, v): (Tag, Endpoint<C, S>)| (k, v.with_state(state.clone()));
+        let remap = |(k, v): (Tag, Endpoint<C, S>)| (k, v.with_state::<S2>(state.clone()));
         TagRouter {
             endpoints: self.endpoints.into_iter().map(remap).collect(),
-            fallback: self.fallback.map(|x| x.with_state(state)),
+            fallback: self.fallback.map(|x| x.with_state::<S2>(state)),
         }
     }
 }

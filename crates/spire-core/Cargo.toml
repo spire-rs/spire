@@ -21,9 +21,6 @@ description = "Core types and traits for Spire web scraping framework"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
-[lib]
-path = "src/lib.rs"
-
 [features]
 default = []
 full = ["tracing", "metric"]
@@ -34,29 +31,29 @@ metric = ["tower/load"]
 
 [dependencies]
 # Tower ecosystem
-tower = { workspace = true }
+tower = { workspace = true, features = [] }
 
 # Async
-futures = { workspace = true }
-async-trait = { workspace = true }
-tokio = { workspace = true }
-tokio-util = { workspace = true }
+futures = { workspace = true, features = [] }
+async-trait = { workspace = true, features = [] }
+tokio = { workspace = true, features = [] }
+tokio-util = { workspace = true, features = [] }
 
 # HTTP
-http = { workspace = true }
-http-body = { workspace = true }
-http-body-util = { workspace = true }
+http = { workspace = true, features = [] }
+http-body = { workspace = true, features = [] }
+http-body-util = { workspace = true, features = [] }
 
 # Utilities
-bytes = { workspace = true }
-pin-project-lite = { workspace = true }
-thiserror = { workspace = true }
-derive_more = { workspace = true }
+bytes = { workspace = true, features = [] }
+pin-project-lite = { workspace = true, features = [] }
+thiserror = { workspace = true, features = [] }
+derive_more = { workspace = true, features = [] }
 
 # Optional: Observability
-tracing = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true, features = [] }
 
 [dev-dependencies]
 # Testing
-tokio = { workspace = true }
-tracing-test = { workspace = true }
+tokio = { workspace = true, features = [] }
+tracing-test = { workspace = true, features = [] }

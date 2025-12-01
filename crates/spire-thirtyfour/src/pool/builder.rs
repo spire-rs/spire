@@ -514,13 +514,25 @@ impl BrowserBuilder {
 #[derive(Debug, Display)]
 pub enum BuilderError {
     #[display(fmt = "Configuration error: {}", message)]
-    Config { message: String },
+    /// Configuration error occurred during building
+    Config {
+        /// Error message describing the configuration issue
+        message: String,
+    },
 
     #[display(fmt = "Validation error: {}", message)]
-    Validation { message: String },
+    /// Validation error occurred during building
+    Validation {
+        /// Error message describing the validation failure
+        message: String,
+    },
 
     #[display(fmt = "Build error: {}", message)]
-    Build { message: String },
+    /// Build error occurred during construction
+    Build {
+        /// Error message describing the build failure
+        message: String,
+    },
 }
 
 impl std::error::Error for BuilderError {}

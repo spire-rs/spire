@@ -35,47 +35,46 @@ spire-thirtyfour = { path = "./crates/spire-thirtyfour", version = "0.2.0" }
 
 # Async runtime
 tokio = { version = "1.39", features = ["rt-multi-thread", "macros"] }
-tokio-util = { version = "0.7" }
-futures = { version = "0.3" }
-async-trait = { version = "0.1" }
+tokio-util = { version = "0.7", features = [] }
+futures = { version = "0.3", features = [] }
+async-trait = { version = "0.1", features = [] }
 
 # Tower ecosystem
 tower = { version = "0.4", features = ["util"] }
 
 # HTTP
-http = { version = "1.1" }
-http-body = { version = "1.0" }
-http-body-util = { version = "0.1" }
+http = { version = "1.1", features = [] }
+http-body = { version = "1.0", features = [] }
+http-body-util = { version = "0.1", features = [] }
 
 # Utilities
-bytes = { version = "1.7" }
-pin-project-lite = { version = "0.2" }
-thiserror = { version = "1.0" }
-derive_more = { version = "0.99" }
+bytes = { version = "1.7", features = [] }
+pin-project-lite = { version = "0.2", features = [] }
+thiserror = { version = "1.0", features = [] }
+derive_more = { version = "0.99", features = [] }
+derive_builder = { version = "0.20", features = [] }
 
 # Serialization
-serde = { version = "1.0" }
-serde_json = { version = "1.0" }
+serde = { version = "1.0", features = [] }
+serde_json = { version = "1.0", features = [] }
 
-# HTTP clients
-reqwest = { version = "0.12" }
+# HTTP clients & HTML parsing
+reqwest = { version = "0.12", features = [] }
+scraper = { version = "0.19", features = [] }
 
 # Browser automation
-thirtyfour = { version = "0.32" }
-deadpool = { version = "0.12" }
+thirtyfour = { version = "0.32", features = [] }
+deadpool = { version = "0.12", features = [] }
 
-# HTML parsing
-scraper = { version = "0.19" }
-
-# Tracing
-tracing = { version = "0.1" }
-tracing-subscriber = { version = "0.3" }
-tracing-test = { version = "0.2" }
+# Observability
+tracing = { version = "0.1", features = [] }
+tracing-subscriber = { version = "0.3", features = [] }
+tracing-test = { version = "0.2", features = [] }
 
 # Time handling
-jiff = { version = "0.1" }
+jiff = { version = "0.1", features = [] }
 
 # Proc macros
-proc-macro2 = { version = "1.0" }
-quote = { version = "1.0" }
-syn = { version = "2.0" }
+proc-macro2 = { version = "1.0", features = [] }
+quote = { version = "1.0", features = [] }
+syn = { version = "2.0", features = [] }

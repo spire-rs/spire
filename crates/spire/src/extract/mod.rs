@@ -11,23 +11,21 @@
 //! ### [`Context`] extractors
 //!
 //! - [`RequestQueue`] for enqueuing new requests.
-//! - [`Data`], [`DataStream`] and [`DataSink`] for reading and writing response data.
-//! - [`Client`] to access [`Backend`]-specific [`HttpClient`] or [`BrowserClient`].
+//! - [`Data`], `DataStream` and `DataSink` for reading and writing response data.
+//! - [`Client`] to access [`Backend`]-specific `HttpClient` or `BrowserClient`.
 //! - [`State`] and [`FromRef`] trait for state extraction.
 //!
 //! [`Backend`]: crate::backend::Backend
-//! [`HttpClient`]: crate::backend::HttpClient
-//! [`BrowserClient`]: crate::backend::BrowserClient
+
 //!
 //! [`Data`]: crate::dataset::Data
-//! [`DataStream`]: crate::dataset::DataStream
-//! [`DataSink`]: crate::dataset::DataSink
+
 //! [`RequestQueue`]: crate::context::RequestQueue
 //!
 //! ### [`Request`] and [`Response`] extractors
 //!
 //! - [`Body`], [`Text`], and [`Json`] for response body extraction.
-//! - [`Html`] (for [`HttpClient`]) or [`View`] (for [`BrowserClient`]) for direct markup access.
+//! - [`Html`] (for `HttpClient`) or [`View`] (for `BrowserClient`) for direct markup access.
 //! - [`Elements`] and [`Select`] trait for declarative markup extraction.
 //!
 //! [`Request`]: crate::context::Request
@@ -51,13 +49,14 @@ mod content;
 mod context;
 mod state;
 
+pub mod select;
+
 #[cfg(feature = "reqwest")]
 #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
 pub mod client;
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
 pub mod driver;
-pub mod select;
 
 mod sealed {
     #[derive(Debug, Clone, Copy)]

@@ -1,24 +1,11 @@
-//! [`HttpClient`] extractors.
-//!
-//! This module provides extractors specifically designed for HTTP-based web scraping
-//! using the [`HttpClient`] backend. These extractors work with static HTML content
-//! fetched via HTTP requests.
-//!
-//! # Available Extractors
-//!
-//! - [`Html`] - Parsed HTML document for direct DOM queries
-//! - [`Elements`] - Declarative extraction of structured data from HTML
-//!
-//! [`HttpClient`]: spire_reqwest::HttpClient
-
 use std::ops::{Deref, DerefMut};
 
 use scraper::Html as HtmlDoc;
 
+use crate::Error;
 use crate::backend::Client;
 use crate::context::Context;
 use crate::extract::{Elements, FromContext, Select, Text};
-use crate::Error;
 
 /// Parsed HTML document extractor.
 ///

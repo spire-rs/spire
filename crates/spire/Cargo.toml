@@ -21,9 +21,6 @@ description = "The flexible scraper framework powered by tokio and tower"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
-[lib]
-path = "src/lib.rs"
-
 [features]
 default = []
 full = ["macros", "tracing", "reqwest", "thirtyfour"]
@@ -49,7 +46,7 @@ spire-reqwest = { workspace = true, optional = true }
 spire-thirtyfour = { workspace = true, optional = true }
 
 # Tower ecosystem
-tower = { workspace = true }
+tower = { workspace = true, features = ["timeout"] }
 
 # Async
 futures = { workspace = true }
@@ -68,6 +65,9 @@ scraper = { workspace = true, optional = true }
 
 # Optional: Observability
 tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
 
 
 
