@@ -63,7 +63,7 @@ reqwest = { version = "0.12", features = [] }
 scraper = { version = "0.19", features = [] }
 
 # Browser automation
-thirtyfour = { version = "0.32", features = [] }
+thirtyfour = { version = "0.36", features = [] }
 deadpool = { version = "0.12", features = [] }
 
 # Observability
