@@ -15,7 +15,7 @@ use crate::dataset::Dataset;
 ///
 /// ## Basic Type Conversion
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {
@@ -34,7 +34,7 @@ use crate::dataset::Dataset;
 ///
 /// ## Data Normalization
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {
@@ -53,7 +53,7 @@ use crate::dataset::Dataset;
 ///
 /// ## Serialization/Deserialization
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 /// use serde::{Deserialize, Serialize};
 ///

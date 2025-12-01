@@ -73,7 +73,7 @@ impl fmt::Display for ErrorKind {
 ///
 /// ## Creating Errors
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::{Error, ErrorKind};
 ///
 /// // From a message
@@ -89,7 +89,10 @@ impl fmt::Display for ErrorKind {
 ///
 /// ## Error Handling
 ///
-/// ```ignore
+/// ```no_run
+/// use spire_core::{Error, ErrorKind};
+///
+/// # let result: Result<(), Error> = Err(Error::new(ErrorKind::Timeout, "timeout"));
 /// match result {
 ///     Err(e) if e.kind() == ErrorKind::Timeout => {
 ///         // Retry on timeout
@@ -121,7 +124,7 @@ impl Error {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::{Error, ErrorKind};
     ///
     /// let err = Error::new(ErrorKind::Dataset, "failed to write data");
@@ -139,7 +142,7 @@ impl Error {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::{Error, ErrorKind};
     ///
     /// let io_err = std::io::Error::from(std::io::ErrorKind::NotFound);
@@ -188,7 +191,7 @@ impl Error {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::{Error, ErrorKind};
     ///
     /// let err = Error::new(ErrorKind::Http, "request failed");
@@ -213,7 +216,7 @@ impl Error {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::{Error, ErrorKind};
     /// use spire_core::context::TagQuery;
     ///

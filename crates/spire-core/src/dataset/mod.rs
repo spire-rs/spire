@@ -6,19 +6,16 @@
 //!
 //! # Core Concepts
 //!
-//! ## [`Dataset`] Trait
+//! ## Core Traits
 //!
-//! The fundamental trait for expandable collections with async read/write operations.
-//! All dataset implementations must provide:
-//! - [`write`](Dataset::write) - Add items to the collection
-//! - [`read`](Dataset::read) - Remove and return the next item
-//! - [`len`](Dataset::len) - Query collection size
+//! - [`Dataset`] - The fundamental trait for expandable collections with async read/write operations
+//! - [`DatasetBatchExt`] - Extension trait providing efficient batch read/write operations for all dataset implementations
+//! - [`DatasetExt`] - Extension trait providing adapter methods for type erasure, error conversion, data transformation, and integration with the `futures` ecosystem
 //!
 //! ## Built-in Implementations
 //!
 //! - [`InMemDataset`] - Simple in-memory FIFO queue or LIFO stack for fast local storage
-//! - Future: `RedbDataset` - Embedded key-value store (planned)
-//! - Future: `SqlxDataset` - SQL database backend (planned)
+//! - [`FutureDataset`] - Dataset implementation using separate stream and sink components
 //!
 //! ## Type Erasure Utilities ([`DatasetExt`])
 //!
@@ -37,21 +34,23 @@
 //! - [`Data`] - Convenient wrapper around [`BoxCloneDataset`] for ergonomic usage
 //! - [`DataStream`] - Adapts datasets to `futures::`[`Stream`] for consumption
 //! - [`DataSink`] - Adapts datasets to `futures::`[`Sink`] for production
+//! - [`FutureDataset`] - Dataset implementation using stream and sink components
 //!
 //! [`Stream`]: futures::Stream
 //! [`Sink`]: futures::Sink
 //! [`Data`]: future::Data
 //! [`DataStream`]: future::DataStream
 //! [`DataSink`]: future::DataSink
+//! [`FutureDataset`]: FutureDataset
 //!
 //! # Examples
 //!
 //! ## Basic Usage
 //!
-//! ```ignore
+//! ```no_run
 //! use spire_core::dataset::{Dataset, InMemDataset};
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn example() -> spire_core::Result<()> {
 //! // Create a FIFO queue for URLs
 //! let urls = InMemDataset::<String>::queue();
 //!
@@ -69,11 +68,11 @@
 //!
 //! ## Using with Futures
 //!
-//! ```ignore
+//! ```no_run
 //! use futures::{SinkExt, StreamExt};
 //! use spire_core::dataset::{DatasetExt, InMemDataset};
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn example() -> spire_core::Result<()> {
 //! let dataset = InMemDataset::<i32>::queue();
 //! let (mut sink, mut stream) = dataset.into_split();
 //!
@@ -90,13 +89,15 @@
 
 #[doc(inline)]
 pub use future::Data;
-pub use memory::InMemDataset;
+pub use future_dataset::FutureDataset;
+pub use memory_dataset::InMemDataset;
 pub(crate) use registry::DatasetRegistry;
 #[doc(inline)]
 pub use utils::DatasetExt;
 
 pub mod future;
-mod memory;
+mod future_dataset;
+mod memory_dataset;
 mod registry;
 pub mod utils;
 
@@ -120,10 +121,10 @@ pub mod utils;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, InMemDataset};
 ///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example() -> spire_core::Result<()> {
 /// let dataset = InMemDataset::<i32>::queue();
 ///
 /// // Write items
@@ -141,8 +142,7 @@ pub mod utils;
 /// ```
 #[async_trait::async_trait]
 pub trait Dataset<T>: Send + Sync {
-    /// The error type returned by failed [`write`](Dataset::write) or
-    /// [`read`](Dataset::read) operations.
+    /// The error type returned by failed operations.
     type Error;
 
     /// Adds an item to the collection.
@@ -175,37 +175,37 @@ pub trait Dataset<T>: Send + Sync {
     }
 }
 
-/// Extension trait for bulk dataset operations.
+/// Extension trait for batch dataset operations.
 ///
 /// This trait provides efficient batch read/write operations for datasets.
 /// It is automatically implemented for all types that implement [`Dataset`].
 ///
 /// # Examples
 ///
-/// ```ignore
-/// use spire_core::dataset::{Dataset, DatasetBulkExt, InMemDataset};
+/// ```no_run
+/// use spire_core::dataset::{Dataset, DatasetBatchExt, InMemDataset};
 ///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example() -> spire_core::Result<()> {
 /// let dataset = InMemDataset::<i32>::queue();
 ///
 /// // Write multiple items at once
-/// dataset.write_bulk(vec![1, 2, 3, 4, 5]).await?;
+/// dataset.write_batch(vec![1, 2, 3, 4, 5]).await?;
 ///
 /// // Read multiple items at once
-/// let items = dataset.read_bulk(3).await?;
+/// let items = dataset.read_batch(3).await?;
 /// assert_eq!(items, vec![1, 2, 3]);
 /// # Ok(())
 /// # }
 /// ```
 #[async_trait::async_trait]
-pub trait DatasetBulkExt<T>: Dataset<T>
+pub trait DatasetBatchExt<T>: Dataset<T>
 where
     T: Send + 'static,
 {
-    /// Writes multiple items to the dataset in bulk.
+    /// Writes multiple items to the dataset in batch.
     ///
     /// The default implementation calls [`write`](Dataset::write) for each item sequentially.
-    /// Implementations may override this to provide more efficient bulk operations.
+    /// Implementations may override this to provide more efficient batch operations.
     ///
     /// # Errors
     ///
@@ -214,30 +214,30 @@ where
     ///
     /// # Examples
     ///
-    /// ```ignore
-    /// use spire_core::dataset::{Dataset, DatasetBulkExt, InMemDataset};
+    /// ```no_run
+    /// use spire_core::dataset::{Dataset, DatasetBatchExt, InMemDataset};
     ///
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example() -> spire_core::Result<()> {
     /// let dataset = InMemDataset::<i32>::queue();
-    /// dataset.write_bulk(vec![1, 2, 3, 4, 5]).await?;
+    /// dataset.write_batch(vec![1, 2, 3, 4, 5]).await?;
     /// assert_eq!(dataset.len(), 5);
     /// # Ok(())
     /// # }
     /// ```
-    async fn write_bulk(&self, items: Vec<T>) -> Result<(), Self::Error> {
+    async fn write_batch(&self, items: Vec<T>) -> Result<(), Self::Error> {
         for item in items {
             self.write(item).await?;
         }
         Ok(())
     }
 
-    /// Reads multiple items from the dataset in bulk.
+    /// Reads multiple items from the dataset in batch.
     ///
     /// Returns up to `count` items from the dataset. May return fewer items if
     /// the dataset becomes empty before reaching the requested count.
     ///
     /// The default implementation calls [`read`](Dataset::read) up to `count` times.
-    /// Implementations may override this to provide more efficient bulk operations.
+    /// Implementations may override this to provide more efficient batch operations.
     ///
     /// # Errors
     ///
@@ -245,20 +245,20 @@ where
     ///
     /// # Examples
     ///
-    /// ```ignore
-    /// use spire_core::dataset::{Dataset, DatasetBulkExt, InMemDataset};
+    /// ```no_run
+    /// use spire_core::dataset::{Dataset, DatasetBatchExt, InMemDataset};
     ///
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example() -> spire_core::Result<()> {
     /// let dataset = InMemDataset::<i32>::queue();
-    /// dataset.write_bulk(vec![1, 2, 3, 4, 5]).await?;
+    /// dataset.write_batch(vec![1, 2, 3, 4, 5]).await?;
     ///
-    /// let items = dataset.read_bulk(3).await?;
+    /// let items = dataset.read_batch(3).await?;
     /// assert_eq!(items, vec![1, 2, 3]);
     /// assert_eq!(dataset.len(), 2);
     /// # Ok(())
     /// # }
     /// ```
-    async fn read_bulk(&self, count: usize) -> Result<Vec<T>, Self::Error> {
+    async fn read_batch(&self, count: usize) -> Result<Vec<T>, Self::Error> {
         let mut items = Vec::with_capacity(count.min(self.len()));
         for _ in 0..count {
             match self.read().await? {
@@ -272,10 +272,10 @@ where
     /// Reads all items from the dataset.
     ///
     /// Continuously reads items until the dataset is empty. This is equivalent to
-    /// calling [`read_bulk`](DatasetBulkExt::read_bulk) with a count equal to the dataset length.
+    /// calling [`read_batch`](DatasetBatchExt::read_batch) with a count equal to the dataset length.
     ///
     /// The default implementation calls [`read`](Dataset::read) until it returns `None`.
-    /// Implementations may override this to provide more efficient bulk operations.
+    /// Implementations may override this to provide more efficient batch operations.
     ///
     /// # Errors
     ///
@@ -283,12 +283,12 @@ where
     ///
     /// # Examples
     ///
-    /// ```ignore
-    /// use spire_core::dataset::{Dataset, DatasetBulkExt, InMemDataset};
+    /// ```no_run
+    /// use spire_core::dataset::{Dataset, DatasetBatchExt, InMemDataset};
     ///
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example() -> spire_core::Result<()> {
     /// let dataset = InMemDataset::<i32>::queue();
-    /// dataset.write_bulk(vec![1, 2, 3]).await?;
+    /// dataset.write_batch(vec![1, 2, 3]).await?;
     ///
     /// let all_items = dataset.read_all().await?;
     /// assert_eq!(all_items, vec![1, 2, 3]);
@@ -305,8 +305,8 @@ where
     }
 }
 
-/// Blanket implementation of [`DatasetBulkExt`] for all [`Dataset`] types.
-impl<T, D> DatasetBulkExt<T> for D
+/// Blanket implementation of [`DatasetBatchExt`] for all [`Dataset`] types.
+impl<T, D> DatasetBatchExt<T> for D
 where
     D: Dataset<T>,
     T: Send + 'static,

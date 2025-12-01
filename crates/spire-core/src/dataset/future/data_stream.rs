@@ -20,7 +20,7 @@ use crate::{Error, Result};
 ///
 /// Create a `DataStream` using [`DatasetExt::into_stream`] or [`DatasetExt::into_split`]:
 ///
-/// ```ignore
+/// ```no_run
 /// use futures::StreamExt;
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 ///
@@ -40,9 +40,9 @@ use crate::{Error, Result};
 ///
 /// # Stream Processing
 ///
-/// ```ignore
+/// ```no_run
 /// use futures::StreamExt;
-/// use spire_core::dataset::{DatasetExt, InMemDataset};
+/// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {
 /// let dataset = InMemDataset::<i32>::queue();

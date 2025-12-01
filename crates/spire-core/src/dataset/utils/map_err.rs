@@ -12,7 +12,7 @@ use crate::dataset::Dataset;
 ///
 /// ## Converting to a Custom Error Type
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 /// use std::convert::Infallible;
 ///
@@ -32,7 +32,7 @@ use crate::dataset::Dataset;
 ///
 /// ## Converting to anyhow::Error
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 /// use anyhow::Error;
 ///
@@ -47,7 +47,7 @@ use crate::dataset::Dataset;
 ///
 /// ## Chaining Error Transformations
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 ///
 /// #[derive(Debug)]
@@ -68,7 +68,7 @@ use crate::dataset::Dataset;
 ///
 /// ## Making Infallible Errors Explicit
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 /// use std::convert::Infallible;
 ///

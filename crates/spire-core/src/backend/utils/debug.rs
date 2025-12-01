@@ -29,7 +29,7 @@ use crate::{Error, Result};
 ///
 /// ## Basic Testing
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::utils::Noop;
 /// use spire_core::Client;
 ///
@@ -40,7 +40,7 @@ use crate::{Error, Result};
 ///
 /// ## Controlling Worker Behavior
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::utils::Noop;
 ///
 /// // Always continue without resolving requests

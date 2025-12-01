@@ -18,7 +18,7 @@
 //!
 //! ## Using Noop for Testing
 //!
-//! ```ignore
+//! ```no_run
 //! use spire_core::backend::utils::Noop;
 //! use spire_core::Client;
 //!
@@ -29,11 +29,16 @@
 //!
 //! ## Adding Tracing
 //!
-//! ```ignore
+//! ```no_run
+//! # #[cfg(feature = "tracing")]
+//! # {
 //! use spire_core::backend::utils::Trace;
 //!
+//! # let my_backend = (); // your backend here
+//! # let my_worker = (); // your worker here
 //! let backend = Trace::new(my_backend);
 //! let worker = Trace::new(my_worker);
+//! # }
 //! ```
 //!
 //! [`Backend`]: crate::backend::Backend

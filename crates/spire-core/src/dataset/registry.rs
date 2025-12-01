@@ -20,7 +20,7 @@ type AnyBox = Box<dyn Any + Send + Sync>;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{DatasetRegistry, InMemDataset};
 ///
 /// let registry = DatasetRegistry::new();
@@ -58,7 +58,7 @@ impl DatasetRegistry {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::dataset::{DatasetRegistry, InMemDataset};
     ///
     /// let registry = DatasetRegistry::new();
@@ -82,7 +82,7 @@ impl DatasetRegistry {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::dataset::DatasetRegistry;
     ///
     /// let registry = DatasetRegistry::new();
@@ -106,7 +106,7 @@ impl DatasetRegistry {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::dataset::DatasetRegistry;
     ///
     /// let registry = DatasetRegistry::new();

@@ -14,11 +14,11 @@
 //!
 //! ## Using DataStream
 //!
-//! ```ignore
+//! ```no_run
 //! use futures::StreamExt;
 //! use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn example() -> spire_core::Result<()> {
 //! let dataset = InMemDataset::queue();
 //! dataset.write("item1").await?;
 //! dataset.write("item2").await?;
@@ -33,11 +33,11 @@
 //!
 //! ## Using DataSink
 //!
-//! ```ignore
+//! ```no_run
 //! use futures::SinkExt;
 //! use spire_core::dataset::{DatasetExt, InMemDataset};
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! # async fn example() -> spire_core::Result<()> {
 //! let dataset = InMemDataset::queue();
 //! let mut sink = dataset.into_sink();
 //!

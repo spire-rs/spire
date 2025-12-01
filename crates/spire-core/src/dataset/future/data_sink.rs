@@ -23,7 +23,7 @@ type BoxSink<'a, T, E> = Pin<Box<dyn Sink<T, Error = E> + Send + 'a>>;
 ///
 /// Create a `DataSink` using [`DatasetExt::into_sink`] or [`DatasetExt::into_split`]:
 ///
-/// ```ignore
+/// ```no_run
 /// use futures::SinkExt;
 /// use spire_core::dataset::{DatasetExt, InMemDataset};
 ///
@@ -39,7 +39,7 @@ type BoxSink<'a, T, E> = Pin<Box<dyn Sink<T, Error = E> + Send + 'a>>;
 ///
 /// # Producer-Consumer Pattern
 ///
-/// ```ignore
+/// ```no_run
 /// use futures::SinkExt;
 /// use spire_core::dataset::{DatasetExt, InMemDataset};
 ///

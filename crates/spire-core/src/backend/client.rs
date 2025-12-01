@@ -13,7 +13,7 @@ use crate::{Error, Result};
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::Client;
 /// use spire_core::context::Request;
 ///

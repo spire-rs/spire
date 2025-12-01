@@ -34,7 +34,7 @@ use crate::{Error, Result};
 ///
 /// ## Basic Usage
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::utils::Metric;
 ///
 /// let worker = Metric::new(my_worker);
@@ -46,7 +46,7 @@ use crate::{Error, Result};
 ///
 /// ## Using with Tower Layers
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::utils::MetricLayer;
 /// use tower::ServiceBuilder;
 ///
@@ -81,7 +81,7 @@ impl<S> Metric<S> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::backend::utils::Metric;
     ///
     /// let worker = Metric::new(my_worker);
@@ -190,7 +190,7 @@ impl Future for MetricFuture {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::utils::MetricLayer;
 /// use tower::ServiceBuilder;
 ///
@@ -209,7 +209,7 @@ impl MetricLayer {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::backend::utils::MetricLayer;
     ///
     /// let layer = MetricLayer::new();

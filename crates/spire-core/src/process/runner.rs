@@ -68,7 +68,7 @@ impl<B, W> Runner<B, W> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use tokio::time::{sleep, Duration};
     ///
     /// let client = Client::new(backend, worker);

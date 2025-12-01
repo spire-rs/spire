@@ -13,7 +13,7 @@ use crate::dataset::utils::BoxCloneDataset;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Data, DatasetExt, InMemDataset};
 ///
 /// let dataset = InMemDataset::<String>::queue().boxed_clone();

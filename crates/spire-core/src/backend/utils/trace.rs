@@ -36,7 +36,7 @@ use crate::{Error, Result};
 ///
 /// ## Wrapping Individual Services
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::utils::Trace;
 ///
 /// let backend = Trace::new(my_backend);
@@ -46,7 +46,7 @@ use crate::{Error, Result};
 ///
 /// ## Using with Tower Layers
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::utils::TraceLayer;
 /// use tower::ServiceBuilder;
 ///
@@ -78,7 +78,7 @@ impl<S> Trace<S> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::backend::utils::Trace;
     ///
     /// let traced = Trace::new(my_service);
@@ -247,7 +247,7 @@ impl<T, E> Future for TraceFuture<T, E> {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::utils::TraceLayer;
 /// use tower::ServiceBuilder;
 ///
@@ -266,7 +266,7 @@ impl TraceLayer {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::backend::utils::TraceLayer;
     ///
     /// let layer = TraceLayer::new();

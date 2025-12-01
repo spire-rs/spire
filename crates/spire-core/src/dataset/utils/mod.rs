@@ -23,7 +23,7 @@
 //!
 //! ## Type Erasure
 //!
-//! ```ignore
+//! ```no_run
 //! use spire_core::dataset::{DatasetExt, InMemDataset};
 //!
 //! // Store different dataset types in a vector
@@ -35,7 +35,7 @@
 //!
 //! ## Data Transformation
 //!
-//! ```ignore
+//! ```no_run
 //! use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 //!
 //! // Store URLs as normalized lowercase
@@ -67,7 +67,7 @@ pub use map_err::MapErr;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{DatasetExt, InMemDataset};
 ///
 /// let dataset = InMemDataset::<String>::queue()
@@ -85,7 +85,7 @@ pub trait DatasetExt<T>: Dataset<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use futures::{SinkExt, StreamExt};
     /// use spire_core::dataset::{DatasetExt, InMemDataset};
     ///
@@ -108,7 +108,7 @@ pub trait DatasetExt<T>: Dataset<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use futures::StreamExt;
     /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
     ///
@@ -131,7 +131,7 @@ pub trait DatasetExt<T>: Dataset<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use futures::SinkExt;
     /// use spire_core::dataset::{DatasetExt, InMemDataset};
     ///
@@ -170,7 +170,7 @@ pub trait DatasetExt<T>: Dataset<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
     ///
     /// # async fn example() -> Result<(), std::convert::Infallible> {
@@ -197,7 +197,7 @@ pub trait DatasetExt<T>: Dataset<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::dataset::{DatasetExt, InMemDataset};
     ///
     /// let dataset = InMemDataset::<i32>::queue()

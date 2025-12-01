@@ -28,7 +28,7 @@ use crate::dataset::Dataset;
 ///
 /// ## FIFO Queue (Breadth-First)
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, InMemDataset};
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {
@@ -45,7 +45,7 @@ use crate::dataset::Dataset;
 ///
 /// ## LIFO Stack (Depth-First)
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, InMemDataset};
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {
@@ -77,7 +77,7 @@ impl<T> InMemDataset<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::dataset::InMemDataset;
     ///
     /// let dataset = InMemDataset::<String>::new();
@@ -94,7 +94,7 @@ impl<T> InMemDataset<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::dataset::InMemDataset;
     ///
     /// // Pre-allocate space for 1000 URLs
@@ -121,7 +121,7 @@ impl<T> InMemDataset<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::dataset::{Dataset, InMemDataset};
     ///
     /// # async fn example() -> Result<(), std::convert::Infallible> {
@@ -150,7 +150,7 @@ impl<T> InMemDataset<T> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::dataset::{Dataset, InMemDataset};
     ///
     /// # async fn example() -> Result<(), std::convert::Infallible> {

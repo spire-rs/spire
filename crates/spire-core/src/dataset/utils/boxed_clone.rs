@@ -11,7 +11,7 @@ use crate::dataset::Dataset;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {
@@ -30,7 +30,7 @@ use crate::dataset::Dataset;
 ///
 /// `BoxCloneDataset` can be cloned and sent across thread boundaries:
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {

@@ -15,7 +15,7 @@ use crate::context::{Context, FlowControl};
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::Worker;
 /// use spire_core::context::{Context, FlowControl};
 ///

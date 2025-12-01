@@ -29,7 +29,7 @@ use crate::{Error, Result};
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::Client;
 ///
 /// let client = Client::new(backend, worker)
@@ -58,7 +58,7 @@ where
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::Client;
     ///
     /// let client = Client::new(my_backend, my_worker);
@@ -87,7 +87,7 @@ where
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::Client;
     ///
     /// let client = Client::new(backend, worker)
@@ -121,7 +121,7 @@ where
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::Client;
     ///
     /// let client = Client::new(backend, worker);
@@ -148,7 +148,7 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::Client;
     /// use spire_core::dataset::InMemDataset;
     ///
@@ -178,7 +178,7 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use http::Request;
     /// use spire_core::Client;
     ///
@@ -215,7 +215,7 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use http::Request;
     /// use spire_core::Client;
     ///
@@ -260,7 +260,7 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::Client;
     ///
     /// let client = Client::new(backend, worker)
@@ -292,7 +292,7 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::Client;
     /// use spire_core::dataset::InMemDataset;
     ///
@@ -330,7 +330,7 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use spire_core::Client;
     /// use spire_core::dataset::Dataset;
     ///
@@ -366,7 +366,7 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```no_run
     /// use tokio::time::{sleep, Duration};
     /// use spire_core::Client;
     ///

@@ -45,11 +45,11 @@ pub use worker::Worker;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::backend::Backend;
 ///
 /// async fn use_backend<B: Backend>(backend: B) {
-///     let client = backend.client().await.unwrap();
+///     let client = backend.connect().await.unwrap();
 ///     // Use the client to fetch responses
 /// }
 /// ```

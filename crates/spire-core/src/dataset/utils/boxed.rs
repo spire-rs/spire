@@ -12,7 +12,7 @@ use crate::dataset::Dataset;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {
@@ -34,7 +34,7 @@ use crate::dataset::Dataset;
 /// Type erasure allows you to work with datasets generically without knowing
 /// their concrete types at compile time:
 ///
-/// ```ignore
+/// ```no_run
 /// use spire_core::dataset::{BoxDataset, DatasetExt, InMemDataset};
 ///
 /// fn create_dataset(use_queue: bool) -> BoxDataset<i32, std::convert::Infallible> {

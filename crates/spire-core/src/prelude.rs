@@ -2,7 +2,7 @@
 //!
 //! This module is intended to be glob-imported for convenience:
 //!
-//! ```ignore
+//! ```no_run
 //! use spire_core::prelude::*;
 //! ```
 
@@ -26,7 +26,7 @@ pub use crate::context::{
 };
 // Dataset types
 pub use crate::dataset::{
-    Dataset, DatasetBulkExt, InMemDataset,
+    Dataset, DatasetBatchExt, InMemDataset,
     future::{Data, DataSink, DataStream},
     utils::{BoxCloneDataset, BoxDataset, DatasetExt, MapData, MapErr},
 };
