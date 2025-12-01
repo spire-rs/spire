@@ -1,6 +1,6 @@
 use std::convert::Infallible;
-use std::fmt;
 use std::time::Duration;
+use std::{fmt, io};
 
 use crate::context::{IntoSignal, Signal, TagQuery};
 
@@ -282,9 +282,9 @@ impl From<http::Error> for Error {
     }
 }
 
-impl From<std::io::Error> for Error {
+impl From<io::Error> for Error {
     #[inline]
-    fn from(error: std::io::Error) -> Self {
+    fn from(error: io::Error) -> Self {
         Self::with_source(ErrorKind::Io, "I/O error", Box::new(error))
     }
 }
@@ -297,8 +297,7 @@ impl IntoSignal for Error {
                     source
                 } else {
                     // Convert string message to io::Error which implements std::error::Error
-                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, self.message))
-                        as BoxError
+                    Box::new(io::Error::new(io::ErrorKind::Other, self.message)) as BoxError
                 };
                 Signal::Fail(query, message)
             }

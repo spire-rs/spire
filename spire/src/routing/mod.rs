@@ -6,13 +6,12 @@ use std::fmt;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use tower::{Layer, Service};
-
 use endpoint::Endpoint;
 pub use future::RouteFuture;
 use make_route::MakeRoute;
 pub use route::Route;
 use tag_router::TagRouter;
+use tower::{Layer, Service};
 
 use crate::context::{Context as Cx, IntoSignal, Signal, Tag};
 pub use crate::handler::{Handler, HandlerService};
@@ -221,9 +220,9 @@ impl<C> Service<Cx<C>> for Router<C, ()>
 where
     C: 'static,
 {
-    type Response = Signal;
     type Error = Infallible;
     type Future = RouteFuture<C, Infallible>;
+    type Response = Signal;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -253,8 +252,8 @@ mod test {
         async fn handler() {}
 
         let _: Router = Router::new()
-            .route(Tag::default(), handler)
-            .route(Tag::default(), handler);
+            .route(Tag::from("route1"), handler)
+            .route(Tag::from("route2"), handler);
     }
 
     #[test]
@@ -273,8 +272,8 @@ mod test {
         async fn handler(_: State<AppState>, _: State<u32>) {}
 
         let _: Router = Router::new()
-            .route(Tag::default(), handler)
-            .route(Tag::default(), handler)
+            .route(Tag::from("route1"), handler)
+            .route(Tag::from("route2"), handler)
             .with_state(AppState::default());
     }
 }

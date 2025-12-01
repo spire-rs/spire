@@ -57,14 +57,14 @@ This crate is typically not used directly. Instead, use the main `spire` crate w
 
 ```toml
 [dependencies]
-spire = "0.1.1"
+spire = "0.2.0"
 ```
 
 If you're implementing custom backends or extending spire's functionality, you may need to depend on `spire-core` directly:
 
 ```toml
 [dependencies]
-spire-core = "0.1.1"
+spire-core = "0.2.0"
 ```
 
 ## Feature Flags
@@ -77,7 +77,7 @@ spire-core = "0.1.1"
 
 Implementing a custom backend:
 
-```rust
+```rust,ignore
 use spire_core::backend::{Backend, Client};
 use spire_core::context::{Request, Response};
 use spire_core::Result;

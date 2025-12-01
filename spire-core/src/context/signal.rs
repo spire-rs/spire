@@ -10,6 +10,28 @@ use crate::context::Tag;
 use crate::{BoxError, Error};
 
 /// Defines a way to select or filter [`Tag`]s for signal operations.
+///
+/// Used with [`Signal`] variants like [`Signal::Wait`], [`Signal::Hold`], and [`Signal::Fail`]
+/// to specify which tagged requests should be affected by the signal.
+///
+/// # Examples
+///
+/// ```
+/// use spire_core::context::{Tag, TagQuery};
+/// use std::time::Duration;
+///
+/// // Match only the current request's tag
+/// let query = TagQuery::Owner;
+///
+/// // Match a specific tag
+/// let query = TagQuery::Single(Tag::from("product_list"));
+///
+/// // Match multiple tags
+/// let query = TagQuery::List(vec![Tag::from("page1"), Tag::from("page2")]);
+///
+/// // Match all tags
+/// let query = TagQuery::Every;
+/// ```
 #[derive(Debug, Default, Clone)]
 pub enum TagQuery {
     /// Matches the same [`Tag`] as used by the [`Request`].
@@ -32,7 +54,7 @@ pub enum TagQuery {
 
 impl TagQuery {
     /// Matches a [`Tag`] to the owned [`TagQuery`].
-    pub(crate) fn is_match(&self, tag: &Tag, owner: &Tag) -> bool {
+    pub fn is_match(&self, tag: &Tag, owner: &Tag) -> bool {
         match self {
             Self::Owner => !owner.is_fallback() && tag == owner,
             Self::Single(x) => x == tag,

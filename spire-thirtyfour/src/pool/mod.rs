@@ -1,28 +1,35 @@
 use std::task::{Context, Poll};
 
 use deadpool::managed::Pool;
-use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures::future::BoxFuture;
+use spire_core::{Error, Result};
 use tower::Service;
 
-use spire_core::{Error, ErrorKind, Result};
+/// Browser pool builder for configuring and creating pools.
+pub mod builder;
+/// Internal browser connection manager and lifecycle handling.
+pub mod manager;
 
-use crate::builder::BrowserBuilder;
+pub use builder::BrowserBuilder;
+pub use manager::BrowserManager;
+
 use crate::client::BrowserClient;
-use crate::manager::BrowserManager;
+use crate::error::BrowserError;
 
-/// WebDriver backend built on top of [`fantoccini`] crate.
+/// WebDriver backend built on top of [`thirtyfour`] crate.
 ///
 /// `BrowserPool` manages a pool of browser instances for web scraping tasks
 /// that require JavaScript execution, dynamic content rendering, or user interaction
 /// simulation.
 ///
-/// Uses [`BrowserClient`] as the client implementation.
+/// Uses [`BrowserClient`] as the client implementation and supports multiple
+/// WebDriver configurations with health monitoring and automatic cleanup.
 ///
 /// # Examples
 ///
 /// ```ignore
-/// use spire_fantoccini::BrowserPool;
+/// use spire_thirtyfour::BrowserPool;
 /// use spire_core::Client;
 ///
 /// let pool = BrowserPool::builder()
@@ -51,11 +58,8 @@ impl BrowserPool {
 
     /// Waits and returns an available [`BrowserClient`].
     async fn client(&self) -> Result<BrowserClient> {
-        self.pool.get().await.map(Into::into).map_err(|e| {
-            Error::new(
-                ErrorKind::Backend,
-                format!("Failed to get browser from pool: {}", e),
-            )
+        self.pool.get().await.map(Into::into).map_err(|_e| {
+            BrowserError::pool_exhausted(0, 0).into() // TODO: Get actual pool metrics
         })
     }
 
@@ -64,7 +68,7 @@ impl BrowserPool {
     /// # Examples
     ///
     /// ```ignore
-    /// use spire_fantoccini::BrowserPool;
+    /// use spire_thirtyfour::BrowserPool;
     ///
     /// let pool = BrowserPool::builder()
     ///     .with_unmanaged("127.0.0.1:4444")
@@ -86,23 +90,29 @@ impl From<Pool<BrowserManager>> for BrowserPool {
 impl Default for BrowserPool {
     /// Creates a default browser pool.
     ///
+    /// Creates a default browser pool with a single localhost connection.
+    ///
     /// ## Note
     ///
-    /// This implementation is currently not available and will panic.
-    /// Use [`BrowserPool::builder`] instead.
+    /// This creates a basic pool for development. For production use,
+    /// use [`BrowserPool::builder`] instead with proper configuration.
     fn default() -> Self {
-        todo!("impl Default for BrowserPool - use BrowserPool::builder() instead")
+        BrowserPool::builder()
+            .with_unmanaged("http://127.0.0.1:4444")
+            .build()
+            .expect("Failed to create default BrowserPool")
     }
 }
 
 impl Service<()> for BrowserPool {
-    type Response = BrowserClient;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Response = BrowserClient;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // TODO: Check for available browsers in the pool
+        // Check if pool has available capacity
+        // For now, we assume the pool is always ready (deadpool handles waiting)
         Poll::Ready(Ok(()))
     }
 
@@ -117,7 +127,7 @@ impl Service<()> for BrowserPool {
 
 #[cfg(test)]
 mod test {
-    use spire_core::backend::utils::{Noop, Trace};
+    use spire_core::backend::utils::Noop;
     use spire_core::context::Request;
     use spire_core::dataset::InMemDataset;
     use spire_core::{Client, Result};
@@ -132,12 +142,12 @@ mod test {
     #[tokio::test]
     async fn noop() -> Result<()> {
         let pool = BrowserPool::builder()
-            .with_unmanaged("127.0.0.1:4444")
-            .with_unmanaged("127.0.0.1:4445")
+            .with_unmanaged("http://127.0.0.1:4444")
+            .with_unmanaged("http://127.0.0.1:4445")
             .build();
 
-        let backend = Trace::new(pool);
-        let worker = Trace::new(Noop::default());
+        let backend = pool?;
+        let worker = Noop::default();
 
         let request = Request::get("https://example.com/").body(());
         let client = Client::new(backend, worker)

@@ -28,7 +28,7 @@ Procedural macros for the spire web scraping framework.
 
 The `Select` derive macro generates implementations of the `Select` trait, allowing you to declaratively extract structured data from HTML:
 
-```rust
+```rust,ignore
 use spire::extract::Select;
 
 #[derive(Debug, Select)]
@@ -46,7 +46,7 @@ struct Product {
 
 This enables type-safe extraction in your handlers:
 
-```rust
+```rust,ignore
 use spire::extract::Elements;
 
 async fn handler(Elements(products): Elements<Vec<Product>>) {
@@ -62,12 +62,12 @@ This crate is typically not used directly. Instead, enable the `macros` feature 
 
 ```toml
 [dependencies]
-spire = { version = "0.1.1", features = ["macros"] }
+spire = { version = "0.2.0", features = ["macros"] }
 ```
 
 The macros will then be available through the `spire` prelude:
 
-```rust
+```rust,ignore
 use spire::prelude::*;
 use spire::extract::Select;
 

@@ -23,7 +23,8 @@ pub struct AttrData(String);
 ///
 /// Can be automatically generated with a `Select` derive macro:
 ///
-/// ```rust
+/// ```rust,ignore
+/// // This requires the "macros" feature to be enabled
 /// use spire::extract::Select;
 ///
 /// #[derive(Debug, Select)]

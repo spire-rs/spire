@@ -28,7 +28,7 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 ## Features
 
 - **Flexible Architecture**: Built on tower's Service trait for composable middleware
-- **Multiple Backends**: Support for HTTP (reqwest) and WebDriver (fantoccini) backends
+- **Multiple Backends**: Support for HTTP (reqwest) and WebDriver (thirtyfour) backends
 - **Type-Safe Routing**: Tag-based routing with compile-time safety
 - **Async First**: Powered by tokio for high-performance concurrent scraping
 - **Ergonomic Extractors**: Extract data from requests with a clean, type-safe API
@@ -41,24 +41,24 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-spire = "0.1.1"
+spire = "0.2.0"
 ```
 
 ### Feature Flags
 
 - **`reqwest`** - Enables the reqwest-based HTTP client backend
-- **`fantoccini`** - Enables the WebDriver/browser automation backend
+- **`thirtyfour`** - Enables the WebDriver/browser automation backend
 - **`macros`** - Enables procedural macros for deriving extractors
 - **`tracing`** - Enables tracing/logging support
 - **`trace`** - Enables detailed trace-level instrumentation
 - **`metric`** - Enables metrics collection
-- **`full`** - Enables all features (macros, tracing, reqwest, fantoccini)
+- **`full`** - Enables all features (macros, tracing, reqwest, thirtyfour)
 
 ## Quick Start
 
 ### HTTP Scraping with Reqwest
 
-```rust
+```rust,no_run
 use spire::prelude::*;
 use spire::extract::{Text, State};
 use spire::context::{RequestQueue, Tag};
@@ -78,7 +78,7 @@ async fn scrape_handler(
     println!("Scraped {} bytes with API key: {}", html.len(), state.api_key);
     
     // Queue more requests
-    queue.push(Tag::new("page2"), "https://example.com/page2").await?;
+    queue.push("page2", "https://example.com/page2").await?;
     
     Ok(())
 }
@@ -87,7 +87,7 @@ async fn scrape_handler(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create router
     let router = Router::new()
-        .route(Tag::new("main"), scrape_handler)
+        .route("main", scrape_handler)
         .with_state(AppState {
             api_key: "my-api-key".to_string(),
         });
@@ -100,7 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start initial request
     client.queue()
-        .push(Tag::new("main"), "https://example.com")
+        .push("main", "https://example.com")
         .await?;
 
     // Run the client
@@ -112,11 +112,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Browser Automation with Fantoccini
 
-```rust
+```rust,no_run
 use spire::prelude::*;
 use spire::extract::State;
 use spire::context::{RequestQueue, Tag};
-use spire::fantoccini_backend::BrowserPool;
+use spire::thirtyfour_backend::BrowserPool;
 use spire::dataset::InMemDataset;
 
 async fn browser_handler(
@@ -130,7 +130,7 @@ async fn browser_handler(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create router
     let router = Router::new()
-        .route(Tag::new("main"), browser_handler);
+        .route("main", browser_handler);
 
     // Create browser pool backend
     let backend = BrowserPool::builder().build();
@@ -141,7 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start initial request
     client.queue()
-        .push(Tag::new("main"), "https://example.com")
+        .push("main", "https://example.com")
         .await?;
 
     // Run the client
@@ -165,13 +165,18 @@ Spire is built on several key abstractions:
 
 Spire integrates seamlessly with the tower ecosystem:
 
-```rust
+```rust,no_run
 use tower::ServiceBuilder;
 use tower::timeout::TimeoutLayer;
 use std::time::Duration;
+use spire::prelude::*;
+
+async fn handler() -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
+}
 
 let router = Router::new()
-    .route(Tag::new("main"), handler)
+    .route("main", handler)
     .layer(
         ServiceBuilder::new()
             .timeout(Duration::from_secs(30))

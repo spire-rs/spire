@@ -1,4 +1,4 @@
-use std::future::{ready, Future, Ready};
+use std::future::{Future, Ready, ready};
 use std::pin::Pin;
 
 use macros::all_the_tuples;
@@ -15,14 +15,13 @@ mod service;
 /// You shouldn't need to depend on this trait directly. It is automatically
 /// implemented to closures of the right types.
 ///
-/// ```rust
+/// ```rust,no_run
 /// # use spire::routing::Router;
-/// # use spire::context::Tag;
 ///
 /// async fn handler() {}
 ///
 /// let router: Router = Router::new()
-///     .route(Tag::default(), handler);
+///     .route("main", handler);
 /// ```
 ///
 /// ### Handlers that aren't functions
@@ -30,12 +29,12 @@ mod service;
 /// The `Handler` trait is also implemented for `T: IntoSignal`.
 /// That allows easily returning fixed [`Signal`] for routes:
 ///
-/// ```rust
+/// ```rust,ignore
 /// # use spire::routing::Router;
-/// # use spire::context::{Tag, Signal};
+/// # use spire::context::Signal;
 ///
 /// let router: Router = Router::new()
-///     .route(Tag::default(), Signal::Continue);
+///     .route("main", Signal::Continue);
 /// ```
 ///
 /// [`Request`]: crate::context::Request

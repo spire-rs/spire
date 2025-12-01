@@ -26,14 +26,14 @@ path = "src/lib.rs"
 
 [features]
 default = []
-full = ["macros", "tracing", "reqwest", "fantoccini"]
+full = ["macros", "tracing", "reqwest", "thirtyfour"]
 
 # Proc macros
 macros = ["dep:spire-macros"]
 
 # Backend implementations
 reqwest = ["dep:spire-reqwest", "dep:scraper"]
-fantoccini = ["dep:spire-fantoccini"]
+thirtyfour = ["dep:spire-thirtyfour"]
 
 # Observability
 tracing = ["dep:tracing", "spire-core/tracing"]
@@ -49,7 +49,7 @@ include = []
 spire-core = { workspace = true }
 spire-macros = { workspace = true, optional = true }
 spire-reqwest = { workspace = true, optional = true }
-spire-fantoccini = { workspace = true, optional = true }
+spire-thirtyfour = { workspace = true, optional = true }
 
 # Tower ecosystem
 tower = { workspace = true }

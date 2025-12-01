@@ -1,5 +1,5 @@
 [package]
-name = "spire-fantoccini"
+name = "spire-thirtyfour"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -9,7 +9,7 @@ repository = { workspace = true }
 homepage = { workspace = true }
 documentation = { workspace = true }
 
-description = "Fantoccini-based browser automation backend for Spire web scraping framework"
+description = "Thirtyfour-based browser automation backend for Spire web scraping framework"
 keywords = ["crawler", "scraper", "browser", "webdriver"]
 categories = ["asynchronous", "web-programming"]
 
@@ -32,12 +32,29 @@ futures = { workspace = true }
 async-trait = { workspace = true }
 
 # Browser automation
-fantoccini = { workspace = true }
+thirtyfour = { workspace = true }
 deadpool = { workspace = true }
 
 # HTTP
 http = { workspace = true }
 http-body-util = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["time", "fs"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Time handling
+jiff = { version = "0.1", features = ["serde"] }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Derive macros
+derive_builder = "0.20"
+derive_more = "0.99"
 
 # Utilities
 bytes = { workspace = true }

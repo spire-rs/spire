@@ -165,7 +165,7 @@ What actually happened.
 **Environment**
 - Rust version: [e.g. 1.83.0]
 - OS: [e.g. Ubuntu 22.04]
-- Spire version: [e.g. 0.1.1]
+- Spire version: [e.g. 0.2.0]
 
 **Additional context**
 Any other relevant information.

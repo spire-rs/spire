@@ -160,9 +160,9 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "fantoccini")]
-    fn with_fantoccini() {
-        let backend = spire_fantoccini::BrowserPool::default();
+    #[cfg(feature = "thirtyfour")]
+    fn with_thirtyfour() {
+        let backend = spire_thirtyfour::BrowserPool::default();
         let _ = Client::new(backend, service());
     }
 }

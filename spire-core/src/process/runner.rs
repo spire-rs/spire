@@ -15,6 +15,8 @@ use futures::stream::{AbortHandle, Abortable};
 use tokio_util::sync::CancellationToken;
 
 use crate::Result;
+#[cfg(feature = "trace")]
+use crate::TRACING_TARGET_RUNNER as TARGET;
 use crate::backend::{Backend, Worker};
 use crate::context::{Context, IntoSignal, Request, Signal, Tag, TagQuery, Task};
 use crate::dataset::{Dataset, DatasetExt, DatasetRegistry};
@@ -124,7 +126,7 @@ impl<B, W> Runner<B, W> {
         tracing::Span::current().record("concurrent_limit", concurrent_limit);
 
         #[cfg(feature = "trace")]
-        tracing::info!(initial_requests = requests.len(), "starting runner");
+        tracing::info!(target: TARGET, initial_requests = requests.len(), "starting runner");
 
         let (handle, registration) = AbortHandle::new_pair();
         let stream = Abortable::new(dataset.into_stream(), registration);
@@ -137,7 +139,7 @@ impl<B, W> Runner<B, W> {
         tokio::spawn(async move {
             shutdown.cancelled().await;
             #[cfg(feature = "trace")]
-            tracing::info!("shutdown requested, stopping request processing");
+            tracing::info!(target: TARGET, "shutdown requested, stopping request processing");
             shutdown_handle.abort();
         });
 
@@ -156,13 +158,14 @@ impl<B, W> Runner<B, W> {
 
         #[cfg(feature = "trace")]
         if self.shutdown.is_cancelled() {
-            tracing::info!("runner stopped due to shutdown request");
+            tracing::info!(target: TARGET, "runner stopped due to shutdown request");
         }
 
         #[cfg(feature = "trace")]
         {
             let duration = start.elapsed();
             tracing::info!(
+                target: TARGET,
                 total_requests = total,
                 duration_ms = duration.as_millis(),
                 requests_per_sec = (total as f64 / duration.as_secs_f64()) as u64,
@@ -189,12 +192,13 @@ impl<B, W> Runner<B, W> {
         W: Worker<B::Client>,
     {
         #[cfg(feature = "trace")]
-        tracing::debug!("processing request");
+        tracing::debug!(target: TARGET, "processing request");
 
         match self.call_service(req).await {
             Ok((signal, owner)) => {
                 #[cfg(feature = "trace")]
                 tracing::debug!(
+                    target: TARGET,
                     signal = ?signal,
                     owner = ?owner,
                     "request completed"
@@ -204,6 +208,7 @@ impl<B, W> Runner<B, W> {
             Err(x) => {
                 #[cfg(feature = "trace")]
                 tracing::warn!(
+                    target: TARGET,
                     error = %x,
                     "request failed"
                 );
@@ -228,12 +233,12 @@ impl<B, W> Runner<B, W> {
         let datasets = self.datasets.clone();
 
         #[cfg(feature = "trace")]
-        tracing::trace!("acquiring backend client");
+        tracing::trace!(target: TARGET, "acquiring backend client");
 
         let client: B::Client = self.backend.client().await?;
 
         #[cfg(feature = "trace")]
-        tracing::trace!("invoking worker");
+        tracing::trace!(target: TARGET, "invoking worker");
 
         let cx: Context<B::Client> = Context::new(request, client, datasets);
         let signal = self.service.clone().invoke(cx).await;
@@ -251,19 +256,19 @@ impl<B, W> Runner<B, W> {
         #[cfg(feature = "trace")]
         match &signal {
             Signal::Wait(query, duration) => {
-                tracing::debug!(query = ?query, duration_ms = duration.as_millis(), "deferring tags");
+                tracing::debug!(target: TARGET, query = ?query, duration_ms = duration.as_millis(), "deferring tags");
             }
             Signal::Hold(query, duration) => {
-                tracing::debug!(query = ?query, duration_ms = duration.as_millis(), "holding tags");
+                tracing::debug!(target: TARGET, query = ?query, duration_ms = duration.as_millis(), "holding tags");
             }
             Signal::Fail(query, _) => {
-                tracing::warn!(query = ?query, "aborting tags");
+                tracing::warn!(target: TARGET, query = ?query, "aborting tags");
             }
             Signal::Continue => {
-                tracing::trace!("continuing");
+                tracing::trace!(target: TARGET, "continuing");
             }
             Signal::Skip => {
-                tracing::trace!("skipping");
+                tracing::trace!(target: TARGET, "skipping");
             }
         }
 
@@ -309,7 +314,7 @@ impl<B, W> Runner<B, W> {
     #[cfg_attr(feature = "trace", tracing::instrument(skip(self), fields(query = ?query, owner = ?owner), level = "trace"))]
     fn apply_abort(&self, query: TagQuery, owner: Tag) -> Result<()> {
         #[cfg(feature = "trace")]
-        tracing::warn!("abort functionality not yet implemented");
+        tracing::warn!(target: TARGET, "abort functionality not yet implemented");
 
         let _ = query;
         let _ = owner;

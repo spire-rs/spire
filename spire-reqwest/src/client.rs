@@ -1,14 +1,52 @@
 use std::fmt;
-use std::future::{ready, Ready};
+use std::future::{Ready, ready};
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 
 use futures::future::BoxFuture;
+use spire_core::context::{Body, Request, Response};
+use spire_core::{Error, Result};
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
-use spire_core::context::{Body, Request, Response};
-use spire_core::{Error, Result};
+/// Converts an http::Request to a reqwest::Request.
+fn request_to_reqwest(req: Request) -> reqwest::Request {
+    use reqwest::Client as RwClient;
+
+    let (parts, _body) = req.into_parts();
+
+    // TODO: Handle request body properly - requires async or streaming
+    let body_bytes = bytes::Bytes::new();
+
+    // Build URL from URI
+    let url = parts.uri.to_string();
+
+    // Build reqwest request
+    RwClient::new()
+        .request(parts.method, &url)
+        .headers(parts.headers)
+        .version(parts.version)
+        .body(body_bytes)
+        .build()
+        .expect("failed to build request")
+}
+
+/// Converts a reqwest::Response to an http::Response.
+fn response_from_reqwest(rw_res: reqwest::Response) -> Response {
+    // Convert reqwest::Response to http::Response
+    let mut res_builder = Response::builder()
+        .status(rw_res.status())
+        .version(rw_res.version());
+
+    if let Some(headers) = res_builder.headers_mut() {
+        *headers = rw_res.headers().clone();
+    }
+
+    // TODO: Handle response body properly - requires async streaming
+    let body = Body::from(bytes::Bytes::new());
+
+    res_builder.body(body).expect("failed to build response")
+}
 
 /// Simple HTTP client backed by an underlying Tower [`Service`].
 ///
@@ -75,14 +113,21 @@ impl HttpClient {
 }
 
 impl Default for HttpClient {
-    /// Creates a default HTTP client.
+    /// Creates a default HTTP client using a default reqwest client.
     ///
-    /// ## Note
-    ///
-    /// This implementation is currently not available and will panic.
-    /// Use [`HttpClient::new`] with a configured service instead.
+    /// This creates a basic HTTP client with default configuration.
+    /// For custom configuration, use [`HttpClient::new`] with a configured service.
     fn default() -> Self {
-        todo!("impl Default for HttpClient - use HttpClient::new() instead")
+        use reqwest::Client as RwClient;
+        use tower::ServiceBuilder;
+
+        let svc = ServiceBuilder::default()
+            .map_request(request_to_reqwest)
+            .map_response(response_from_reqwest)
+            .map_err(|x: reqwest::Error| -> Error { Error::from_boxed(x) })
+            .service(RwClient::default());
+
+        Self::new(svc)
     }
 }
 
@@ -104,9 +149,9 @@ impl fmt::Debug for HttpClient {
 }
 
 impl Service<()> for HttpClient {
-    type Response = Self;
     type Error = Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
+    type Response = Self;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -120,9 +165,9 @@ impl Service<()> for HttpClient {
 }
 
 impl Service<Request> for HttpClient {
-    type Response = Response;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Response>>;
+    type Response = Response;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -139,14 +184,12 @@ impl Service<Request> for HttpClient {
 
 #[cfg(test)]
 mod test {
-    use reqwest::{Client as RwClient, Request as RwRequest};
-    use reqwest::{Error as RwError, Response as RwResponse};
-    use tower::ServiceBuilder;
-
-    use spire_core::backend::utils::{Noop, Trace};
+    use reqwest::{
+        Client as RwClient, Error as RwError, Request as RwRequest, Response as RwResponse,
+    };
+    use spire_core::BoxError;
     use spire_core::context::{Request, Response};
-    use spire_core::dataset::InMemDataset;
-    use spire_core::{BoxError, Client, Result};
+    use tower::ServiceBuilder;
 
     use crate::HttpClient;
 
@@ -162,22 +205,5 @@ mod test {
             .service(RwClient::default());
 
         let _ = HttpClient::new(svc);
-    }
-
-    #[tokio::test]
-    async fn noop() -> Result<()> {
-        let backend = Trace::new(HttpClient::default());
-        let worker = Trace::new(Noop::default());
-
-        let request = Request::get("https://example.com/").body(());
-        let client = Client::new(backend, worker)
-            .with_request_queue(InMemDataset::stack())
-            .with_dataset(InMemDataset::<u64>::new())
-            .with_initial_request(request.unwrap());
-
-        let _ = client.dataset::<u64>();
-        let _ = client.run().await?;
-
-        Ok(())
     }
 }

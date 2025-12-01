@@ -26,19 +26,9 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 
 Spire is a modular web scraping and crawling framework for Rust that combines the power of async/await with the composability of tower's middleware ecosystem. It supports both HTTP-based scraping and browser automation through pluggable backends.
 
-## Workspace Crates
-
-This repository is organized as a Cargo workspace containing the following crates:
-
-- **[spire](./spire/)** - Main crate with high-level APIs, routing, and extraction utilities
-- **[spire-core](./spire-core/)** - Core types, traits, and foundational abstractions
-- **[spire-macros](./spire-macros/)** - Procedural macros for deriving extractors
-- **[spire-reqwest](./spire-reqwest/)** - Reqwest-based HTTP client backend
-- **[spire-fantoccini](./spire-fantoccini/)** - Fantoccini WebDriver backend for browser automation
-
 ## Features
 
-- **Multiple Backends**: HTTP (reqwest) and browser automation (fantoccini) support
+- **Multiple Backends**: HTTP (reqwest) and browser automation (thirtyfour) support
 - **Tower Integration**: Composable middleware using the tower ecosystem
 - **Type-Safe Routing**: Tag-based routing with compile-time guarantees
 - **Ergonomic Extractors**: Clean, type-safe data extraction from requests
@@ -52,7 +42,7 @@ Add spire to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-spire = { version = "0.1.1", features = ["reqwest"] }
+spire = { version = "0.2.0", features = ["reqwest"] }
 ```
 
 Basic HTTP scraping example:
@@ -90,45 +80,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 See the [main crate documentation](./spire/) for more examples and detailed usage.
 
-## Documentation
-
-- [API Documentation](https://docs.rs/spire)
-- [Contributing Guide](./CONTRIBUTING.md)
-- [Changelog](./CHANGELOG.md)
-
-## Development
-
-### Prerequisites
-
-- Rust 1.83 or later
-- Cargo
-
-### Building
-
-```bash
-# Build all crates
-cargo build --workspace
-
-# Run tests
-cargo test --workspace --all-features
-
-# Check formatting
-cargo fmt --all -- --check
-
-# Run clippy
-cargo clippy --workspace --all-targets --all-features
-```
-
 ## Contributing
 
-We welcome contributions! Please read our [Contributing Guide](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+We welcome contributions! Please read our [Contributing Guide](./CONTRIBUTING.md) for details.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
-
-## Acknowledgments
-
-- Inspired by [axum](https://github.com/tokio-rs/axum) for its routing and extraction patterns
-- Built on [tokio](https://github.com/tokio-rs/tokio) for the async runtime
-- Uses [tower](https://github.com/tower-rs/tower) for middleware composition

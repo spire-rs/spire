@@ -9,7 +9,7 @@
 //! - [`View`] - Direct access to the browser's DOM view
 //! - [`Elements`] - Declarative extraction of structured data from rendered pages
 //!
-//! [`BrowserClient`]: spire_fantoccini::BrowserClient
+//! [`BrowserClient`]: spire_thirtyfour::BrowserClient
 
 use std::ops::{Deref, DerefMut};
 
@@ -61,9 +61,9 @@ impl DerefMut for View {
     }
 }
 
-#[cfg(all(feature = "macros", feature = "fantoccini"))]
+#[cfg(all(feature = "macros", feature = "thirtyfour"))]
 #[async_trait::async_trait]
-impl<S, T> FromContextRef<spire_fantoccini::BrowserClient, S> for Elements<T>
+impl<S, T> FromContextRef<spire_thirtyfour::BrowserClient, S> for Elements<T>
 where
     S: Sync + Send + 'static,
     T: Select + Send,
@@ -71,7 +71,7 @@ where
     type Rejection = Error;
 
     async fn from_context_ref(
-        cx: &Context<spire_fantoccini::BrowserClient>,
+        cx: &Context<spire_thirtyfour::BrowserClient>,
         state: &S,
     ) -> Result<Self, Self::Rejection> {
         let View(_view) = View::from_context_ref(cx, state).await?;

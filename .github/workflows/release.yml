@@ -65,8 +65,8 @@ jobs:
         run: cargo publish --token ${{ secrets.CARGO_TOKEN }}
         continue-on-error: true
 
-      - name: Publish spire-fantoccini
-        working-directory: spire-fantoccini
+      - name: Publish spire-thirtyfour
+        working-directory: spire-thirtyfour
         run: cargo publish --token ${{ secrets.CARGO_TOKEN }}
         continue-on-error: true
 

@@ -1,12 +1,10 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
-// #![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::cargo)]
 
 use proc_macro::TokenStream;
-
 use quote::quote;
-use syn::{parse_macro_input, parse_quote, DeriveInput, GenericParam};
+use syn::{DeriveInput, GenericParam, parse_macro_input, parse_quote};
 
 // use proc_macro2::TokenStream as TokenStream2;
 

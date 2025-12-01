@@ -10,6 +10,8 @@ use http_body::Body;
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
 
+#[cfg(feature = "trace")]
+use crate::TRACING_TARGET_BACKEND as TARGET;
 use crate::context::{Context as Cx, Request, Response, Signal, Task};
 use crate::dataset::Dataset;
 use crate::{Error, Result};
@@ -115,7 +117,7 @@ where
         let mut inner = self.inner.clone();
         let fut = async move {
             let client = inner.call(req).await?;
-            tracing::trace!("initialized new client");
+            tracing::trace!(target: TARGET, "initialized new client");
             Ok::<_, Error>(Trace::new(client))
         };
 
@@ -142,6 +144,7 @@ where
         let mut inner = self.inner.clone();
         let fut = async move {
             tracing::trace!(
+                target: TARGET,
                 lower = req.body().size_hint().lower(),
                 upper = req.body().size_hint().upper(),
                 "request body"
@@ -149,6 +152,7 @@ where
 
             let resp = inner.call(req).await?;
             tracing::trace!(
+                target: TARGET,
                 status = resp.status().as_u16(),
                 lower = resp.body().size_hint().lower(),
                 upper = resp.body().size_hint().upper(),
@@ -185,6 +189,7 @@ where
             let dataset = cx.dataset::<Request>();
             let requests = dataset.as_dataset();
             tracing::trace!(
+                target: TARGET,
                 depth = cx.get_ref().depth(),
                 requests = requests.len(),
                 "handler requested"
@@ -192,6 +197,7 @@ where
 
             let signal = inner.call(cx).await;
             tracing::trace!(
+                target: TARGET,
                 // signal = signal.as_str(),
                 requests = requests.len(),
                 "handler responded"

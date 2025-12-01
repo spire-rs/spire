@@ -13,7 +13,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.89"
 readme = "./README.md"
@@ -26,11 +26,11 @@ documentation = "https://docs.rs/spire"
 
 [workspace.dependencies]
 # Workspace crates
-spire = { path = "./spire", version = "0.1.1" }
-spire-core = { path = "./spire-core", version = "0.1.1" }
-spire-fantoccini = { path = "./spire-fantoccini", version = "0.1.1" }
-spire-macros = { path = "./spire-macros", version = "0.1.1" }
-spire-reqwest = { path = "./spire-reqwest", version = "0.1.1" }
+spire = { path = "./spire", version = "0.2.0" }
+spire-core = { path = "./spire-core", version = "0.2.0" }
+spire-macros = { path = "./spire-macros", version = "0.2.0" }
+spire-reqwest = { path = "./spire-reqwest", version = "0.2.0" }
+spire-thirtyfour = { path = "./spire-thirtyfour", version = "0.2.0" }
 
 # Async runtime
 tokio = { version = "1.39", features = ["rt-multi-thread", "macros"] }
@@ -59,7 +59,7 @@ serde_json = { version = "1.0" }
 reqwest = { version = "0.12" }
 
 # Browser automation
-fantoccini = { version = "0.21" }
+thirtyfour = { version = "0.32" }
 deadpool = { version = "0.12" }
 
 # HTML parsing

@@ -8,6 +8,9 @@ pub mod dataset;
 mod error;
 mod process;
 
+#[doc(hidden)]
+pub mod prelude;
+
 #[doc(no_inline)]
 pub use async_trait::async_trait;
 
@@ -19,3 +22,11 @@ pub use crate::process::Client;
 /// [`Result`]: std::result::Result
 /// [`Request`]: context::Request
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// Tracing target for runner-related events.
+#[cfg(feature = "trace")]
+pub(crate) const TRACING_TARGET_RUNNER: &str = "spire_core::runner";
+
+/// Tracing target for backend-related events.
+#[cfg(feature = "trace")]
+pub(crate) const TRACING_TARGET_BACKEND: &str = "spire_core::backend";
