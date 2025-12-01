@@ -94,9 +94,9 @@ impl<C, S> fmt::Debug for Endpoint<C, S> {
 }
 
 impl<C> Service<Cx<C>> for Endpoint<C, ()> {
-    type Response = Signal;
     type Error = Infallible;
     type Future = RouteFuture<C, Infallible>;
+    type Response = Signal;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -104,9 +104,9 @@ impl<C> Service<Cx<C>> for Endpoint<C, ()> {
     }
 
     #[inline]
-    #[cfg_attr(feature = "trace", tracing::instrument(skip_all, level = "trace"))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip_all, level = "trace"))]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         tracing::trace!(endpoint_type = ?match self {
             Self::Route(_) => "Route",
             Self::Handler(_) => "Handler",

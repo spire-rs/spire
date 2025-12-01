@@ -110,7 +110,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Browser Automation with Fantoccini
+### Browser Automation with ThirtyFour
 
 ```rust,no_run
 use spire::prelude::*;

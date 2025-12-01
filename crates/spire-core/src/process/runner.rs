@@ -15,7 +15,7 @@ use futures::stream::{AbortHandle, Abortable};
 use tokio_util::sync::CancellationToken;
 
 use crate::Result;
-#[cfg(feature = "trace")]
+#[cfg(feature = "tracing")]
 use crate::TRACING_TARGET_RUNNER as TARGET;
 use crate::backend::{Backend, Worker};
 use crate::context::{Context, IntoSignal, Request, Signal, Tag, TagQuery, Task};
@@ -97,7 +97,7 @@ impl<B, W> Runner<B, W> {
     /// Initial requests are consumed when this method is called. If an error occurs
     /// during processing, unconsumed requests in the dataset may be lost.
     #[cfg_attr(
-        feature = "trace",
+        feature = "tracing",
         tracing::instrument(skip(self), fields(concurrent_limit))
     )]
     pub async fn run(&self) -> Result<usize>
@@ -105,7 +105,7 @@ impl<B, W> Runner<B, W> {
         B: Backend,
         W: Worker<B::Client>,
     {
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         let start = Instant::now();
         let mut requests: Vec<_> = {
             let mut initial = self
@@ -122,10 +122,10 @@ impl<B, W> Runner<B, W> {
 
         let concurrent_limit = self.limit.load(Ordering::SeqCst);
 
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         tracing::Span::current().record("concurrent_limit", concurrent_limit);
 
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         tracing::info!(target: TARGET, initial_requests = requests.len(), "starting runner");
 
         let (handle, registration) = AbortHandle::new_pair();
@@ -138,7 +138,7 @@ impl<B, W> Runner<B, W> {
         let shutdown_handle = handle.clone();
         tokio::spawn(async move {
             shutdown.cancelled().await;
-            #[cfg(feature = "trace")]
+            #[cfg(feature = "tracing")]
             tracing::info!(target: TARGET, "shutdown requested, stopping request processing");
             shutdown_handle.abort();
         });
@@ -156,12 +156,12 @@ impl<B, W> Runner<B, W> {
 
         let total = stream.await;
 
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         if self.shutdown.is_cancelled() {
             tracing::info!(target: TARGET, "runner stopped due to shutdown request");
         }
 
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         {
             let duration = start.elapsed();
             tracing::info!(
@@ -181,7 +181,7 @@ impl<B, W> Runner<B, W> {
     /// # Errors
     ///
     /// Only if the `Request` stream should be aborted.
-    #[cfg_attr(feature = "trace", tracing::instrument(skip(self, req), fields(
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, req), fields(
         uri = %req.uri(),
         method = %req.method(),
         depth = req.depth()
@@ -191,12 +191,12 @@ impl<B, W> Runner<B, W> {
         B: Backend,
         W: Worker<B::Client>,
     {
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         tracing::debug!(target: TARGET, "processing request");
 
         match self.call_service(req).await {
             Ok((signal, owner)) => {
-                #[cfg(feature = "trace")]
+                #[cfg(feature = "tracing")]
                 tracing::debug!(
                     target: TARGET,
                     signal = ?signal,
@@ -206,7 +206,7 @@ impl<B, W> Runner<B, W> {
                 self.notify(signal, owner)
             }
             Err(x) => {
-                #[cfg(feature = "trace")]
+                #[cfg(feature = "tracing")]
                 tracing::warn!(
                     target: TARGET,
                     error = %x,
@@ -232,12 +232,12 @@ impl<B, W> Runner<B, W> {
         let owner = request.tag().clone();
         let datasets = self.datasets.clone();
 
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         tracing::trace!(target: TARGET, "acquiring backend client");
 
         let client: B::Client = self.backend.client().await?;
 
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         tracing::trace!(target: TARGET, "invoking worker");
 
         let cx: Context<B::Client> = Context::new(request, client, datasets);
@@ -251,9 +251,9 @@ impl<B, W> Runner<B, W> {
     /// # Errors
     ///
     /// Only if the `Request` stream should be aborted.
-    #[cfg_attr(feature = "trace", tracing::instrument(skip(self, signal), fields(owner = ?owner)))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, signal), fields(owner = ?owner)))]
     pub fn notify(&self, signal: Signal, owner: Tag) -> Result<()> {
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         match &signal {
             Signal::Wait(query, duration) => {
                 tracing::debug!(target: TARGET, query = ?query, duration_ms = duration.as_millis(), "deferring tags");
@@ -285,7 +285,7 @@ impl<B, W> Runner<B, W> {
     ///
     /// Marks tags to be delayed for the specified duration. Deferred tags will not
     /// be processed until the delay expires.
-    #[cfg_attr(feature = "trace", tracing::instrument(skip(self), fields(query = ?query, owner = ?owner, duration_ms = duration.as_millis()), level = "trace"))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self), fields(query = ?query, owner = ?owner, duration_ms = duration.as_millis()), level = "trace"))]
     fn apply_defer(&self, query: TagQuery, owner: Tag, duration: Duration) {
         let minimum = Instant::now() + duration;
         let mut defer = self.defer.lock().expect("Runner defer mutex poisoned");
@@ -311,9 +311,9 @@ impl<B, W> Runner<B, W> {
     ///
     /// This functionality is not yet implemented. Currently this method does nothing
     /// and always returns `Ok(())`. Full abort functionality will be added in a future version.
-    #[cfg_attr(feature = "trace", tracing::instrument(skip(self), fields(query = ?query, owner = ?owner), level = "trace"))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self), fields(query = ?query, owner = ?owner), level = "trace"))]
     fn apply_abort(&self, query: TagQuery, owner: Tag) -> Result<()> {
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         tracing::warn!(target: TARGET, "abort functionality not yet implemented");
 
         let _ = query;

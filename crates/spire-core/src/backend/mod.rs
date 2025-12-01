@@ -13,8 +13,8 @@
 //!
 //! Concrete backend implementations are provided in separate crates:
 //!
-//! - `spire-reqwest` - HTTP client backend using reqwest/Tower
-//! - `spire-fantoccini` - WebDriver browser automation backend
+//! - `spire-reqwest` - HTTP client backend using Reqwest/Tower
+//! - `spire-thirtyfour` - WebDriver browser automation backend
 //!
 //! # Utilities
 //!

@@ -230,9 +230,9 @@ where
     }
 
     #[inline]
-    #[cfg_attr(feature = "trace", tracing::instrument(skip_all, level = "trace"))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip_all, level = "trace"))]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         tracing::trace!("router calling inner tag router");
 
         // Clone the Arc to get access to the inner TagRouter

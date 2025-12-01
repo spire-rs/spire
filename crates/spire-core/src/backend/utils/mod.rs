@@ -44,16 +44,16 @@ mod debug;
 #[cfg(feature = "metric")]
 #[cfg_attr(docsrs, doc(cfg(feature = "metric")))]
 mod metric;
-#[cfg(feature = "trace")]
-#[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
+#[cfg(feature = "tracing")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
 mod trace;
 
 pub use debug::Noop;
 #[cfg(feature = "metric")]
 #[cfg_attr(docsrs, doc(cfg(feature = "metric")))]
 pub use metric::{Metric, MetricLayer};
-#[cfg(feature = "trace")]
-#[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
+#[cfg(feature = "tracing")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
 pub use trace::{Trace, TraceLayer};
 
 pub mod futures {
@@ -64,8 +64,8 @@ pub mod futures {
     #[cfg(feature = "metric")]
     #[cfg_attr(docsrs, doc(cfg(feature = "metric")))]
     pub use crate::backend::utils::metric::MetricFuture;
-    #[cfg(feature = "trace")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
+    #[cfg(feature = "tracing")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
     pub use crate::backend::utils::trace::TraceFuture;
 }
 
@@ -92,7 +92,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg(feature = "trace")]
+    #[cfg(feature = "tracing")]
     #[tracing_test::traced_test]
     async fn noop_trace() -> Result<()> {
         use crate::backend::utils::Trace;

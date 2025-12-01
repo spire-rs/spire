@@ -5,7 +5,8 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::{future::Map, FutureExt};
+use futures::FutureExt;
+use futures::future::Map;
 use pin_project_lite::pin_project;
 use tower::Service;
 
@@ -61,9 +62,9 @@ where
     H: Handler<C, V, S>,
     S: Clone,
 {
-    type Response = Signal;
     type Error = Infallible;
     type Future = HandlerFuture<H::Future>;
+    type Response = Signal;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -71,9 +72,9 @@ where
     }
 
     #[inline]
-    #[cfg_attr(feature = "trace", tracing::instrument(skip_all, level = "trace"))]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip_all, level = "trace"))]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
-        #[cfg(feature = "trace")]
+        #[cfg(feature = "tracing")]
         tracing::trace!("calling handler");
 
         let handler = self.handler.clone();
@@ -137,9 +138,9 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::Client;
     use crate::backend::Worker;
     use crate::handler::HandlerService;
-    use crate::Client;
 
     fn service<B: Send + 'static>() -> impl Worker<B> {
         async fn handler() {}

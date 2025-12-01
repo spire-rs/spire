@@ -10,7 +10,7 @@ use http_body::Body;
 use pin_project_lite::pin_project;
 use tower::{Layer, Service};
 
-#[cfg(feature = "trace")]
+#[cfg(feature = "tracing")]
 use crate::TRACING_TARGET_BACKEND as TARGET;
 use crate::context::{Context as Cx, Request, Response, Signal, Task};
 use crate::dataset::Dataset;

@@ -3,13 +3,14 @@
 [workspace]
 resolver = "2"
 members = [
-    "./spire",
-    "./spire-*",
+    "./crates/spire",
+    "./crates/spire-*",
+    "./examples/*",
 ]
 
 default-members = [
-    "./spire",
-    "./spire-*",
+    "./crates/spire",
+    "./crates/spire-*",
 ]
 
 [workspace.package]
@@ -26,11 +27,11 @@ documentation = "https://docs.rs/spire"
 
 [workspace.dependencies]
 # Workspace crates
-spire = { path = "./spire", version = "0.2.0" }
-spire-core = { path = "./spire-core", version = "0.2.0" }
-spire-macros = { path = "./spire-macros", version = "0.2.0" }
-spire-reqwest = { path = "./spire-reqwest", version = "0.2.0" }
-spire-thirtyfour = { path = "./spire-thirtyfour", version = "0.2.0" }
+spire = { path = "./crates/spire", version = "0.2.0" }
+spire-core = { path = "./crates/spire-core", version = "0.2.0" }
+spire-macros = { path = "./crates/spire-macros", version = "0.2.0" }
+spire-reqwest = { path = "./crates/spire-reqwest", version = "0.2.0" }
+spire-thirtyfour = { path = "./crates/spire-thirtyfour", version = "0.2.0" }
 
 # Async runtime
 tokio = { version = "1.39", features = ["rt-multi-thread", "macros"] }
@@ -67,7 +68,11 @@ scraper = { version = "0.19" }
 
 # Tracing
 tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3" }
 tracing-test = { version = "0.2" }
+
+# Time handling
+jiff = { version = "0.1" }
 
 # Proc macros
 proc-macro2 = { version = "1.0" }

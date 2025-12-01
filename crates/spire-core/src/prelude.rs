@@ -14,8 +14,8 @@ pub use crate::async_trait;
 #[cfg_attr(docsrs, doc(cfg(feature = "metric")))]
 pub use crate::backend::utils::Metric;
 pub use crate::backend::utils::Noop;
-#[cfg(feature = "trace")]
-#[cfg_attr(docsrs, doc(cfg(feature = "trace")))]
+#[cfg(feature = "tracing")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tracing")))]
 pub use crate::backend::utils::Trace;
 // Backend traits
 pub use crate::backend::{Backend, Client as BackendClient, Worker};

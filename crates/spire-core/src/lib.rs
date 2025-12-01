@@ -24,9 +24,9 @@ pub use crate::process::Client;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Tracing target for runner-related events.
-#[cfg(feature = "trace")]
+#[cfg(feature = "tracing")]
 pub(crate) const TRACING_TARGET_RUNNER: &str = "spire_core::runner";
 
 /// Tracing target for backend-related events.
-#[cfg(feature = "trace")]
+#[cfg(feature = "tracing")]
 pub(crate) const TRACING_TARGET_BACKEND: &str = "spire_core::backend";
