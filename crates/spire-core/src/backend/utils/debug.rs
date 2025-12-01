@@ -7,7 +7,7 @@ use futures::FutureExt;
 use futures::future::BoxFuture;
 use tower::Service;
 
-use crate::context::{Body, Context as Cx, IntoSignal, Request, Response, Signal};
+use crate::context::{Body, Context as Cx, FlowControl, IntoFlowControl, Request, Response};
 use crate::{Error, Result};
 
 /// No-op `tower::`[`Service`] used for testing and debugging.
@@ -67,12 +67,12 @@ impl Noop {
     ///
     /// # Parameters
     ///
-    /// - `Some(true)` - Always returns [`Signal::Continue`] without resolving requests
-    /// - `Some(false)` - Always returns [`Signal::Skip`] without resolving requests
-    /// - `None` - Resolves requests and returns [`Signal::Continue`] on success
+    /// - `Some(true)` - Always returns [`FlowControl::Continue`] without resolving requests
+    /// - `Some(false)` - Always returns [`FlowControl::Skip`] without resolving requests
+    /// - `None` - Resolves requests and returns [`FlowControl::Continue`] on success
     ///
-    /// [`Signal::Continue`]: crate::context::Signal::Continue
-    /// [`Signal::Skip`]: crate::context::Signal::Skip
+    /// [`FlowControl::Continue`]: crate::context::FlowControl::Continue
+    /// [`FlowControl::Skip`]: crate::context::FlowControl::Skip
     pub const fn new(always: Option<bool>) -> Self {
         Self { always }
     }
@@ -122,8 +122,8 @@ where
     C::Future: Send,
 {
     type Error = Infallible;
-    type Future = BoxFuture<'static, Result<Signal, Infallible>>;
-    type Response = Signal;
+    type Future = BoxFuture<'static, Result<FlowControl, Infallible>>;
+    type Response = FlowControl;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -133,18 +133,22 @@ where
     #[inline]
     fn call(&mut self, cx: Cx<C>) -> Self::Future {
         if let Some(always) = self.always {
-            let signal = if always {
-                Signal::Continue
+            let flow_control = if always {
+                FlowControl::Continue
             } else {
-                Signal::Skip
+                FlowControl::Skip
             };
 
-            return ready(Ok(signal)).boxed();
+            return ready(Ok(flow_control)).boxed();
         }
 
         let fut = async move {
             let response = cx.resolve().await;
-            Ok(response.map_or_else(IntoSignal::into_signal, |_| Signal::Continue))
+            Ok(
+                response.map_or_else(IntoFlowControl::into_flow_control, |_| {
+                    FlowControl::Continue
+                }),
+            )
         };
 
         fut.boxed()

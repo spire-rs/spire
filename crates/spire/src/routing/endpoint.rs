@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 
 use tower::{Layer, Service};
 
-use crate::context::{Context as Cx, IntoSignal, Signal};
+use crate::context::{Context as Cx, FlowControl, IntoFlowControl};
 use crate::handler::Handler;
 use crate::routing::{MakeRoute, Route, RouteFuture};
 
@@ -19,7 +19,7 @@ impl<C, S> Endpoint<C, S> {
     pub fn from_service<T>(service: T) -> Self
     where
         T: Service<Cx<C>, Error = Infallible> + Clone + Send + 'static,
-        T::Response: IntoSignal + 'static,
+        T::Response: IntoFlowControl + 'static,
         T::Future: Send + 'static,
     {
         Self::Route(Route::new(service))
@@ -42,7 +42,7 @@ impl<C, S> Endpoint<C, S> {
         S: Clone + Send + 'static,
         L: Layer<Route<C, Infallible>> + Clone + Send + 'static,
         L::Service: Service<Cx<C>> + Clone + Send + 'static,
-        <L::Service as Service<Cx<C>>>::Response: IntoSignal + 'static,
+        <L::Service as Service<Cx<C>>>::Response: IntoFlowControl + 'static,
         <L::Service as Service<Cx<C>>>::Error: Into<Infallible> + 'static,
         <L::Service as Service<Cx<C>>>::Future: Send + 'static,
     {
@@ -60,9 +60,9 @@ impl<C, S> Endpoint<C, S> {
     }
 }
 
-/// Ignores all incoming tasks by returning [`Signal::Continue`].
-async fn default_fallback() -> Signal {
-    Signal::Continue
+/// Ignores all incoming tasks by returning [`FlowControl::Continue`].
+async fn default_fallback() -> FlowControl {
+    FlowControl::Continue
 }
 
 impl<C> Default for Endpoint<C, ()>
@@ -96,7 +96,7 @@ impl<C, S> fmt::Debug for Endpoint<C, S> {
 impl<C> Service<Cx<C>> for Endpoint<C, ()> {
     type Error = Infallible;
     type Future = RouteFuture<C, Infallible>;
-    type Response = Signal;
+    type Response = FlowControl;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

@@ -7,16 +7,15 @@ use std::fmt;
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 
-use tower::util::{BoxCloneService, Oneshot};
-use tower::util::{MapErrLayer, MapResponseLayer};
+use tower::util::{BoxCloneService, MapErrLayer, MapResponseLayer, Oneshot};
 use tower::{Layer, Service, ServiceExt};
 
-use crate::context::{Context as Cx, IntoSignal, Signal};
+use crate::context::{Context as Cx, FlowControl, IntoFlowControl};
 use crate::routing::RouteFuture;
 
 /// Provides type-erasure for the underlying `tower::`[`Service`].
 pub struct Route<C, E> {
-    inner: Mutex<BoxCloneService<Cx<C>, Signal, E>>,
+    inner: Mutex<BoxCloneService<Cx<C>, FlowControl, E>>,
 }
 
 impl<C, E> Route<C, E> {
@@ -24,11 +23,11 @@ impl<C, E> Route<C, E> {
     pub fn new<T>(svc: T) -> Self
     where
         T: Service<Cx<C>, Error = E> + Clone + Send + 'static,
-        T::Response: IntoSignal + 'static,
+        T::Response: IntoFlowControl + 'static,
         T::Future: Send + 'static,
     {
         let inner = Mutex::new(BoxCloneService::new(
-            svc.map_response(IntoSignal::into_signal),
+            svc.map_response(IntoFlowControl::into_flow_control),
         ));
 
         Self { inner }
@@ -37,7 +36,10 @@ impl<C, E> Route<C, E> {
     /// Calls the underlying `tower::`[`Service`] with a provided [`Context`].
     ///
     /// [`Context`]: Cx
-    fn oneshot_inner(&mut self, cx: Cx<C>) -> Oneshot<BoxCloneService<Cx<C>, Signal, E>, Cx<C>> {
+    fn oneshot_inner(
+        &mut self,
+        cx: Cx<C>,
+    ) -> Oneshot<BoxCloneService<Cx<C>, FlowControl, E>, Cx<C>> {
         let svc = self.inner.lock().unwrap();
         svc.clone().oneshot(cx)
     }
@@ -47,14 +49,14 @@ impl<C, E> Route<C, E> {
     where
         L: Layer<Self> + Clone + Send + 'static,
         L::Service: Service<Cx<C>> + Clone + Send + 'static,
-        <L::Service as Service<Cx<C>>>::Response: IntoSignal + 'static,
+        <L::Service as Service<Cx<C>>>::Response: IntoFlowControl + 'static,
         <L::Service as Service<Cx<C>>>::Error: Into<E2> + 'static,
         <L::Service as Service<Cx<C>>>::Future: Send + 'static,
         E2: 'static,
     {
         let layer = (
             MapErrLayer::new(Into::into),
-            MapResponseLayer::new(IntoSignal::into_signal),
+            MapResponseLayer::new(IntoFlowControl::into_flow_control),
             layer,
         );
 
@@ -79,9 +81,9 @@ impl<C, E> fmt::Debug for Route<C, E> {
 }
 
 impl<C, E> Service<Cx<C>> for Route<C, E> {
-    type Response = Signal;
     type Error = E;
     type Future = RouteFuture<C, E>;
+    type Response = FlowControl;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

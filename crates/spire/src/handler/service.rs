@@ -10,7 +10,7 @@ use futures::future::Map;
 use pin_project_lite::pin_project;
 use tower::Service;
 
-use crate::context::{Context as Cx, Signal};
+use crate::context::{Context as Cx, FlowControl};
 use crate::handler::Handler;
 
 /// Implementation of a `tower::`[`Service`] for a [`Handler`].
@@ -64,7 +64,7 @@ where
 {
     type Error = Infallible;
     type Future = HandlerFuture<H::Future>;
-    type Response = Signal;
+    type Response = FlowControl;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -103,7 +103,7 @@ pin_project! {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct HandlerFuture<F>
     where
-        F: Future<Output = Signal>
+        F: Future<Output = FlowControl>
     {
         #[pin]
         future: HandlerFut<F>,
@@ -111,11 +111,11 @@ pin_project! {
 }
 
 /// Underlying [`HandlerFuture`] type.
-type HandlerFut<F> = Map<F, fn(Signal) -> Result<Signal, Infallible>>;
+type HandlerFut<F> = Map<F, fn(FlowControl) -> Result<FlowControl, Infallible>>;
 
 impl<F> HandlerFuture<F>
 where
-    F: Future<Output = Signal>,
+    F: Future<Output = FlowControl>,
 {
     /// Creates a new [`HandlerFuture`].
     pub fn new(future: F) -> Self {
@@ -126,9 +126,9 @@ where
 
 impl<F> Future for HandlerFuture<F>
 where
-    F: Future<Output = Signal>,
+    F: Future<Output = FlowControl>,
 {
-    type Output = Result<Signal, Infallible>;
+    type Output = Result<FlowControl, Infallible>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();

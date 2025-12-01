@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 use tower::{Layer, Service};
 
-use crate::context::{Context as Cx, IntoSignal};
+use crate::context::{Context as Cx, IntoFlowControl};
 use crate::handler::Handler;
 use crate::routing::Route;
 
@@ -49,7 +49,7 @@ impl<C, S, E> MakeRoute<C, S, E> {
         E: 'static,
         L: Layer<Route<C, E>> + Clone + Send + 'static,
         L::Service: Service<Cx<C>> + Clone + Send + 'static,
-        <L::Service as Service<Cx<C>>>::Response: IntoSignal + 'static,
+        <L::Service as Service<Cx<C>>>::Response: IntoFlowControl + 'static,
         <L::Service as Service<Cx<C>>>::Error: Into<E2> + 'static,
         <L::Service as Service<Cx<C>>>::Future: Send + 'static,
         E2: 'static,

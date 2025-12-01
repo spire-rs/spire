@@ -3,6 +3,7 @@
 //! This module provides extensions to HTTP requests for managing routing tags
 //! and tracking request depth in recursive scraping scenarios.
 
+use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
 use http::request::Builder;
@@ -40,7 +41,7 @@ pub enum Tag {
     #[default]
     Fallback,
     /// Unique identifier used for routing.
-    Sequence(String),
+    Sequence(Cow<'static, str>),
     /// Unique identifier used for routing.
     Rehash(u64),
 }
@@ -51,17 +52,22 @@ impl Tag {
     pub const fn is_fallback(&self) -> bool {
         matches!(self, Self::Fallback)
     }
+
+    /// Creates a new [`Tag`] from a static string slice.
+    pub const fn from_static(value: &'static str) -> Self {
+        Self::Sequence(Cow::Borrowed(value))
+    }
 }
 
 impl From<&str> for Tag {
     fn from(value: &str) -> Self {
-        value.to_owned().into()
+        Self::Sequence(Cow::Owned(value.to_owned()))
     }
 }
 
 impl From<String> for Tag {
     fn from(value: String) -> Self {
-        Self::Sequence(value)
+        Self::Sequence(Cow::Owned(value))
     }
 }
 
@@ -101,8 +107,51 @@ impl Default for Depth {
     }
 }
 
-/// Extension trait for `http::`[`Request`].
-pub trait Task {
+/// Wrapper around `http::`[`Request`] with additional functionality.
+#[derive(derive_more::Deref, derive_more::DerefMut)]
+pub struct Task {
+    #[deref]
+    #[deref_mut]
+    inner: Request,
+}
+
+impl Task {
+    /// Creates a new Task from a Request.
+    pub fn new(request: Request) -> Self {
+        Self { inner: request }
+    }
+
+    /// Returns a reference to the attached [`Tag`].
+    pub fn try_tag(&self) -> Option<&Tag> {
+        self.extensions().get()
+    }
+
+    /// Returns a reference to the attached [`Tag`], [`Tag::Fallback`] otherwise.
+    pub fn tag(&self) -> &Tag {
+        self.try_tag().unwrap_or(&Tag::Fallback)
+    }
+
+    /// Returns a recursive depth of this [`Request`].
+    pub fn depth(&self) -> usize {
+        let depth = self.extensions().get::<Depth>();
+        depth.unwrap_or(&Depth::MIN).get()
+    }
+}
+
+impl From<Request> for Task {
+    fn from(request: Request) -> Self {
+        Self::new(request)
+    }
+}
+
+impl std::fmt::Display for Task {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.method(), self.uri())
+    }
+}
+
+/// Extension trait for `http::`[`Request`] to provide Task functionality.
+pub trait TaskExt {
     /// Returns a reference to the attached [`Tag`].
     fn try_tag(&self) -> Option<&Tag>;
 
@@ -113,7 +162,7 @@ pub trait Task {
     fn depth(&self) -> usize;
 }
 
-impl<B> Task for Request<B> {
+impl<B> TaskExt for Request<B> {
     fn try_tag(&self) -> Option<&Tag> {
         self.extensions().get()
     }
@@ -153,26 +202,38 @@ impl TaskBuilder for Builder {
 mod test {
     use http::request::Builder;
 
-    use crate::context::{Body, Request, Tag, Task, TaskBuilder};
+    use crate::context::{Body, Tag, Task, TaskBuilder, TaskExt};
 
-    fn make_request(f: fn(Builder) -> Builder) -> Request {
+    fn make_task(f: fn(Builder) -> Builder) -> Task {
         let request = Builder::new().uri("https://example.com/");
-        f(request).body(Body::default()).unwrap()
+        let request = f(request).body(Body::default()).unwrap();
+        Task::new(request)
     }
 
     #[test]
     fn with_tag() {
-        let request = make_request(|x| x);
-        assert_eq!(request.tag(), &Tag::Fallback);
-        let request = make_request(|x| x.tag(""));
-        assert_eq!(request.tag(), &"".into());
+        let task = make_task(|x| x);
+        assert_eq!(task.tag(), &Tag::Fallback);
+        let task = make_task(|x| x.tag(""));
+        assert_eq!(task.tag(), &"".into());
     }
 
     #[test]
     fn with_depth() {
-        let request = make_request(|x| x);
+        let task = make_task(|x| x);
+        assert_eq!(task.depth(), 1);
+        let task = make_task(|x| x.depth(2));
+        assert_eq!(task.depth(), 2);
+    }
+
+    #[test]
+    fn task_ext_on_request() {
+        let request = Builder::new()
+            .uri("https://example.com/")
+            .tag("test")
+            .body(Body::default())
+            .unwrap();
+        assert_eq!(request.tag(), &Tag::from("test"));
         assert_eq!(request.depth(), 1);
-        let request = make_request(|x| x.depth(2));
-        assert_eq!(request.depth(), 2);
     }
 }

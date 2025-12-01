@@ -49,7 +49,7 @@ use crate::dataset::Dataset;
 /// ```
 ///
 /// [`boxed_clone`]: crate::dataset::DatasetExt::boxed_clone
-/// [`BoxDataset`]: crate::dataset::BoxDataset
+/// [`BoxDataset`]: crate::dataset::utils::BoxDataset
 #[must_use]
 pub struct BoxCloneDataset<T, E> {
     dataset: Box<dyn CloneBoxDataset<T, Error = E>>,

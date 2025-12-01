@@ -159,9 +159,4 @@ mod test {
         let body = Full::new(Bytes::new());
         let _ = Body::new(body);
     }
-
-    #[test]
-    pub fn stream() {
-        // Streaming body support will be added when needed for specific use cases.
-    }
 }

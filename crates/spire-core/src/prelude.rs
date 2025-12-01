@@ -21,8 +21,8 @@ pub use crate::backend::utils::Trace;
 pub use crate::backend::{Backend, Client as BackendClient, Worker};
 // Context types
 pub use crate::context::{
-    Body, Context, Depth, IntoSignal, Request, RequestQueue, Response, Signal, Tag, TagQuery, Task,
-    TaskBuilder,
+    Body, Context, Depth, FlowControl, IntoFlowControl, Request, RequestQueue, Response, Tag,
+    TagQuery, Task, TaskBuilder, TaskExt,
 };
 // Dataset types
 pub use crate::dataset::{

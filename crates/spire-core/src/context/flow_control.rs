@@ -1,6 +1,6 @@
-//! Signal-based flow control for web scraping tasks.
+//! FlowControl-based flow control for web scraping tasks.
 //!
-//! This module provides the [`Signal`] type for controlling task execution flow,
+//! This module provides the [`FlowControl`] type for controlling task execution flow,
 //! including success/failure handling, waiting, and aborting tasks based on tags.
 
 use std::convert::Infallible;
@@ -9,10 +9,10 @@ use std::time::Duration;
 use crate::context::Tag;
 use crate::{BoxError, Error};
 
-/// Defines a way to select or filter [`Tag`]s for signal operations.
+/// Defines a way to select or filter [`Tag`]s for flow control operations.
 ///
-/// Used with [`Signal`] variants like [`Signal::Wait`], [`Signal::Hold`], and [`Signal::Fail`]
-/// to specify which tagged requests should be affected by the signal.
+/// Used with [`FlowControl`] variants like [`FlowControl::Wait`], [`FlowControl::Hold`], and [`FlowControl::Fail`]
+/// to specify which tagged requests should be affected by the flow control.
 ///
 /// # Examples
 ///
@@ -73,7 +73,7 @@ impl TagQuery {
 /// [`ControlFlow`]: std::ops::ControlFlow
 #[must_use]
 #[derive(Debug, Default)]
-pub enum Signal {
+pub enum FlowControl {
     /// Task succeeded, immediately proceed with another task.
     #[default]
     Continue,
@@ -89,10 +89,10 @@ pub enum Signal {
     Fail(TagQuery, BoxError),
 }
 
-impl Signal {
-    /// Creates a new [`Signal`] from the boxable error.
+impl FlowControl {
+    /// Creates a new [`FlowControl`] from the boxable error.
     pub fn error(error: impl Into<BoxError>) -> Self {
-        error.into().into_signal()
+        error.into().into_flow_control()
     }
 
     /// Returns the [`Duration`] if applicable, default otherwise.
@@ -114,75 +114,78 @@ impl Signal {
     }
 }
 
-/// Trait for generating [`Signal`]s.
-pub trait IntoSignal {
-    /// Transforms `self` into the [`Signal`].
-    fn into_signal(self) -> Signal;
+/// Trait for generating [`FlowControl`]s.
+pub trait IntoFlowControl {
+    /// Transforms `self` into the [`FlowControl`].
+    fn into_flow_control(self) -> FlowControl;
 }
 
-impl IntoSignal for Signal {
+impl IntoFlowControl for FlowControl {
     #[inline]
-    fn into_signal(self) -> Signal {
+    fn into_flow_control(self) -> FlowControl {
         self
     }
 }
 
-impl IntoSignal for () {
+impl IntoFlowControl for () {
     #[inline]
-    fn into_signal(self) -> Signal {
-        Signal::Continue
+    fn into_flow_control(self) -> FlowControl {
+        FlowControl::Continue
     }
 }
 
-impl IntoSignal for Infallible {
+impl IntoFlowControl for Infallible {
     #[inline]
-    fn into_signal(self) -> Signal {
-        Signal::Continue
+    fn into_flow_control(self) -> FlowControl {
+        FlowControl::Continue
     }
 }
 
-impl IntoSignal for Duration {
+impl IntoFlowControl for Duration {
     #[inline]
-    fn into_signal(self) -> Signal {
-        Signal::Wait(TagQuery::default(), self)
+    fn into_flow_control(self) -> FlowControl {
+        FlowControl::Wait(TagQuery::default(), self)
     }
 }
 
-impl IntoSignal for BoxError {
+impl IntoFlowControl for BoxError {
     #[inline]
-    fn into_signal(self) -> Signal {
-        Error::from_boxed(self).into_signal()
+    fn into_flow_control(self) -> FlowControl {
+        Error::from_boxed(self).into_flow_control()
     }
 }
 
-impl<T> IntoSignal for Option<T>
+impl<T> IntoFlowControl for Option<T>
 where
-    T: IntoSignal,
+    T: IntoFlowControl,
 {
-    fn into_signal(self) -> Signal {
-        self.map_or_else(|| ().into_signal(), IntoSignal::into_signal)
+    fn into_flow_control(self) -> FlowControl {
+        self.map_or_else(
+            || ().into_flow_control(),
+            IntoFlowControl::into_flow_control,
+        )
     }
 }
 
-impl<T, E> IntoSignal for Result<T, E>
+impl<T, E> IntoFlowControl for Result<T, E>
 where
-    T: IntoSignal,
-    E: IntoSignal,
+    T: IntoFlowControl,
+    E: IntoFlowControl,
 {
-    fn into_signal(self) -> Signal {
-        fn flip(x: Signal) -> Signal {
+    fn into_flow_control(self) -> FlowControl {
+        fn flip(x: FlowControl) -> FlowControl {
             match x {
-                Signal::Continue => Signal::Skip,
-                Signal::Skip => Signal::Continue,
-                Signal::Wait(q, x) => Signal::Hold(q, x),
-                Signal::Hold(q, x) => Signal::Wait(q, x),
-                Signal::Fail(q, x) => Signal::Fail(q, x),
+                FlowControl::Continue => FlowControl::Skip,
+                FlowControl::Skip => FlowControl::Continue,
+                FlowControl::Wait(q, x) => FlowControl::Hold(q, x),
+                FlowControl::Hold(q, x) => FlowControl::Wait(q, x),
+                FlowControl::Fail(q, x) => FlowControl::Fail(q, x),
             }
         }
 
         match self {
-            Ok(x) => x.into_signal(),
-            Err(x) => flip(x.into_signal()),
+            Ok(x) => x.into_flow_control(),
+            Err(x) => flip(x.into_flow_control()),
         }
     }
 }
@@ -191,28 +194,28 @@ where
 mod test {
     use std::time::Duration;
 
-    use crate::context::{IntoSignal, Signal};
+    use crate::context::{FlowControl, IntoFlowControl};
 
     #[test]
     fn basic() {
-        assert!(matches!(().into_signal(), Signal::Continue));
+        assert!(matches!(().into_flow_control(), FlowControl::Continue));
         let data = Duration::default();
-        assert!(matches!(data.into_signal(), Signal::Wait(..)));
+        assert!(matches!(data.into_flow_control(), FlowControl::Wait(..)));
     }
 
     #[test]
     fn with_option() {
         let flip: Option<Duration> = Some(Duration::default());
-        assert!(matches!(flip.into_signal(), Signal::Wait(..)));
+        assert!(matches!(flip.into_flow_control(), FlowControl::Wait(..)));
         let flip: Option<Duration> = None;
-        assert!(matches!(flip.into_signal(), Signal::Continue));
+        assert!(matches!(flip.into_flow_control(), FlowControl::Continue));
     }
 
     #[test]
     fn with_result() {
         let flip: Result<Duration, Duration> = Ok(Duration::default());
-        assert!(matches!(flip.into_signal(), Signal::Wait(..)));
+        assert!(matches!(flip.into_flow_control(), FlowControl::Wait(..)));
         let flip: Result<Duration, Duration> = Err(Duration::default());
-        assert!(matches!(flip.into_signal(), Signal::Hold(..)));
+        assert!(matches!(flip.into_flow_control(), FlowControl::Hold(..)));
     }
 }

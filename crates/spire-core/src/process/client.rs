@@ -20,7 +20,7 @@ use crate::{Error, Result};
 /// - Request queue processing
 /// - Dataset storage for scraped data
 /// - Concurrency control
-/// - Signal-based flow control
+/// - FlowControl-based flow control
 ///
 /// # Type Parameters
 ///
@@ -69,7 +69,7 @@ where
     }
 
     /// Processes [`Request`]s with a provided [`Worker`] until the [`RequestQueue`] is empty
-    /// or the processing is aborted with a [`Signal`].
+    /// or the processing is aborted with a [`FlowControl`].
     ///
     /// This is the main execution method that processes all queued requests concurrently
     /// according to the configured concurrency limit.
@@ -82,7 +82,7 @@ where
     ///
     /// Returns an error if:
     /// - The backend fails to create a client
-    /// - A request fails with a [`Signal::Fail`]
+    /// - A request fails with a [`FlowControl::Fail`]
     /// - The request queue encounters an error
     ///
     /// # Examples
@@ -98,8 +98,8 @@ where
     /// ```
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
-    /// [`Signal`]: crate::context::Signal
-    /// [`Signal::Fail`]: crate::context::Signal::Fail
+    /// [`FlowControl`]: crate::context::FlowControl
+    /// [`FlowControl::Fail`]: crate::context::FlowControl::Fail
     pub async fn run(&self) -> Result<usize> {
         self.inner.run().await
     }

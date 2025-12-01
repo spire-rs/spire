@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 use pin_project_lite::pin_project;
 use tower::util::{BoxCloneService, Oneshot};
 
-use crate::context::{Context as Cx, Signal};
+use crate::context::{Context as Cx, FlowControl};
 
 pin_project! {
     /// Response [`Future`] for [`Route`].
@@ -19,13 +19,13 @@ pin_project! {
 }
 
 /// Underlying [`Future`] type.
-type Fut<C, E> = Oneshot<BoxCloneService<Cx<C>, Signal, E>, Cx<C>>;
+type Fut<C, E> = Oneshot<BoxCloneService<Cx<C>, FlowControl, E>, Cx<C>>;
 
 pin_project! {
     #[project = RouteFutureKindProj]
     enum RouteFutureKind<C, E> {
         Future { #[pin] fut: Fut<C, E>, },
-        Signal { signal: Option<Signal>, },
+        FlowControl { flow_control: Option<FlowControl>, },
     }
 }
 
@@ -44,22 +44,22 @@ impl<C, E> fmt::Debug for RouteFuture<C, E> {
 }
 
 impl<C, E> Future for RouteFuture<C, E> {
-    type Output = Result<Signal, E>;
+    type Output = Result<FlowControl, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
 
-        let signal = match this.kind.project() {
+        let flow_control = match this.kind.project() {
             RouteFutureKindProj::Future { fut } => match fut.poll(cx) {
                 Poll::Ready(Ok(x)) => x,
                 Poll::Ready(Err(x)) => return Poll::Ready(Err(x)),
                 Poll::Pending => return Poll::Pending,
             },
-            RouteFutureKindProj::Signal { signal } => signal
+            RouteFutureKindProj::FlowControl { flow_control } => flow_control
                 .take()
                 .expect("future should not be polled after completion"),
         };
 
-        Poll::Ready(Ok(signal))
+        Poll::Ready(Ok(flow_control))
     }
 }

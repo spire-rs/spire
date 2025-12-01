@@ -52,12 +52,12 @@
 //! [`BoxCloneDataset`]: crate::dataset::utils::BoxCloneDataset
 
 mod data;
-mod sink;
-mod stream;
+mod data_sink;
+mod data_stream;
 
 pub use data::Data;
-pub use sink::DataSink;
-pub use stream::DataStream;
+pub use data_sink::DataSink;
+pub use data_stream::DataStream;
 
 #[cfg(test)]
 mod test {

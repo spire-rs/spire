@@ -22,34 +22,7 @@ Core types and traits for the spire web scraping framework.
 
 `spire-core` provides the foundational abstractions and types used throughout the spire ecosystem. This crate contains the core traits, error types, context structures, and dataset interfaces that power spire's flexible architecture.
 
-## Key Components
 
-### Backend Traits
-
-- **`Backend`** - Trait for implementing custom backends (HTTP clients, browser automation, etc.)
-- **`Client`** - Trait for executing requests and handling responses
-- **`Worker`** - Trait for managing pooled resources
-
-### Context Types
-
-- **`Context`** - Request/response context that flows through the system
-- **`Request`** - Represents a scraping request with URI and metadata
-- **`Response`** - Backend-agnostic response wrapper
-- **`Signal`** - Flow control signals (Continue, Defer, Abort)
-- **`Tag`** - Type-safe routing tags
-
-### Dataset Traits
-
-- **`Dataset`** - Core trait for data storage and retrieval
-- **`DatasetBulkExt`** - Extension trait for bulk operations
-- **`InMemDataset`** - In-memory dataset implementations (queue, stack, set)
-- **`Data`**, **`DataStream`**, **`DataSink`** - Typed dataset accessors
-
-### Error Handling
-
-- **`Error`** - Unified error type with source chaining
-- **`ErrorKind`** - Error categorization (Http, Dataset, Worker, Backend, etc.)
-- **`Result<T>`** - Type alias for `std::result::Result<T, Error>`
 
 ## Usage
 
@@ -70,7 +43,6 @@ spire-core = "0.2.0"
 ## Feature Flags
 
 - **`tracing`** - Enables tracing support
-- **`trace`** - Enables detailed trace-level instrumentation
 - **`metric`** - Enables metrics collection
 
 ## Example
@@ -82,12 +54,14 @@ use spire_core::backend::{Backend, Client};
 use spire_core::context::{Request, Response};
 use spire_core::Result;
 
+#[derive(Clone)]
 struct MyBackend;
 
+#[async_trait::async_trait]
 impl Backend for MyBackend {
     type Client = MyClient;
     
-    fn connect(&self) -> Result<Self::Client> {
+    async fn connect(&self) -> Result<Self::Client> {
         Ok(MyClient)
     }
 }
@@ -96,7 +70,7 @@ struct MyClient;
 
 #[async_trait::async_trait]
 impl Client for MyClient {
-    async fn send(&self, request: Request) -> Result<Response> {
+    async fn resolve(self, req: Request) -> Result<Response> {
         // Custom request handling
         todo!()
     }

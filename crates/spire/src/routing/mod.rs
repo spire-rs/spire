@@ -13,7 +13,7 @@ pub use route::Route;
 use tag_router::TagRouter;
 use tower::{Layer, Service};
 
-use crate::context::{Context as Cx, IntoSignal, Signal, Tag};
+use crate::context::{Context as Cx, FlowControl, IntoFlowControl, Tag};
 pub use crate::handler::{Handler, HandlerService};
 
 mod endpoint;
@@ -70,7 +70,7 @@ impl<C, S> Router<C, S> {
         C: 'static,
         S: Send + Clone + 'static,
         H: Service<Cx<C>, Error = Infallible> + Clone + Send + 'static,
-        H::Response: IntoSignal + 'static,
+        H::Response: IntoFlowControl + 'static,
         H::Future: Send + 'static,
     {
         let endpoint = Endpoint::from_service(service);
@@ -82,7 +82,7 @@ impl<C, S> Router<C, S> {
     ///
     /// Fallback handler processes all tasks without matching [`Tag`]s.
     ///
-    /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
+    /// Default handler ignores incoming tasks by returning [`FlowControl::Continue`].
     ///
     /// # Panics
     ///
@@ -104,7 +104,7 @@ impl<C, S> Router<C, S> {
     ///
     /// Fallback handler processes all tasks without matching [`Tag`]s.
     ///
-    /// Default handler ignores incoming tasks by returning [`Signal::Continue`].
+    /// Default handler ignores incoming tasks by returning [`FlowControl::Continue`].
     ///
     /// # Panics
     ///
@@ -114,7 +114,7 @@ impl<C, S> Router<C, S> {
         C: 'static,
         S: Send + Clone + 'static,
         H: Service<Cx<C>, Error = Infallible> + Clone + Send + 'static,
-        H::Response: IntoSignal + 'static,
+        H::Response: IntoFlowControl + 'static,
         H::Future: Send + 'static,
     {
         let endpoint = Endpoint::from_service(service);
@@ -149,7 +149,7 @@ impl<C, S> Router<C, S> {
         S: Clone + Send + 'static,
         L: Layer<Route<C, Infallible>> + Clone + Send + 'static,
         L::Service: Service<Cx<C>> + Clone + Send + 'static,
-        <L::Service as Service<Cx<C>>>::Response: IntoSignal + 'static,
+        <L::Service as Service<Cx<C>>>::Response: IntoFlowControl + 'static,
         <L::Service as Service<Cx<C>>>::Error: Into<Infallible> + 'static,
         <L::Service as Service<Cx<C>>>::Future: Send + 'static,
     {
@@ -222,7 +222,7 @@ where
 {
     type Error = Infallible;
     type Future = RouteFuture<C, Infallible>;
-    type Response = Signal;
+    type Response = FlowControl;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

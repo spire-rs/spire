@@ -27,7 +27,7 @@ use crate::dataset::utils::BoxCloneDataset;
 /// let sink = sink_data.into_sink();
 /// ```
 #[must_use]
-#[derive(Clone)]
+#[derive(Clone, derive_more::Deref, derive_more::DerefMut)]
 pub struct Data<T, E = Error>(pub BoxCloneDataset<T, E>)
 where
     T: 'static,

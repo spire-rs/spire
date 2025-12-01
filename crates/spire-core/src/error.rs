@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::time::Duration;
 use std::{fmt, io};
 
-use crate::context::{IntoSignal, Signal, TagQuery};
+use crate::context::{FlowControl, IntoFlowControl, TagQuery};
 
 /// Type alias for a type-erased [`Error`] type.
 ///
@@ -289,19 +289,19 @@ impl From<io::Error> for Error {
     }
 }
 
-impl IntoSignal for Error {
-    fn into_signal(self) -> Signal {
+impl IntoFlowControl for Error {
+    fn into_flow_control(self) -> FlowControl {
         match self.query {
             Some(query) => {
                 let message = if let Some(source) = self.source {
                     source
                 } else {
                     // Convert string message to io::Error which implements std::error::Error
-                    Box::new(io::Error::new(io::ErrorKind::Other, self.message)) as BoxError
+                    Box::new(io::Error::other(self.message)) as BoxError
                 };
-                Signal::Fail(query, message)
+                FlowControl::Fail(query, message)
             }
-            None => Signal::Hold(TagQuery::Owner, Duration::default()),
+            None => FlowControl::Hold(TagQuery::Owner, Duration::default()),
         }
     }
 }

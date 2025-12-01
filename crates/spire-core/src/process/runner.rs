@@ -1,7 +1,7 @@
 //! Internal runner for executing web scraping tasks.
 //!
 //! This module contains the [`Runner`] type which handles the low-level execution
-//! of requests, signal processing, and coordination between the backend and worker.
+//! of requests, flow control processing, and coordination between the backend and worker.
 
 use std::cmp::max;
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ use crate::Result;
 #[cfg(feature = "tracing")]
 use crate::TRACING_TARGET_RUNNER as TARGET;
 use crate::backend::{Backend, Worker};
-use crate::context::{Context, IntoSignal, Request, Signal, Tag, TagQuery, Task};
+use crate::context::{Context, FlowControl, IntoFlowControl, Request, Tag, TagQuery, TaskExt};
 use crate::dataset::{Dataset, DatasetExt, DatasetRegistry};
 
 /// Internal runner that executes web scraping tasks.
@@ -26,7 +26,7 @@ use crate::dataset::{Dataset, DatasetExt, DatasetRegistry};
 /// The `Runner` is responsible for:
 /// - Managing the request queue and datasets
 /// - Coordinating between backend and worker
-/// - Processing signals (wait, hold, fail, etc.)
+/// - Processing flow control (wait, hold, fail, etc.)
 /// - Handling deferred and aborted requests
 /// - Graceful shutdown via cancellation token
 pub struct Runner<B, W> {
@@ -88,7 +88,7 @@ impl<B, W> Runner<B, W> {
     }
 
     /// Repeatedly calls the used [`Backend`] until the [`Request`] queue is empty
-    /// or the stream is aborted with a [`Signal`].
+    /// or the stream is aborted with a [`FlowControl`].
     ///
     /// Returns the total amount of processed `Request`s.
     ///
@@ -195,15 +195,15 @@ impl<B, W> Runner<B, W> {
         tracing::debug!(target: TARGET, "processing request");
 
         match self.call_service(req).await {
-            Ok((signal, owner)) => {
+            Ok((flow_control, owner)) => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!(
                     target: TARGET,
-                    signal = ?signal,
+                    flow_control = ?flow_control,
                     owner = ?owner,
                     "request completed"
                 );
-                self.notify(signal, owner)
+                self.notify(flow_control, owner)
             }
             Err(x) => {
                 #[cfg(feature = "tracing")]
@@ -212,19 +212,19 @@ impl<B, W> Runner<B, W> {
                     error = %x,
                     "request failed"
                 );
-                self.notify(x.into_signal(), Tag::Fallback)
+                self.notify(x.into_flow_control(), Tag::Fallback)
             }
         }
     }
 
     /// Creates the [`Context`] and calls the used [`Backend`] with it.
     ///
-    /// Returns [`Signal`] and owner [`Tag`].
+    /// Returns [`FlowControl`] and owner [`Tag`].
     ///
     /// ## Note
     ///
     /// Deferred request handling is not yet implemented and will be added in a future version.
-    async fn call_service(&self, request: Request) -> Result<(Signal, Tag)>
+    async fn call_service(&self, request: Request) -> Result<(FlowControl, Tag)>
     where
         B: Backend,
         W: Worker<B::Client>,
@@ -235,47 +235,47 @@ impl<B, W> Runner<B, W> {
         #[cfg(feature = "tracing")]
         tracing::trace!(target: TARGET, "acquiring backend client");
 
-        let client: B::Client = self.backend.client().await?;
+        let client: B::Client = self.backend.connect().await?;
 
         #[cfg(feature = "tracing")]
         tracing::trace!(target: TARGET, "invoking worker");
 
         let cx: Context<B::Client> = Context::new(request, client, datasets);
-        let signal = self.service.clone().invoke(cx).await;
+        let flow_control = self.service.clone().invoke(cx).await;
 
-        Ok((signal, owner))
+        Ok((flow_control, owner))
     }
 
-    /// Applies the [`Signal`] to the subsequent [`Request`]s.
+    /// Applies the [`FlowControl`] to the subsequent [`Request`]s.
     ///
     /// # Errors
     ///
     /// Only if the `Request` stream should be aborted.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, signal), fields(owner = ?owner)))]
-    pub fn notify(&self, signal: Signal, owner: Tag) -> Result<()> {
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, flow_control), fields(owner = ?owner)))]
+    pub fn notify(&self, flow_control: FlowControl, owner: Tag) -> Result<()> {
         #[cfg(feature = "tracing")]
-        match &signal {
-            Signal::Wait(query, duration) => {
+        match &flow_control {
+            FlowControl::Wait(query, duration) => {
                 tracing::debug!(target: TARGET, query = ?query, duration_ms = duration.as_millis(), "deferring tags");
             }
-            Signal::Hold(query, duration) => {
+            FlowControl::Hold(query, duration) => {
                 tracing::debug!(target: TARGET, query = ?query, duration_ms = duration.as_millis(), "holding tags");
             }
-            Signal::Fail(query, _) => {
+            FlowControl::Fail(query, _) => {
                 tracing::warn!(target: TARGET, query = ?query, "aborting tags");
             }
-            Signal::Continue => {
+            FlowControl::Continue => {
                 tracing::trace!(target: TARGET, "continuing");
             }
-            Signal::Skip => {
+            FlowControl::Skip => {
                 tracing::trace!(target: TARGET, "skipping");
             }
         }
 
-        match signal {
-            Signal::Wait(x, t) | Signal::Hold(x, t) => self.apply_defer(x, owner, t),
-            Signal::Fail(x, _) => self.apply_abort(x, owner)?,
-            Signal::Continue | Signal::Skip => {}
+        match flow_control {
+            FlowControl::Wait(x, t) | FlowControl::Hold(x, t) => self.apply_defer(x, owner, t),
+            FlowControl::Fail(x, _) => self.apply_abort(x, owner)?,
+            FlowControl::Continue | FlowControl::Skip => {}
         }
 
         Ok(())

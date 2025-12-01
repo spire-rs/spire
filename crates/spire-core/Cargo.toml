@@ -32,7 +32,6 @@ full = ["tracing", "metric"]
 tracing = ["dep:tracing"]
 metric = ["tower/load"]
 
-
 [dependencies]
 # Tower ecosystem
 tower = { workspace = true }
@@ -52,6 +51,7 @@ http-body-util = { workspace = true }
 bytes = { workspace = true }
 pin-project-lite = { workspace = true }
 thiserror = { workspace = true }
+derive_more = { workspace = true }
 
 # Optional: Observability
 tracing = { workspace = true, optional = true }

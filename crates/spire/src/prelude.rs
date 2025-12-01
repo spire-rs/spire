@@ -17,8 +17,8 @@ pub use crate::async_trait;
 // Re-export core spire-core types
 pub use crate::backend::{Backend, Worker};
 pub use crate::context::{
-    Body, Context, Depth, IntoSignal, Request, RequestQueue, Response, Signal, Tag, TagQuery, Task,
-    TaskBuilder,
+    Body, Context, Depth, FlowControl, IntoFlowControl, Request, RequestQueue, Response, Tag,
+    TagQuery, Task, TaskBuilder,
 };
 pub use crate::dataset::future::{Data, DataSink, DataStream};
 pub use crate::dataset::{Dataset, DatasetExt, InMemDataset};

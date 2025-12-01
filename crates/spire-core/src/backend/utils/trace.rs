@@ -12,7 +12,7 @@ use tower::{Layer, Service};
 
 #[cfg(feature = "tracing")]
 use crate::TRACING_TARGET_BACKEND as TARGET;
-use crate::context::{Context as Cx, Request, Response, Signal, Task};
+use crate::context::{Context as Cx, FlowControl, Request, Response, TaskExt};
 use crate::dataset::Dataset;
 use crate::{Error, Result};
 
@@ -26,7 +26,7 @@ use crate::{Error, Result};
 ///
 /// - **Backend**: Client initialization events
 /// - **Client**: Request/response body sizes and HTTP status codes
-/// - **Worker**: Request depth, queue size, and signal outcomes
+/// - **Worker**: Request depth, queue size, and flow control outcomes
 ///
 /// # Requirements
 ///
@@ -168,13 +168,13 @@ where
 
 impl<S, C> Service<Cx<C>> for Trace<S>
 where
-    S: Service<Cx<C>, Response = Signal, Error = Infallible> + Clone + Send + 'static,
+    S: Service<Cx<C>, Response = FlowControl, Error = Infallible> + Clone + Send + 'static,
     C: Service<Request, Response = Response, Error = Error> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Error = Infallible;
     type Future = TraceFuture<S::Response, S::Error>;
-    type Response = Signal;
+    type Response = FlowControl;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -195,7 +195,7 @@ where
                 "handler requested"
             );
 
-            let signal = inner.call(cx).await;
+            let flow_control = inner.call(cx).await;
             tracing::trace!(
                 target: TARGET,
                 // signal = signal.as_str(),
@@ -203,7 +203,7 @@ where
                 "handler responded"
             );
 
-            signal
+            flow_control
         };
 
         TraceFuture::new(fut.boxed())

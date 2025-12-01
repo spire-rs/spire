@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 
 use tower::Service;
 
-use crate::context::{Context as Cx, Signal, Tag, Task};
+use crate::context::{Context as Cx, FlowControl, Tag, TaskExt};
 use crate::routing::{Endpoint, RouteFuture};
 
 /// Routes [`Context`]s according to [`Tag`]s associated with a [`Request`].
@@ -41,7 +41,7 @@ impl<C, S> TagRouter<C, S> {
         }
 
         let tag_copy = tag.clone();
-        if let Some(_) = self.endpoints.insert(tag, endpoint) {
+        if self.endpoints.insert(tag, endpoint).is_some() {
             panic!(
                 "route conflict: tag '{:?}' has already been registered. \
                  Each tag can only be used once per router.",
@@ -147,7 +147,7 @@ where
 {
     type Error = Infallible;
     type Future = RouteFuture<C, Infallible>;
-    type Response = Signal;
+    type Response = FlowControl;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

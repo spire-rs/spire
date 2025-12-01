@@ -4,7 +4,7 @@ use std::pin::Pin;
 use macros::all_the_tuples;
 pub use service::HandlerService;
 
-use crate::context::{Context, IntoSignal, Signal};
+use crate::context::{Context, FlowControl, IntoFlowControl};
 use crate::extract::{FromContext, FromContextRef};
 
 mod macros;
@@ -26,20 +26,20 @@ mod service;
 ///
 /// ### Handlers that aren't functions
 ///
-/// The `Handler` trait is also implemented for `T: IntoSignal`.
-/// That allows easily returning fixed [`Signal`] for routes:
+/// The `Handler` trait is also implemented for `T: IntoFlowControl`.
+/// That allows easily returning fixed [`FlowControl`] for routes:
 ///
 /// ```rust,ignore
 /// # use spire::routing::Router;
-/// # use spire::context::Signal;
+/// # use spire::context::FlowControl;
 ///
 /// let router: Router = Router::new()
-///     .route("main", Signal::Continue);
+///     .route("main", FlowControl::Continue);
 /// ```
 ///
 /// [`Request`]: crate::context::Request
 pub trait Handler<C, V, S>: Clone + Send + Sized + 'static {
-    type Future: Future<Output = Signal>;
+    type Future: Future<Output = FlowControl>;
 
     /// Calls the [`Handler`] with the given [`Context`] and user-provided state `S`.
     fn call(self, cx: Context<C>, state: S) -> Self::Future;
@@ -56,12 +56,12 @@ impl<C, S, F, Fut, Ret> Handler<C, ((),), S> for F
 where
     F: FnOnce() -> Fut + Clone + Send + 'static,
     Fut: Future<Output = Ret> + Send,
-    Ret: IntoSignal,
+    Ret: IntoFlowControl,
 {
-    type Future = Pin<Box<dyn Future<Output = Signal> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = FlowControl> + Send>>;
 
     fn call(self, _cx: Context<C>, _state: S) -> Self::Future {
-        Box::pin(async move { self().await.into_signal() })
+        Box::pin(async move { self().await.into_flow_control() })
     }
 }
 
@@ -72,12 +72,12 @@ mod sealed {
 
 impl<C, S, T> Handler<C, sealed::IntoSignal, S> for T
 where
-    T: IntoSignal + Clone + Send + 'static,
+    T: IntoFlowControl + Clone + Send + 'static,
 {
-    type Future = Ready<Signal>;
+    type Future = Ready<FlowControl>;
 
     fn call(self, _cx: Context<C>, _state: S) -> Self::Future {
-        ready(self.into_signal())
+        ready(self.into_flow_control())
     }
 }
 
@@ -95,28 +95,28 @@ macro_rules! impl_handler {
             S: Send + Sync + 'static,
             F: FnOnce($($ty,)* $last,) -> Fut + Clone + Send + 'static,
             Fut: Future<Output = Ret> + Send,
-            Ret: IntoSignal,
+            Ret: IntoFlowControl,
             $( $ty: FromContextRef<C, S> + Send, )*
             $last: FromContext<C, S, M> + Send,
         {
-            type Future = Pin<Box<dyn Future<Output = Signal> + Send>>;
+            type Future = Pin<Box<dyn Future<Output = FlowControl> + Send>>;
 
             fn call(self, cx: Context<C>, state: S) -> Self::Future {
                 Box::pin(async move {
                     $(
                         let $ty = match $ty::from_context_ref(&cx, &state).await {
                             Ok(value) => value,
-                            Err(rejection) => return rejection.into_signal(),
+                            Err(rejection) => return rejection.into_flow_control(),
                         };
                     )*
 
                     let $last = match $last::from_context(cx, &state).await {
                         Ok(value) => value,
-                        Err(rejection) => return rejection.into_signal(),
+                        Err(rejection) => return rejection.into_flow_control(),
                     };
 
                     let res = self($($ty,)* $last,).await;
-                    res.into_signal()
+                    res.into_flow_control()
                 })
             }
         }

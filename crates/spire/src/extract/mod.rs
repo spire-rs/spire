@@ -41,7 +41,7 @@ use std::convert::Infallible;
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 pub use spire_macros::Select;
 
-use crate::context::{Context, IntoSignal};
+use crate::context::{Context, IntoFlowControl};
 pub use crate::extract::content::{Body, Json, Text};
 pub use crate::extract::context::Client;
 pub use crate::extract::select::{AttrData, AttrTag, Elements, Select};
@@ -72,10 +72,10 @@ mod sealed {
 pub trait FromContextRef<C, S>: Sized {
     /// Extraction failure type.
     ///
-    /// Should be convertable into the [`Signal`].
+    /// Should be convertable into the [`FlowControl`].
     ///
-    /// [`Signal`]: crate::context::Signal
-    type Rejection: IntoSignal;
+    /// [`FlowControl`]: crate::context::FlowControl
+    type Rejection: IntoFlowControl;
 
     /// Extracts the value from the reference to the context.
     async fn from_context_ref(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection>;
@@ -86,10 +86,10 @@ pub trait FromContextRef<C, S>: Sized {
 pub trait FromContext<C, S, V = sealed::ViaRequest>: Sized {
     /// Extraction failure type.
     ///
-    /// Should be convertable into the [`Signal`].
+    /// Should be convertable into the [`FlowControl`].
     ///
-    /// [`Signal`]: crate::context::Signal
-    type Rejection: IntoSignal;
+    /// [`FlowControl`]: crate::context::FlowControl
+    type Rejection: IntoFlowControl;
 
     /// Extracts the value from the context.
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection>;

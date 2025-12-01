@@ -27,10 +27,10 @@
 //! - [`MapData`] - Transform data types during read/write operations
 //! - [`MapErr`] - Convert error types between dataset implementations
 //!
-//! [`BoxDataset`]: util::BoxDataset
-//! [`BoxCloneDataset`]: util::BoxCloneDataset
-//! [`MapData`]: util::MapData
-//! [`MapErr`]: util::MapErr
+//! [`BoxDataset`]: utils::BoxDataset
+//! [`BoxCloneDataset`]: utils::BoxCloneDataset
+//! [`MapData`]: utils::MapData
+//! [`MapErr`]: utils::MapErr
 //!
 //! ## Futures Integration
 //!

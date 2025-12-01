@@ -47,7 +47,7 @@ use crate::dataset::Dataset;
 /// ```
 ///
 /// [`boxed`]: crate::dataset::DatasetExt::boxed
-/// [`BoxCloneDataset`]: crate::dataset::BoxCloneDataset
+/// [`BoxCloneDataset`]: crate::dataset::utils::BoxCloneDataset
 #[must_use]
 pub struct BoxDataset<T, E> {
     dataset: Box<dyn Dataset<T, Error = E>>,

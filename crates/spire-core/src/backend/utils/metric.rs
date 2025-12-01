@@ -12,7 +12,7 @@ use pin_project_lite::pin_project;
 use tower::load::Load;
 use tower::{Layer, Service};
 
-use crate::context::{Context as Cx, Request, Response, Signal};
+use crate::context::{Context as Cx, FlowControl, Request, Response};
 use crate::{Error, Result};
 
 /// Metric collection middleware for [`Worker`] services.
@@ -23,8 +23,8 @@ use crate::{Error, Result};
 ///
 /// # Collected Metrics
 ///
-/// - **Success count**: Number of successful worker invocations (Continue/Skip signals)
-/// - **Failure count**: Number of failed worker invocations (errors or Stop signals)
+/// - **Success count**: Number of successful worker invocations (Continue/Skip flow control)
+/// - **Failure count**: Number of failed worker invocations (errors or Stop flow control)
 ///
 /// # Requirements
 ///
@@ -110,13 +110,13 @@ where
 
 impl<S, C> Service<Cx<C>> for Metric<S>
 where
-    S: Service<Cx<C>, Response = Signal, Error = Infallible> + Clone + Send + 'static,
+    S: Service<Cx<C>, Response = FlowControl, Error = Infallible> + Clone + Send + 'static,
     C: Service<Request, Response = Response, Error = Error> + Send + 'static,
     S::Future: Send + 'static,
 {
     type Error = Infallible;
     type Future = MetricFuture;
-    type Response = Signal;
+    type Response = FlowControl;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -127,17 +127,17 @@ where
         let mut inner = self.inner.clone();
         let metrics = self.metrics.clone();
         let fut = async move {
-            let signal = inner.call(cx).await.expect("should be infallible");
-            match &signal {
-                Signal::Continue | Signal::Wait(..) => {
+            let flow_control = inner.call(cx).await.expect("should be infallible");
+            match &flow_control {
+                FlowControl::Continue | FlowControl::Wait(..) => {
                     metrics.success.fetch_add(1, Ordering::SeqCst);
                 }
-                Signal::Skip | Signal::Hold(..) | Signal::Fail(..) => {
+                FlowControl::Skip | FlowControl::Hold(..) | FlowControl::Fail(..) => {
                     metrics.failure.fetch_add(1, Ordering::SeqCst);
                 }
             };
 
-            Ok(signal)
+            Ok(flow_control)
         };
 
         MetricFuture::new(fut.boxed())
@@ -158,23 +158,23 @@ pin_project! {
     /// Response [`Future`] for [`Metric`] middleware.
     ///
     /// This future wraps the worker's future and updates metrics based on
-    /// the returned signal when polled to completion.
+    /// the returned flow control when polled to completion.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct MetricFuture {
-        #[pin] fut: BoxFuture<'static, Result<Signal, Infallible>>,
+        #[pin] fut: BoxFuture<'static, Result<FlowControl, Infallible>>,
     }
 }
 
 impl MetricFuture {
     /// Creates a new [`MetricFuture`].
     #[inline]
-    fn new(fut: BoxFuture<'static, Result<Signal, Infallible>>) -> Self {
+    fn new(fut: BoxFuture<'static, Result<FlowControl, Infallible>>) -> Self {
         Self { fut }
     }
 }
 
 impl Future for MetricFuture {
-    type Output = Result<Signal, Infallible>;
+    type Output = Result<FlowControl, Infallible>;
 
     #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

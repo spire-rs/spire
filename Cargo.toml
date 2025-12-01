@@ -51,6 +51,7 @@ http-body-util = { version = "0.1" }
 bytes = { version = "1.7" }
 pin-project-lite = { version = "0.2" }
 thiserror = { version = "1.0" }
+derive_more = { version = "0.99" }
 
 # Serialization
 serde = { version = "1.0" }
