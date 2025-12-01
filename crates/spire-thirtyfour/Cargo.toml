@@ -1,0 +1,61 @@
+[package]
+name = "spire-thirtyfour"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+readme = "./README.md"
+
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+
+description = "Thirtyfour-based browser automation backend for Spire web scraping framework"
+keywords = ["crawler", "scraper", "browser", "webdriver"]
+categories = ["asynchronous", "web-programming"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+# Spire
+spire-core = { workspace = true, features = [] }
+
+# Tower ecosystem
+tower = { workspace = true, features = [] }
+
+# Async
+futures = { workspace = true, features = [] }
+async-trait = { workspace = true, features = [] }
+
+# Browser automation
+thirtyfour = { workspace = true }
+deadpool = { workspace = true, features = [] }
+
+# HTTP
+http = { workspace = true, features = [] }
+http-body-util = { workspace = true, features = [] }
+
+# Async runtime
+tokio = { workspace = true, features = ["time", "fs"] }
+
+# Serialization
+serde = { workspace = true, features = [] }
+serde_json = { workspace = true, features = [] }
+
+# Time handling
+jiff = { workspace = true, features = ["serde"] }
+
+# Derive macros
+thiserror = { workspace = true, features = [] }
+derive_builder = { workspace = true, features = [] }
+derive_more = { workspace = true, features = [] }
+
+# Utilities
+bytes = { workspace = true, features = [] }
+
+[dev-dependencies]
+# Testing
+tokio = { workspace = true, features = [] }

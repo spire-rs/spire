@@ -3,18 +3,20 @@
 [workspace]
 resolver = "2"
 members = [
-    "./spire",
-    "./spire-*",
+    "./crates/spire",
+    "./crates/spire-*",
+    "./examples/*",
 ]
 
 default-members = [
-    "./spire",
-    "./spire-*",
+    "./crates/spire",
+    "./crates/spire-*",
 ]
 
 [workspace.package]
-version = "0.1.1-rc.1"
-edition = "2021"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.89"
 readme = "./README.md"
 license = "MIT"
 
@@ -24,6 +26,55 @@ homepage = "https://github.com/spire-rs/spire"
 documentation = "https://docs.rs/spire"
 
 [workspace.dependencies]
-spire = { path = "./spire", version = "0.1.1-rc.1" }
-spire-core = { path = "./spire-core", version = "0.1.1-rc.1" }
-spire-macros = { path = "./spire-macros", version = "0.1.1-rc.1" }
+# Workspace crates
+spire = { path = "./crates/spire", version = "0.2.0" }
+spire-core = { path = "./crates/spire-core", version = "0.2.0" }
+spire-macros = { path = "./crates/spire-macros", version = "0.2.0" }
+spire-reqwest = { path = "./crates/spire-reqwest", version = "0.2.0" }
+spire-thirtyfour = { path = "./crates/spire-thirtyfour", version = "0.2.0" }
+
+# Async runtime
+tokio = { version = "1.39", features = ["rt-multi-thread", "macros"] }
+tokio-util = { version = "0.7", features = [] }
+futures = { version = "0.3", features = [] }
+async-trait = { version = "0.1", features = [] }
+
+# Tower ecosystem
+tower = { version = "0.4", features = ["util"] }
+
+# HTTP
+http = { version = "1.1", features = [] }
+http-body = { version = "1.0", features = [] }
+http-body-util = { version = "0.1", features = [] }
+
+# Utilities
+bytes = { version = "1.7", features = [] }
+pin-project-lite = { version = "0.2", features = [] }
+thiserror = { version = "1.0", features = [] }
+derive_more = { version = "0.99", features = [] }
+derive_builder = { version = "0.20", features = [] }
+
+# Serialization
+serde = { version = "1.0", features = [] }
+serde_json = { version = "1.0", features = [] }
+
+# HTTP clients & HTML parsing
+reqwest = { version = "0.12", features = [] }
+scraper = { version = "0.19", features = [] }
+
+# Browser automation
+thirtyfour = { version = "0.32", features = [] }
+deadpool = { version = "0.12", features = [] }
+
+# Observability
+tracing = { version = "0.1", features = [] }
+tracing-subscriber = { version = "0.3", features = [] }
+tracing-test = { version = "0.2", features = [] }
+
+# Time handling
+jiff = { version = "0.1", features = [] }
+
+# Proc macros
+proc-macro2 = { version = "1.0", features = [] }
+quote = { version = "1.0", features = [] }
+syn = { version = "2.0", features = [] }

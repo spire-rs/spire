@@ -1,0 +1,32 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "spire-macros"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+readme = "./README.md"
+
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+
+categories = ["asynchronous", "web-programming"]
+keywords = ["crawler", "scraper", "web", "framework"]
+description = "Procedural macros for Spire web scraping framework"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lib]
+proc-macro = true
+path = "src/lib.rs"
+
+[dependencies]
+# Proc macro utilities
+proc-macro2 = { workspace = true, features = [] }
+syn = { workspace = true, features = [] }
+quote = { workspace = true, features = [] }

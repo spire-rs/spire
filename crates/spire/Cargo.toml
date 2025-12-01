@@ -1,0 +1,76 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "spire"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+readme = "./README.md"
+
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+
+categories = ["asynchronous", "web-programming"]
+keywords = ["crawler", "scraper", "web", "framework"]
+description = "The flexible scraper framework powered by tokio and tower"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = []
+full = ["macros", "tracing", "reqwest", "thirtyfour"]
+
+# Proc macros
+macros = ["dep:spire-macros"]
+
+# Backend implementations
+reqwest = ["dep:spire-reqwest", "dep:scraper"]
+thirtyfour = ["dep:spire-thirtyfour"]
+
+# Observability
+tracing = ["dep:tracing", "spire-core/tracing"]
+metric = ["spire-core/metric"]
+
+
+
+[dependencies]
+# Spire
+spire-core = { workspace = true }
+spire-macros = { workspace = true, optional = true }
+spire-reqwest = { workspace = true, optional = true }
+spire-thirtyfour = { workspace = true, optional = true }
+
+# Tower ecosystem
+tower = { workspace = true, features = ["timeout"] }
+
+# Async
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Utilities
+bytes = { workspace = true }
+pin-project-lite = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# HTML parsing
+scraper = { workspace = true, optional = true }
+
+# Optional: Observability
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+
+
+# Future features (commented out)
+#robotxt = { version = "0.6", optional = true }
+#sitemapo = { version = "0.2", optional = true }

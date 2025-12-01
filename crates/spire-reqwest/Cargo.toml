@@ -1,0 +1,43 @@
+[package]
+name = "spire-reqwest"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+readme = "./README.md"
+
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+
+description = "Reqwest-based HTTP client backend for Spire web scraping framework"
+keywords = ["crawler", "scraper", "web", "reqwest"]
+categories = ["asynchronous", "web-programming"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+# Spire
+spire-core = { workspace = true, features = [] }
+
+# Tower ecosystem
+tower = { workspace = true, features = [] }
+
+# Async
+futures = { workspace = true, features = [] }
+
+# HTTP
+http = { workspace = true, features = [] }
+http-body = { workspace = true, features = [] }
+http-body-util = { workspace = true, features = [] }
+reqwest = { workspace = true, features = [] }
+
+# Utilities
+bytes = { workspace = true, features = [] }
+
+[dev-dependencies]
+# Testing
+tokio = { workspace = true, features = [] }

@@ -1,0 +1,25 @@
+[package]
+name = "chrome_webdriver"
+version = "0.1.0"
+edition = "2021"
+description = "Chrome WebDriver automation example for Spire web scraping framework"
+
+[[bin]]
+name = "chrome_webdriver"
+path = "main.rs"
+
+[dependencies]
+# Main spire crate
+spire = { workspace = true, features = ["thirtyfour", "tracing"] }
+
+# Async runtime
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+
+# Browser automation
+thirtyfour = { workspace = true }
+
+# Tracing
+tracing-subscriber = { workspace = true }
+
+# Time handling
+jiff = { workspace = true }
