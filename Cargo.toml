@@ -40,7 +40,7 @@ futures = { version = "0.3", features = [] }
 async-trait = { version = "0.1", features = [] }
 
 # Tower ecosystem
-tower = { version = "0.4", features = ["util"] }
+tower = { version = "0.5", features = ["util"] }
 
 # HTTP
 http = { version = "1.1", features = [] }
@@ -51,7 +51,7 @@ http-body-util = { version = "0.1", features = [] }
 bytes = { version = "1.7", features = [] }
 pin-project-lite = { version = "0.2", features = [] }
 thiserror = { version = "2.0", features = [] }
-derive_more = { version = "0.99", features = [] }
+derive_more = { version = "2.0", features = [] }
 derive_builder = { version = "0.20", features = [] }
 
 # Serialization
@@ -60,10 +60,10 @@ serde_json = { version = "1.0", features = [] }
 
 # HTTP clients & HTML parsing
 reqwest = { version = "0.12", features = [] }
-scraper = { version = "0.19", features = [] }
+scraper = { version = "0.24", features = [] }
 
 # Browser automation
-thirtyfour = { version = "0.32", features = [] }
+thirtyfour = { version = "0.36", features = [] }
 deadpool = { version = "0.12", features = [] }
 
 # Observability
@@ -72,7 +72,7 @@ tracing-subscriber = { version = "0.3", features = [] }
 tracing-test = { version = "0.2", features = [] }
 
 # Time handling
-jiff = { version = "0.1", features = [] }
+jiff = { version = "0.2", features = [] }
 
 # Proc macros
 proc-macro2 = { version = "1.0", features = [] }
