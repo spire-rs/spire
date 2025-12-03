@@ -9,15 +9,15 @@
 //! - Dataset access for storing scraped data
 
 mod body;
-mod extend;
 mod flow_control;
+mod request_extend;
 mod request_queue;
 
 use std::fmt;
 
 pub use body::{Body, Request, Response};
-pub use extend::{Depth, Tag, Task, TaskBuilder, TaskExt};
 pub use flow_control::{FlowControl, IntoFlowControl, TagQuery};
+pub use request_extend::{Depth, RequestExt, Tag, Task, TaskBuilder, TaskExt};
 pub use request_queue::RequestQueue;
 
 use crate::Result;
@@ -81,7 +81,7 @@ impl<C> Context<C> {
     }
 
     /// Initializes and returns the [`RequestQueue`].
-    pub fn queue(&self) -> RequestQueue {
+    pub fn request_queue(&self) -> RequestQueue {
         let dataset = self.datasets.get::<Request>();
         RequestQueue::new(dataset, self.request.depth())
     }

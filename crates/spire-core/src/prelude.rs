@@ -6,6 +6,9 @@
 //! use spire_core::prelude::*;
 //! ```
 
+// HTTP types
+pub use http;
+
 #[doc(hidden)]
 pub use crate::async_trait;
 #[cfg(feature = "metric")]

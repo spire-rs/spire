@@ -16,7 +16,12 @@ spire = { workspace = true, features = ["reqwest", "tracing"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 # Tower ecosystem
-tower = { workspace = true, features = ["retry", "limit", "timeout", "util"] }
+tower = { workspace = true, features = ["retry", "limit", "timeout", "util", "buffer"] }
+tower-http = { workspace = true, features = ["trace"] }
+
+# JSON handling
+serde_json = { workspace = true }
 
 # Tracing
+tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

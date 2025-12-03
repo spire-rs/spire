@@ -60,6 +60,33 @@ spire = { version = "0.2.0", features = ["reqwest"] }
 For advanced usage and custom configurations, see the
 [API documentation](https://docs.rs/spire-reqwest).
 
+## Advanced Usage Examples
+
+### Creating from reqwest Client
+
+```rust
+use spire_reqwest::HttpClient;
+use std::time::Duration;
+
+let reqwest_client = reqwest::Client::builder()
+    .timeout(Duration::from_secs(30))
+    .user_agent("MyBot/1.0")
+    .build()
+    .unwrap();
+
+let backend = HttpClient::from_client(reqwest_client);
+```
+
+### Creating from Tower Service
+
+```rust
+use spire_reqwest::{HttpClient, HttpService, client_to_service};
+
+let reqwest_client = reqwest::Client::new();
+let service: HttpService = client_to_service(reqwest_client);
+let backend = HttpClient::from_service(service);
+```
+
 ## Error Handling
 
 All reqwest errors are automatically converted to `spire_core::Error` types.

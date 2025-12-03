@@ -19,7 +19,5 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 thirtyfour = { workspace = true }
 
 # Tracing
+tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-
-# Time handling
-jiff = { workspace = true }

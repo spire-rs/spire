@@ -6,6 +6,8 @@
 //! use spire::prelude::*;
 //! ```
 
+// HTTP types
+pub use spire_core::http;
 // Macros (with feature gate)
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]

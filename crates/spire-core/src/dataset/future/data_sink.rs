@@ -82,6 +82,12 @@ impl<T, E> DataSink<T, E> {
         let inner: BoxSink<'static, T, E> = Box::pin(sink);
         Self { inner }
     }
+
+    /// Convenience method to push data to the sink.
+    pub async fn push(&mut self, item: T) -> Result<(), E> {
+        use futures::SinkExt;
+        self.send(item).await
+    }
 }
 
 impl<T, E> Sink<T> for DataSink<T, E> {

@@ -9,3 +9,4 @@ mod utils;
 pub mod prelude;
 
 pub use client::{HttpClient, HttpConnection};
+pub use utils::{HttpService, client_to_service};

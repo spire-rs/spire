@@ -5,7 +5,7 @@
 
 use std::fmt;
 
-use crate::context::{Depth, Request, Tag};
+use crate::context::{Depth, Request, RequestExt, Tag};
 use crate::dataset::Dataset;
 use crate::dataset::utils::BoxCloneDataset;
 use crate::{Error, Result};
@@ -44,6 +44,40 @@ impl RequestQueue {
         let depth = || Depth::new(self.depth.saturating_add(1));
         let _ = request.extensions_mut().get_or_insert_with(depth);
         self.append(request).await
+    }
+
+    /// Convenience method to create and queue a request with a tag.
+    pub async fn push<T>(&self, tag: T, request_or_url: impl IntoRequest) -> Result<()>
+    where
+        T: Into<Tag>,
+    {
+        let mut request = request_or_url.into_request();
+        request.extensions_mut().insert(tag.into());
+        self.branch(request).await
+    }
+}
+
+/// Trait for types that can be converted into a Request.
+pub trait IntoRequest {
+    /// Converts the type into a Request.
+    fn into_request(self) -> Request;
+}
+
+impl IntoRequest for Request {
+    fn into_request(self) -> Request {
+        self
+    }
+}
+
+impl IntoRequest for &str {
+    fn into_request(self) -> Request {
+        Request::from_url(self)
+    }
+}
+
+impl IntoRequest for String {
+    fn into_request(self) -> Request {
+        Request::from_url(&self)
     }
 }
 

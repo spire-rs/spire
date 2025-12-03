@@ -16,4 +16,8 @@ spire = { workspace = true, features = ["reqwest", "tracing"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 # Tracing
+tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+# JSON handling
+serde_json = { workspace = true }

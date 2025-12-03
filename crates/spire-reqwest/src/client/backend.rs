@@ -8,7 +8,7 @@ use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
 use super::connection::HttpConnection;
-use crate::utils::{request_to_reqwest, response_from_reqwest};
+use crate::HttpService;
 
 /// HTTP backend implementation using reqwest.
 ///
@@ -111,6 +111,27 @@ impl HttpClient {
         Self { inner }
     }
 
+    /// Creates a new [`HttpClient`] from an [`HttpService`].
+    ///
+    /// This is a convenience method for creating an HttpClient from the standard
+    /// [`HttpService`] type alias used throughout the Spire framework.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_reqwest::{HttpClient, HttpService, client_to_service};
+    /// use reqwest::Client;
+    ///
+    /// let client = Client::new();
+    /// let service: HttpService = client_to_service(client);
+    /// let backend = HttpClient::from_http_service(service);
+    /// ```
+    pub fn from_http_service(service: HttpService) -> Self {
+        Self {
+            inner: HttpClientInner::Service(Arc::new(Mutex::new(service))),
+        }
+    }
+
     /// Creates a new [`HttpClient`] with default configuration.
     ///
     /// This creates a basic HTTP client with default reqwest configuration.
@@ -120,20 +141,12 @@ impl HttpClient {
 }
 
 impl Default for HttpClient {
-    /// Creates a default HTTP client using a default reqwest client with Tower service wrapper.
+    /// Creates a default HTTP client using a default reqwest client.
     ///
     /// This creates a basic HTTP client with default configuration.
     /// For custom configuration, use [`HttpClient::from_client`] with a configured client.
     fn default() -> Self {
-        use tower::ServiceBuilder;
-
-        let svc = ServiceBuilder::default()
-            .map_request(request_to_reqwest)
-            .map_response(response_from_reqwest)
-            .map_err(|x: reqwest::Error| -> Error { Error::from_boxed(x) })
-            .service(reqwest::Client::default());
-
-        Self::from_service(svc)
+        Self::from_client(reqwest::Client::default())
     }
 }
 
@@ -211,5 +224,14 @@ mod test {
         let backend = HttpClient::default();
         let debug_str = format!("{:?}", backend);
         assert!(debug_str.contains("HttpClient"));
+    }
+
+    #[test]
+    fn test_from_http_service() {
+        use crate::{HttpService, client_to_service};
+
+        let reqwest_client = reqwest::Client::new();
+        let service: HttpService = client_to_service(reqwest_client);
+        let _ = HttpClient::from_http_service(service);
     }
 }

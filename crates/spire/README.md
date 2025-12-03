@@ -24,12 +24,16 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 
 ## Features
 
-- **Flexible Architecture**: Built on tower's Service trait for composable middleware
-- **Multiple Backends**: Support for HTTP (reqwest) and WebDriver (thirtyfour) backends
+- **Flexible Architecture**: Built on tower's Service trait for composable
+  middleware
+- **Multiple Backends**: Support for HTTP (reqwest) and WebDriver (thirtyfour)
+  backends
 - **Type-Safe Routing**: Tag-based routing with compile-time safety
 - **Async First**: Powered by tokio for high-performance concurrent scraping
-- **Ergonomic Extractors**: Extract data from requests with a clean, type-safe API
-- **Graceful Shutdown**: Built-in support for clean shutdown and resource cleanup
+- **Ergonomic Extractors**: Extract data from requests with a clean, type-safe
+  API
+- **Graceful Shutdown**: Built-in support for clean shutdown and resource
+  cleanup
 - **Observability**: Optional tracing support for debugging and monitoring
 
 ## Installation
@@ -190,11 +194,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for
+guidelines.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE)
+file for details.
 
 ## Acknowledgments
 

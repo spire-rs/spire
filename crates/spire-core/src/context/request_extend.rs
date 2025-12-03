@@ -58,6 +58,11 @@ impl Tag {
     pub const fn from_static(value: &'static str) -> Self {
         Self::Sequence(Cow::Borrowed(value))
     }
+
+    /// Creates a new [`Tag`] from any type that implements `Into<Tag>`.
+    pub fn new<T: Into<Tag>>(value: T) -> Self {
+        value.into()
+    }
 }
 
 impl From<&str> for Tag {
@@ -75,6 +80,22 @@ impl From<String> for Tag {
 impl From<u64> for Tag {
     fn from(value: u64) -> Self {
         Self::Rehash(value)
+    }
+}
+
+/// Extension trait for creating requests from URLs.
+pub trait RequestExt {
+    /// Creates a new request from a URL string.
+    fn from_url(url: &str) -> Request;
+}
+
+impl RequestExt for Request {
+    fn from_url(url: &str) -> Request {
+        use http::request::Builder;
+        Builder::new()
+            .uri(url)
+            .body(crate::context::Body::default())
+            .expect("Failed to create request from URL")
     }
 }
 

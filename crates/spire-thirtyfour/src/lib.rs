@@ -206,6 +206,9 @@ pub mod error;
 /// - `manager` - Internal pool management and connection lifecycle
 pub mod pool;
 
+// Re-export thirtyfour types for convenience
+pub use thirtyfour::{WebDriver, WebElement};
+
 pub use crate::client::{BrowserBackend, ClientConfig};
 pub use crate::config::capabilities::{self, CapabilitiesBuilder};
 pub use crate::config::{

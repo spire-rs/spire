@@ -1,9 +1,11 @@
 use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
+use spire_core::http;
+
 use crate::context::{Context, RequestQueue, Tag, TaskExt};
 use crate::dataset::Data;
-use crate::dataset::future::{DataSink, DataStream};
+use crate::dataset::future::DataStream;
 use crate::extract::{FromContext, FromContextRef};
 
 /// [`Backend`]-specific client extractor.
@@ -55,6 +57,18 @@ where
 }
 
 #[async_trait::async_trait]
+impl<C, S> FromContextRef<C, S> for http::Uri
+where
+    C: Sync,
+{
+    type Rejection = Infallible;
+
+    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
+        Ok(cx.get_ref().uri().clone())
+    }
+}
+
+#[async_trait::async_trait]
 impl<C, S> FromContextRef<C, S> for RequestQueue
 where
     C: Sync,
@@ -62,7 +76,7 @@ where
     type Rejection = Infallible;
 
     async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx.queue())
+        Ok(cx.request_queue())
     }
 }
 
@@ -101,18 +115,5 @@ where
 
     async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
         Ok(cx.dataset::<T>().into_stream())
-    }
-}
-
-#[async_trait::async_trait]
-impl<C, S, T> FromContextRef<C, S> for DataSink<T>
-where
-    C: Sync,
-    T: Send + Sync + 'static,
-{
-    type Rejection = Infallible;
-
-    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx.dataset::<T>().into_sink())
     }
 }

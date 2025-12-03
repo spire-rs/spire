@@ -1,6 +1,7 @@
 # Contributing
 
-Thank you for your interest in contributing to Spire! We appreciate your help in making this project better.
+Thank you for your interest in contributing to Spire! We appreciate your help in
+making this project better.
 
 ## Table of Contents
 
@@ -16,7 +17,9 @@ Thank you for your interest in contributing to Spire! We appreciate your help in
 
 ## Code of Conduct
 
-This project follows the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct). By participating, you are expected to uphold this code.
+This project follows the
+[Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct). By
+participating, you are expected to uphold this code.
 
 ## Getting Started
 
@@ -148,27 +151,24 @@ If you find a bug, please create an issue on GitHub with:
 ### Bug Report Template
 
 ```markdown
-**Describe the bug**
-A clear and concise description of the bug.
+**Describe the bug** A clear and concise description of the bug.
 
-**To Reproduce**
-Steps to reproduce the behavior:
+**To Reproduce** Steps to reproduce the behavior:
+
 1. ...
 2. ...
 
-**Expected behavior**
-What you expected to happen.
+**Expected behavior** What you expected to happen.
 
-**Actual behavior**
-What actually happened.
+**Actual behavior** What actually happened.
 
 **Environment**
+
 - Rust version: [e.g. 1.83.0]
 - OS: [e.g. Ubuntu 22.04]
 - Spire version: [e.g. 0.2.0]
 
-**Additional context**
-Any other relevant information.
+**Additional context** Any other relevant information.
 ```
 
 ## Feature Requests
@@ -189,8 +189,10 @@ If you have questions about contributing, feel free to:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the
+MIT License.
 
 ## Recognition
 
-Contributors will be recognized in the project's README and releases. Thank you for making this project better!
+Contributors will be recognized in the project's README and releases. Thank you
+for making this project better!

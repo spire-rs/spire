@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::{Arc, Mutex};
 
 use spire_core::backend::Client;
 use spire_core::context::{Request, Response};
@@ -6,6 +7,7 @@ use spire_core::{Error, Result};
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
+use crate::HttpService;
 use crate::utils::{request_to_reqwest, response_from_reqwest};
 
 /// HTTP connection that can perform individual HTTP requests.
@@ -19,7 +21,7 @@ pub struct HttpConnection {
 
 enum HttpConnectionInner {
     Client(reqwest::Client),
-    Service(BoxCloneService<Request, Response, Error>),
+    Service(Arc<Mutex<BoxCloneService<Request, Response, Error>>>),
 }
 
 impl HttpConnection {
@@ -57,7 +59,28 @@ impl HttpConnection {
     /// ```
     pub fn from_service(service: BoxCloneService<Request, Response, Error>) -> Self {
         Self {
-            inner: HttpConnectionInner::Service(service),
+            inner: HttpConnectionInner::Service(Arc::new(Mutex::new(service))),
+        }
+    }
+
+    /// Creates a new [`HttpConnection`] from an [`HttpService`].
+    ///
+    /// This is a convenience method for creating an HttpConnection from the standard
+    /// [`HttpService`] type alias used throughout the Spire framework.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_reqwest::{HttpConnection, HttpService, client_to_service};
+    /// use reqwest::Client;
+    ///
+    /// let client = Client::new();
+    /// let service: HttpService = client_to_service(client);
+    /// let connection = HttpConnection::from_http_service(service);
+    /// ```
+    pub fn from_http_service(service: HttpService) -> Self {
+        Self {
+            inner: HttpConnectionInner::Service(Arc::new(Mutex::new(service))),
         }
     }
 }
@@ -107,7 +130,12 @@ impl Client for HttpConnection {
 
                 Ok(response)
             }
-            HttpConnectionInner::Service(mut service) => {
+            HttpConnectionInner::Service(service_arc) => {
+                // Clone the service from the Arc<Mutex<>>
+                let mut service = {
+                    let guard = service_arc.lock().unwrap();
+                    guard.clone()
+                };
                 // Use the Tower service directly
                 let ready_service = service.ready().await.map_err(Error::from_boxed)?;
                 ready_service.call(req).await

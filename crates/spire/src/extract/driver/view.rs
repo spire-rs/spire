@@ -1,5 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
+#[cfg(feature = "thirtyfour")]
+use spire_thirtyfour::WebDriver;
+
 use crate::Error;
 use crate::context::Context;
 use crate::extract::{Elements, FromContextRef, Select};
@@ -12,15 +15,47 @@ use crate::extract::{Elements, FromContextRef, Select};
 /// browser automation backend. This is analogous to `Html` for HTTP clients,
 /// but works with dynamically rendered content.
 ///
-/// # Note
+/// The View wraps a WebDriver instance, allowing direct access to browser
+/// automation methods like `find_element`, `current_url`, `title`, etc.
 ///
-/// Currently a placeholder implementation. Full functionality will be added
-/// in future versions.
+/// # Examples
 ///
+/// ```ignore
+/// async fn handler(View(driver): View) -> Result<()> {
+///     let title = driver.title().await?;
+///     let url = driver.current_url().await?;
+///     // ... use WebDriver methods
+///     Ok(())
+/// }
+/// ```
+#[cfg(feature = "thirtyfour")]
+#[derive(Debug)]
+pub struct View(pub WebDriver);
 
+#[cfg(not(feature = "thirtyfour"))]
 #[derive(Debug, Clone)]
 pub struct View(pub ());
 
+#[cfg(feature = "thirtyfour")]
+#[async_trait::async_trait]
+impl<S> FromContextRef<spire_thirtyfour::BrowserConnection, S> for View
+where
+    S: Send + Sync + 'static,
+{
+    type Rejection = Error;
+
+    async fn from_context_ref(
+        cx: &Context<spire_thirtyfour::BrowserConnection>,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let client = cx.as_client_ref();
+        // Clone the WebDriver from the BrowserConnection
+        let driver = (**client).clone();
+        Ok(Self(driver))
+    }
+}
+
+#[cfg(not(feature = "thirtyfour"))]
 #[async_trait::async_trait]
 impl<C, S> FromContextRef<C, S> for View
 where
@@ -34,6 +69,23 @@ where
     }
 }
 
+#[cfg(feature = "thirtyfour")]
+impl Deref for View {
+    type Target = WebDriver;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg(feature = "thirtyfour")]
+impl DerefMut for View {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[cfg(not(feature = "thirtyfour"))]
 impl Deref for View {
     type Target = ();
 
@@ -42,11 +94,15 @@ impl Deref for View {
     }
 }
 
+#[cfg(not(feature = "thirtyfour"))]
 impl DerefMut for View {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
+
+// Remove Clone implementation since WebDriver is not Clone
+// Users should extract what they need from the WebDriver instead
 
 #[cfg(all(feature = "macros", feature = "thirtyfour"))]
 #[async_trait::async_trait]
