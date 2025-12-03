@@ -10,20 +10,20 @@ use serde_json::{Value, json};
 #[derive(Default)]
 pub enum BrowserType {
     /// Google Chrome browser
-    #[display(fmt = "Chrome")]
+    #[display("Chrome")]
     #[default]
     Chrome,
     /// Mozilla Firefox browser
-    #[display(fmt = "Firefox")]
+    #[display("Firefox")]
     Firefox,
     /// Microsoft Edge browser
-    #[display(fmt = "Edge")]
+    #[display("Edge")]
     Edge,
     /// Apple Safari browser (macOS only)
-    #[display(fmt = "Safari")]
+    #[display("Safari")]
     Safari,
     /// Custom browser with explicit capabilities
-    #[display(fmt = "Custom({})", name)]
+    #[display("Custom({})", name)]
     Custom {
         /// Browser name
         name: String,
@@ -133,27 +133,30 @@ impl BrowserType {
             BrowserType::Chrome => {
                 if let Some(chrome_options) = caps.get_mut("goog:chromeOptions")
                     && let Some(args) = chrome_options.get_mut("args")
-                        && let Some(args_array) = args.as_array_mut() {
-                            args_array.push(json!("--headless"));
-                            args_array.push(json!("--window-size=1920,1080"));
-                        }
+                    && let Some(args_array) = args.as_array_mut()
+                {
+                    args_array.push(json!("--headless"));
+                    args_array.push(json!("--window-size=1920,1080"));
+                }
             }
             BrowserType::Firefox => {
                 if let Some(firefox_options) = caps.get_mut("moz:firefoxOptions")
                     && let Some(args) = firefox_options.get_mut("args")
-                        && let Some(args_array) = args.as_array_mut() {
-                            args_array.push(json!("--headless"));
-                            args_array.push(json!("--width=1920"));
-                            args_array.push(json!("--height=1080"));
-                        }
+                    && let Some(args_array) = args.as_array_mut()
+                {
+                    args_array.push(json!("--headless"));
+                    args_array.push(json!("--width=1920"));
+                    args_array.push(json!("--height=1080"));
+                }
             }
             BrowserType::Edge => {
                 if let Some(edge_options) = caps.get_mut("ms:edgeOptions")
                     && let Some(args) = edge_options.get_mut("args")
-                        && let Some(args_array) = args.as_array_mut() {
-                            args_array.push(json!("--headless"));
-                            args_array.push(json!("--window-size=1920,1080"));
-                        }
+                    && let Some(args_array) = args.as_array_mut()
+                {
+                    args_array.push(json!("--headless"));
+                    args_array.push(json!("--window-size=1920,1080"));
+                }
             }
             BrowserType::Safari => {
                 // Safari doesn't support headless mode in the same way
@@ -175,40 +178,42 @@ impl BrowserType {
             BrowserType::Chrome => {
                 if let Some(chrome_options) = caps.get_mut("goog:chromeOptions")
                     && let Some(prefs) = chrome_options.get_mut("prefs")
-                        && let Some(prefs_obj) = prefs.as_object_mut() {
-                            prefs_obj.insert(
-                                "profile.managed_default_content_settings.images".to_string(),
-                                json!(2),
-                            );
-                            prefs_obj.insert(
-                                "profile.default_content_setting_values.plugins".to_string(),
-                                json!(2),
-                            );
-                            prefs_obj.insert(
-                                "profile.default_content_setting_values.media_stream".to_string(),
-                                json!(2),
-                            );
-                        }
+                    && let Some(prefs_obj) = prefs.as_object_mut()
+                {
+                    prefs_obj.insert(
+                        "profile.managed_default_content_settings.images".to_string(),
+                        json!(2),
+                    );
+                    prefs_obj.insert(
+                        "profile.default_content_setting_values.plugins".to_string(),
+                        json!(2),
+                    );
+                    prefs_obj.insert(
+                        "profile.default_content_setting_values.media_stream".to_string(),
+                        json!(2),
+                    );
+                }
             }
             BrowserType::Firefox => {
                 if let Some(firefox_options) = caps.get_mut("moz:firefoxOptions")
                     && let Some(prefs) = firefox_options.get_mut("prefs")
-                        && let Some(prefs_obj) = prefs.as_object_mut() {
-                            prefs_obj.insert("permissions.default.image".to_string(), json!(2));
-                            prefs_obj.insert("media.navigator.enabled".to_string(), json!(false));
-                            prefs_obj
-                                .insert("media.peerconnection.enabled".to_string(), json!(false));
-                        }
+                    && let Some(prefs_obj) = prefs.as_object_mut()
+                {
+                    prefs_obj.insert("permissions.default.image".to_string(), json!(2));
+                    prefs_obj.insert("media.navigator.enabled".to_string(), json!(false));
+                    prefs_obj.insert("media.peerconnection.enabled".to_string(), json!(false));
+                }
             }
             BrowserType::Edge => {
                 // Similar optimizations for Edge
                 if let Some(edge_options) = caps.get_mut("ms:edgeOptions")
                     && let Some(args) = edge_options.get_mut("args")
-                        && let Some(args_array) = args.as_array_mut() {
-                            args_array.push(json!("--disable-images"));
-                            args_array.push(json!("--disable-javascript"));
-                            args_array.push(json!("--disable-plugins"));
-                        }
+                    && let Some(args_array) = args.as_array_mut()
+                {
+                    args_array.push(json!("--disable-images"));
+                    args_array.push(json!("--disable-javascript"));
+                    args_array.push(json!("--disable-plugins"));
+                }
             }
             BrowserType::Safari | BrowserType::Custom { .. } => {
                 // Less granular control for Safari and custom browsers
@@ -286,7 +291,6 @@ impl BrowserType {
         }
     }
 }
-
 
 // Custom From implementation for string parsing with browser name matching
 impl From<&str> for BrowserType {

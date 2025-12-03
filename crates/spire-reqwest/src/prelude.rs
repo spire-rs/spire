@@ -2,7 +2,7 @@
 //!
 //! This module is intended to be glob-imported for convenience:
 //!
-//! ```ignore
+//! ```
 //! use spire_reqwest::prelude::*;
 //! ```
 

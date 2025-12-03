@@ -6,6 +6,7 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
+use derive_more::{Deref, DerefMut};
 use http::request::Builder;
 
 use crate::context::Request;
@@ -108,7 +109,7 @@ impl Default for Depth {
 }
 
 /// Wrapper around `http::`[`Request`] with additional functionality.
-#[derive(derive_more::Deref, derive_more::DerefMut)]
+#[derive(Deref, DerefMut)]
 pub struct Task {
     #[deref]
     #[deref_mut]

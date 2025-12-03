@@ -50,7 +50,7 @@ impl DerefMut for View {
 
 #[cfg(all(feature = "macros", feature = "thirtyfour"))]
 #[async_trait::async_trait]
-impl<S, T> FromContextRef<spire_thirtyfour::BrowserClient, S> for Elements<T>
+impl<S, T> FromContextRef<spire_thirtyfour::BrowserConnection, S> for Elements<T>
 where
     S: Sync + Send + 'static,
     T: Select + Send,
@@ -58,7 +58,7 @@ where
     type Rejection = Error;
 
     async fn from_context_ref(
-        cx: &Context<spire_thirtyfour::BrowserClient>,
+        cx: &Context<spire_thirtyfour::BrowserConnection>,
         state: &S,
     ) -> Result<Self, Self::Rejection> {
         let View(_view) = View::from_context_ref(cx, state).await?;

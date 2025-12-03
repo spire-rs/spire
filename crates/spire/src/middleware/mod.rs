@@ -26,7 +26,7 @@
 //! any middleware from the tower ecosystem:
 //!
 //! - [`tower::timeout`] - Request timeouts
-//! - [`tower::limit`] - Rate limiting and concurrency control
+//! - `tower::limit` - Rate limiting and concurrency control
 //! - `tower::buffer` - Request buffering
 //! - [`tower::retry`] - Automatic retries
 //!

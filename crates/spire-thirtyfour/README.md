@@ -47,7 +47,7 @@ Then use the browser automation backend in your spire applications:
 use spire::prelude::*;
 use spire::extract::Text;
 use spire::context::{RequestQueue, Tag};
-use spire::thirtyfour_backend::BrowserPool;
+use spire::BrowserBackend;
 use spire::dataset::InMemDataset;
 
 async fn handler(
@@ -69,7 +69,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(Tag::new("spa"), handler);
 
     // Create browser pool backend
-    let backend = BrowserPool::builder().build();
+    let backend = BrowserBackend::builder()
+        .with_unmanaged("http://localhost:4444")
+        .build()?;
     
     let client = Client::new(backend, router)
         .with_request_queue(InMemDataset::stack())
@@ -89,16 +91,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 You can customize the browser pool backend:
 
 ```rust
-use spire::thirtyfour_backend::BrowserPool;
-use thirtyfour::DesiredCapabilities;
+use spire::BrowserBackend;
+use spire::{WebDriverConfig, PoolConfig, BrowserType};
 
 // Create a custom browser pool
-let backend = BrowserPool::builder()
-    .max_size(10)  // Maximum 10 browser instances
-    .webdriver_url("http://localhost:4444")  // Custom WebDriver URL
-    .capabilities(DesiredCapabilities::chrome())
-    .headless(true)  // Run in headless mode
-    .build();
+let backend = BrowserBackend::builder()
+    .with_config(
+        WebDriverConfig::builder()
+            .with_url("http://localhost:4444")
+            .with_browser(BrowserType::chrome())
+            .build()?
+    )?
+    .with_pool_config(
+        PoolConfig::builder()
+            .with_max_size(10)
+            .build()?
+    )
+    .build()?;
 ```
 
 ## Prerequisites
@@ -163,10 +172,12 @@ spire-thirtyfour = "0.2.0"
 ```
 
 ```rust
-use spire_thirtyfour::BrowserPool;
+use spire_thirtyfour::BrowserBackend;
 use spire_core::backend::Backend;
 
-let backend = BrowserPool::builder().build();
+let backend = BrowserBackend::builder()
+    .with_unmanaged("http://localhost:4444")
+    .build()?;
 let client = backend.connect().await?;
 ```
 

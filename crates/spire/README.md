@@ -7,9 +7,6 @@
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
 
-> [!WARNING]
-> Work in progress. The API is not yet stable and may change.
-
 [action-badge]: https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yml?branch=main&label=build&logo=github&style=flat-square
 [action-url]: https://github.com/spire-rs/spire/actions/workflows/build.yml
 [crates-badge]: https://img.shields.io/crates/v/spire.svg?logo=rust&style=flat-square
@@ -62,7 +59,7 @@ spire = "0.2.0"
 use spire::prelude::*;
 use spire::extract::{Text, State};
 use spire::context::{RequestQueue, Tag};
-use spire::reqwest_backend::HttpClient;
+use spire::HttpClient;
 use spire::dataset::InMemDataset;
 
 #[derive(Clone)]
@@ -76,10 +73,10 @@ async fn scrape_handler(
     queue: RequestQueue,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Scraped {} bytes with API key: {}", html.len(), state.api_key);
-    
+
     // Queue more requests
     queue.push("page2", "https://example.com/page2").await?;
-    
+
     Ok(())
 }
 
@@ -116,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 use spire::prelude::*;
 use spire::extract::State;
 use spire::context::{RequestQueue, Tag};
-use spire::thirtyfour_backend::BrowserPool;
+use spire::BrowserBackend;
 use spire::dataset::InMemDataset;
 
 async fn browser_handler(
@@ -133,8 +130,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("main", browser_handler);
 
     // Create browser pool backend
-    let backend = BrowserPool::builder().build();
-    
+    let backend = BrowserBackend::builder()
+        .with_unmanaged("http://localhost:4444")
+        .build()?;
+
     let client = Client::new(backend, router)
         .with_request_queue(InMemDataset::stack())
         .with_dataset(InMemDataset::<String>::new());
@@ -165,7 +164,7 @@ Spire is built on several key abstractions:
 
 Spire integrates seamlessly with the tower ecosystem:
 
-```rust,no_run
+```rust,ignore
 use tower::ServiceBuilder;
 use tower::timeout::TimeoutLayer;
 use std::time::Duration;
@@ -175,13 +174,18 @@ async fn handler() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-let router = Router::new()
-    .route("main", handler)
-    .layer(
-        ServiceBuilder::new()
-            .timeout(Duration::from_secs(30))
-            .into_inner()
-    );
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let router = Router::new()
+        .route("main", handler)
+        .layer(
+            ServiceBuilder::new()
+                .timeout(Duration::from_secs(30))
+                .into_inner()
+        );
+    
+    Ok(())
+}
 ```
 
 ## Contributing

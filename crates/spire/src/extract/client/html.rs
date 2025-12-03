@@ -5,7 +5,7 @@ use scraper::Html as HtmlDoc;
 use crate::Error;
 use crate::backend::Client;
 use crate::context::Context;
-use crate::extract::{Elements, FromContext, Select, Text};
+use crate::extract::{FromContext, Text};
 
 /// Parsed HTML document extractor.
 ///
@@ -61,20 +61,21 @@ impl DerefMut for Html {
     }
 }
 
-#[cfg(all(feature = "macros", feature = "reqwest"))]
-#[async_trait::async_trait]
-impl<S, T> FromContext<spire_reqwest::HttpClient, S> for Elements<T>
-where
-    S: Sync + Send + 'static,
-    T: Select + Send,
-{
-    type Rejection = Error;
-
-    async fn from_context(
-        cx: Context<spire_reqwest::HttpClient>,
-        state: &S,
-    ) -> Result<Self, Self::Rejection> {
-        let Html(_html) = Html::from_context(cx, state).await?;
-        todo!("Elements extractor for HttpClient not yet implemented")
-    }
-}
+// FIXME: Commented out due to Service trait constraint issues with HttpClient
+// #[cfg(all(feature = "macros", feature = "reqwest"))]
+// #[async_trait::async_trait]
+// impl<S, T> FromContext<spire_reqwest::HttpClient, S> for Elements<T>
+// where
+//     S: Sync + Send + 'static,
+//     T: Select + Send,
+// {
+//     type Rejection = Error;
+//
+//     async fn from_context(
+//         cx: Context<spire_reqwest::HttpClient>,
+//         state: &S,
+//     ) -> Result<Self, Self::Rejection> {
+//         let Html(_html) = Html::from_context(cx, state).await?;
+//         todo!("Elements extractor for HttpClient not yet implemented")
+//     }
+// }

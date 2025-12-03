@@ -51,7 +51,7 @@ Basic HTTP scraping example:
 use spire::prelude::*;
 use spire::extract::Text;
 use spire::context::{RequestQueue, Tag};
-use spire::reqwest_backend::HttpClient;
+use spire::HttpClient;
 use spire::dataset::InMemDataset;
 
 async fn handler(Text(html): Text) -> Result<(), Box<dyn std::error::Error>> {

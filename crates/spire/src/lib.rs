@@ -14,7 +14,7 @@ pub use spire_reqwest::HttpClient;
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
 pub use spire_thirtyfour::{
-    BrowserClient, BrowserError, BrowserPool, BrowserType, ClientConfig as BrowserClientConfig,
+    BrowserBackend, BrowserConnection, BrowserError, BrowserPool, BrowserType, ClientConfig,
     NavigationErrorType, PoolConfig, PoolConfigBuilder, WebDriverConfig, WebDriverConfigBuilder,
 };
 
@@ -54,7 +54,7 @@ mod tests {
     #[test]
     #[cfg(feature = "thirtyfour")]
     fn thirtyfour_backend_available() {
-        let _backend = crate::BrowserPool::builder()
+        let _backend = crate::BrowserBackend::builder()
             .with_unmanaged("http://127.0.0.1:4444")
             .build()
             .expect("Failed to build browser pool");
