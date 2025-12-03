@@ -3,11 +3,11 @@ use std::sync::{Arc, Mutex};
 
 use spire_core::backend::Backend;
 use spire_core::context::{Body, Request, Response};
-use spire_core::{Error, Result};
+use spire_core::{Error, ErrorKind, Result};
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
-use crate::client::HttpConnection;
+use super::connection::HttpConnection;
 use crate::utils::{request_to_reqwest, response_from_reqwest};
 
 /// HTTP backend implementation using reqwest.
@@ -40,18 +40,10 @@ pub struct HttpClient {
     inner: HttpClientInner,
 }
 
+#[derive(Clone)]
 enum HttpClientInner {
     Service(Arc<Mutex<BoxCloneService<Request, Response, Error>>>),
-    ReqwestClient(reqwest::Client),
-}
-
-impl Clone for HttpClientInner {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Service(service) => Self::Service(service.clone()),
-            Self::ReqwestClient(client) => Self::ReqwestClient(client.clone()),
-        }
-    }
+    Client(reqwest::Client),
 }
 
 impl HttpClient {
@@ -77,7 +69,7 @@ impl HttpClient {
     /// ```
     pub fn from_client(client: reqwest::Client) -> Self {
         Self {
-            inner: HttpClientInner::ReqwestClient(client),
+            inner: HttpClientInner::Client(client),
         }
     }
 
@@ -161,14 +153,12 @@ impl Backend for HttpClient {
     /// allowing for efficient connection reuse and sharing.
     async fn connect(&self) -> Result<Self::Client> {
         match &self.inner {
-            HttpClientInner::ReqwestClient(client) => {
-                Ok(HttpConnection::from_reqwest_client(client.clone()))
-            }
+            HttpClientInner::Client(client) => Ok(HttpConnection::from_client(client.clone())),
             HttpClientInner::Service(service_arc) => {
                 let service = {
-                    let guard = service_arc.lock().map_err(|_| {
-                        Error::new(spire_core::ErrorKind::Backend, "HttpClient mutex poisoned")
-                    })?;
+                    let guard = service_arc
+                        .lock()
+                        .map_err(|_| Error::new(ErrorKind::Backend, "HttpClient mutex poisoned"))?;
                     guard.clone()
                 };
                 Ok(HttpConnection::from_service(service))

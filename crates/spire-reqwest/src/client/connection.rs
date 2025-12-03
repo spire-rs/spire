@@ -12,15 +12,13 @@ use crate::utils::{request_to_reqwest, response_from_reqwest};
 ///
 /// `HttpConnection` implements the [`Client`] trait and can use either a reqwest client
 /// or a Tower service to perform HTTP requests. Connections are typically created by calling
-/// [`HttpClient::connect`].
-///
-/// [`HttpClient::connect`]: crate::HttpClient::connect
+/// the backend's connect method.
 pub struct HttpConnection {
     inner: HttpConnectionInner,
 }
 
 enum HttpConnectionInner {
-    ReqwestClient(reqwest::Client),
+    Client(reqwest::Client),
     Service(BoxCloneService<Request, Response, Error>),
 }
 
@@ -38,9 +36,9 @@ impl HttpConnection {
     /// let reqwest_client = Client::new();
     /// let connection = HttpConnection::from_reqwest_client(reqwest_client);
     /// ```
-    pub fn from_reqwest_client(client: reqwest::Client) -> Self {
+    pub fn from_client(client: reqwest::Client) -> Self {
         Self {
-            inner: HttpConnectionInner::ReqwestClient(client),
+            inner: HttpConnectionInner::Client(client),
         }
     }
 
@@ -67,9 +65,9 @@ impl HttpConnection {
 impl fmt::Debug for HttpConnection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.inner {
-            HttpConnectionInner::ReqwestClient(_) => f
+            HttpConnectionInner::Client(_) => f
                 .debug_struct("HttpConnection")
-                .field("type", &"ReqwestClient")
+                .field("type", &"Client")
                 .finish_non_exhaustive(),
             HttpConnectionInner::Service(_) => f
                 .debug_struct("HttpConnection")
@@ -94,7 +92,7 @@ impl Client for HttpConnection {
     /// - The response cannot be converted back to a spire response
     async fn resolve(self, req: Request) -> Result<Response> {
         match self.inner {
-            HttpConnectionInner::ReqwestClient(client) => {
+            HttpConnectionInner::Client(client) => {
                 // Convert spire request to reqwest request
                 let reqwest_req = request_to_reqwest(req);
 
@@ -125,10 +123,10 @@ mod tests {
     #[test]
     fn test_debug_reqwest_client() {
         let client = reqwest::Client::new();
-        let connection = HttpConnection::from_reqwest_client(client);
+        let connection = HttpConnection::from_client(client);
         let debug_str = format!("{:?}", connection);
         assert!(debug_str.contains("HttpConnection"));
-        assert!(debug_str.contains("ReqwestClient"));
+        assert!(debug_str.contains("Client"));
     }
 
     #[test]
@@ -148,6 +146,6 @@ mod tests {
     #[tokio::test]
     async fn test_reqwest_connection_creation() {
         let client = reqwest::Client::new();
-        let _connection = HttpConnection::from_reqwest_client(client);
+        let _connection = HttpConnection::from_client(client);
     }
 }
