@@ -9,15 +9,10 @@ name = "chrome_webdriver"
 path = "main.rs"
 
 [dependencies]
-# Main spire crate
+# Async runtime and spire framework
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 spire = { workspace = true, features = ["thirtyfour", "tracing"] }
 
-# Async runtime
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
-
-# Browser automation
-thirtyfour = { workspace = true }
-
-# Tracing
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+# Observability
+tracing = { workspace = true, features = [] }
+tracing-subscriber = { workspace = true, features = [] }

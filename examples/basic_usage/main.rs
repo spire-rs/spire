@@ -1,12 +1,12 @@
 //! Basic usage example demonstrating core Spire functionality.
 //!
-//! This example demonstrates fundamental concepts of the Spire framework:
-//! - Setting up an HTTP scraping client with the reqwest backend
-//! - Defining handlers for different content types using extractors
-//! - Managing request queues with tag-based routing
-//! - Extracting and processing text and JSON data from responses
-//! - Storing scraped data using in-memory datasets
-//! - Error handling using Spire's Result types
+//! This example demonstrates fundamental concepts of the Spire framework.
+//! It shows how to set up an HTTP scraping client with the reqwest backend
+//! and define handlers for different content types using extractors.
+//! The example covers managing request queues with tag-based routing,
+//! extracting and processing text and JSON data from responses,
+//! storing scraped data using in-memory datasets, and handling errors
+//! using Spire's Result types.
 //!
 //! The example scrapes test endpoints from httpbin.org to demonstrate
 //! real HTTP interactions without relying on external services that
@@ -15,41 +15,36 @@
 use std::collections::HashMap;
 
 use spire::prelude::*;
-use tracing::{error, info};
 
 /// Handler for scraping HTML pages and extracting basic information.
 ///
-/// This handler demonstrates:
-/// - Text extraction from HTML responses
-/// - Simple HTML parsing for title extraction
-/// - Queueing additional requests based on page content
-/// - Storing extracted data in the dataset
+/// This handler demonstrates text extraction from HTML responses,
+/// simple HTML parsing for title extraction, queueing additional
+/// requests based on page content, and storing extracted data in the dataset.
 async fn scrape_html_page(Text(html): Text) -> Result<()> {
-    info!("Processing HTML page: {} bytes", html.len());
+    tracing::info!("Processing HTML page: {} bytes", html.len());
     Ok(())
 }
 
 /// Handler for processing JSON API responses.
 ///
-/// This handler demonstrates:
-/// - JSON deserialization from HTTP responses
-/// - Processing structured data from APIs
-/// - Handling dynamic JSON structures
+/// This handler demonstrates JSON deserialization from HTTP responses,
+/// processing structured data from APIs, and handling dynamic JSON structures.
 async fn scrape_json_api(
     uri: http::Uri,
     data_store: Data<String>,
     Json(data): Json<HashMap<String, serde_json::Value>>,
 ) -> Result<()> {
     let url = uri.to_string();
-    info!("Processing JSON API: {}", url);
+    tracing::info!("Processing JSON API: {}", url);
 
     let field_count = data.len();
-    info!("JSON response contains {} fields", field_count);
+    tracing::info!("JSON response contains {} fields", field_count);
 
     // Process each field in the JSON response
     for (key, value) in data {
         let entry = format!("API field '{}': {}", key, value);
-        info!("Extracted: {}", entry);
+        tracing::info!("Extracted: {}", entry);
         data_store.write(entry).await?;
     }
 
@@ -63,25 +58,25 @@ async fn scrape_json_api(
 
 /// Handler for processing different types of text content.
 ///
-/// This handler demonstrates:
-/// - Generic text processing for various content types
-/// - Content-type aware processing
-/// - Basic text analysis and metrics
+/// This handler demonstrates generic text processing for various content types,
+/// content-type aware processing, and basic text analysis and metrics.
 async fn scrape_text_content(
     uri: http::Uri,
     data: Data<String>,
     Text(content): Text,
 ) -> Result<()> {
     let url = uri.to_string();
-    info!("Processing text content: {}", url);
+    tracing::info!("Processing text content: {}", url);
 
     let content_length = content.len();
     let line_count = content.lines().count();
     let word_count = content.split_whitespace().count();
 
-    info!(
+    tracing::info!(
         "Text analysis: {} bytes, {} lines, {} words",
-        content_length, line_count, word_count
+        content_length,
+        line_count,
+        word_count
     );
 
     // Store content analysis
@@ -98,41 +93,22 @@ async fn scrape_text_content(
     Ok(())
 }
 
-// /// Handler for failed requests.
-// ///
-// /// This handler demonstrates:
-// /// - Graceful error handling for different HTTP status codes
-// /// - Logging error information for debugging
-// /// - Converting errors to Spire Result types
-// async fn handle_error(uri: Uri, response: Response) -> Result<()> {
-//     let url = uri.to_string();
+/// Handler for failed requests.
+///
+/// This handler demonstrates graceful error handling for different request scenarios,
+/// logging error information for debugging, and converting errors to Spire Result types.
+async fn handle_error(uri: http::Uri) -> Result<()> {
+    let url = uri.to_string();
 
-//     let status = response.status();
-//     let status_code = status.as_u16();
+    // Log the error case - in production you might have more context
+    // about the specific error through other mechanisms
+    tracing::error!("Error processing request: {}", url);
 
-//     match status_code {
-//         404 => {
-//             warn!("Resource not found: {}", url);
-//         }
-//         403 => {
-//             warn!(
-//                 "Access forbidden: {} - check permissions or rate limiting",
-//                 url
-//             );
-//         }
-//         429 => {
-//             warn!("Rate limited: {} - consider implementing delays", url);
-//         }
-//         500..=599 => {
-//             error!("Server error {} for: {}", status_code, url);
-//         }
-//         _ => {
-//             error!("HTTP error {} for: {}", status_code, url);
-//         }
-//     }
+    // You could implement specific error handling logic here
+    // based on the URL pattern or other available context
 
-//     Ok(())
-// }
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -145,15 +121,15 @@ async fn main() -> Result<()> {
         .with_line_number(false)
         .init();
 
-    info!("Starting Spire Basic Usage Example");
+    tracing::info!("Starting Spire Basic Usage Example");
 
     // Create a router that maps tags to handler functions
     // Each tag represents a different type of content to be processed
     let router = Router::new()
         .route(Tag::new("html_page"), scrape_html_page)
         .route(Tag::new("json_api"), scrape_json_api)
-        .route(Tag::new("text_content"), scrape_text_content);
-    // .route(Tag::new("error"), handle_error);
+        .route(Tag::new("text_content"), scrape_text_content)
+        .route(Tag::new("error"), handle_error);
 
     // Create the HTTP backend for making requests
     let backend = HttpClient::default();
@@ -168,46 +144,46 @@ async fn main() -> Result<()> {
         .with_dataset(InMemDataset::<String>::new());
 
     // Queue initial requests to demonstrate different content types
-    info!("Queueing initial requests");
+    tracing::info!("Queueing initial requests");
 
     let queue = client.request_queue();
 
     // HTML page with potential links to other content
     queue
-        .push(Tag::new("html_page"), "https://httpbin.org/html")
+        .append_with_tag(Tag::new("html_page"), "https://httpbin.org/html")
         .await?;
 
     // JSON API endpoint
     queue
-        .push(Tag::new("json_api"), "https://httpbin.org/json")
+        .append_with_tag(Tag::new("json_api"), "https://httpbin.org/json")
         .await?;
 
     // Plain text content
     queue
-        .push(Tag::new("text_content"), "https://httpbin.org/robots.txt")
+        .append_with_tag(Tag::new("text_content"), "https://httpbin.org/robots.txt")
         .await?;
 
     // Intentional error to demonstrate error handling
-    // queue
-    //     .push(Tag::new("error"), "https://httpbin.org/status/404")
-    //     .await?;
+    queue
+        .append_with_tag(Tag::new("error"), "https://httpbin.org/status/404")
+        .await?;
 
-    info!("Starting scraping process");
+    tracing::info!("Starting scraping process");
 
     // Execute the scraping process
     // This will process all queued requests and any additional requests
     // that are queued by handlers during processing
     match client.run().await {
         Ok(_) => {
-            info!("Scraping completed successfully");
+            tracing::info!("Scraping completed successfully");
         }
         Err(e) => {
-            error!("Scraping process failed: {}", e);
+            tracing::error!("Scraping process failed: {}", e);
             return Err(e);
         }
     }
 
-    info!("Basic usage example completed");
+    tracing::info!("Basic usage example completed");
 
     // Note: In a real application, you would typically access the dataset
     // to retrieve and process the stored results:
