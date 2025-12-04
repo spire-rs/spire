@@ -1,4 +1,4 @@
-# Spire Examples
+# Examples
 
 This directory contains examples demonstrating the core functionality of the Spire web scraping and crawling framework. Each example showcases different aspects of the framework's capabilities and serves as both documentation and integration tests.
 
@@ -8,103 +8,125 @@ This directory contains examples demonstrating the core functionality of the Spi
 
 **Location**: `examples/basic_usage/`
 
-Demonstrates fundamental Spire functionality using the HTTP backend with the reqwest implementation.
+Demonstrates fundamental Spire functionality including custom data types, HTML parsing, and text processing.
 
-**Key Features**: This example covers HTTP client setup and configuration, request routing with tag-based handlers, text and JSON data extraction using built-in extractors, request queue management and dataset storage, structured error handling with Spire Result types, and tracing integration for observability.
+**Key Features**: 
+- HTTP client setup with reqwest backend
+- Custom data structures for dataset storage
+- HTML content extraction using the Html extractor
+- Text content processing and analysis
+- Tag-based routing using Into<Tag>
+- Jiff timestamps and proper URL types
+- Request queue management and link discovery
 
-**Learning Outcomes**: You'll learn about core Spire architecture and request flow, handler function patterns and extractors, and basic data processing and storage workflows.
+**Learning Outcomes**: Core Spire architecture, handler patterns with extractors, custom dataset usage, and basic HTML parsing workflows.
 
-```rust
-use spire::prelude::*;
+### API Endpoints
 
-async fn scrape_html_page(
-    Text(html): Text,
-    request: Request,
-    mut data_sink: DataSink<String>,
-) -> Result<()> {
-    let url = request.uri().to_string();
-    data_sink.push(format!("Scraped: {}", url)).await?;
-    Ok(())
-}
+**Location**: `examples/api_endpoints/`
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let router = Router::new()
-        .route(Tag::new("html_page"), scrape_html_page);
+Shows how to process JSON API responses with structured and dynamic JSON handling, demonstrating multiple dataset management.
 
-    let client = Client::new(HttpClient::default(), router)
-        .with_request_queue(InMemDataset::stack())
-        .with_dataset(InMemDataset::<String>::new());
+**Key Features**:
+- Structured JSON API processing with custom data types
+- Dynamic JSON response handling and analysis
+- Text content processing and analysis
+- API endpoint discovery and link following
+- Multiple dataset types for different data structures
+- Proper error handling and data validation
 
-    client.queue()
-        .push(Tag::new("html_page"), "https://example.com")
-        .await?;
+**Learning Outcomes**: JSON API integration patterns, structured vs. dynamic JSON processing, multi-dataset management, and API endpoint discovery.
 
-    client.run().await
-}
-```
+
 
 ### Chrome WebDriver
 
 **Location**: `examples/chrome_webdriver/`
 
-Demonstrates browser automation using the thirtyfour backend for JavaScript-heavy sites and dynamic content.
+Demonstrates browser automation using the thirtyfour backend for JavaScript-heavy sites and dynamic content rendering.
 
-**Key Features**: This example demonstrates browser backend configuration with Chrome WebDriver, connection pool management for concurrent operations, dynamic page interaction and JavaScript execution, form filling and submission workflows, element selection and manipulation, and single-page application content extraction.
+**Key Features**:
+- Browser backend configuration with Chrome WebDriver
+- Basic page rendering and content extraction
+- Dynamic content loading with extended wait patterns
+- WebDriver integration and error handling
+- Structured data extraction from browser-rendered pages
+- Graceful error handling when WebDriver is unavailable
 
-**Learning Outcomes**: You'll master browser automation patterns with Spire, handling dynamic and JavaScript-rendered content, WebDriver configuration and resource management, and advanced element interaction techniques.
+**Learning Outcomes**: Browser automation patterns, handling dynamic content, WebDriver integration, and browser-based scraping workflows.
 
-**Requirements**: You need Chrome browser installed and accessible, with ChromeDriver automatically managed by thirtyfour.
+**Requirements**: Chrome browser installed (ChromeDriver automatically managed by thirtyfour).
 
-### Tower Layers
 
-**Location**: `examples/tower_layers/`
-
-Shows integration with the Tower middleware ecosystem for building robust, production-ready scraping systems.
-
-**Key Features**: This example showcases custom middleware layer implementation, built-in Tower middleware composition including timeout, retry, and rate limiting, request and response processing through middleware stack, error handling strategies across layers, observability and metrics collection, and resilient scraping architecture patterns.
-
-**Learning Outcomes**: You'll understand composable middleware design with Tower, building fault-tolerant scraping systems, custom middleware development patterns, and production-ready error handling and recovery.
 
 ## Running Examples
 
 Navigate to any example directory and execute with cargo:
 
 ```bash
-# Basic HTTP scraping example
+# Basic usage example
 cd examples/basic_usage
 cargo run
 
-# Browser automation example
-cd examples/chrome_webdriver
+# API endpoints processing
+cd examples/api_endpoints
 cargo run
 
-# Middleware integration example
-cd examples/tower_layers
+# Browser automation
+cd examples/chrome_webdriver
 cargo run
 ```
 
 ## Example Structure
 
-Each example follows a consistent structure with comprehensive documentation that includes detailed comments explaining concepts and patterns. They use real-world scenarios with httpbin.org for reliable testing endpoints, demonstrate proper error handling using Spire's Result types, include integrated tracing for debugging and monitoring, and show production patterns with scalable and maintainable code organization.
+Each example follows a consistent structure:
+
+- **Comprehensive documentation** with detailed comments explaining concepts and patterns
+- **Real-world scenarios** using httpbin.org for reliable testing endpoints  
+- **Proper error handling** using Spire's Result types
+- **Integrated tracing** for debugging and monitoring
+- **Production patterns** with scalable and maintainable code organization
 
 ## Dependencies
 
-Examples are self-contained with their own `Cargo.toml` files. The `basic_usage` example focuses on core HTTP functionality with reqwest backend, `chrome_webdriver` demonstrates browser automation with thirtyfour backend, and `tower_layers` shows middleware integration with Tower ecosystem.
+Examples are self-contained with their own `Cargo.toml` files and organized dependency categories:
+
+- **Async runtime and Spire framework**: Core tokio and spire dependencies
+- **Serialization and JSON/data processing**: Data handling libraries
+- **Data types**: Proper URL and timestamp handling with jiff
+- **Observability**: Tracing and logging support
 
 ## Development Guidelines
 
-These examples serve as living documentation and integration tests. When contributing, ensure examples compile and run successfully, include comprehensive inline documentation, follow established architectural patterns, verify examples work with current framework versions, and maintain consistent style and structure across examples.
+These examples serve as living documentation and integration tests. When contributing:
+
+- Ensure examples compile and run successfully
+- Include comprehensive inline documentation  
+- Follow established architectural patterns
+- Verify examples work with current framework versions
+- Maintain consistent style and structure across examples
 
 ## Troubleshooting
 
-**Chrome WebDriver Issues**: Ensure Chrome browser is installed and accessible, note that ChromeDriver is automatically managed by thirtyfour, and try running without `--headless` flag for debugging.
+**Chrome WebDriver Issues**: 
+- Ensure Chrome browser is installed and accessible
+- ChromeDriver is automatically managed by thirtyfour
+- Verify WebDriver server is running on port 4444 for full browser automation
+- Example demonstrates graceful error handling when WebDriver is unavailable
 
-**Network Errors**: Examples use httpbin.org which should be reliable, so check network connectivity and firewall settings, and enable debug logging with `RUST_LOG=debug cargo run`.
+**Network Errors**:
+- Examples use httpbin.org which should be reliable
+- Check network connectivity and firewall settings  
+- Enable debug logging with `RUST_LOG=debug cargo run`
+
+**Response Body Issues**:
+- Current reqwest backend implementation has limitations with response body extraction
+- Examples demonstrate proper patterns and error handling
+- Framework architecture and example structure work correctly
 
 ## See Also
 
 - [Main Documentation](../README.md) - Framework overview and getting started guide
-- [Core Crate](../crates/spire/) - Core framework implementation
+- [Core Crate](../spire/) - Core framework implementation  
 - [Contributing Guide](../CONTRIBUTING.md) - Development and contribution guidelines
 - [API Documentation](https://docs.rs/spire) - Comprehensive API reference

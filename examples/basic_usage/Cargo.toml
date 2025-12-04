@@ -1,7 +1,11 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [package]
 name = "basic_usage"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
 description = "Basic usage example for Spire web scraping framework"
 
 [[bin]]
@@ -9,13 +13,17 @@ name = "basic_usage"
 path = "main.rs"
 
 [dependencies]
-# Async runtime and spire framework
+# Async runtime and Spire framework
+spire = { workspace = true, features = ["reqwest", "tracing", "macros"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
-spire = { workspace = true, features = ["reqwest", "tracing"] }
+
+# Serialization and HTML parsing
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = [] }
+
+# Data types
+jiff = { workspace = true, features = ["serde"] }
 
 # Observability
 tracing = { workspace = true, features = [] }
 tracing-subscriber = { workspace = true, features = [] }
-
-# JSON handling
-serde_json = { workspace = true }

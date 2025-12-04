@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn test_complete_workflow() {
-        use crate::{HttpClient, HttpConnection};
+        use crate::HttpClient;
 
         // Step 1: Create a reqwest client
         let reqwest_client = reqwest::Client::new();
@@ -63,11 +63,9 @@ mod tests {
         // Step 3: Create backend from HttpService
         let backend = HttpClient::from_http_service(service.clone());
 
-        // Step 4: Create connection from HttpService
-        let connection = HttpConnection::from_http_service(service);
+        // HttpConnection has been removed - HttpClient now implements Client directly
 
         // Test passes if all conversions work without panicking
         drop(backend);
-        drop(connection);
     }
 }

@@ -1,9 +1,11 @@
 use derive_more::{Deref, DerefMut};
-use spire_thirtyfour::WebDriver;
+use spire_thirtyfour::{BrowserConnection, WebDriver};
 
 use crate::Error;
 use crate::context::Context;
-use crate::extract::{Elements, FromContextRef, Select};
+use crate::extract::FromContextRef;
+#[cfg(feature = "macros")]
+use crate::extract::{Elements, Select};
 
 // TODO: Snapshot, Screen, Color, Capture extractors for browser screenshots and visual data.
 
@@ -32,16 +34,13 @@ pub struct View(pub WebDriver);
 
 #[cfg(feature = "thirtyfour")]
 #[spire_core::async_trait]
-impl<S> FromContextRef<spire_thirtyfour::BrowserConnection, S> for View
+impl<S> FromContextRef<BrowserConnection, S> for View
 where
     S: Send + Sync + 'static,
 {
     type Rejection = Error;
 
-    async fn from_context_ref(
-        cx: &Context<spire_thirtyfour::BrowserConnection>,
-        _state: &S,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_context_ref(cx: &Context<BrowserConnection>, _state: &S) -> Result<Self, Error> {
         let client = cx.as_client_ref();
         // Clone the WebDriver from the BrowserConnection
         let driver = (**client).clone();
@@ -52,9 +51,9 @@ where
 // Remove Clone implementation since WebDriver is not Clone
 // Users should extract what they need from the WebDriver instead
 
-#[cfg(all(feature = "macros", feature = "thirtyfour"))]
+#[cfg(feature = "macros")]
 #[spire_core::async_trait]
-impl<S, T> FromContextRef<spire_thirtyfour::BrowserConnection, S> for Elements<T>
+impl<S, T> FromContextRef<BrowserConnection, S> for Elements<T>
 where
     S: Sync + Send + 'static,
     T: Select + Send,
@@ -62,7 +61,7 @@ where
     type Rejection = Error;
 
     async fn from_context_ref(
-        cx: &Context<spire_thirtyfour::BrowserConnection>,
+        cx: &Context<BrowserConnection>,
         state: &S,
     ) -> Result<Self, Self::Rejection> {
         let View(_view) = View::from_context_ref(cx, state).await?;

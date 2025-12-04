@@ -1,184 +1,221 @@
-//! Chrome WebDriver example demonstrating browser automation with Spire.
+//! Chrome WebDriver automation example demonstrating browser-based scraping with Spire.
 //!
-//! This example showcases the browser automation capabilities of Spire using
-//! the thirtyfour backend with Chrome WebDriver. It demonstrates how to set up
-//! a basic browser backend for rendering JavaScript-heavy pages and extracting
-//! content from dynamically loaded websites.
+//! This example showcases the browser automation capabilities of the Spire framework
+//! using the thirtyfour backend with Chrome WebDriver. It demonstrates how to set up
+//! browser-based web scraping for JavaScript-heavy pages, handle dynamic content
+//! loading, extract data from rendered web pages, and manage browser automation
+//! workflows with proper error handling.
 //!
-//! The example focuses on fundamental browser automation concepts rather than
-//! advanced interactions, making it suitable for understanding the core patterns
-//! of browser-based web scraping with Spire.
+//! The example covers basic browser page processing, dynamic content handling,
+//! WebDriver integration patterns, and graceful error handling when WebDriver
+//! services are unavailable.
 //!
-//! Prerequisites include having Chrome browser installed and accessible,
-//! with ChromeDriver automatically managed by thirtyfour.
+//! Prerequisites: Chrome browser must be installed and accessible.
+//! ChromeDriver is automatically managed by the thirtyfour library.
+
+mod data;
 
 use std::time::Duration;
 
+use data::PageData;
+use spire::context::RequestQueue;
+use spire::dataset::future::Data;
+use spire::dataset::{Dataset, DatasetBatchExt, InMemDataset};
 use spire::extract::driver::View;
-use spire::prelude::*;
+use spire::{BrowserBackend, Client, Result, Router, http};
 
 /// Handler for processing pages that require browser rendering.
 ///
-/// This handler demonstrates basic browser navigation and content extraction.
-/// It shows how to wait for page content to load and extract basic information
-/// from the rendered page using the WebDriver interface.
-async fn scrape_browser_page(view: View, data: Data<String>) -> Result<()> {
-    // Get the current page URL through the WebDriver
-    let current_url = view
-        .current_url()
-        .await
-        .map_err(|e| Error::new(ErrorKind::Backend, format!("Failed to get URL: {}", e)))?;
+/// This handler demonstrates basic browser navigation and content extraction
+/// using WebDriver for JavaScript-heavy or dynamically rendered pages. It shows
+/// how to wait for page content to load, extract basic page information, and
+/// store structured data about browser-rendered pages.
+async fn scrape_browser_page(uri: http::Uri, data_store: Data<PageData>, view: View) -> Result<()> {
+    let url = uri.to_string();
+    tracing::info!("Processing browser page: {}", url);
 
-    tracing::info!("Processing browser page: {}", current_url);
-
-    // Allow time for page content to fully load and JavaScript to execute
+    // Allow time for page content to load and JavaScript to execute
     tokio::time::sleep(Duration::from_secs(2)).await;
 
-    // Extract the page title using WebDriver
-    let title = view
-        .title()
-        .await
-        .map_err(|e| Error::new(ErrorKind::Backend, format!("Failed to get title: {}", e)))?;
+    // Extract page information using WebDriver
+    let title = view.title().await.map_err(|e| {
+        spire::Error::new(
+            spire::ErrorKind::Backend,
+            format!("Failed to get title: {}", e),
+        )
+    })?;
 
-    tracing::info!("Page title extracted: {}", title);
-
-    // Store the extracted title in the dataset
-    data.write(format!(
-        "Browser page title: {} from {}",
-        title, current_url
-    ))
-    .await?;
-
-    // Get basic page information by extracting the page source
     let page_source = view.source().await.map_err(|e| {
-        Error::new(
-            ErrorKind::Backend,
+        spire::Error::new(
+            spire::ErrorKind::Backend,
             format!("Failed to get page source: {}", e),
         )
     })?;
 
-    let content_length = page_source.len();
-    let line_count = page_source.lines().count();
+    let current_url = view.current_url().await.map_err(|e| {
+        spire::Error::new(
+            spire::ErrorKind::Backend,
+            format!("Failed to get current URL: {}", e),
+        )
+    })?;
 
-    tracing::info!(
-        "Page content analysis: {} bytes, {} lines",
-        content_length,
-        line_count
+    tracing::info!("Extracted title: {} from {}", title, current_url);
+
+    let page_data = PageData::new(
+        current_url.to_string(),
+        title,
+        page_source.len(),
+        "Browser".to_string(),
     );
 
-    // Store content analysis results
-    data.write(format!(
-        "Page analysis: {} ({} bytes, {} lines)",
-        current_url, content_length, line_count
-    ))
-    .await?;
-
+    data_store.write(page_data).await?;
     Ok(())
 }
 
 /// Handler for processing pages with dynamic content loading.
 ///
 /// This handler demonstrates handling JavaScript-heavy pages that require
-/// additional time to load content dynamically. It shows the basic pattern
-/// of waiting for content to load before extraction.
-async fn scrape_dynamic_content(view: View, data: Data<String>) -> Result<()> {
-    let current_url = view
-        .current_url()
-        .await
-        .map_err(|e| Error::new(ErrorKind::Backend, format!("Failed to get URL: {}", e)))?;
-
-    tracing::info!("Processing dynamic content page: {}", current_url);
+/// additional time for dynamic content to load and render. It shows extended
+/// wait patterns for content that loads asynchronously via JavaScript.
+async fn scrape_dynamic_content(
+    uri: http::Uri,
+    data_store: Data<PageData>,
+    view: View,
+) -> Result<()> {
+    let url = uri.to_string();
+    tracing::info!("Processing dynamic content page: {}", url);
 
     // Wait longer for dynamic content to load
     tokio::time::sleep(Duration::from_secs(3)).await;
 
-    let title = view
-        .title()
-        .await
-        .map_err(|e| Error::new(ErrorKind::Backend, format!("Failed to get title: {}", e)))?;
+    let title = view.title().await.map_err(|e| {
+        spire::Error::new(
+            spire::ErrorKind::Backend,
+            format!("Failed to get title: {}", e),
+        )
+    })?;
 
-    tracing::info!("Dynamic page loaded with title: {}", title);
+    let current_url = view.current_url().await.map_err(|e| {
+        spire::Error::new(
+            spire::ErrorKind::Backend,
+            format!("Failed to get current URL: {}", e),
+        )
+    })?;
 
-    // Store information about the dynamically loaded content
-    data.write(format!(
-        "Dynamic content processed: {} - {}",
-        current_url, title
-    ))
-    .await?;
+    let page_source = view.source().await.map_err(|e| {
+        spire::Error::new(
+            spire::ErrorKind::Backend,
+            format!("Failed to get page source: {}", e),
+        )
+    })?;
+
+    tracing::info!("Dynamic content loaded: {} from {}", title, current_url);
+
+    let page_data = PageData::new(
+        current_url.to_string(),
+        title,
+        page_source.len(),
+        "Dynamic Browser".to_string(),
+    );
+
+    data_store.write(page_data).await?;
+    Ok(())
+}
+
+/// Creates and configures the browser client with WebDriver backend.
+fn create_browser_client() -> Result<Client<BrowserBackend>> {
+    let browser_backend = BrowserBackend::builder()
+        .with_unmanaged("http://127.0.0.1:4444")
+        .build()?;
+
+    let router = Router::new()
+        .route("browser_page", scrape_browser_page)
+        .route("dynamic_content", scrape_dynamic_content);
+
+    Ok(Client::new(browser_backend, router)
+        .with_request_queue(InMemDataset::stack())
+        .with_dataset(InMemDataset::<PageData>::new()))
+}
+
+/// Queues initial browser automation requests for processing.
+async fn queue_initial_requests(queue: &RequestQueue) -> Result<()> {
+    queue
+        .append_with_tag("browser_page", "https://httpbin.org/html")
+        .await?;
+
+    queue
+        .append_with_tag("dynamic_content", "https://httpbin.org/delay/1")
+        .await?;
 
     Ok(())
 }
 
-/// Handler for browser automation errors.
-///
-/// This handler demonstrates graceful error handling when browser operations
-/// fail, providing appropriate logging and error recovery patterns for
-/// WebDriver-related issues.
-async fn handle_browser_error(uri: http::Uri) -> Result<()> {
-    let url = uri.to_string();
+/// Displays the browser automation results from processed pages.
+async fn display_results(dataset: &Data<PageData>) -> Result<()> {
+    let results = dataset.read_all().await?;
 
-    tracing::error!("Browser automation error for: {}", url);
-    tracing::warn!("This may indicate WebDriver setup issues or page loading problems");
-    tracing::info!("Consider checking Chrome installation and network connectivity");
+    tracing::info!(
+        "Browser automation completed! Processed {} pages:",
+        results.len()
+    );
+
+    for (i, page_data) in results.iter().enumerate() {
+        tracing::info!(
+            "{}: {} - {} ({} bytes)",
+            i + 1,
+            page_data.title,
+            page_data.url,
+            page_data.content_length
+        );
+        tracing::info!("   Processing method: {}", page_data.processing_method);
+        tracing::info!("   Processed at: {}", page_data.processed_at);
+    }
 
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize structured logging for observability
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .with_target(false)
-        .with_thread_ids(false)
-        .with_file(false)
-        .with_line_number(false)
-        .init();
+    // Initialize structured logging
+    tracing_subscriber::fmt().init();
 
     tracing::info!("Starting Spire Chrome WebDriver Example");
 
-    // Note: This example assumes the browser backend configuration is handled
-    // by the framework defaults. In a real application, you would configure
-    // WebDriver settings, connection pools, and browser options here.
-    tracing::warn!("This example requires proper WebDriver configuration");
-    tracing::info!("Ensure Chrome browser and ChromeDriver are properly installed");
+    // Note: This example requires Chrome browser and WebDriver setup
+    tracing::info!("Ensure Chrome browser is installed and accessible");
+    tracing::info!("WebDriver will attempt to connect to http://127.0.0.1:4444");
 
-    // Create a simple router for browser-based handlers
-    // Note: In a real implementation, this would be configured with proper backend types
-    tracing::info!("Router configuration:");
-    tracing::info!("  - browser_page: Basic page rendering and content extraction");
-    tracing::info!("  - dynamic_content: JavaScript-heavy content processing");
-    tracing::info!("  - browser_error: Error handling for browser automation failures");
+    // Attempt to create browser client
+    match create_browser_client() {
+        Ok(client) => {
+            tracing::info!("Browser backend initialized successfully");
 
-    // For this simplified example, we'll use a placeholder configuration
-    // In a real implementation, you would properly configure BrowserBackend here
-    tracing::error!("Browser backend configuration not fully implemented in this example");
-    tracing::info!("This example demonstrates the documentation patterns and handler structure");
-    tracing::info!("For working browser automation, refer to the Spire documentation");
+            // Queue initial requests
+            let queue = client.request_queue();
+            queue_initial_requests(&queue).await?;
 
-    // The following code demonstrates the intended structure but may not execute
-    // without proper browser backend configuration
+            tracing::info!("Starting browser automation");
 
-    /*
-    let client = Client::new(browser_backend, router)
-        .with_request_queue(InMemDataset::stack())
-        .with_dataset(InMemDataset::<String>::new());
+            // Execute browser automation
+            client.run().await?;
 
-    let queue = client.request_queue();
+            // Display results
+            let dataset = client.dataset::<PageData>();
+            display_results(&dataset).await?;
 
-    queue
-        .append_with_tag(Tag::new("browser_page"), "https://httpbin.org/html")
-        .await?;
-
-    queue
-        .append_with_tag(Tag::new("dynamic_content"), "https://httpbin.org/delay/1")
-        .await?;
-
-    client.run().await?;
-    */
-
-    tracing::info!("Chrome WebDriver example structure demonstration completed");
-    tracing::info!("Refer to Spire documentation for complete browser backend setup");
+            tracing::info!("Chrome WebDriver example completed successfully");
+        }
+        Err(e) => {
+            tracing::error!("Failed to initialize browser backend: {}", e);
+            tracing::warn!("This may indicate WebDriver setup issues:");
+            tracing::info!("  - Chrome browser not installed or not in PATH");
+            tracing::info!("  - ChromeDriver compatibility issues");
+            tracing::info!("  - Network connectivity problems");
+            tracing::info!("  - Insufficient system resources");
+            tracing::info!("  - WebDriver server not running on port 4444");
+            tracing::info!("Example structure demonstrated, but browser automation skipped");
+        }
+    }
 
     Ok(())
 }

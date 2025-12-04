@@ -25,9 +25,12 @@ pub use crate::context::{
 };
 pub use crate::dataset::future::{Data, DataSink, DataStream};
 pub use crate::dataset::{Dataset, DatasetExt, InMemDataset};
+#[cfg(feature = "reqwest")]
+#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
+pub use crate::extract::client::HttpBackend;
 pub use crate::extract::{
     AttrData, AttrTag, Body as ExtractBody, Client as ExtractClient, Elements, FromContext,
-    FromContextRef, Json, Select, State, Text,
+    FromContextRef, Html, Json, Select, State, Text,
 };
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]

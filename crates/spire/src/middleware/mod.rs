@@ -23,12 +23,7 @@
 //! # Tower Ecosystem
 //!
 //! Spire is built on the [`tower`] service abstraction, which means you can use
-//! any middleware from the tower ecosystem:
-//!
-//! - [`tower::timeout`] - Request timeouts
-//! - `tower::limit` - Rate limiting and concurrency control
-//! - `tower::buffer` - Request buffering
-//! - [`tower::retry`] - Automatic retries
+//! any middleware from the tower ecosystem.
 //!
 //! # Custom Middleware
 //!

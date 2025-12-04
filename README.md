@@ -58,15 +58,15 @@ Basic HTTP scraping example:
 use spire::prelude::*;
 
 async fn scrape_page(
+    uri: http::Uri,
+    data_store: Data<String>,
     Text(html): Text,
-    request: Request,
-    mut data_sink: DataSink<String>,
 ) -> Result<()> {
-    let url = request.uri().to_string();
+    let url = uri.to_string();
     tracing::info!("Scraped {}: {} bytes", url, html.len());
 
     // Store the scraped data
-    data_sink.push(format!("Content from {}", url)).await?;
+    data_store.write(format!("Content from {}", url)).await?;
     Ok(())
 }
 
@@ -76,14 +76,14 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let router = Router::new()
-        .route(Tag::new("page"), scrape_page);
+        .route("page", scrape_page);
 
     let client = Client::new(HttpClient::default(), router)
         .with_request_queue(InMemDataset::stack())
         .with_dataset(InMemDataset::<String>::new());
 
-    client.queue()
-        .push(Tag::new("page"), "https://example.com")
+    client.request_queue()
+        .append_with_tag("page", "https://example.com")
         .await?;
 
     client.run().await

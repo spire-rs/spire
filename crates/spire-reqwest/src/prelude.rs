@@ -7,4 +7,4 @@
 //! ```
 
 #[doc(hidden)]
-pub use crate::{HttpClient, HttpConnection, HttpService, client_to_service};
+pub use crate::{HttpClient, HttpService, client_to_service};

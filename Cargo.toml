@@ -54,6 +54,7 @@ pin-project-lite = { version = "0.2", features = [] }
 thiserror = { version = "2.0", features = [] }
 derive_more = { version = "2.0", features = [] }
 derive_builder = { version = "0.20", features = [] }
+url = { version = "2.5", features = [] }
 
 # Serialization
 serde = { version = "1.0", features = [] }
@@ -61,7 +62,6 @@ serde_json = { version = "1.0", features = [] }
 
 # HTTP clients & HTML parsing
 reqwest = { version = "0.12", features = [] }
-scraper = { version = "0.24", features = [] }
 
 # Browser automation
 thirtyfour = { version = "0.36", features = [] }

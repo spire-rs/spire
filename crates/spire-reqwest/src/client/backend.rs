@@ -1,39 +1,38 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use spire_core::backend::Backend;
+use spire_core::backend::{Backend, Client};
 use spire_core::context::{Body, Request, Response};
 use spire_core::{Error, ErrorKind, Result};
 use tower::util::BoxCloneService;
 use tower::{Service, ServiceExt};
 
-use super::connection::HttpConnection;
 use crate::HttpService;
+use crate::utils::{request_to_reqwest, response_from_reqwest};
 
-/// HTTP backend implementation using reqwest.
+/// HTTP client implementation using reqwest.
 ///
-/// `HttpClient` implements the [`Backend`] trait and creates [`HttpConnection`]
-/// instances that can perform HTTP requests using the reqwest library or
-/// Tower services.
+/// `HttpClient` implements the [`Client`] trait and can perform HTTP requests
+/// using the reqwest library or Tower services directly.
 ///
 /// # Examples
 ///
 /// ```ignore
 /// use spire_reqwest::HttpClient;
-/// use spire_core::backend::Backend;
+/// use spire_core::backend::Client;
 ///
 /// // Create with default reqwest client
-/// let backend = HttpClient::default();
+/// let client = HttpClient::default();
 ///
 /// // Create with custom reqwest client
 /// let reqwest_client = reqwest::Client::builder()
 ///     .timeout(std::time::Duration::from_secs(30))
 ///     .build()
 ///     .unwrap();
-/// let backend = HttpClient::from_client(reqwest_client);
+/// let client = HttpClient::from_client(reqwest_client);
 ///
 /// // Create with custom Tower service
-/// let backend = HttpClient::from_service(my_tower_service);
+/// let client = HttpClient::from_service(my_tower_service);
 /// ```
 #[derive(Clone)]
 pub struct HttpClient {
@@ -65,7 +64,7 @@ impl HttpClient {
     ///     .build()
     ///     .unwrap();
     ///
-    /// let backend = HttpClient::from_client(reqwest_client);
+    /// let client = HttpClient::from_client(reqwest_client);
     /// ```
     pub fn from_client(client: reqwest::Client) -> Self {
         Self {
@@ -124,7 +123,7 @@ impl HttpClient {
     ///
     /// let client = Client::new();
     /// let service: HttpService = client_to_service(client);
-    /// let backend = HttpClient::from_http_service(service);
+    /// let client = HttpClient::from_http_service(service);
     /// ```
     pub fn from_http_service(service: HttpService) -> Self {
         Self {
@@ -157,26 +156,61 @@ impl fmt::Debug for HttpClient {
 }
 
 #[spire_core::async_trait]
-impl Backend for HttpClient {
-    type Client = HttpConnection;
-
-    /// Creates a new HTTP connection from this backend.
+impl Client for HttpClient {
+    /// Resolves an HTTP request using the underlying client implementation.
     ///
-    /// Each connection gets access to the underlying HTTP client implementation,
-    /// allowing for efficient connection reuse and sharing.
-    async fn connect(&self) -> Result<Self::Client> {
-        match &self.inner {
-            HttpClientInner::Client(client) => Ok(HttpConnection::from_client(client.clone())),
+    /// Depending on how this client was created, it will either use a reqwest
+    /// client or a Tower service to perform the HTTP operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The request cannot be processed by the underlying client
+    /// - The HTTP request fails (network errors, timeouts, etc.)
+    /// - The response cannot be converted back to a spire response
+    async fn resolve(self, req: Request) -> Result<Response> {
+        match self.inner {
+            HttpClientInner::Client(client) => {
+                // Convert spire request to reqwest request
+                let reqwest_req = request_to_reqwest(req);
+
+                // Perform the HTTP request
+                let reqwest_res = client
+                    .execute(reqwest_req)
+                    .await
+                    .map_err(Error::from_boxed)?;
+
+                // Convert reqwest response to spire response
+                let response = response_from_reqwest(reqwest_res);
+
+                Ok(response)
+            }
             HttpClientInner::Service(service_arc) => {
-                let service = {
+                // Clone the service from the Arc<Mutex<>>
+                let mut service = {
                     let guard = service_arc
                         .lock()
                         .map_err(|_| Error::new(ErrorKind::Backend, "HttpClient mutex poisoned"))?;
                     guard.clone()
                 };
-                Ok(HttpConnection::from_service(service))
+                // Use the Tower service directly
+                let ready_service = service.ready().await.map_err(Error::from_boxed)?;
+                ready_service.call(req).await
             }
         }
+    }
+}
+
+#[spire_core::async_trait]
+impl Backend for HttpClient {
+    type Client = Self;
+
+    /// Creates a new HTTP client connection by cloning this client.
+    ///
+    /// Since HttpClient now implements Client directly, connecting simply
+    /// returns a clone of the current client, allowing for efficient reuse.
+    async fn connect(&self) -> Result<Self::Client> {
+        Ok(self.clone())
     }
 }
 
@@ -186,23 +220,20 @@ mod test {
         Client as RwClient, Error as RwError, Request as RwRequest, Response as RwResponse,
     };
     use spire_core::BoxError;
-    use spire_core::backend::Backend;
     use spire_core::context::{Request, Response};
     use tower::ServiceBuilder;
 
     use super::*;
 
     #[tokio::test]
-    async fn test_backend_creation() {
-        let backend = HttpClient::default();
-        let _connection = backend.connect().await.unwrap();
+    async fn test_client_creation() {
+        let _client = HttpClient::default();
     }
 
     #[tokio::test]
     async fn test_from_client() {
         let reqwest_client = reqwest::Client::new();
-        let backend = HttpClient::from_client(reqwest_client);
-        let _connection = backend.connect().await.unwrap();
+        let _client = HttpClient::from_client(reqwest_client);
     }
 
     #[test]
@@ -221,8 +252,8 @@ mod test {
 
     #[test]
     fn test_debug() {
-        let backend = HttpClient::default();
-        let debug_str = format!("{:?}", backend);
+        let client = HttpClient::default();
+        let debug_str = format!("{:?}", client);
         assert!(debug_str.contains("HttpClient"));
     }
 

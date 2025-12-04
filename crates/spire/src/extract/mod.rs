@@ -40,7 +40,7 @@ use std::convert::Infallible;
 pub use spire_macros::Select;
 
 use crate::context::{Context, IntoFlowControl};
-pub use crate::extract::content::{Body, Json, Text};
+pub use crate::extract::content::{Body, Html, Json, Text};
 pub use crate::extract::context::Client;
 pub use crate::extract::select::{AttrData, AttrTag, Elements, Select};
 pub use crate::extract::state::{FromRef, State};
