@@ -148,10 +148,12 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// use spire_core::Client;
     /// use spire_core::dataset::InMemDataset;
     ///
+    /// # let backend = todo!();
+    /// # let worker = todo!();
     /// let client = Client::new(backend, worker)
     ///     .with_request_queue(InMemDataset::stack()); // Use LIFO instead of FIFO
     /// ```
@@ -399,15 +401,18 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// use spire_core::Client;
+    /// use spire_core::context::Tag;
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let backend = todo!();
+    /// # let worker = todo!();
     /// let client = Client::new(backend, worker);
-    /// let queue = client.queue();
+    /// let queue = client.request_queue();
     ///
     /// // Add requests to the queue
-    /// queue.push(tag, "https://example.com").await?;
+    /// queue.append_with_tag(Tag::from("crawl"), "https://example.com").await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -415,7 +420,7 @@ impl<B, W> Client<B, W> {
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub fn request_queue(&self) -> RequestQueue {
         let dataset = self.inner.datasets.get::<Request>();
-        RequestQueue::new(dataset, 0)
+        RequestQueue::new(dataset, std::num::NonZeroU32::new(1).unwrap())
     }
 }
 

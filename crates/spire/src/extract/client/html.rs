@@ -1,5 +1,4 @@
-use std::ops::{Deref, DerefMut};
-
+use derive_more::{Deref, DerefMut};
 use scraper::Html as HtmlDoc;
 
 use crate::Error;
@@ -27,10 +26,10 @@ use crate::extract::{FromContext, Text};
 /// ```
 ///
 /// [`scraper`]: https://docs.rs/scraper
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Html(pub HtmlDoc);
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S> FromContext<C, S> for Html
 where
     C: Client,
@@ -42,22 +41,6 @@ where
         let Text(text) = Text::from_context(cx, state).await?;
         let html = HtmlDoc::parse_document(&text);
         Ok(Self(html))
-    }
-}
-
-impl Deref for Html {
-    type Target = HtmlDoc;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Html {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 

@@ -1,6 +1,4 @@
-use std::ops::{Deref, DerefMut};
-
-#[cfg(feature = "thirtyfour")]
+use derive_more::{Deref, DerefMut};
 use spire_thirtyfour::WebDriver;
 
 use crate::Error;
@@ -28,16 +26,12 @@ use crate::extract::{Elements, FromContextRef, Select};
 ///     Ok(())
 /// }
 /// ```
-#[cfg(feature = "thirtyfour")]
-#[derive(Debug)]
+
+#[derive(Debug, Deref, DerefMut)]
 pub struct View(pub WebDriver);
 
-#[cfg(not(feature = "thirtyfour"))]
-#[derive(Debug, Clone)]
-pub struct View(pub ());
-
 #[cfg(feature = "thirtyfour")]
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<S> FromContextRef<spire_thirtyfour::BrowserConnection, S> for View
 where
     S: Send + Sync + 'static,
@@ -55,57 +49,11 @@ where
     }
 }
 
-#[cfg(not(feature = "thirtyfour"))]
-#[async_trait::async_trait]
-impl<C, S> FromContextRef<C, S> for View
-where
-    C: Send + Sync + 'static,
-    S: Send + Sync + 'static,
-{
-    type Rejection = Error;
-
-    async fn from_context_ref(_cx: &Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
-        todo!("View extractor not yet implemented")
-    }
-}
-
-#[cfg(feature = "thirtyfour")]
-impl Deref for View {
-    type Target = WebDriver;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[cfg(feature = "thirtyfour")]
-impl DerefMut for View {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[cfg(not(feature = "thirtyfour"))]
-impl Deref for View {
-    type Target = ();
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[cfg(not(feature = "thirtyfour"))]
-impl DerefMut for View {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 // Remove Clone implementation since WebDriver is not Clone
 // Users should extract what they need from the WebDriver instead
 
 #[cfg(all(feature = "macros", feature = "thirtyfour"))]
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<S, T> FromContextRef<spire_thirtyfour::BrowserConnection, S> for Elements<T>
 where
     S: Sync + Send + 'static,

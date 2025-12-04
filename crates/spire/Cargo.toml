@@ -36,8 +36,6 @@ thirtyfour = ["dep:spire-thirtyfour"]
 tracing = ["dep:tracing", "spire-core/tracing"]
 metric = ["spire-core/metric"]
 
-
-
 [dependencies]
 # Spire
 spire-core = { workspace = true }
@@ -46,30 +44,24 @@ spire-reqwest = { workspace = true, optional = true }
 spire-thirtyfour = { workspace = true, optional = true }
 
 # Tower ecosystem
+futures = { workspace = true, features = [] }
 tower = { workspace = true, features = ["timeout"] }
-
-# Async
-futures = { workspace = true }
-async-trait = { workspace = true }
 
 # Utilities
 bytes = { workspace = true }
 pin-project-lite = { workspace = true }
+derive_more = { workspace = true }
 
 # Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
-
-# HTML parsing
 scraper = { workspace = true, optional = true }
 
-# Optional: Observability
+# Observability
 tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }
-
-
 
 # Future features (commented out)
 #robotxt = { version = "0.6", optional = true }

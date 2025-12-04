@@ -2,10 +2,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 
-#[doc(no_inline)]
-pub use async_trait::async_trait;
 #[doc(inline)]
 pub use routing::Router;
+#[doc(no_inline)]
+pub use spire_core::async_trait;
 use spire_core::backend::Backend;
 pub use spire_core::{Error, ErrorKind, Result, backend, context, dataset};
 #[cfg(feature = "reqwest")]

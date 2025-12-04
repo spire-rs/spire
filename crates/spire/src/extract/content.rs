@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use derive_more::{Deref, DerefMut};
 use serde::de::DeserializeOwned;
 
 use crate::backend::Client;
@@ -9,10 +10,10 @@ use crate::{Error, ErrorKind};
 /// Bytes [`Response`] body extractor.
 ///
 /// [`Response`]: crate::context::Response
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Body(pub Bytes);
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S> FromContext<C, S> for Body
 where
     C: Client,
@@ -30,10 +31,10 @@ where
 /// Text [`Response`] body extractor.
 ///
 /// [`Response`]: crate::context::Response
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Text(pub String);
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S> FromContext<C, S> for Text
 where
     C: Client,
@@ -58,10 +59,10 @@ where
 /// in a handler.
 ///
 /// [`Response`]: crate::context::Response
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Deref, DerefMut)]
 pub struct Json<T>(pub T);
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S, T> FromContext<C, S> for Json<T>
 where
     C: Client,
