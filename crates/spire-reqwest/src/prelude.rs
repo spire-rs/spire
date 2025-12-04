@@ -2,9 +2,9 @@
 //!
 //! This module is intended to be glob-imported for convenience:
 //!
-//! ```ignore
+//! ```
 //! use spire_reqwest::prelude::*;
 //! ```
 
 #[doc(hidden)]
-pub use crate::HttpClient;
+pub use crate::{HttpClient, HttpService, client_to_service};

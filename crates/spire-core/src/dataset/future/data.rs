@@ -1,5 +1,7 @@
 use std::fmt;
 
+use derive_more::{Deref, DerefMut};
+
 use super::{DataSink, DataStream};
 use crate::Error;
 use crate::dataset::DatasetExt;
@@ -27,7 +29,7 @@ use crate::dataset::utils::BoxCloneDataset;
 /// let sink = sink_data.into_sink();
 /// ```
 #[must_use]
-#[derive(Clone, derive_more::Deref, derive_more::DerefMut)]
+#[derive(Clone, Deref, DerefMut)]
 pub struct Data<T, E = Error>(pub BoxCloneDataset<T, E>)
 where
     T: 'static,

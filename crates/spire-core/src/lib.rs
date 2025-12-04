@@ -13,6 +13,7 @@ pub mod prelude;
 
 #[doc(no_inline)]
 pub use async_trait::async_trait;
+pub use http;
 
 pub use crate::error::{BoxError, Error, ErrorKind};
 pub use crate::process::Client;

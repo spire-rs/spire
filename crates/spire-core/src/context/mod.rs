@@ -8,17 +8,19 @@
 //! - FlowControl-based flow control
 //! - Dataset access for storing scraped data
 
-mod body;
-mod extend;
 mod flow_control;
+mod http_body;
+mod request_extend;
 mod request_queue;
+mod request_source;
 
 use std::fmt;
 
-pub use body::{Body, Request, Response};
-pub use extend::{Depth, Tag, Task, TaskBuilder, TaskExt};
 pub use flow_control::{FlowControl, IntoFlowControl, TagQuery};
+pub use http_body::{Body, Request, Response};
+pub use request_extend::{Depth, Tag, Task, TaskBuilder, TaskExt};
 pub use request_queue::RequestQueue;
+pub use request_source::RequestSource;
 
 use crate::Result;
 use crate::backend::Client;
@@ -81,9 +83,21 @@ impl<C> Context<C> {
     }
 
     /// Initializes and returns the [`RequestQueue`].
-    pub fn queue(&self) -> RequestQueue {
+    pub fn request_queue(&self) -> RequestQueue {
+        use std::num::NonZeroU32;
         let dataset = self.datasets.get::<Request>();
-        RequestQueue::new(dataset, self.request.depth())
+        let depth = NonZeroU32::new(self.request.depth()).unwrap_or(NonZeroU32::MIN);
+        let mut queue = RequestQueue::new(dataset, depth);
+
+        // Attach existing tag from request as default
+        if !self.request.tag().is_fallback() {
+            queue = queue.with_default_tag(self.request.tag().clone());
+        }
+
+        // Attach existing depth from request as default
+        queue = queue.with_default_depth(Depth::new(self.request.depth()));
+
+        queue
     }
 
     /// Initializes and returns the boxed [`Dataset`] of type `T`.

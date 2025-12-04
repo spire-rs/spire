@@ -371,28 +371,28 @@ impl Default for PoolConfig {
 /// Wrapper type for easier error handling in builders
 #[derive(Debug, Display)]
 pub enum ConfigError {
-    #[display(fmt = "Invalid URL: {}", message)]
+    #[display("Invalid URL: {}", message)]
     /// Invalid URL provided in configuration
     InvalidUrl {
         /// Error message describing the invalid URL
         message: String,
     },
 
-    #[display(fmt = "Invalid timeout: {}", message)]
+    #[display("Invalid timeout: {}", message)]
     /// Invalid timeout value provided in configuration
     InvalidTimeout {
         /// Error message describing the invalid timeout
         message: String,
     },
 
-    #[display(fmt = "Invalid pool configuration: {}", message)]
+    #[display("Invalid pool configuration: {}", message)]
     /// Invalid pool configuration provided
     InvalidPool {
         /// Error message describing the invalid pool configuration
         message: String,
     },
 
-    #[display(fmt = "Validation error: {}", message)]
+    #[display("Validation error: {}", message)]
     /// Configuration validation failed
     Validation {
         /// Error message describing the validation failure

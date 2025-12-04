@@ -1,24 +1,27 @@
 # https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [package]
-name = "chrome_webdriver"
+name = "api_endpoints"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
-description = "Chrome WebDriver automation example for Spire web scraping framework"
+description = "API endpoints example for Spire web scraping framework"
 
 [[bin]]
-name = "chrome_webdriver"
+name = "api_endpoints"
 path = "main.rs"
 
 [dependencies]
 # Async runtime and Spire framework
-spire = { workspace = true, features = ["thirtyfour", "tracing"] }
+spire = { workspace = true, features = ["reqwest", "tracing", "macros"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 
-# Serialization and data types
+# Serialization and JSON processing
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = [] }
+
+# Data types
 jiff = { workspace = true, features = ["serde"] }
 
 # Observability

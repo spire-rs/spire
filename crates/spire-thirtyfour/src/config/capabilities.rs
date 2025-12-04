@@ -200,12 +200,13 @@ pub fn merge_capabilities(
     for (key, value) in override_caps {
         // Special handling for nested objects (like browser options)
         if let (Some(base_value), Value::Object(override_obj)) = (merged.get(&key), &value)
-            && let Value::Object(base_obj) = base_value {
-                let mut merged_obj = base_obj.clone();
-                merged_obj.extend(override_obj.clone());
-                merged.insert(key, Value::Object(merged_obj));
-                continue;
-            }
+            && let Value::Object(base_obj) = base_value
+        {
+            let mut merged_obj = base_obj.clone();
+            merged_obj.extend(override_obj.clone());
+            merged.insert(key, Value::Object(merged_obj));
+            continue;
+        }
 
         merged.insert(key, value);
     }
@@ -222,38 +223,39 @@ pub fn validate_capabilities(capabilities: &HashMap<String, Value>) -> Result<()
 
     // Validate page load strategy
     if let Some(strategy) = capabilities.get(keys::PAGE_LOAD_STRATEGY)
-        && let Some(strategy_str) = strategy.as_str() {
-            match strategy_str {
-                page_load_strategy::NORMAL
-                | page_load_strategy::EAGER
-                | page_load_strategy::NONE => {}
-                _ => return Err(format!("Invalid page load strategy: {}", strategy_str)),
-            }
+        && let Some(strategy_str) = strategy.as_str()
+    {
+        match strategy_str {
+            page_load_strategy::NORMAL | page_load_strategy::EAGER | page_load_strategy::NONE => {}
+            _ => return Err(format!("Invalid page load strategy: {}", strategy_str)),
         }
+    }
 
     // Validate unhandled prompt behavior
     if let Some(behavior) = capabilities.get(keys::UNHANDLED_PROMPT_BEHAVIOR)
-        && let Some(behavior_str) = behavior.as_str() {
-            match behavior_str {
-                unhandled_prompt_behavior::DISMISS
-                | unhandled_prompt_behavior::ACCEPT
-                | unhandled_prompt_behavior::DISMISS_AND_NOTIFY
-                | unhandled_prompt_behavior::ACCEPT_AND_NOTIFY
-                | unhandled_prompt_behavior::IGNORE => {}
-                _ => {
-                    return Err(format!(
-                        "Invalid unhandled prompt behavior: {}",
-                        behavior_str
-                    ));
-                }
+        && let Some(behavior_str) = behavior.as_str()
+    {
+        match behavior_str {
+            unhandled_prompt_behavior::DISMISS
+            | unhandled_prompt_behavior::ACCEPT
+            | unhandled_prompt_behavior::DISMISS_AND_NOTIFY
+            | unhandled_prompt_behavior::ACCEPT_AND_NOTIFY
+            | unhandled_prompt_behavior::IGNORE => {}
+            _ => {
+                return Err(format!(
+                    "Invalid unhandled prompt behavior: {}",
+                    behavior_str
+                ));
             }
         }
+    }
 
     // Validate timeouts format
     if let Some(timeouts) = capabilities.get(keys::TIMEOUTS)
-        && !timeouts.is_object() {
-            return Err("Timeouts must be an object".to_string());
-        }
+        && !timeouts.is_object()
+    {
+        return Err("Timeouts must be an object".to_string());
+    }
 
     Ok(())
 }

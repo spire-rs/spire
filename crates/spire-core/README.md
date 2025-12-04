@@ -20,20 +20,22 @@ Core types and traits for the spire web scraping framework.
 
 ## Overview
 
-`spire-core` provides the foundational abstractions and types used throughout the spire ecosystem. This crate contains the core traits, error types, context structures, and dataset interfaces that power spire's flexible architecture.
-
-
+`spire-core` provides the foundational abstractions and types used throughout
+the spire ecosystem. This crate contains the core traits, error types, context
+structures, and dataset interfaces that power spire's flexible architecture.
 
 ## Usage
 
-This crate is typically not used directly. Instead, use the main `spire` crate which re-exports these types:
+This crate is typically not used directly. Instead, use the main `spire` crate
+which re-exports these types:
 
 ```toml
 [dependencies]
 spire = "0.2.0"
 ```
 
-If you're implementing custom backends or extending spire's functionality, you may need to depend on `spire-core` directly:
+If you're implementing custom backends or extending spire's functionality, you
+may need to depend on `spire-core` directly:
 
 ```toml
 [dependencies]
@@ -79,4 +81,5 @@ impl Client for MyClient {
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE)
+file for details.
