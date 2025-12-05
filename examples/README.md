@@ -1,6 +1,9 @@
 # Examples
 
-This directory contains examples demonstrating the core functionality of the Spire web scraping and crawling framework. Each example showcases different aspects of the framework's capabilities and serves as both documentation and integration tests.
+This directory contains examples demonstrating the core functionality of the
+Spire web scraping and crawling framework. Each example showcases different
+aspects of the framework's capabilities and serves as both documentation and
+integration tests.
 
 ## Available Examples
 
@@ -8,56 +11,55 @@ This directory contains examples demonstrating the core functionality of the Spi
 
 **Location**: `examples/basic_usage/`
 
-Demonstrates fundamental Spire functionality including custom data types, HTML parsing, and text processing.
+Demonstrates fundamental Spire functionality including custom data types, HTML
+parsing, and text processing.
 
-**Key Features**: 
-- HTTP client setup with reqwest backend
-- Custom data structures for dataset storage
-- HTML content extraction using the Html extractor
-- Text content processing and analysis
-- Tag-based routing using Into<Tag>
-- Jiff timestamps and proper URL types
-- Request queue management and link discovery
+**Key Features**:
 
-**Learning Outcomes**: Core Spire architecture, handler patterns with extractors, custom dataset usage, and basic HTML parsing workflows.
+- Built on the reqwest HTTP backend
+- Demonstrates core Spire scraping patterns
+- HTML parsing and data extraction
+- Custom dataset management
+
+**Learning Outcomes**: Core Spire architecture, handler patterns with
+extractors, custom dataset usage, and basic HTML parsing workflows.
 
 ### API Endpoints
 
 **Location**: `examples/api_endpoints/`
 
-Shows how to process JSON API responses with structured and dynamic JSON handling, demonstrating multiple dataset management.
+Shows how to process JSON API responses with structured and dynamic JSON
+handling, demonstrating multiple dataset management.
 
 **Key Features**:
-- Structured JSON API processing with custom data types
-- Dynamic JSON response handling and analysis
-- Text content processing and analysis
-- API endpoint discovery and link following
-- Multiple dataset types for different data structures
-- Proper error handling and data validation
 
-**Learning Outcomes**: JSON API integration patterns, structured vs. dynamic JSON processing, multi-dataset management, and API endpoint discovery.
+- JSON API integration patterns
+- Structured and dynamic JSON processing
+- Multiple dataset management
+- API endpoint crawling
 
-
+**Learning Outcomes**: JSON API integration patterns, structured vs. dynamic
+JSON processing, multi-dataset management, and API endpoint discovery.
 
 ### Chrome WebDriver
 
 **Location**: `examples/chrome_webdriver/`
 
-Demonstrates browser automation using the thirtyfour backend for JavaScript-heavy sites and dynamic content rendering.
+Demonstrates browser automation using the thirtyfour backend for
+JavaScript-heavy sites and dynamic content rendering.
 
 **Key Features**:
-- Browser backend configuration with Chrome WebDriver
-- Basic page rendering and content extraction
-- Dynamic content loading with extended wait patterns
-- WebDriver integration and error handling
-- Structured data extraction from browser-rendered pages
-- Graceful error handling when WebDriver is unavailable
 
-**Learning Outcomes**: Browser automation patterns, handling dynamic content, WebDriver integration, and browser-based scraping workflows.
+- Built on the thirtyfour WebDriver backend
+- Browser automation for dynamic content
+- JavaScript-rendered page scraping
+- WebDriver integration patterns
 
-**Requirements**: Chrome browser installed (ChromeDriver automatically managed by thirtyfour).
+**Learning Outcomes**: Browser automation patterns, handling dynamic content,
+WebDriver integration, and browser-based scraping workflows.
 
-
+**Requirements**: Chrome browser installed (ChromeDriver automatically managed
+by thirtyfour).
 
 ## Running Examples
 
@@ -81,15 +83,17 @@ cargo run
 
 Each example follows a consistent structure:
 
-- **Comprehensive documentation** with detailed comments explaining concepts and patterns
-- **Real-world scenarios** using httpbin.org for reliable testing endpoints  
+- **Comprehensive documentation** with detailed comments explaining concepts and
+  patterns
+- **Real-world scenarios** using httpbin.org for reliable testing endpoints
 - **Proper error handling** using Spire's Result types
 - **Integrated tracing** for debugging and monitoring
 - **Production patterns** with scalable and maintainable code organization
 
 ## Dependencies
 
-Examples are self-contained with their own `Cargo.toml` files and organized dependency categories:
+Examples are self-contained with their own `Cargo.toml` files and organized
+dependency categories:
 
 - **Async runtime and Spire framework**: Core tokio and spire dependencies
 - **Serialization and JSON/data processing**: Data handling libraries
@@ -98,35 +102,42 @@ Examples are self-contained with their own `Cargo.toml` files and organized depe
 
 ## Development Guidelines
 
-These examples serve as living documentation and integration tests. When contributing:
+These examples serve as living documentation and integration tests. When
+contributing:
 
 - Ensure examples compile and run successfully
-- Include comprehensive inline documentation  
+- Include comprehensive inline documentation
 - Follow established architectural patterns
 - Verify examples work with current framework versions
 - Maintain consistent style and structure across examples
 
 ## Troubleshooting
 
-**Chrome WebDriver Issues**: 
+**Chrome WebDriver Issues**:
+
 - Ensure Chrome browser is installed and accessible
 - ChromeDriver is automatically managed by thirtyfour
 - Verify WebDriver server is running on port 4444 for full browser automation
 - Example demonstrates graceful error handling when WebDriver is unavailable
 
 **Network Errors**:
+
 - Examples use httpbin.org which should be reliable
-- Check network connectivity and firewall settings  
+- Check network connectivity and firewall settings
 - Enable debug logging with `RUST_LOG=debug cargo run`
 
 **Response Body Issues**:
-- Current reqwest backend implementation has limitations with response body extraction
+
+- Current reqwest backend implementation has limitations with response body
+  extraction
 - Examples demonstrate proper patterns and error handling
 - Framework architecture and example structure work correctly
 
 ## See Also
 
-- [Main Documentation](../README.md) - Framework overview and getting started guide
-- [Core Crate](../spire/) - Core framework implementation  
-- [Contributing Guide](../CONTRIBUTING.md) - Development and contribution guidelines
+- [Main Documentation](../README.md) - Framework overview and getting started
+  guide
+- [Core Crate](../spire/) - Core framework implementation
+- [Contributing Guide](../CONTRIBUTING.md) - Development and contribution
+  guidelines
 - [API Documentation](https://docs.rs/spire) - Comprehensive API reference

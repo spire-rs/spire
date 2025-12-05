@@ -53,7 +53,33 @@ spire = "0.2.0"
 - **`tracing`** - Enables tracing/logging support
 - **`trace`** - Enables detailed trace-level instrumentation
 - **`metric`** - Enables metrics collection
-- **`full`** - Enables all features (macros, tracing, reqwest, thirtyfour)
+- **`rustls-tls`** - Use rustls for TLS connections (enabled by default)
+- **`native-tls`** - Use native system TLS library for connections
+- **`full`** - Enables all features (macros, tracing, reqwest, thirtyfour,
+  rustls-tls)
+
+### TLS Configuration
+
+By default, Spire uses rustls for TLS connections. You can choose between
+different TLS implementations:
+
+```toml
+# Default: uses rustls-tls
+[dependencies]
+spire = "0.2.0"
+
+# Explicitly use rustls
+[dependencies]
+spire = { version = "0.2.0", features = ["rustls-tls"], default-features = false }
+
+# Use native TLS (system TLS library)
+[dependencies]
+spire = { version = "0.2.0", features = ["native-tls"], default-features = false }
+
+# Use with specific backends
+[dependencies]
+spire = { version = "0.2.0", features = ["reqwest", "native-tls"], default-features = false }
+```
 
 ## Quick Start
 

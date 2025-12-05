@@ -25,9 +25,8 @@ implementation that integrates with the Spire web scraping framework using the
 ## Overview
 
 `spire-thirtyfour` provides a browser automation backend implementation for
-spire using the thirtyfour WebDriver library. This backend enables scraping of
-JavaScript-heavy websites and single-page applications by controlling real
-browsers through the WebDriver protocol.
+Spire built on top of the [thirtyfour](https://github.com/stevepryde/thirtyfour)
+WebDriver library.
 
 The backend implements the `Backend` trait from `spire-core` and creates
 `BrowserConnection` instances that implement the `Client` trait for performing
@@ -35,18 +34,14 @@ browser-based operations.
 
 ## Features
 
-- **Multi-Browser Support**: Chrome, Firefox, Safari, and Edge via WebDriver
-  protocol.
-- **JavaScript Execution**: Handle dynamic content and single-page applications.
-- **Connection Pooling**: Efficient browser instance management with configurable
-  pools.
-- **Element Interaction**: Click, type, scroll, and interact with page elements.
-- **Form Automation**: Fill forms, submit data, and handle complex user
-  interactions.
-- **Screenshot Capture**: Take screenshots for debugging and verification.
-- **Mobile Emulation**: Simulate mobile devices and different screen sizes.
-- **Network Control**: Monitor and modify network requests (browser-dependent).
-- **Async/Await**: Fully async implementation for concurrent browser operations.
+- **Built on thirtyfour**: Leverages the powerful thirtyfour WebDriver library
+- **Spire Integration**: Seamlessly integrates with the Spire web scraping
+  framework
+- **Browser Automation**: Control real browsers for JavaScript-heavy websites
+  and SPAs
+- **Async/Await**: Fully async implementation for concurrent browser operations
+- **TLS Support**: Choose between rustls (default) and native TLS
+  implementations
 
 ## Usage
 
@@ -57,6 +52,25 @@ feature in the main `spire` crate and refer to the
 ```toml
 [dependencies]
 spire = { version = "0.2.0", features = ["thirtyfour"] }
+```
+
+### TLS Configuration
+
+By default, `spire-thirtyfour` uses rustls for TLS connections. You can choose
+between different TLS implementations:
+
+```toml
+# Default: uses rustls-tls
+[dependencies]
+spire-thirtyfour = "0.2.0"
+
+# Explicitly use rustls
+[dependencies]
+spire-thirtyfour = { version = "0.2.0", features = ["rustls-tls"], default-features = false }
+
+# Use native TLS (system TLS library)
+[dependencies]
+spire-thirtyfour = { version = "0.2.0", features = ["native-tls"], default-features = false }
 ```
 
 For advanced usage and custom configurations, see the
@@ -71,20 +85,21 @@ Browser automation requires a WebDriver server. For Chrome:
 # Ensure Chrome browser is installed and accessible
 ```
 
-For other browsers, see the [thirtyfour documentation](https://docs.rs/thirtyfour/)
-for setup instructions.
+For other browsers, see the
+[thirtyfour documentation](https://docs.rs/thirtyfour/) for setup instructions.
 
 ## Error Handling
 
-All thirtyfour WebDriver errors are automatically converted to `spire_core::Error`
-types. This includes browser connection errors, element interaction failures,
-navigation timeouts, and JavaScript execution errors.
+All thirtyfour WebDriver errors are automatically converted to
+`spire_core::Error` types. This includes browser connection errors, element
+interaction failures, navigation timeouts, and JavaScript execution errors.
 
 ## Performance Considerations
 
 - Browser instances are resource-intensive compared to HTTP clients.
 - Connection pooling helps manage browser lifecycle and memory usage.
-- Consider configuring appropriate pool sizes based on available system resources.
+- Consider configuring appropriate pool sizes based on available system
+  resources.
 - Browser startup time can be significant; pool warm-up strategies may improve
   performance.
 - JavaScript execution and page rendering add latency compared to HTTP-only

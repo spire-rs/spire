@@ -22,8 +22,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = []
-full = ["macros", "tracing", "reqwest", "thirtyfour"]
+default = ["rustls-tls"]
+full = ["macros", "tracing", "reqwest", "thirtyfour", "rustls-tls"]
 
 # Proc macros
 macros = ["dep:spire-macros"]
@@ -32,7 +32,9 @@ macros = ["dep:spire-macros"]
 reqwest = ["dep:spire-reqwest"]
 thirtyfour = ["dep:spire-thirtyfour"]
 
-
+# TLS implementations
+rustls-tls = ["spire-reqwest?/rustls-tls", "spire-thirtyfour?/rustls-tls"]
+native-tls = ["spire-reqwest?/native-tls", "spire-thirtyfour?/native-tls"]
 
 # Observability
 tracing = ["dep:tracing", "spire-core/tracing"]

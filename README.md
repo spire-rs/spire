@@ -90,8 +90,8 @@ async fn main() -> Result<()> {
 }
 ```
 
-See the [examples directory](./examples/) for comprehensive guides and the [main crate documentation](./spire/) for detailed API reference.
-usage.
+See the [examples directory](./examples/) for comprehensive guides and the
+[main crate documentation](./spire/) for detailed API reference. usage.
 
 ## Contributing
 

@@ -24,9 +24,10 @@ integrates with the Spire web scraping framework using the popular
 
 ## Overview
 
-`spire-reqwest` provides an HTTP client backend implementation for spire using
-the reqwest library. This backend enables high-performance HTTP-based web
-scraping with support for cookies, headers, redirects, and other HTTP features.
+`spire-reqwest` provides an HTTP client backend implementation for Spire on top
+of the popular [reqwest](https://github.com/seanmonstar/reqwest) library. This
+backend enables high-performance HTTP-based web scraping with support for
+cookies, headers, redirects, and other HTTP features.
 
 The backend implements the `Backend` trait from `spire-core` and creates
 `HttpConnection` instances that implement the `Client` trait for performing HTTP
@@ -34,17 +35,12 @@ requests.
 
 ## Features
 
-- **High Performance**: Built on reqwest and hyper for efficient HTTP
-  operations.
-- **Cookie Support**: Automatic cookie jar management for session handling.
-- **Flexible Configuration**: Customizable timeouts, headers, and client
-  settings.
-- **Redirect Handling**: Configurable redirect following.
-- **Proxy Support**: HTTP and SOCKS proxy support via reqwest.
-- **TLS/SSL**: Full TLS support with certificate validation options.
-- **Connection Pooling**: Efficient connection reuse through reqwest's
-  connection pooling.
-- **Async/Await**: Fully async implementation for better performance.
+- **Built on Reqwest**: Leverages the popular reqwest HTTP client library
+- **Spire Integration**: Seamlessly integrates with the Spire web scraping
+  framework
+- **Async/Await**: Fully async implementation for better performance
+- **TLS Support**: Choose between rustls (default) and native TLS
+  implementations
 
 ## Usage
 
@@ -55,6 +51,25 @@ in the main `spire` crate and refer to the
 ```toml
 [dependencies]
 spire = { version = "0.2.0", features = ["reqwest"] }
+```
+
+### TLS Configuration
+
+By default, `spire-reqwest` uses rustls for TLS connections. You can choose
+between different TLS implementations:
+
+```toml
+# Default: uses rustls-tls
+[dependencies]
+spire-reqwest = "0.2.0"
+
+# Explicitly use rustls
+[dependencies]
+spire-reqwest = { version = "0.2.0", features = ["rustls-tls"], default-features = false }
+
+# Use native TLS (system TLS library)
+[dependencies]
+spire-reqwest = { version = "0.2.0", features = ["native-tls"], default-features = false }
 ```
 
 For advanced usage and custom configurations, see the

@@ -22,12 +22,12 @@ use spire::{Client, HttpClient, Result, Router, http};
 async fn scrape_html_page(
     uri: http::Uri,
     data_store: Data<PageContent>,
-    Html(html): Html,
+    Html(document): Html,
 ) -> Result<()> {
     let url = uri.to_string();
     tracing::info!("Processing HTML page: {}", url);
 
-    let content_length = html.len();
+    let content_length = document.len();
     let page_content = PageContent::new(url, "text/html".to_string(), content_length)
         .with_title("HTML Page".to_string());
 
