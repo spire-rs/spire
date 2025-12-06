@@ -1,4 +1,4 @@
-//! Configuration types for WebDriver connections.
+//! WebDriver and pool configuration types.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -9,26 +9,17 @@ use derive_more::Display;
 use serde_json::Value;
 use spire_core::{Error, ErrorKind, Result};
 
-pub mod browser;
-pub mod capabilities;
-
-pub use browser::BrowserType;
-
-/// Configuration for a WebDriver endpoint.
+/// Configuration for a browser connection.
 #[derive(Debug, Clone, Builder)]
 #[builder(
-    name = "WebDriverConfigBuilder",
+    name = "BrowserConfigBuilder",
     pattern = "owned",
     setter(into, strip_option, prefix = "with"),
     build_fn(validate = "Self::validate_config")
 )]
-pub struct WebDriverConfig {
+pub struct BrowserConfig {
     /// The WebDriver server URL (e.g., "http://127.0.0.1:4444")
     pub url: String,
-
-    /// Browser type and version requirements
-    #[builder(default = "BrowserType::Chrome")]
-    pub browser: BrowserType,
 
     /// WebDriver capabilities
     #[builder(default = "HashMap::new()")]
@@ -47,13 +38,13 @@ pub struct WebDriverConfig {
     pub managed: bool,
 }
 
-impl From<spire_core::Error> for WebDriverConfigBuilderError {
+impl From<spire_core::Error> for BrowserConfigBuilderError {
     fn from(err: spire_core::Error) -> Self {
         Self::ValidationError(err.to_string())
     }
 }
 
-impl WebDriverConfigBuilder {
+impl BrowserConfigBuilder {
     fn validate_config(&self) -> Result<()> {
         // Validate URL format
         if let Some(ref url) = self.url {
@@ -96,12 +87,11 @@ impl WebDriverConfigBuilder {
     }
 }
 
-impl WebDriverConfig {
-    /// Creates a new WebDriver configuration with default values.
+impl BrowserConfig {
+    /// Creates a new browser configuration with default values.
     pub fn new(url: impl Into<String>) -> Self {
         Self {
             url: url.into(),
-            browser: BrowserType::Chrome,
             capabilities: HashMap::new(),
             connect_timeout: Duration::from_secs(30),
             request_timeout: Duration::from_secs(60),
@@ -109,9 +99,9 @@ impl WebDriverConfig {
         }
     }
 
-    /// Creates a builder for WebDriver configuration.
-    pub fn builder() -> WebDriverConfigBuilder {
-        WebDriverConfigBuilder::default()
+    /// Creates a builder for browser configuration.
+    pub fn builder() -> BrowserConfigBuilder {
+        BrowserConfigBuilder::default()
     }
 
     /// Sets a WebDriver capability.
@@ -123,12 +113,6 @@ impl WebDriverConfig {
     /// Sets multiple WebDriver capabilities.
     pub fn with_capabilities(mut self, capabilities: HashMap<String, Value>) -> Self {
         self.capabilities.extend(capabilities);
-        self
-    }
-
-    /// Sets the browser type for this configuration.
-    pub fn with_browser(mut self, browser: BrowserType) -> Self {
-        self.browser = browser;
         self
     }
 
@@ -193,19 +177,15 @@ impl WebDriverConfig {
     }
 }
 
-impl Default for WebDriverConfig {
+impl Default for BrowserConfig {
     fn default() -> Self {
         Self::new("http://127.0.0.1:4444")
     }
 }
 
-impl fmt::Display for WebDriverConfig {
+impl fmt::Display for BrowserConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "WebDriver({}, {}, managed: {})",
-            self.url, self.browser, self.managed
-        )
+        write!(f, "Browser({}, managed: {})", self.url, self.managed)
     }
 }
 
@@ -415,33 +395,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn webdriver_config_builder() {
-        let config = WebDriverConfig::builder()
+    fn browser_config_builder() {
+        let config = BrowserConfig::builder()
             .with_url("http://localhost:4444")
-            .with_browser(BrowserType::Firefox)
             .with_connect_timeout(Duration::from_secs(10))
             .with_managed(true)
             .build()
             .expect("Should build successfully");
 
         assert_eq!(config.url, "http://localhost:4444");
-        assert!(matches!(config.browser, BrowserType::Firefox));
         assert_eq!(config.connect_timeout, Duration::from_secs(10));
         assert!(config.managed);
     }
 
     #[test]
-    fn webdriver_config_builder_validation() {
+    fn browser_config_builder_validation() {
         // Empty URL should fail validation
-        let result = WebDriverConfig::builder().with_url("").build();
+        let result = BrowserConfig::builder().with_url("").build();
         assert!(result.is_err());
 
         // Invalid URL should fail validation
-        let result = WebDriverConfig::builder().with_url("invalid-url").build();
+        let result = BrowserConfig::builder().with_url("invalid-url").build();
         assert!(result.is_err());
 
         // Zero timeout should fail validation
-        let result = WebDriverConfig::builder()
+        let result = BrowserConfig::builder()
             .with_url("http://localhost:4444")
             .with_connect_timeout(Duration::ZERO)
             .build();
@@ -449,34 +427,33 @@ mod tests {
     }
 
     #[test]
-    fn webdriver_config_new() {
-        let config = WebDriverConfig::new("http://localhost:4444");
+    fn browser_config_new() {
+        let config = BrowserConfig::new("http://localhost:4444");
         assert_eq!(config.url, "http://localhost:4444");
-        assert!(matches!(config.browser, BrowserType::Chrome));
         assert!(!config.managed);
     }
 
     #[test]
-    fn webdriver_config_validation() {
+    fn browser_config_validation() {
         // Valid config should pass
-        let config = WebDriverConfig::new("http://localhost:4444");
+        let config = BrowserConfig::new("http://localhost:4444");
         assert!(config.validate().is_ok());
 
         // Empty URL should fail
-        let config = WebDriverConfig {
+        let config = BrowserConfig {
             url: String::new(),
             ..Default::default()
         };
         assert!(config.validate().is_err());
 
         // Invalid URL format should fail
-        let config = WebDriverConfig::new("localhost:4444");
+        let config = BrowserConfig::new("localhost:4444");
         assert!(config.validate().is_err());
     }
 
     #[test]
-    fn webdriver_config_capabilities() {
-        let config = WebDriverConfig::new("http://localhost:4444")
+    fn browser_config_capabilities() {
+        let config = BrowserConfig::new("http://localhost:4444")
             .with_capability("browserName", json!("firefox"))
             .with_connect_timeout(Duration::from_secs(10))
             .managed();

@@ -9,8 +9,8 @@ use spire_core::context::{Body, Request, Response};
 use spire_core::{Error, Result};
 use thirtyfour::prelude::*;
 
-use crate::client::ClientConfig;
-use crate::pool::manager::WebDriverManager;
+use crate::pool::BrowserBehaviorConfig;
+use crate::pool::manager::BrowserManager;
 
 /// Browser connection that provides direct access to a pooled WebDriver instance.
 ///
@@ -31,9 +31,9 @@ use crate::pool::manager::WebDriverManager;
 /// ```
 pub struct BrowserConnection {
     /// The pooled WebDriver instance
-    driver: Object<WebDriverManager>,
+    driver: Object<BrowserManager>,
     /// Client configuration for request processing
-    config: ClientConfig,
+    config: BrowserBehaviorConfig,
 }
 
 impl BrowserConnection {
@@ -49,10 +49,10 @@ impl BrowserConnection {
     /// let pooled_driver = pool.get().await?;
     /// let connection = BrowserConnection::from_pooled(pooled_driver);
     /// ```
-    pub fn from_pooled(driver: Object<WebDriverManager>) -> Self {
+    pub fn from_pooled(driver: Object<BrowserManager>) -> Self {
         Self {
             driver,
-            config: ClientConfig::default(),
+            config: BrowserBehaviorConfig::default(),
         }
     }
 
@@ -73,18 +73,22 @@ impl BrowserConnection {
     ///
     /// let connection = BrowserConnection::from_pooled_with_config(pooled_driver, config);
     /// ```
-    pub fn from_pooled_with_config(driver: Object<WebDriverManager>, config: ClientConfig) -> Self {
+    pub fn from_pooled_with_config(
+        driver: Object<BrowserManager>,
+        config: BrowserBehaviorConfig,
+    ) -> Self {
         Self { driver, config }
     }
 
     /// Returns a reference to the client configuration.
-    pub fn config(&self) -> &ClientConfig {
+    pub fn config(&self) -> &BrowserBehaviorConfig {
         &self.config
     }
 
     /// Updates the client configuration.
-    pub fn set_config(&mut self, config: ClientConfig) {
+    pub fn with_config(mut self, config: BrowserBehaviorConfig) -> Self {
         self.config = config;
+        self
     }
 }
 

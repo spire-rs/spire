@@ -6,9 +6,8 @@
 //! use spire_thirtyfour::prelude::*;
 //! ```
 
-pub use crate::config::capabilities::CapabilitiesBuilder;
-pub use crate::pool::BrowserBuilder;
+pub use crate::pool::{BrowserBehaviorConfig, BrowserBuilder};
 pub use crate::{
-    BrowserBackend, BrowserConnection, BrowserError, BrowserType, ClientConfig,
-    NavigationErrorType, PoolConfig, PoolConfigBuilder, WebDriverConfig, WebDriverConfigBuilder,
+    BrowserBackend, BrowserConfig, BrowserConfigBuilder, BrowserConnection, BrowserError,
+    NavigationErrorType, PoolConfig, PoolConfigBuilder,
 };

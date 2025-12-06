@@ -30,7 +30,7 @@
 //!
 //! [`Request`]: crate::context::Request
 //! [`Response`]: crate::context::Response
-//! [`Html`]: client::Html
+
 //! [`View`]: driver::View
 
 use std::convert::Infallible;

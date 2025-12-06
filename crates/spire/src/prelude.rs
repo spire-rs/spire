@@ -35,7 +35,7 @@ pub use crate::extract::{
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
 pub use crate::{
-    BrowserBackend, BrowserConnection, BrowserError, BrowserPool, BrowserType, NavigationErrorType,
-    PoolConfig, PoolConfigBuilder, WebDriverConfig, WebDriverConfigBuilder,
+    BrowserBackend, BrowserBehaviorConfig, BrowserConfig, BrowserConfigBuilder, BrowserConnection,
+    BrowserError, BrowserPool, NavigationErrorType, PoolConfig, PoolConfigBuilder,
 };
 pub use crate::{Client, Error, ErrorKind, Result, Router};

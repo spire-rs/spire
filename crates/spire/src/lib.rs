@@ -10,12 +10,12 @@ use spire_core::backend::Backend;
 pub use spire_core::{Error, ErrorKind, Result, backend, context, dataset, http};
 #[cfg(feature = "reqwest")]
 #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-pub use spire_reqwest::HttpClient;
+pub use spire_reqwest::{HttpClient, reqwest};
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
 pub use spire_thirtyfour::{
-    BrowserBackend, BrowserConnection, BrowserError, BrowserPool, BrowserType, ClientConfig,
-    NavigationErrorType, PoolConfig, PoolConfigBuilder, WebDriverConfig, WebDriverConfigBuilder,
+    BrowserBackend, BrowserBehaviorConfig, BrowserConfig, BrowserConfigBuilder, BrowserConnection,
+    BrowserError, BrowserPool, NavigationErrorType, PoolConfig, PoolConfigBuilder, thirtyfour,
 };
 
 pub mod extract;

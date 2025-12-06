@@ -9,7 +9,7 @@ use serde_json;
 use spire_core::{Error, ErrorKind, Result};
 use thirtyfour::prelude::*;
 
-use crate::config::{PoolConfig, WebDriverConfig};
+use crate::client::BrowserConfig as WebDriverConfig;
 
 /// Manager that creates and manages WebDriver instances in a deadpool.
 ///
@@ -18,7 +18,7 @@ use crate::config::{PoolConfig, WebDriverConfig};
 /// It supports multiple WebDriver configurations and can distribute connections
 /// across different browser endpoints.
 #[derive(Debug, Clone)]
-pub struct WebDriverManager {
+pub struct BrowserManager {
     /// WebDriver server configurations indexed by connection ID
     configs: Arc<HashMap<u64, WebDriverConfig>>,
     /// Connection ID counter for round-robin selection
@@ -29,7 +29,7 @@ pub struct WebDriverManager {
     max_retry_attempts: usize,
 }
 
-impl WebDriverManager {
+impl BrowserManager {
     /// Creates a new WebDriverManager with default settings.
     pub fn new() -> Self {
         Self {
@@ -45,7 +45,7 @@ impl WebDriverManager {
     /// Each configuration represents a potential browser connection endpoint.
     /// The manager will distribute connection requests across all configured endpoints.
     pub fn with_config(mut self, config: WebDriverConfig) -> Self {
-        let configs = Arc::make_mut(&mut self.configs);
+        let configs: &mut HashMap<u64, WebDriverConfig> = Arc::make_mut(&mut self.configs);
         let id = self.connection_counter.fetch_add(1, Ordering::Relaxed);
         configs.insert(id, config);
         self
@@ -94,10 +94,9 @@ impl WebDriverManager {
             Error::new(ErrorKind::Backend, "No WebDriver configurations available")
         })?;
 
-        // Get capabilities as HashMap from config and convert to serde_json::Map
-        let caps_map = config.browser.default_capabilities();
+        // Use capabilities directly from config
         let capabilities: serde_json::Map<String, serde_json::Value> =
-            caps_map.into_iter().collect();
+            config.capabilities.clone().into_iter().collect();
 
         for attempt in 1..=self.max_retry_attempts {
             match WebDriver::new(&config.url, capabilities.clone()).await {
@@ -139,13 +138,13 @@ impl WebDriverManager {
     }
 }
 
-impl Default for WebDriverManager {
+impl Default for BrowserManager {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Manager for WebDriverManager {
+impl Manager for BrowserManager {
     type Error = Error;
     type Type = WebDriver;
 
@@ -178,72 +177,8 @@ impl Manager for WebDriverManager {
     }
 }
 
-/// Browser pool manager that provides high-level access to browser connections.
-///
-/// This type wraps a deadpool `Pool<WebDriverManager>` and provides convenient
-/// methods for getting connections, checking pool status, and managing the
-/// browser pool lifecycle.
-pub struct BrowserPool {
-    pool: Pool<WebDriverManager>,
-}
-
-impl BrowserPool {
-    /// Creates a new BrowserPool from a deadpool Pool.
-    pub fn from_pool(pool: Pool<WebDriverManager>) -> Self {
-        Self { pool }
-    }
-
-    /// Creates a BrowserPool with the given manager and pool configuration.
-    pub fn new(manager: WebDriverManager, pool_config: PoolConfig) -> Result<Self> {
-        let pool = Pool::builder(manager)
-            .max_size(pool_config.max_size)
-            .build()
-            .map_err(|e| {
-                Error::new(
-                    ErrorKind::Backend,
-                    format!("Failed to create browser pool: {}", e),
-                )
-            })?;
-
-        Ok(Self { pool })
-    }
-
-    /// Gets a WebDriver instance from the pool.
-    ///
-    /// Returns a pooled WebDriver wrapped in deadpool's Object type.
-    /// The WebDriver will be automatically returned to the pool when dropped.
-    pub async fn get(&self) -> Result<deadpool::managed::Object<WebDriverManager>> {
-        self.pool.get().await.map_err(|e| {
-            Error::new(
-                ErrorKind::Backend,
-                format!("Failed to get WebDriver from pool: {}", e),
-            )
-        })
-    }
-
-    /// Returns the current pool status including size and availability.
-    pub fn status(&self) -> deadpool::Status {
-        self.pool.status()
-    }
-
-    /// Returns a reference to the underlying deadpool Pool.
-    pub fn pool(&self) -> &Pool<WebDriverManager> {
-        &self.pool
-    }
-
-    /// Closes the pool and terminates all connections.
-    pub async fn close(&self) {
-        self.pool.close();
-    }
-}
-
-impl Clone for BrowserPool {
-    fn clone(&self) -> Self {
-        Self {
-            pool: self.pool.clone(),
-        }
-    }
-}
+/// Type alias for a browser connection pool.
+pub type BrowserPool = Pool<BrowserManager>;
 
 #[cfg(test)]
 mod tests {

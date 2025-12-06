@@ -5,7 +5,7 @@ use spire_core::Result;
 use spire_core::backend::Backend;
 
 use crate::error::BrowserError;
-use crate::pool::{BrowserBuilder, BrowserConnection, WebDriverManager};
+use crate::pool::{BrowserBuilder, BrowserConnection, BrowserManager};
 
 /// Browser backend implementation using Thirtyfour WebDriver.
 ///
@@ -36,7 +36,7 @@ use crate::pool::{BrowserBuilder, BrowserConnection, WebDriverManager};
 /// ```
 #[derive(Clone)]
 pub struct BrowserBackend {
-    pool: Pool<WebDriverManager>,
+    pool: Pool<BrowserManager>,
 }
 
 impl BrowserBackend {
@@ -54,7 +54,7 @@ impl BrowserBackend {
     /// let pool = Pool::builder(manager).build().unwrap();
     /// let backend = BrowserBackend::from_pool(pool);
     /// ```
-    pub fn from_pool(pool: Pool<WebDriverManager>) -> Self {
+    pub fn from_pool(pool: Pool<BrowserManager>) -> Self {
         Self { pool }
     }
 
@@ -108,8 +108,8 @@ impl Default for BrowserBackend {
     }
 }
 
-impl From<Pool<WebDriverManager>> for BrowserBackend {
-    fn from(pool: Pool<WebDriverManager>) -> Self {
+impl From<Pool<BrowserManager>> for BrowserBackend {
+    fn from(pool: Pool<BrowserManager>) -> Self {
         Self::from_pool(pool)
     }
 }
@@ -144,7 +144,7 @@ impl Backend for BrowserBackend {
     /// - Unable to establish connection to WebDriver endpoints
     /// - Browser instance fails health checks
     async fn connect(&self) -> Result<Self::Client> {
-        // pool.get() returns Object<WebDriverManager> which manages WebDriver instances
+        // pool.get() returns Object<BrowserManager> which manages WebDriver instances
         let webdriver_client = self.pool.get().await.map_err(|_e| {
             let status = self.pool.status();
             spire_core::Error::from(BrowserError::pool_exhausted(status.size, status.available))

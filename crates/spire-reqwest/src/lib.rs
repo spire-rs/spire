@@ -9,6 +9,9 @@ compile_error!("At least one TLS feature must be enabled: 'rustls-tls' or 'nativ
 mod client;
 mod utils;
 
+// Re-export reqwest for convenience
+pub use reqwest;
+
 #[doc(hidden)]
 pub mod prelude;
 

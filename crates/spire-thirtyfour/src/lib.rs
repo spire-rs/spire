@@ -7,20 +7,19 @@
 compile_error!("At least one TLS feature must be enabled: 'rustls-tls' or 'native-tls'");
 
 pub mod client;
-pub mod config;
 pub mod error;
 pub mod pool;
 
 // Re-export thirtyfour types for convenience
+// Re-export thirtyfour crate
+pub use thirtyfour;
 pub use thirtyfour::{WebDriver, WebElement};
 
-pub use crate::client::{BrowserBackend, ClientConfig};
-pub use crate::config::capabilities::{self, CapabilitiesBuilder};
-pub use crate::config::{
-    BrowserType, PoolConfig, PoolConfigBuilder, WebDriverConfig, WebDriverConfigBuilder,
+pub use crate::client::{
+    BrowserBackend, BrowserConfig, BrowserConfigBuilder, PoolConfig, PoolConfigBuilder,
 };
 pub use crate::error::{BrowserError, NavigationErrorType};
-pub use crate::pool::{BrowserBuilder, BrowserConnection, BrowserPool};
+pub use crate::pool::{BrowserBehaviorConfig, BrowserBuilder, BrowserConnection, BrowserPool};
 
 /// Prelude module for convenient imports.
 ///
@@ -52,19 +51,11 @@ mod tests {
     }
 
     #[test]
-    fn browser_types() {
-        assert_eq!(BrowserType::Chrome.browser_name(), "chrome");
-        assert_eq!(BrowserType::Firefox.browser_name(), "firefox");
-        assert_eq!(BrowserType::Edge.browser_name(), "MicrosoftEdge");
-        assert_eq!(BrowserType::Safari.browser_name(), "safari");
-    }
-
-    #[test]
-    fn webdriver_config_validation() {
-        let config = WebDriverConfig::new("http://localhost:4444");
+    fn browser_config_validation() {
+        let config = BrowserConfig::new("http://localhost:4444");
         assert!(config.validate().is_ok());
 
-        let invalid_config = WebDriverConfig::new("");
+        let invalid_config = BrowserConfig::new("");
         assert!(invalid_config.validate().is_err());
     }
 
@@ -112,21 +103,6 @@ mod tests {
 
     //     Ok(())
     // }
-
-    #[test]
-    fn capabilities_builder() {
-        let caps = CapabilitiesBuilder::new()
-            .browser_name("chrome")
-            .browser_version("latest")
-            .accept_insecure_certs(true)
-            .page_load_strategy(capabilities::page_load_strategy::NORMAL)
-            .build();
-
-        assert_eq!(caps["browserName"], serde_json::json!("chrome"));
-        assert_eq!(caps["browserVersion"], serde_json::json!("latest"));
-        assert_eq!(caps["acceptInsecureCerts"], serde_json::json!(true));
-        assert_eq!(caps["pageLoadStrategy"], serde_json::json!("normal"));
-    }
 
     #[test]
     fn browser_error_categories() {

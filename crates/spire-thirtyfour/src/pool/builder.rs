@@ -2,9 +2,8 @@ use deadpool::managed::Pool;
 use derive_more::Display;
 use spire_core::{Error, ErrorKind, Result};
 
-use crate::client::BrowserBackend;
-use crate::config::{BrowserType, PoolConfig, WebDriverConfig};
-use crate::pool::manager::WebDriverManager;
+use crate::client::{BrowserBackend, BrowserConfig as WebDriverConfig, PoolConfig};
+use crate::pool::manager::BrowserManager;
 
 /// Builder for configuring and creating a [`BrowserBackend`].
 ///
@@ -38,7 +37,7 @@ use crate::pool::manager::WebDriverManager;
 ///
 /// let chrome_config = WebDriverConfig::builder()
 ///     .with_url("http://localhost:4444")
-///     .with_browser(BrowserType::chrome())
+///     .with_capabilities(custom_capabilities)
 ///     .with_connect_timeout(Duration::from_secs(30))
 ///     .build()?;
 ///
@@ -110,30 +109,7 @@ impl BrowserBuilder {
     ///     .build()?;
     /// ```
     pub fn with_unmanaged(mut self, addr: impl AsRef<str>) -> Self {
-        let config = WebDriverConfig::new(addr.as_ref()).with_browser(BrowserType::Chrome);
-        self.configs.push(config);
-        self
-    }
-
-    /// Adds an unmanaged WebDriver connection with a specific browser type.
-    ///
-    /// # Arguments
-    ///
-    /// * `addr` - WebDriver server address
-    /// * `browser` - Browser type to use
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use spire_thirtyfour::{BrowserBackend, BrowserType};
-    ///
-    /// let backend = BrowserBackend::builder()
-    ///     .with_unmanaged_browser("http://localhost:4444", BrowserType::Chrome)
-    ///     .with_unmanaged_browser("http://localhost:4445", BrowserType::Firefox)
-    ///     .build()?;
-    /// ```
-    pub fn with_unmanaged_browser(mut self, addr: impl AsRef<str>, browser: BrowserType) -> Self {
-        let config = WebDriverConfig::new(addr.as_ref()).with_browser(browser);
+        let config = WebDriverConfig::new(addr.as_ref());
         self.configs.push(config);
         self
     }
@@ -159,7 +135,7 @@ impl BrowserBuilder {
     ///
     /// let config = WebDriverConfig::builder()
     ///     .with_url("http://localhost:4444")
-    ///     .with_browser(BrowserType::chrome())
+    ///     .with_capabilities(custom_capabilities)
     ///     .with_connect_timeout(Duration::from_secs(30))
     ///     .build()?;
     ///
@@ -344,7 +320,7 @@ impl BrowserBuilder {
         }
 
         // Create a WebDriver manager with configurations
-        let mut manager = WebDriverManager::new();
+        let mut manager = BrowserManager::new();
 
         // Add all configurations to the manager
         for config in self.configs {
@@ -447,7 +423,6 @@ mod tests {
     fn builder_with_config() {
         let config = WebDriverConfig::builder()
             .with_url("http://localhost:4444")
-            .with_browser(BrowserType::Firefox)
             .build()
             .expect("Config should build");
 
@@ -503,9 +478,9 @@ mod tests {
     #[test]
     fn builder_multiple_browser_types() {
         let builder = BrowserBuilder::new()
-            .with_unmanaged_browser("http://localhost:4444", BrowserType::Chrome)
-            .with_unmanaged_browser("http://localhost:4445", BrowserType::Firefox)
-            .with_unmanaged_browser("http://localhost:4446", BrowserType::Edge);
+            .with_unmanaged("http://localhost:4444")
+            .with_unmanaged("http://localhost:4445")
+            .with_unmanaged("http://localhost:4446");
 
         assert_eq!(builder.config_count(), 3);
     }
