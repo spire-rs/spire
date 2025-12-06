@@ -234,7 +234,7 @@ mod tests {
     fn test_debug_connection() {
         // We can't create a real connection without a pool in tests,
         // but we can test that the Debug impl compiles
-        let config = ClientConfig::default();
+        let config = BrowserBehaviorConfig::default();
         let debug_str = format!("{:?}", config);
         assert!(!debug_str.is_empty());
     }
@@ -242,7 +242,7 @@ mod tests {
     #[test]
     fn test_config_management() {
         // Test ClientConfig creation and modification
-        let mut config = ClientConfig::default();
+        let mut config = BrowserBehaviorConfig::default();
         assert!(config.extract_html);
         assert!(!config.extract_text);
 
@@ -250,7 +250,7 @@ mod tests {
         assert!(config.extract_text);
 
         // Test builder pattern
-        let config2 = ClientConfig::builder()
+        let config2 = BrowserBehaviorConfig::builder()
             .with_extract_text(true)
             .with_user_agent("TestBot/1.0".to_string())
             .build()

@@ -183,10 +183,11 @@ pub type BrowserPool = Pool<BrowserManager>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::client::PoolConfig;
 
     #[test]
     fn webdriver_manager_creation() {
-        let manager = WebDriverManager::new();
+        let manager = BrowserManager::new();
         assert!(manager.configs.is_empty());
         assert!(manager.health_check_enabled);
         assert_eq!(manager.max_retry_attempts, 3);
@@ -195,7 +196,7 @@ mod tests {
     #[test]
     fn webdriver_manager_with_config() {
         let config = WebDriverConfig::new("http://localhost:4444");
-        let manager = WebDriverManager::new().with_config(config);
+        let manager = BrowserManager::new().with_config(config);
 
         assert_eq!(manager.configs.len(), 1);
         assert!(manager.select_config().is_some());
@@ -207,14 +208,14 @@ mod tests {
             WebDriverConfig::new("http://localhost:4444"),
             WebDriverConfig::new("http://localhost:4445"),
         ];
-        let manager = WebDriverManager::new().with_configs(configs);
+        let manager = BrowserManager::new().with_configs(configs);
 
         assert_eq!(manager.configs.len(), 2);
     }
 
     #[test]
     fn webdriver_manager_configuration() {
-        let manager = WebDriverManager::new()
+        let manager = BrowserManager::new()
             .with_health_checks(false)
             .with_max_retry_attempts(5);
 
@@ -225,14 +226,16 @@ mod tests {
     #[tokio::test]
     async fn browser_pool_creation() {
         let manager =
-            WebDriverManager::new().with_config(WebDriverConfig::new("http://localhost:4444"));
+            BrowserManager::new().with_config(WebDriverConfig::new("http://localhost:4444"));
         let pool_config = PoolConfig::new().with_max_size(2);
 
-        let result = BrowserPool::new(manager, pool_config);
+        let result = Pool::builder(manager)
+            .max_size(pool_config.max_size)
+            .build();
         // This will fail without a running WebDriver, but tests the construction
         assert!(result.is_ok());
 
-        let pool = result.unwrap();
+        let pool: BrowserPool = result.unwrap();
         let status = pool.status();
         assert_eq!(status.max_size, 2);
     }
