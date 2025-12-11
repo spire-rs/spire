@@ -1,5 +1,6 @@
 use std::convert::Infallible;
-use std::ops::{Deref, DerefMut};
+
+use derive_more::{Deref, DerefMut};
 
 use crate::context::Context;
 use crate::extract::FromContextRef;
@@ -38,10 +39,10 @@ where
 ///
 /// async fn handler(State(port): State<u16>) {}
 /// ```
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Deref, DerefMut)]
 pub struct State<T>(pub T);
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S, T> FromContextRef<C, S> for State<T>
 where
     S: Send + Sync + 'static,
@@ -51,21 +52,5 @@ where
 
     async fn from_context_ref(_cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(T::from_ref(state)))
-    }
-}
-
-impl<T> Deref for State<T> {
-    type Target = T;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T> DerefMut for State<T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }

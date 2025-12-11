@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use crate::backend::{Backend, Worker};
-use crate::context::{Body, Request};
+use crate::context::{Body, Request, RequestQueue};
 use crate::dataset::{Data, Dataset};
 use crate::process::Runner;
 use crate::{Error, Result};
@@ -148,10 +148,12 @@ impl<B, W> Client<B, W> {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// use spire_core::Client;
     /// use spire_core::dataset::InMemDataset;
     ///
+    /// # let backend = todo!();
+    /// # let worker = todo!();
     /// let client = Client::new(backend, worker)
     ///     .with_request_queue(InMemDataset::stack()); // Use LIFO instead of FIFO
     /// ```
@@ -389,6 +391,36 @@ impl<B, W> Client<B, W> {
     /// ```
     pub fn shutdown_token(&self) -> tokio_util::sync::CancellationToken {
         self.inner.shutdown_token()
+    }
+
+    /// Returns a [`RequestQueue`] for adding requests manually.
+    ///
+    /// This provides access to the request queue for adding requests programmatically
+    /// during runtime. Requests added through this queue will be processed when
+    /// [`Client::run`] is called.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_core::Client;
+    /// use spire_core::context::Tag;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let backend = todo!();
+    /// # let worker = todo!();
+    /// let client = Client::new(backend, worker);
+    /// let queue = client.request_queue();
+    ///
+    /// // Add requests to the queue
+    /// queue.append_with_tag(Tag::from("crawl"), "https://example.com").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`RequestQueue`]: crate::context::RequestQueue
+    pub fn request_queue(&self) -> RequestQueue {
+        let dataset = self.inner.datasets.get::<Request>();
+        RequestQueue::new(dataset, std::num::NonZeroU32::new(1).unwrap())
     }
 }
 

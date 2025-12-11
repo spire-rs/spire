@@ -20,13 +20,16 @@ Procedural macros for the spire web scraping framework.
 
 ## Overview
 
-`spire-macros` provides derive macros that enable declarative HTML data extraction in spire applications. This crate is automatically included when using the `macros` feature flag in the main `spire` crate.
+`spire-macros` provides derive macros that enable declarative HTML data
+extraction in spire applications. This crate is automatically included when
+using the `macros` feature flag in the main `spire` crate.
 
 ## Macros
 
 ### `Select` Derive Macro
 
-The `Select` derive macro generates implementations of the `Select` trait, allowing you to declaratively extract structured data from HTML:
+The `Select` derive macro generates implementations of the `Select` trait,
+allowing you to declaratively extract structured data from HTML:
 
 ```rust,ignore
 use spire::extract::Select;
@@ -58,7 +61,8 @@ async fn handler(Elements(products): Elements<Vec<Product>>) {
 
 ## Usage
 
-This crate is typically not used directly. Instead, enable the `macros` feature in the main `spire` crate:
+This crate is typically not used directly. Instead, enable the `macros` feature
+in the main `spire` crate:
 
 ```toml
 [dependencies]
@@ -79,4 +83,5 @@ struct MyData {
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE)
+file for details.

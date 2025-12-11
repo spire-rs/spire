@@ -191,7 +191,8 @@ impl BrowserError {
         }
     }
 
-    /// Creates a timeout error.
+    /// Creates a new timeout error.
+    #[must_use]
     pub fn timeout(operation: impl Into<String>, duration_secs: u64) -> Self {
         Self::Timeout {
             operation: operation.into(),
@@ -255,14 +256,16 @@ impl BrowserError {
     }
 
     /// Creates a script error.
-    pub fn script_error(script: impl Into<String>, message: impl Into<String>) -> Self {
+    #[must_use]
+    pub fn javascript_error(script: impl Into<String>, error: impl Into<String>) -> Self {
         Self::ScriptError {
             script: script.into(),
-            message: message.into(),
+            message: error.into(),
         }
     }
 
     /// Creates a resource error.
+    #[must_use]
     pub fn resource_error(
         resource_type: impl Into<String>,
         identifier: impl Into<String>,
@@ -276,6 +279,7 @@ impl BrowserError {
     }
 
     /// Creates a capability error.
+    #[must_use]
     pub fn capability_error(
         capability: impl Into<String>,
         value: impl Into<String>,
@@ -289,6 +293,7 @@ impl BrowserError {
     }
 
     /// Creates an operation failed error.
+    #[must_use]
     pub fn operation_failed(operation: impl Into<String>, message: impl Into<String>) -> Self {
         Self::OperationFailed {
             operation: operation.into(),
@@ -297,6 +302,7 @@ impl BrowserError {
     }
 
     /// Returns the error category for grouping similar errors.
+    #[must_use]
     pub fn category(&self) -> &'static str {
         match self {
             Self::ConnectionFailed { .. } => "connection",
@@ -315,7 +321,8 @@ impl BrowserError {
         }
     }
 
-    /// Returns whether this error type is typically retryable.
+    /// Returns whether this error type is generally retryable.
+    #[must_use]
     pub fn is_retryable(&self) -> bool {
         match self {
             Self::ConnectionFailed { .. } => true,
@@ -391,25 +398,19 @@ fn is_webdriver_error_retryable(_error: &WebDriverError) -> bool {
     false
 }
 
-/// Utility functions for error conversion.
-pub mod conversions {
-    use super::*;
-
-    /// Converts an IO error to a BrowserError.
-    pub fn from_io_error(error: std::io::Error, operation: &str) -> BrowserError {
-        BrowserError::operation_failed(operation, error.to_string())
-    }
-
-    /// Converts a JSON error to a BrowserError.
-    pub fn from_json_error(error: serde_json::Error, context: &str) -> BrowserError {
-        BrowserError::operation_failed(context, format!("JSON error: {}", error))
-    }
-
-    /// Converts HTTP status codes to navigation error types.
-    pub fn http_status_to_nav_error(status: u16) -> NavigationErrorType {
-        NavigationErrorType::HttpError(status)
-    }
-}
+/// Type alias for `Result<T, BrowserError>` for more ergonomic error handling.
+///
+/// # Example
+///
+/// ```no_run
+/// use spire_thirtyfour::{BrowserResult, BrowserConnection};
+///
+/// async fn navigate_to_page(connection: &BrowserConnection, url: &str) -> BrowserResult<()> {
+///     // connection.navigate(url).await
+///     Ok(())
+/// }
+/// ```
+pub type BrowserResult<T> = Result<T, BrowserError>;
 
 #[cfg(test)]
 mod tests {

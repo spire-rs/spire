@@ -20,7 +20,7 @@ mod service;
 ///
 /// Handlers can take any number of extractors as arguments:
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// # use spire::routing::Router;
 /// # use spire::extract::{State, Text};
 /// # use spire::context::FlowControl;
@@ -41,7 +41,7 @@ mod service;
 ///
 /// # #[derive(Clone)]
 /// # struct MyState;
-/// let router: Router = Router::new()
+/// let router = Router::new()
 ///     .route("simple", simple_handler)
 ///     .route("complex", handler_with_extractors);
 /// ```

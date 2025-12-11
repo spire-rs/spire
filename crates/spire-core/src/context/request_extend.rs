@@ -4,8 +4,9 @@
 //! and tracking request depth in recursive scraping scenarios.
 
 use std::borrow::Cow;
-use std::num::NonZeroUsize;
+use std::num::NonZeroU32;
 
+use derive_more::{Deref, DerefMut};
 use http::request::Builder;
 
 use crate::context::Request;
@@ -57,6 +58,11 @@ impl Tag {
     pub const fn from_static(value: &'static str) -> Self {
         Self::Sequence(Cow::Borrowed(value))
     }
+
+    /// Creates a new [`Tag`] from any type that implements `Into<Tag>`.
+    pub fn new<T: Into<Tag>>(value: T) -> Self {
+        value.into()
+    }
 }
 
 impl From<&str> for Tag {
@@ -79,24 +85,24 @@ impl From<u64> for Tag {
 
 /// Extends a [`Request`] to track a recursively increasing depth.
 #[derive(Debug, Copy, Clone)]
-pub struct Depth(pub NonZeroUsize);
+pub struct Depth(pub NonZeroU32);
 
 impl Depth {
     /// The smallest recursive [`Depth`] value.
-    const MIN: Self = Self(NonZeroUsize::MIN);
+    const MIN: Self = Self(NonZeroU32::MIN);
 
     /// Creates a new [`Depth`] extension.
     ///
     /// If `depth` is 0, uses the minimum value (1) instead.
-    pub fn new(depth: usize) -> Self {
-        Self(NonZeroUsize::new(depth).unwrap_or_else(|| {
+    pub fn new(depth: u32) -> Self {
+        Self(NonZeroU32::new(depth).unwrap_or_else(|| {
             debug_assert!(false, "Depth::new called with 0, using MIN instead");
-            NonZeroUsize::MIN
+            NonZeroU32::MIN
         }))
     }
 
     /// Returns the depth as a primitive type.
-    pub const fn get(self) -> usize {
+    pub const fn get(self) -> u32 {
         self.0.get()
     }
 }
@@ -108,7 +114,7 @@ impl Default for Depth {
 }
 
 /// Wrapper around `http::`[`Request`] with additional functionality.
-#[derive(derive_more::Deref, derive_more::DerefMut)]
+#[derive(Deref, DerefMut)]
 pub struct Task {
     #[deref]
     #[deref_mut]
@@ -132,7 +138,7 @@ impl Task {
     }
 
     /// Returns a recursive depth of this [`Request`].
-    pub fn depth(&self) -> usize {
+    pub fn depth(&self) -> u32 {
         let depth = self.extensions().get::<Depth>();
         depth.unwrap_or(&Depth::MIN).get()
     }
@@ -159,7 +165,7 @@ pub trait TaskExt {
     fn tag(&self) -> &Tag;
 
     /// Returns a recursive depth of this [`Request`].
-    fn depth(&self) -> usize;
+    fn depth(&self) -> u32;
 }
 
 impl<B> TaskExt for Request<B> {
@@ -171,7 +177,7 @@ impl<B> TaskExt for Request<B> {
         self.try_tag().unwrap_or(&Tag::Fallback)
     }
 
-    fn depth(&self) -> usize {
+    fn depth(&self) -> u32 {
         let depth = self.extensions().get::<Depth>();
         depth.unwrap_or(&Depth::MIN).get()
     }
@@ -185,7 +191,7 @@ pub trait TaskBuilder {
 
     /// Attaches a depth value to this [`Builder`].
     #[must_use]
-    fn depth(self, depth: usize) -> Self;
+    fn depth(self, depth: u32) -> Self;
 }
 
 impl TaskBuilder for Builder {
@@ -193,7 +199,7 @@ impl TaskBuilder for Builder {
         self.extension(tag.into())
     }
 
-    fn depth(self, depth: usize) -> Self {
+    fn depth(self, depth: u32) -> Self {
         self.extension(Depth::new(depth))
     }
 }

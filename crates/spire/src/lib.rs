@@ -2,20 +2,20 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 
-#[doc(no_inline)]
-pub use async_trait::async_trait;
 #[doc(inline)]
 pub use routing::Router;
+#[doc(no_inline)]
+pub use spire_core::async_trait;
 use spire_core::backend::Backend;
-pub use spire_core::{Error, ErrorKind, Result, backend, context, dataset};
+pub use spire_core::{Error, ErrorKind, Result, backend, context, dataset, http};
 #[cfg(feature = "reqwest")]
 #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-pub use spire_reqwest::HttpClient;
+pub use spire_reqwest::{HttpClient, reqwest};
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
 pub use spire_thirtyfour::{
-    BrowserClient, BrowserError, BrowserPool, BrowserType, ClientConfig as BrowserClientConfig,
-    NavigationErrorType, PoolConfig, PoolConfigBuilder, WebDriverConfig, WebDriverConfigBuilder,
+    BrowserBackend, BrowserBehaviorConfig, BrowserBuilder, BrowserConfig, BrowserConfigBuilder,
+    BrowserConnection, BrowserError, BrowserResult, NavigationErrorType, thirtyfour,
 };
 
 pub mod extract;
@@ -54,7 +54,7 @@ mod tests {
     #[test]
     #[cfg(feature = "thirtyfour")]
     fn thirtyfour_backend_available() {
-        let _backend = crate::BrowserPool::builder()
+        let _backend = crate::BrowserBackend::builder()
             .with_unmanaged("http://127.0.0.1:4444")
             .build()
             .expect("Failed to build browser pool");

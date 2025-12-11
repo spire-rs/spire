@@ -1,21 +1,19 @@
-//! Reqwest-based HTTP client backend for Spire.
-//!
-//! This crate provides [`HttpClient`], a Tower service-based HTTP client implementation
-//! that integrates with the Spire web scraping framework.
-//!
-//! # Examples
-//!
-//! ```ignore
-//! use spire_reqwest::HttpClient;
-//! use spire_core::Client;
-//!
-//! let backend = HttpClient::default();
-//! let client = Client::new(backend, worker);
-//! ```
+#![forbid(unsafe_code)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![doc = include_str!("../README.md")]
+
+// Ensure at least one TLS feature is enabled
+#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
+compile_error!("At least one TLS feature must be enabled: 'rustls-tls' or 'native-tls'");
 
 mod client;
+mod utils;
+
+// Re-export reqwest for convenience
+pub use reqwest;
 
 #[doc(hidden)]
 pub mod prelude;
 
 pub use client::HttpClient;
+pub use utils::{HttpService, client_to_service};

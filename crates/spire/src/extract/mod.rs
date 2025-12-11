@@ -30,7 +30,7 @@
 //!
 //! [`Request`]: crate::context::Request
 //! [`Response`]: crate::context::Response
-//! [`Html`]: client::Html
+
 //! [`View`]: driver::View
 
 use std::convert::Infallible;
@@ -40,7 +40,7 @@ use std::convert::Infallible;
 pub use spire_macros::Select;
 
 use crate::context::{Context, IntoFlowControl};
-pub use crate::extract::content::{Body, Json, Text};
+pub use crate::extract::content::{Body, Html, Json, Text};
 pub use crate::extract::context::Client;
 pub use crate::extract::select::{AttrData, AttrTag, Elements, Select};
 pub use crate::extract::state::{FromRef, State};
@@ -67,7 +67,7 @@ mod sealed {
 }
 
 /// Core trait for a non-consuming extractor.
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 pub trait FromContextRef<C, S>: Sized {
     /// Extraction failure type.
     ///
@@ -81,7 +81,7 @@ pub trait FromContextRef<C, S>: Sized {
 }
 
 /// Core trait for a consuming extractor.
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 pub trait FromContext<C, S, V = sealed::ViaRequest>: Sized {
     /// Extraction failure type.
     ///
@@ -94,7 +94,7 @@ pub trait FromContext<C, S, V = sealed::ViaRequest>: Sized {
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection>;
 }
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S, T> FromContext<C, S, sealed::ViaParts> for T
 where
     C: Send + Sync + 'static,
@@ -108,7 +108,7 @@ where
     }
 }
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S, T> FromContextRef<C, S> for Option<T>
 where
     C: Send + Sync + 'static,
@@ -122,7 +122,7 @@ where
     }
 }
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S, T> FromContext<C, S> for Option<T>
 where
     C: Send + Sync + 'static,
@@ -136,7 +136,7 @@ where
     }
 }
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S, T> FromContextRef<C, S> for Result<T, T::Rejection>
 where
     C: Send + Sync + 'static,
@@ -150,7 +150,7 @@ where
     }
 }
 
-#[async_trait::async_trait]
+#[spire_core::async_trait]
 impl<C, S, T> FromContext<C, S> for Result<T, T::Rejection>
 where
     C: Send + Sync + 'static,

@@ -7,9 +7,6 @@
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
 
-> [!WARNING]
-> Work in progress. The API is not yet stable and may change.
-
 [action-badge]: https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yml?branch=main&label=build&logo=github&style=flat-square
 [action-url]: https://github.com/spire-rs/spire/actions/workflows/build.yml
 [crates-badge]: https://img.shields.io/crates/v/spire.svg?logo=rust&style=flat-square
@@ -27,12 +24,16 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 
 ## Features
 
-- **Flexible Architecture**: Built on tower's Service trait for composable middleware
-- **Multiple Backends**: Support for HTTP (reqwest) and WebDriver (thirtyfour) backends
+- **Flexible Architecture**: Built on tower's Service trait for composable
+  middleware
+- **Multiple Backends**: Support for HTTP (reqwest) and WebDriver (thirtyfour)
+  backends
 - **Type-Safe Routing**: Tag-based routing with compile-time safety
 - **Async First**: Powered by tokio for high-performance concurrent scraping
-- **Ergonomic Extractors**: Extract data from requests with a clean, type-safe API
-- **Graceful Shutdown**: Built-in support for clean shutdown and resource cleanup
+- **Ergonomic Extractors**: Extract data from requests with a clean, type-safe
+  API
+- **Graceful Shutdown**: Built-in support for clean shutdown and resource
+  cleanup
 - **Observability**: Optional tracing support for debugging and monitoring
 
 ## Installation
@@ -52,7 +53,33 @@ spire = "0.2.0"
 - **`tracing`** - Enables tracing/logging support
 - **`trace`** - Enables detailed trace-level instrumentation
 - **`metric`** - Enables metrics collection
-- **`full`** - Enables all features (macros, tracing, reqwest, thirtyfour)
+- **`rustls-tls`** - Use rustls for TLS connections (enabled by default)
+- **`native-tls`** - Use native system TLS library for connections
+- **`full`** - Enables all features (macros, tracing, reqwest, thirtyfour,
+  rustls-tls)
+
+### TLS Configuration
+
+By default, Spire uses rustls for TLS connections. You can choose between
+different TLS implementations:
+
+```toml
+# Default: uses rustls-tls
+[dependencies]
+spire = "0.2.0"
+
+# Explicitly use rustls
+[dependencies]
+spire = { version = "0.2.0", features = ["rustls-tls"], default-features = false }
+
+# Use native TLS (system TLS library)
+[dependencies]
+spire = { version = "0.2.0", features = ["native-tls"], default-features = false }
+
+# Use with specific backends
+[dependencies]
+spire = { version = "0.2.0", features = ["reqwest", "native-tls"], default-features = false }
+```
 
 ## Quick Start
 
@@ -62,7 +89,7 @@ spire = "0.2.0"
 use spire::prelude::*;
 use spire::extract::{Text, State};
 use spire::context::{RequestQueue, Tag};
-use spire::reqwest_backend::HttpClient;
+use spire::HttpClient;
 use spire::dataset::InMemDataset;
 
 #[derive(Clone)]
@@ -76,10 +103,10 @@ async fn scrape_handler(
     queue: RequestQueue,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Scraped {} bytes with API key: {}", html.len(), state.api_key);
-    
+
     // Queue more requests
     queue.push("page2", "https://example.com/page2").await?;
-    
+
     Ok(())
 }
 
@@ -116,7 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 use spire::prelude::*;
 use spire::extract::State;
 use spire::context::{RequestQueue, Tag};
-use spire::thirtyfour_backend::BrowserPool;
+use spire::BrowserBackend;
 use spire::dataset::InMemDataset;
 
 async fn browser_handler(
@@ -133,8 +160,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("main", browser_handler);
 
     // Create browser pool backend
-    let backend = BrowserPool::builder().build();
-    
+    let backend = BrowserBackend::builder()
+        .with_unmanaged("http://localhost:4444")
+        .build()?;
+
     let client = Client::new(backend, router)
         .with_request_queue(InMemDataset::stack())
         .with_dataset(InMemDataset::<String>::new());
@@ -165,7 +194,7 @@ Spire is built on several key abstractions:
 
 Spire integrates seamlessly with the tower ecosystem:
 
-```rust,no_run
+```rust,ignore
 use tower::ServiceBuilder;
 use tower::timeout::TimeoutLayer;
 use std::time::Duration;
@@ -175,22 +204,29 @@ async fn handler() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-let router = Router::new()
-    .route("main", handler)
-    .layer(
-        ServiceBuilder::new()
-            .timeout(Duration::from_secs(30))
-            .into_inner()
-    );
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let router = Router::new()
+        .route("main", handler)
+        .layer(
+            ServiceBuilder::new()
+                .timeout(Duration::from_secs(30))
+                .into_inner()
+        );
+    
+    Ok(())
+}
 ```
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for
+guidelines.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE)
+file for details.
 
 ## Acknowledgments
 
