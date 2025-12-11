@@ -37,7 +37,7 @@ pub struct BrowserConnection {
 }
 
 impl BrowserConnection {
-    /// Creates a new BrowserConnection from a pooled WebDriver instance.
+    /// Creates a [`BrowserConnection`] from a pooled `WebDriver` instance.
     ///
     /// # Arguments
     ///
@@ -49,6 +49,7 @@ impl BrowserConnection {
     /// let pooled_driver = pool.get().await?;
     /// let connection = BrowserConnection::from_pooled(pooled_driver);
     /// ```
+    #[must_use]
     pub fn from_pooled(driver: Object<BrowserManager>) -> Self {
         Self {
             driver,
@@ -73,6 +74,7 @@ impl BrowserConnection {
     ///
     /// let connection = BrowserConnection::from_pooled_with_config(pooled_driver, config);
     /// ```
+    #[must_use]
     pub fn from_pooled_with_config(
         driver: Object<BrowserManager>,
         config: BrowserBehaviorConfig,
@@ -81,11 +83,13 @@ impl BrowserConnection {
     }
 
     /// Returns a reference to the client configuration.
+    #[must_use]
     pub fn config(&self) -> &BrowserBehaviorConfig {
         &self.config
     }
 
     /// Updates the client configuration.
+    #[must_use]
     pub fn with_config(mut self, config: BrowserBehaviorConfig) -> Self {
         self.config = config;
         self
@@ -128,10 +132,10 @@ impl Client for BrowserConnection {
     async fn resolve(mut self, req: Request) -> Result<Response> {
         // Extract URL from request
         let uri = req.uri().clone();
-        let url = uri.to_string();
+        let url_string = uri.to_string();
 
         // Validate URL
-        if url.is_empty() {
+        if url_string.is_empty() {
             return Err(Error::new(
                 spire_core::ErrorKind::Backend,
                 "Empty URL provided",
@@ -141,9 +145,9 @@ impl Client for BrowserConnection {
         // Set user agent if configured
         if let Some(user_agent) = &self.config.user_agent {
             let script = format!(
-                r#"Object.defineProperty(navigator, 'userAgent', {{
+                "Object.defineProperty(navigator, 'userAgent', {{
                     get: function () {{ return '{}'; }}
-                }});"#,
+                }});",
                 user_agent.replace('\'', "\\'")
             );
 
@@ -154,17 +158,17 @@ impl Client for BrowserConnection {
         }
 
         // Navigate to the URL
-        self.goto(&url).await.map_err(|e| {
+        self.goto(&url_string).await.map_err(|e| {
             Error::new(
                 spire_core::ErrorKind::Backend,
-                format!("Failed to navigate to {}: {}", url, e),
+                format!("Failed to navigate to {}: {}", url_string, e),
             )
         })?;
 
         // Wait for page load if configured
         if self.config.wait_for_load {
             // Simple wait for document ready state
-            let script = r#"
+            let script = "
                 return new Promise((resolve) => {
                     if (document.readyState === 'complete') {
                         resolve();
@@ -172,7 +176,7 @@ impl Client for BrowserConnection {
                         window.addEventListener('load', resolve);
                     }
                 });
-            "#;
+            ";
 
             let _ = tokio::time::timeout(self.config.element_timeout, self.execute(script, vec![]))
                 .await;
@@ -189,10 +193,10 @@ impl Client for BrowserConnection {
                 )
             })?;
         } else if self.config.extract_text {
-            let script = r#"
+            let script = "
                 return document.body ?
                     document.body.innerText || document.body.textContent || '' : '';
-            "#;
+            ";
 
             if let Ok(result) = self.execute(script, vec![]).await {
                 content = result.json().as_str().unwrap_or("").to_string();

@@ -90,7 +90,8 @@ impl Default for BrowserBehaviorConfig {
 }
 
 impl BrowserBehaviorConfig {
-    /// Creates a new browser configuration with default values.
+    /// Creates a new browser behavior configuration with default values.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

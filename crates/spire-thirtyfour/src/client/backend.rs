@@ -7,13 +7,13 @@ use spire_core::backend::Backend;
 use crate::error::BrowserError;
 use crate::pool::{BrowserBuilder, BrowserConnection, BrowserManager};
 
-/// Browser backend implementation using Thirtyfour WebDriver.
+/// Browser backend implementation using Thirtyfour `WebDriver`.
 ///
 /// `BrowserBackend` implements the [`Backend`] trait and creates [`BrowserConnection`]
 /// instances that can perform browser automation using the Thirtyfour library.
 ///
 /// This backend manages a pool of browser instances with health monitoring,
-/// connection lifecycle management, and support for multiple WebDriver configurations.
+/// connection lifecycle management, and support for multiple `WebDriver` configurations.
 ///
 /// # Examples
 ///
@@ -43,7 +43,7 @@ impl BrowserBackend {
     /// Creates a new [`BrowserBackend`] from a browser pool.
     ///
     /// This allows you to use a pre-configured browser pool with specific
-    /// WebDriver configurations, connection limits, and health monitoring settings.
+    /// `WebDriver` configurations, connection limits, and health monitoring settings.
     ///
     /// # Examples
     ///
@@ -54,14 +54,16 @@ impl BrowserBackend {
     /// let pool = Pool::builder(manager).build().unwrap();
     /// let backend = BrowserBackend::from_pool(pool);
     /// ```
+    #[must_use]
     pub fn from_pool(pool: Pool<BrowserManager>) -> Self {
         Self { pool }
     }
 
     /// Creates a new [`BrowserBackend`] with default configuration.
     ///
-    /// This creates a basic browser backend with a single localhost WebDriver connection.
+    /// This creates a basic browser backend with a single localhost `WebDriver` connection.
     /// For production use, prefer using the builder pattern with specific configurations.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -88,6 +90,7 @@ impl BrowserBackend {
     ///
     /// This provides information about the current state of the browser pool,
     /// including active connections, idle connections, and pool capacity.
+    #[must_use]
     pub fn pool_status(&self) -> deadpool::Status {
         self.pool.status()
     }
@@ -96,7 +99,7 @@ impl BrowserBackend {
 impl Default for BrowserBackend {
     /// Creates a default browser backend.
     ///
-    /// Creates a default browser backend with a single localhost WebDriver connection
+    /// Creates a default browser backend with a single localhost `WebDriver` connection
     /// at `http://127.0.0.1:4444`. This is suitable for development and testing.
     ///
     /// For production use, use [`BrowserBackend::builder`] with proper configuration.
@@ -141,7 +144,7 @@ impl Backend for BrowserBackend {
     ///
     /// Returns an error if:
     /// - No browser instances are available and the pool is exhausted
-    /// - Unable to establish connection to WebDriver endpoints
+    /// - Unable to establish connection to `WebDriver` endpoints
     /// - Browser instance fails health checks
     async fn connect(&self) -> Result<Self::Client> {
         // pool.get() returns Object<BrowserManager> which manages WebDriver instances

@@ -14,8 +14,8 @@ pub use spire_reqwest::{HttpClient, reqwest};
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
 pub use spire_thirtyfour::{
-    BrowserBackend, BrowserBehaviorConfig, BrowserConfig, BrowserConfigBuilder, BrowserConnection,
-    BrowserError, BrowserPool, NavigationErrorType, PoolConfig, PoolConfigBuilder, thirtyfour,
+    BrowserBackend, BrowserBehaviorConfig, BrowserBuilder, BrowserConfig, BrowserConfigBuilder,
+    BrowserConnection, BrowserError, BrowserResult, NavigationErrorType, thirtyfour,
 };
 
 pub mod extract;

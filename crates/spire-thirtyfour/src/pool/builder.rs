@@ -1,18 +1,17 @@
+use std::time::Duration;
+
 use deadpool::managed::Pool;
 use derive_more::Display;
 use spire_core::{Error, ErrorKind, Result};
 
-use crate::client::{BrowserBackend, BrowserConfig as WebDriverConfig, PoolConfig};
+use crate::client::{BrowserBackend, BrowserConfig as WebDriverConfig};
 use crate::pool::manager::BrowserManager;
 
 /// Builder for configuring and creating a [`BrowserBackend`].
 ///
 /// The builder supports both simple configuration (for development and testing)
 /// and advanced configuration (for production deployments) with comprehensive
-/// control over browser capabilities, pool settings, and health monitoring.
-///
-/// This builder now uses `derive_builder` internally for better maintainability
-/// and type safety.
+/// control over browser capabilities and pool settings.
 ///
 /// # Simple Configuration
 ///
@@ -32,38 +31,42 @@ use crate::pool::manager::BrowserManager;
 /// For production use, you can use the full configuration API:
 ///
 /// ```ignore
-/// use spire_thirtyfour::{BrowserBackend, config::*};
+/// use spire_thirtyfour::{BrowserBackend, BrowserConfig};
 /// use std::time::Duration;
 ///
-/// let chrome_config = WebDriverConfig::builder()
+/// let chrome_config = BrowserConfig::builder()
 ///     .with_url("http://localhost:4444")
-///     .with_capabilities(custom_capabilities)
 ///     .with_connect_timeout(Duration::from_secs(30))
 ///     .build()?;
 ///
 /// let backend = BrowserBackend::builder()
 ///     .with_config(chrome_config)?
-///     .with_pool_config(
-///         PoolConfig::builder()
-///             .with_max_size(10)
-///             .with_max_lifetime(Duration::from_secs(3600))
-///             .build()?
-///     )
+///     .with_max_pool_size(10)
 ///     .with_health_checks(true)
 ///     .build()?;
 /// ```
 #[must_use]
 #[derive(Default, Display)]
-#[display("BrowserBuilder(configs: {}, health_checks: {:?})", self.configs.len(), self.health_checks)]
+#[display("BrowserBuilder(configs: {}, max_size: {:?})", self.configs.len(), self.max_size)]
 pub struct BrowserBuilder {
     /// WebDriver configurations
     configs: Vec<WebDriverConfig>,
-    /// Pool configuration settings
-    pool_config: Option<PoolConfig>,
+    /// Maximum pool size
+    max_size: Option<usize>,
+    /// Minimum pool size
+    min_size: Option<usize>,
+    /// Timeout for acquiring connections from pool
+    acquire_timeout: Option<Duration>,
+    /// Maximum lifetime of connections
+    max_lifetime: Option<Duration>,
+    /// Maximum idle time for connections
+    max_idle_time: Option<Duration>,
     /// Whether to enable health checks
     health_checks: Option<bool>,
     /// Maximum retry attempts for connection creation
     max_retry_attempts: Option<usize>,
+    /// Whether to skip configuration validation
+    skip_validation: bool,
 }
 
 impl BrowserBuilder {
@@ -78,19 +81,14 @@ impl BrowserBuilder {
     /// ```
     #[inline]
     pub fn new() -> Self {
-        Self {
-            configs: Vec::new(),
-            pool_config: None,
-            health_checks: None,
-            max_retry_attempts: None,
-        }
+        Self::default()
     }
 
     /// Adds an unmanaged WebDriver connection to the pool.
     ///
     /// This is a convenience method for quick setup. The connection points to an
     /// already-running WebDriver server (e.g., Selenium Grid, ChromeDriver, GeckoDriver).
-    /// Uses default Chrome configuration and timeouts.
+    /// Uses default configuration and timeouts.
     ///
     /// For more control, use [`with_config`](Self::with_config) instead.
     ///
@@ -108,49 +106,75 @@ impl BrowserBuilder {
     ///     .with_unmanaged("http://localhost:4445")
     ///     .build()?;
     /// ```
-    pub fn with_unmanaged(mut self, addr: impl AsRef<str>) -> Self {
-        let config = WebDriverConfig::new(addr.as_ref());
+    pub fn with_unmanaged(mut self, addr: impl Into<String>) -> Self {
+        let config = WebDriverConfig::new(addr.into()).unmanaged();
         self.configs.push(config);
         self
     }
 
-    /// Adds a fully configured WebDriver connection to the pool.
+    /// Adds a managed WebDriver connection to the pool.
     ///
-    /// This method provides complete control over the WebDriver configuration,
-    /// including browser type, capabilities, timeouts, and connection settings.
+    /// This creates a managed browser process that will be spawned and controlled
+    /// by the pool. Useful for environments where you want full control over the
+    /// browser lifecycle.
     ///
     /// # Arguments
     ///
-    /// * `config` - Complete WebDriver configuration
-    ///
-    /// # Returns
-    ///
-    /// Returns the updated builder, or an error if the configuration is invalid.
+    /// * `addr` - WebDriver server address where the managed process will run
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// use spire_thirtyfour::{BrowserBackend, config::*};
+    /// use spire_thirtyfour::BrowserBackend;
+    ///
+    /// let backend = BrowserBackend::builder()
+    ///     .with_managed("http://localhost:4444")
+    ///     .build()?;
+    /// ```
+    pub fn with_managed(mut self, addr: impl Into<String>) -> Self {
+        let config = WebDriverConfig::new(addr.into()).managed();
+        self.configs.push(config);
+        self
+    }
+
+    /// Adds a custom WebDriver configuration to the pool.
+    ///
+    /// This provides full control over browser capabilities, timeouts,
+    /// and connection settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Fully configured WebDriver configuration
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use spire_thirtyfour::{BrowserBackend, BrowserConfig};
     /// use std::time::Duration;
     ///
-    /// let config = WebDriverConfig::builder()
+    /// let config = BrowserConfig::builder()
     ///     .with_url("http://localhost:4444")
-    ///     .with_capabilities(custom_capabilities)
-    ///     .with_connect_timeout(Duration::from_secs(30))
+    ///     .with_connect_timeout(Duration::from_secs(60))
+    ///     .with_managed(false)
     ///     .build()?;
     ///
     /// let backend = BrowserBackend::builder()
-    ///     .with_config(config)?
+    ///     .with_config(config)
     ///     .build()?;
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid and validation is enabled.
     pub fn with_config(mut self, config: WebDriverConfig) -> Result<Self> {
-        // Always validate configs
-        config.validate()?;
+        if !self.skip_validation {
+            config.validate()?;
+        }
         self.configs.push(config);
         Ok(self)
     }
 
-    /// Adds multiple WebDriver configurations at once.
+    /// Adds multiple WebDriver configurations to the pool.
     ///
     /// # Arguments
     ///
@@ -159,68 +183,84 @@ impl BrowserBuilder {
     /// # Examples
     ///
     /// ```ignore
+    /// use spire_thirtyfour::{BrowserBackend, BrowserConfig};
+    ///
     /// let configs = vec![
-    ///     WebDriverConfig::builder().with_url("http://localhost:4444").build()?,
-    ///     WebDriverConfig::builder().with_url("http://localhost:4445").build()?,
+    ///     BrowserConfig::new("http://localhost:4444"),
+    ///     BrowserConfig::new("http://localhost:4445"),
     /// ];
     ///
-    /// let pool = BrowserPool::builder()
+    /// let builder = BrowserBackend::builder()
     ///     .with_configs(configs)?
     ///     .build()?;
     /// ```
-    pub fn with_configs(mut self, new_configs: Vec<WebDriverConfig>) -> Result<Self> {
-        // Validate all configs
-        for config in &new_configs {
-            config.validate()?;
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any configuration is invalid and validation is enabled.
+    pub fn with_configs(mut self, configs: Vec<WebDriverConfig>) -> Result<Self> {
+        if !self.skip_validation {
+            for config in &configs {
+                config.validate()?;
+            }
         }
-        self.configs.extend(new_configs);
+        self.configs.extend(configs);
         Ok(self)
     }
 
-    /// Sets the pool configuration.
-    ///
-    /// Pool configuration controls the behavior of the connection pool itself,
-    /// including maximum size, timeouts, and lifecycle management.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - Pool configuration settings
+    /// Sets the maximum pool size.
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// use spire_thirtyfour::{BrowserPool, PoolConfig};
-    /// use std::time::Duration;
+    /// use spire_thirtyfour::BrowserBuilder;
     ///
-    /// let pool_config = PoolConfig::builder()
-    ///     .with_max_size(20)
-    ///     .with_min_size(5)
-    ///     .with_acquire_timeout(Duration::from_secs(30))
-    ///     .build()?;
-    ///
-    /// let pool = BrowserPool::builder()
+    /// let builder = BrowserBuilder::new()
     ///     .with_unmanaged("http://localhost:4444")
-    ///     .with_pool_config(pool_config)
-    ///     .build()?;
+    ///     .with_max_pool_size(20);
     /// ```
-    pub fn with_pool_config(mut self, config: PoolConfig) -> Self {
-        self.pool_config = Some(config);
+    pub fn with_max_pool_size(mut self, max_size: usize) -> Self {
+        self.max_size = Some(max_size);
         self
     }
 
-    /// Enables or disables health checks for browser connections.
+    /// Sets the minimum pool size.
+    pub fn with_min_pool_size(mut self, min_size: usize) -> Self {
+        self.min_size = Some(min_size);
+        self
+    }
+
+    /// Sets the timeout for acquiring connections from the pool.
+    pub fn with_acquire_timeout(mut self, timeout: Duration) -> Self {
+        self.acquire_timeout = Some(timeout);
+        self
+    }
+
+    /// Sets the maximum lifetime for connections in the pool.
+    pub fn with_max_lifetime(mut self, lifetime: Duration) -> Self {
+        self.max_lifetime = Some(lifetime);
+        self
+    }
+
+    /// Sets the maximum idle time for connections in the pool.
+    pub fn with_max_idle_time(mut self, idle_time: Duration) -> Self {
+        self.max_idle_time = Some(idle_time);
+        self
+    }
+
+    /// Enables or disables health checks for pooled browser instances.
     ///
-    /// When enabled, the pool will periodically check the health of browser
-    /// connections and remove unhealthy ones from the pool.
+    /// When enabled, the pool will periodically check if browser instances
+    /// are healthy and remove any that have become unresponsive.
     ///
     /// # Arguments
     ///
-    /// * `enabled` - Whether to enable health checks (default: true)
+    /// * `enabled` - Whether to enable health checks
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let pool = BrowserPool::builder()
+    /// let builder = BrowserBuilder::new()
     ///     .with_unmanaged("http://localhost:4444")
     ///     .with_health_checks(true)
     ///     .build()?;
@@ -232,86 +272,68 @@ impl BrowserBuilder {
 
     /// Sets the maximum number of retry attempts for connection creation.
     ///
-    /// When creating new browser connections fails, the manager will retry
-    /// up to this many times before giving up.
+    /// When a browser connection fails to be created, the pool manager will
+    /// retry up to this many times before giving up.
     ///
     /// # Arguments
     ///
-    /// * `attempts` - Maximum retry attempts (default: 3)
+    /// * `attempts` - Maximum number of retry attempts (minimum 1)
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let pool = BrowserPool::builder()
+    /// let builder = BrowserBuilder::new()
     ///     .with_unmanaged("http://localhost:4444")
     ///     .with_max_retry_attempts(5)
     ///     .build()?;
     /// ```
     pub fn with_max_retry_attempts(mut self, attempts: usize) -> Self {
-        self.max_retry_attempts = Some(attempts);
+        self.max_retry_attempts = Some(attempts.max(1));
         self
     }
 
-    /// Disables configuration validation during building.
+    /// Disables configuration validation during the build process.
     ///
-    /// By default, all configurations are validated when added to the builder.
-    /// This can be disabled for testing or when you're certain the configurations
-    /// are valid.
+    /// By default, all configurations are validated before the pool is created.
+    /// This method skips that validation, which can be useful for testing or
+    /// when you're certain your configurations are valid.
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let pool = BrowserPool::builder()
+    /// let builder = BrowserBuilder::new()
     ///     .without_config_validation()
     ///     .with_unmanaged("invalid-url") // Would normally fail validation
-    ///     .build(); // Validation will happen here instead
+    ///     .build()?;
     /// ```
-    pub fn without_config_validation(self) -> Self {
-        // Configuration validation is now always performed
-        // This method is kept for backward compatibility but does nothing
+    pub fn without_config_validation(mut self) -> Self {
+        self.skip_validation = true;
         self
     }
 
-    /// Adds a managed WebDriver process to the pool.
+    /// Builds the [`BrowserBackend`] with the configured settings.
     ///
-    /// This would spawn and manage browser processes directly, rather than
-    /// connecting to external WebDriver servers.
-    ///
-    /// ## Note
-    ///
-    /// This functionality is not yet implemented and will return an error.
-    /// Use [`with_unmanaged`](Self::with_unmanaged) instead.
-    #[inline]
-    pub fn with_managed(self) -> Result<Self> {
-        Err(Error::new(
-            ErrorKind::Backend,
-            "Managed WebDriver pools are not yet implemented. Use with_unmanaged() instead.",
-        ))
-    }
-
-    /// Constructs the [`BrowserBackend`] from this builder.
-    ///
-    /// Creates a connection pool with the specified configurations and settings.
-    /// The pool size is automatically set based on the number of configurations
-    /// unless overridden by pool configuration.
-    ///
-    /// # Returns
-    ///
-    /// Returns the configured browser pool, or an error if:
-    /// - No configurations were provided
-    /// - Configuration validation fails
-    /// - Pool creation fails
+    /// This method creates the internal browser manager, validates all configurations
+    /// (unless disabled), and constructs the connection pool.
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let pool = BrowserPool::builder()
+    /// let backend = BrowserBuilder::new()
     ///     .with_unmanaged("http://localhost:4444")
     ///     .with_unmanaged("http://localhost:4445")
+    ///     .with_max_pool_size(10)
     ///     .build()?;
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No WebDriver configurations have been added
+    /// - Any configuration is invalid (when validation is enabled)
+    /// - Pool configuration is invalid (e.g., zero max size)
+    /// - Pool creation fails
     pub fn build(self) -> Result<BrowserBackend> {
-        // Validate we have at least one configuration
         if self.configs.is_empty() {
             return Err(Error::new(
                 ErrorKind::Backend,
@@ -319,84 +341,58 @@ impl BrowserBuilder {
             ));
         }
 
-        // Create a WebDriver manager with configurations
-        let mut manager = BrowserManager::new();
+        // Validate pool settings
+        let max_size = self.max_size.unwrap_or(10);
+        let min_size = self.min_size.unwrap_or(1);
 
-        // Add all configurations to the manager
+        if max_size == 0 {
+            return Err(Error::new(
+                ErrorKind::Backend,
+                "Pool max_size must be greater than zero",
+            ));
+        }
+
+        if min_size > max_size {
+            return Err(Error::new(
+                ErrorKind::Backend,
+                "Pool min_size cannot be greater than max_size",
+            ));
+        }
+
+        // Create browser manager with configurations
+        let mut manager = BrowserManager::new();
         for config in self.configs {
             manager = manager.with_config(config);
         }
 
-        // Apply health check and retry settings
-        manager = manager
-            .with_health_checks(self.health_checks.unwrap_or(true))
-            .with_max_retry_attempts(self.max_retry_attempts.unwrap_or(3));
+        // Apply manager settings
+        if let Some(enabled) = self.health_checks {
+            manager = manager.with_health_checks(enabled);
+        }
 
-        // Apply pool configuration
-        let pool_config = self
-            .pool_config
-            .unwrap_or_else(|| PoolConfig::new().with_max_size(1));
+        if let Some(attempts) = self.max_retry_attempts {
+            manager = manager.with_max_retry_attempts(attempts);
+        }
 
-        // Create the deadpool with the manager
-        let pool = Pool::builder(manager)
-            .max_size(pool_config.max_size)
-            .build()
-            .map_err(|e| {
-                Error::new(
-                    ErrorKind::Backend,
-                    format!("Failed to create browser pool: {}", e),
-                )
-            })?;
+        // Build the connection pool
+        let mut pool_builder = Pool::builder(manager).max_size(max_size);
+
+        // Apply optional pool settings
+        if let Some(timeout) = self.acquire_timeout {
+            pool_builder = pool_builder.wait_timeout(Some(timeout));
+        }
+
+        // Note: deadpool doesn't expose max_lifetime and idle_timeout directly
+        // These would need to be configured through the manager if needed
+
+        let pool = pool_builder.build().map_err(|e| {
+            Error::new(
+                ErrorKind::Backend,
+                format!("Failed to create browser connection pool: {}", e),
+            )
+        })?;
 
         Ok(BrowserBackend::from_pool(pool))
-    }
-
-    /// Returns the number of configurations added to this builder.
-    pub fn config_count(&self) -> usize {
-        self.configs.len()
-    }
-
-    /// Returns whether health checks are enabled.
-    pub fn health_checks_enabled(&self) -> Option<bool> {
-        self.health_checks
-    }
-
-    /// Returns the configured maximum retry attempts.
-    pub fn max_retry_attempts(&self) -> Option<usize> {
-        self.max_retry_attempts
-    }
-}
-
-/// Error type for builder-related errors.
-#[derive(Debug, Display)]
-pub enum BuilderError {
-    #[display("Configuration error: {}", message)]
-    /// Configuration error occurred during building
-    Config {
-        /// Error message describing the configuration issue
-        message: String,
-    },
-
-    #[display("Validation error: {}", message)]
-    /// Validation error occurred during building
-    Validation {
-        /// Error message describing the validation failure
-        message: String,
-    },
-
-    #[display("Build error: {}", message)]
-    /// Build error occurred during construction
-    Build {
-        /// Error message describing the build failure
-        message: String,
-    },
-}
-
-impl std::error::Error for BuilderError {}
-
-impl From<BuilderError> for Error {
-    fn from(err: BuilderError) -> Self {
-        Error::new(ErrorKind::Backend, err.to_string())
     }
 }
 
@@ -405,94 +401,112 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builder_new() {
-        let builder = BrowserBuilder::new();
-        assert_eq!(builder.config_count(), 0);
+    fn builder_default() {
+        let builder = BrowserBuilder::default();
+        assert!(builder.configs.is_empty());
+        assert!(builder.max_size.is_none());
+        assert!(builder.health_checks.is_none());
     }
 
     #[test]
     fn builder_with_unmanaged() {
-        let builder = BrowserBuilder::new()
-            .with_unmanaged("http://localhost:4444")
-            .with_unmanaged("http://localhost:4445");
+        let builder = BrowserBuilder::new().with_unmanaged("http://localhost:4444");
+        assert_eq!(builder.configs.len(), 1);
+        assert_eq!(builder.configs[0].url, "http://localhost:4444");
+        assert!(!builder.configs[0].managed);
+    }
 
-        assert_eq!(builder.config_count(), 2);
+    #[test]
+    fn builder_with_managed() {
+        let builder = BrowserBuilder::new().with_managed("http://localhost:4444");
+        assert_eq!(builder.configs.len(), 1);
+        assert_eq!(builder.configs[0].url, "http://localhost:4444");
+        assert!(builder.configs[0].managed);
     }
 
     #[test]
     fn builder_with_config() {
-        let config = WebDriverConfig::builder()
-            .with_url("http://localhost:4444")
-            .build()
-            .expect("Config should build");
+        let config = WebDriverConfig::new("http://localhost:4444");
+        let builder = BrowserBuilder::new().with_config(config).unwrap();
+        assert_eq!(builder.configs.len(), 1);
+        assert_eq!(builder.configs[0].url, "http://localhost:4444");
+    }
 
+    #[test]
+    fn builder_with_pool_settings() {
         let builder = BrowserBuilder::new()
-            .with_config(config)
-            .expect("Valid config should be accepted");
+            .with_max_pool_size(20)
+            .with_min_pool_size(5)
+            .with_health_checks(true)
+            .with_max_retry_attempts(3);
 
-        assert_eq!(builder.config_count(), 1);
+        assert_eq!(builder.max_size, Some(20));
+        assert_eq!(builder.min_size, Some(5));
+        assert_eq!(builder.health_checks, Some(true));
+        assert_eq!(builder.max_retry_attempts, Some(3));
     }
 
     #[test]
-    fn builder_with_invalid_config() {
-        let invalid_config = WebDriverConfig::builder()
-            .with_url("") // Empty URL
-            .build();
-
-        assert!(invalid_config.is_err());
-    }
-
-    #[test]
-    fn builder_without_validation() {
-        let builder = BrowserBuilder::new()
-            .without_config_validation()
-            .with_unmanaged("http://localhost:4444");
-
-        assert_eq!(builder.config_count(), 1);
-    }
-
-    #[test]
-    fn builder_health_checks() {
-        let builder = BrowserBuilder::new().with_health_checks(false);
-        assert_eq!(builder.health_checks_enabled(), Some(false));
-    }
-
-    #[test]
-    fn builder_max_retries() {
-        let builder = BrowserBuilder::new().with_max_retry_attempts(5);
-        assert_eq!(builder.max_retry_attempts(), Some(5));
-    }
-
-    #[test]
-    fn builder_with_managed_not_implemented() {
-        let result = BrowserBuilder::new().with_managed();
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn builder_build_no_configs() {
+    fn builder_validation() {
+        // Should require at least one config
         let result = BrowserBuilder::new().build();
         assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("At least one WebDriver configuration")
+        );
+
+        // Should validate pool size
+        let result = BrowserBuilder::new()
+            .with_unmanaged("http://localhost:4444")
+            .with_max_pool_size(0)
+            .build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("max_size must be greater than zero")
+        );
+
+        // Should validate min > max
+        let result = BrowserBuilder::new()
+            .with_unmanaged("http://localhost:4444")
+            .with_max_pool_size(5)
+            .with_min_pool_size(10)
+            .build();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("min_size cannot be greater than max_size")
+        );
     }
 
     #[test]
-    fn builder_multiple_browser_types() {
+    fn builder_skip_validation() {
         let builder = BrowserBuilder::new()
-            .with_unmanaged("http://localhost:4444")
-            .with_unmanaged("http://localhost:4445")
-            .with_unmanaged("http://localhost:4446");
-
-        assert_eq!(builder.config_count(), 3);
+            .without_config_validation()
+            .with_unmanaged("invalid-url");
+        assert!(builder.skip_validation);
     }
 
     #[test]
     fn builder_display() {
         let builder = BrowserBuilder::new()
             .with_unmanaged("http://localhost:4444")
-            .with_health_checks(true);
+            .with_max_pool_size(10);
+        let display_str = format!("{}", builder);
+        assert!(display_str.contains("configs: 1"));
+        assert!(display_str.contains("max_size: Some(10)"));
+    }
 
-        let display = builder.to_string();
-        assert!(display.contains("configs: 1"));
-        assert!(display.contains("health_checks: Some(true)"));
+    #[test]
+    fn builder_retry_attempts_minimum() {
+        let builder = BrowserBuilder::new().with_max_retry_attempts(0);
+        assert_eq!(builder.max_retry_attempts, Some(1)); // Should be clamped to minimum 1
     }
 }

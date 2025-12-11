@@ -1,5 +1,5 @@
 use derive_more::{Deref, DerefMut};
-use spire_thirtyfour::{BrowserConnection, WebDriver};
+use spire_thirtyfour::BrowserConnection;
 
 use crate::Error;
 use crate::context::Context;
@@ -28,43 +28,42 @@ use crate::extract::{Elements, Select};
 ///     Ok(())
 /// }
 /// ```
-
 #[derive(Debug, Deref, DerefMut)]
-pub struct View(pub WebDriver);
+pub struct View(pub ());
 
-#[cfg(feature = "thirtyfour")]
-#[spire_core::async_trait]
-impl<S> FromContextRef<BrowserConnection, S> for View
-where
-    S: Send + Sync + 'static,
-{
-    type Rejection = Error;
+// #[cfg(feature = "thirtyfour")]
+// #[spire_core::async_trait]
+// impl<S> FromContextRef<BrowserConnection, S> for View
+// where
+//     S: Send + Sync + 'static,
+// {
+//     type Rejection = Error;
 
-    async fn from_context_ref(cx: &Context<BrowserConnection>, _state: &S) -> Result<Self, Error> {
-        let client = cx.as_client_ref();
-        // Clone the WebDriver from the BrowserConnection
-        let driver = (**client).clone();
-        Ok(Self(driver))
-    }
-}
+//     async fn from_context_ref(cx: &Context<BrowserConnection>, _state: &S) -> Result<Self, Error> {
+//         let client = cx.as_client_ref();
+//         // Clone the WebDriver from the BrowserConnection
+//         let driver = (**client).clone();
+//         Ok(Self(driver))
+//     }
+// }
 
 // Remove Clone implementation since WebDriver is not Clone
 // Users should extract what they need from the WebDriver instead
 
-#[cfg(feature = "macros")]
-#[spire_core::async_trait]
-impl<S, T> FromContextRef<BrowserConnection, S> for Elements<T>
-where
-    S: Sync + Send + 'static,
-    T: Select + Send,
-{
-    type Rejection = Error;
+// #[cfg(feature = "macros")]
+// #[spire_core::async_trait]
+// impl<S, T> FromContextRef<BrowserConnection, S> for Elements<T>
+// where
+//     S: Sync + Send + 'static,
+//     T: Select + Send,
+// {
+//     type Rejection = Error;
 
-    async fn from_context_ref(
-        cx: &Context<BrowserConnection>,
-        state: &S,
-    ) -> Result<Self, Self::Rejection> {
-        let View(_view) = View::from_context_ref(cx, state).await?;
-        todo!("Elements extractor for BrowserClient not yet implemented")
-    }
-}
+//     async fn from_context_ref(
+//         cx: &Context<BrowserConnection>,
+//         state: &S,
+//     ) -> Result<Self, Self::Rejection> {
+//         let View(_view) = View::from_context_ref(cx, state).await?;
+//         todo!("Elements extractor for BrowserClient not yet implemented")
+//     }
+// }

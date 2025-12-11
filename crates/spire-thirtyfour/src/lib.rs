@@ -1,3 +1,118 @@
+//! # Spire `ThirtyFour` - `WebDriver` Backend for Spire
+//!
+//! This crate provides a WebDriver-based backend for the Spire web scraping framework,
+//! built on top of the `thirtyfour` crate. It offers browser automation capabilities
+//! with connection pooling, health monitoring, and robust error handling.
+//!
+//! ## Quick Start
+//!
+//! ```no_run
+//! use spire_thirtyfour::BrowserBackend;
+//! use spire_core::backend::Backend;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Create a backend with default configuration
+//!     let backend = BrowserBackend::builder()
+//!         .with_unmanaged("http://localhost:4444")
+//!         .build()?;
+//!
+//!     // Get a browser connection
+//!     let connection = backend.connect().await?;
+//!
+//!     // Use the connection (implements spire_core::backend::Client)
+//!     // connection.navigate("https://example.com").await?;
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Core Components
+//!
+//! ### Backend and Connections
+//! - [`BrowserBackend`] - Main backend implementation with connection pooling
+//! - [`BrowserConnection`] - Individual browser connection wrapper
+//! - [`BrowserBuilder`] - Builder for configuring the backend
+//!
+//! ### Configuration
+//! - [`BrowserConfig`] - `WebDriver` connection configuration
+//! - [`BrowserBehaviorConfig`] - Browser behavior settings
+//!
+//! ### Error Handling
+//! - [`BrowserError`] - Comprehensive error types for browser operations
+//! - [`NavigationErrorType`] - Specific navigation error classifications
+//! - [`BrowserResult`] - Type alias for `Result<T, BrowserError>`
+//!
+//! ## Advanced Configuration
+//!
+//! ```no_run
+//! use spire_thirtyfour::{BrowserBackend, BrowserConfig};
+//! use std::time::Duration;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Configure individual browser settings
+//!     let chrome_config = BrowserConfig::builder()
+//!         .with_url("http://localhost:4444")
+//!         .with_connect_timeout(Duration::from_secs(30))
+//!         .build()?;
+//!
+//!     // Create backend with custom pool settings
+//!     let backend = BrowserBackend::builder()
+//!         .with_config(chrome_config)?
+//!         .with_max_pool_size(10)
+//!         .with_health_checks(true)
+//!         .with_max_retry_attempts(3)
+//!         .build()?;
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Multiple `WebDriver` Endpoints
+//!
+//! ```no_run
+//! use spire_thirtyfour::BrowserBackend;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let backend = BrowserBackend::builder()
+//!         .with_unmanaged("http://localhost:4444")  // Chrome
+//!         .with_unmanaged("http://localhost:4445")  // Firefox
+//!         .with_managed("http://localhost:4446")    // Managed instance
+//!         .with_max_pool_size(15)
+//!         .build()?;
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Feature Flags
+//!
+//! This crate requires exactly one TLS implementation:
+//! - `rustls-tls` - Use rustls for TLS (recommended)
+//! - `native-tls` - Use system's native TLS implementation
+//!
+//! ## Integration with Spire
+//!
+//! This backend integrates seamlessly with the Spire framework:
+//!
+//! ```no_run
+//! use spire_thirtyfour::BrowserBackend;
+//! use spire_core::backend::Backend;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let backend = BrowserBackend::default();
+//!     let connection = backend.connect().await?;
+//!
+//!     // Use the connection for browser automation
+//!     // connection.navigate("https://example.com").await?;
+//!
+//!     Ok(())
+//! }
+//! ```
+
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
@@ -6,41 +121,22 @@
 #[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
 compile_error!("At least one TLS feature must be enabled: 'rustls-tls' or 'native-tls'");
 
-pub mod client;
-pub mod error;
-pub mod pool;
+mod client;
+mod error;
+mod pool;
 
-// Re-export thirtyfour types for convenience
-// Re-export thirtyfour crate
+// Re-export entire thirtyfour crate for convenience
 pub use thirtyfour;
-pub use thirtyfour::{WebDriver, WebElement};
 
-pub use crate::client::{
-    BrowserBackend, BrowserConfig, BrowserConfigBuilder, PoolConfig, PoolConfigBuilder,
-};
-pub use crate::error::{BrowserError, NavigationErrorType};
-pub use crate::pool::{BrowserBehaviorConfig, BrowserBuilder, BrowserConnection, BrowserPool};
+// Main public API exports
+pub use crate::client::{BrowserBackend, BrowserConfig, BrowserConfigBuilder};
+pub use crate::error::{BrowserError, BrowserResult, NavigationErrorType};
+pub use crate::pool::{BrowserBehaviorConfig, BrowserBuilder, BrowserConnection};
 
-/// Prelude module for convenient imports.
-///
-/// This module re-exports the most commonly used types and traits.
-///
-/// # Examples
-///
-/// ```ignore
-/// use spire_thirtyfour::prelude::*;
-///
-/// let backend = BrowserBackend::builder()
-///     .with_unmanaged("http://localhost:4444")
-///     .build()?;
-/// ```
-#[doc(hidden)]
 pub mod prelude;
 
 #[cfg(test)]
 mod tests {
-    // Imports for tests would go here when the integration test is re-enabled
-
     use super::*;
 
     #[test]
@@ -58,51 +154,6 @@ mod tests {
         let invalid_config = BrowserConfig::new("");
         assert!(invalid_config.validate().is_err());
     }
-
-    #[test]
-    fn pool_config_validation() {
-        let config = PoolConfig::builder()
-            .with_max_size(10_usize)
-            .with_min_size(2_usize)
-            .build()
-            .expect("Should build successfully");
-        assert!(config.validate().is_ok());
-
-        let invalid_result = PoolConfig::builder().with_max_size(0_usize).build();
-        assert!(invalid_result.is_err());
-    }
-
-    // FIXME: Commented out due to Service trait constraint issues with BrowserConnection
-    // #[tokio::test]
-    // async fn integration_test_noop() -> Result<()> {
-    //     // This test verifies the integration without requiring actual WebDriver
-    //     let backend = BrowserBackend::builder()
-    //         .with_unmanaged("http://127.0.0.1:4444")
-    //         .with_unmanaged("http://127.0.0.1:4445")
-    //         .build()
-    //         .expect("Failed to build backend");
-
-    //     // Create a no-op worker for testing
-    //     let worker = Noop::default();
-
-    //     let request = Request::get("https://example.com/")
-    //         .body(())
-    //         .expect("Failed to create request");
-
-    //     let client = Client::new(backend, worker)
-    //         .with_request_queue(InMemDataset::stack())
-    //         .with_dataset(InMemDataset::<u64>::new())
-    //         .with_initial_request(request);
-
-    //     // Note: This would fail without actual WebDriver servers running
-    //     // but verifies that the API compiles and types work correctly
-    //     let _dataset = client.dataset::<u64>();
-
-    //     // Skip actual execution in tests
-    //     // let _ = client.run().await?;
-
-    //     Ok(())
-    // }
 
     #[test]
     fn browser_error_categories() {

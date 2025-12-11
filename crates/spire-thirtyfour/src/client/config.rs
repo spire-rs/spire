@@ -1,4 +1,4 @@
-//! WebDriver and pool configuration types.
+//! `WebDriver` and pool configuration types.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -18,10 +18,10 @@ use spire_core::{Error, ErrorKind, Result};
     build_fn(validate = "Self::validate_config")
 )]
 pub struct BrowserConfig {
-    /// The WebDriver server URL (e.g., "http://127.0.0.1:4444")
+    /// The `WebDriver` server URL (e.g., <http://127.0.0.1:4444>)
     pub url: String,
 
-    /// WebDriver capabilities
+    /// `WebDriver` capabilities
     #[builder(default = "HashMap::new()")]
     pub capabilities: HashMap<String, Value>,
 
@@ -29,7 +29,7 @@ pub struct BrowserConfig {
     #[builder(default = "Duration::from_secs(30)")]
     pub connect_timeout: Duration,
 
-    /// Request timeout for WebDriver commands
+    /// Request timeout for `WebDriver` commands
     #[builder(default = "Duration::from_secs(60)")]
     pub request_timeout: Duration,
 
@@ -59,7 +59,7 @@ impl BrowserConfigBuilder {
             if !url.starts_with("http://") && !url.starts_with("https://") {
                 return Err(Error::new(
                     ErrorKind::Backend,
-                    format!("Invalid WebDriver URL format: {}", url),
+                    format!("Invalid WebDriver URL format: {url}"),
                 ));
             }
         }
@@ -100,41 +100,51 @@ impl BrowserConfig {
     }
 
     /// Creates a builder for browser configuration.
+    #[must_use]
     pub fn builder() -> BrowserConfigBuilder {
         BrowserConfigBuilder::default()
     }
 
-    /// Sets a WebDriver capability.
+    /// Sets a `WebDriver` capability.
+    #[must_use]
     pub fn with_capability(mut self, key: impl Into<String>, value: Value) -> Self {
         self.capabilities.insert(key.into(), value);
         self
     }
 
-    /// Sets multiple WebDriver capabilities.
+    /// Sets multiple `WebDriver` capabilities.
+    #[must_use]
     pub fn with_capabilities(mut self, capabilities: HashMap<String, Value>) -> Self {
         self.capabilities.extend(capabilities);
         self
     }
 
     /// Sets the connection timeout for this configuration.
+    #[must_use]
     pub fn with_connect_timeout(mut self, timeout: Duration) -> Self {
         self.connect_timeout = timeout;
         self
     }
 
     /// Marks this connection as managed (browser process will be spawned).
+    #[must_use]
     pub fn managed(mut self) -> Self {
         self.managed = true;
         self
     }
 
-    /// Marks this connection as unmanaged (connects to existing WebDriver server).
+    /// Marks this connection as unmanaged (connects to existing `WebDriver` server).
+    #[must_use]
     pub fn unmanaged(mut self) -> Self {
         self.managed = false;
         self
     }
 
     /// Validates the configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid (empty URL, invalid URL format, zero timeouts).
     pub fn validate(&self) -> Result<()> {
         // Validate URL format
         if self.url.is_empty() {
@@ -170,7 +180,8 @@ impl BrowserConfig {
         Ok(())
     }
 
-    /// Returns the base WebDriver URL without path components.
+    /// Returns the base `WebDriver` URL without path components.
+    #[must_use]
     pub fn base_url(&self) -> &str {
         // Remove trailing slashes and paths if present
         self.url.trim_end_matches('/')
@@ -186,165 +197,6 @@ impl Default for BrowserConfig {
 impl fmt::Display for BrowserConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Browser({}, managed: {})", self.url, self.managed)
-    }
-}
-
-/// Pool configuration for browser connections.
-#[derive(Debug, Clone, Builder)]
-#[builder(
-    name = "PoolConfigBuilder",
-    pattern = "owned",
-    setter(into, strip_option, prefix = "with"),
-    build_fn(validate = "Self::validate_config")
-)]
-pub struct PoolConfig {
-    /// Maximum number of browser instances in the pool
-    #[builder(default = "10")]
-    pub max_size: usize,
-
-    /// Minimum number of browser instances to keep alive
-    #[builder(default = "1")]
-    pub min_size: usize,
-
-    /// Timeout for acquiring a browser from the pool
-    #[builder(default = "Duration::from_secs(30)")]
-    pub acquire_timeout: Duration,
-
-    /// Maximum lifetime of a browser instance
-    #[builder(default = "Some(Duration::from_secs(3600))")]
-    pub max_lifetime: Option<Duration>,
-
-    /// Maximum idle time before recycling a browser
-    #[builder(default = "Some(Duration::from_secs(300))")]
-    pub max_idle_time: Option<Duration>,
-
-    /// Health check interval for browser instances
-    #[builder(default = "Duration::from_secs(60)")]
-    pub health_check_interval: Duration,
-}
-
-impl From<spire_core::Error> for PoolConfigBuilderError {
-    fn from(err: spire_core::Error) -> Self {
-        Self::ValidationError(err.to_string())
-    }
-}
-
-impl PoolConfigBuilder {
-    fn validate_config(&self) -> Result<()> {
-        let max_size = self.max_size.unwrap_or(10);
-        let min_size = self.min_size.unwrap_or(1);
-
-        if max_size == 0 {
-            return Err(Error::new(
-                ErrorKind::Backend,
-                "Pool max_size must be greater than zero",
-            ));
-        }
-
-        if min_size > max_size {
-            return Err(Error::new(
-                ErrorKind::Backend,
-                "Pool min_size cannot be greater than max_size",
-            ));
-        }
-
-        if let Some(ref timeout) = self.acquire_timeout
-            && timeout.is_zero()
-        {
-            return Err(Error::new(
-                ErrorKind::Backend,
-                "Acquire timeout must be greater than zero",
-            ));
-        }
-
-        Ok(())
-    }
-}
-
-impl PoolConfig {
-    /// Creates a new pool configuration with default values.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Creates a builder for pool configuration.
-    pub fn builder() -> PoolConfigBuilder {
-        PoolConfigBuilder::default()
-    }
-
-    /// Validates the pool configuration.
-    pub fn validate(&self) -> Result<()> {
-        if self.max_size == 0 {
-            return Err(Error::new(
-                ErrorKind::Backend,
-                "Pool max_size must be greater than zero",
-            ));
-        }
-
-        if self.min_size > self.max_size {
-            return Err(Error::new(
-                ErrorKind::Backend,
-                "Pool min_size cannot be greater than max_size",
-            ));
-        }
-
-        if self.acquire_timeout.is_zero() {
-            return Err(Error::new(
-                ErrorKind::Backend,
-                "Acquire timeout must be greater than zero",
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// Sets the maximum pool size.
-    pub fn with_max_size(mut self, max_size: usize) -> Self {
-        self.max_size = max_size;
-        self
-    }
-
-    /// Sets the minimum pool size.
-    pub fn with_min_size(mut self, min_size: usize) -> Self {
-        self.min_size = min_size;
-        self
-    }
-
-    /// Sets the acquire timeout.
-    pub fn with_acquire_timeout(mut self, timeout: Duration) -> Self {
-        self.acquire_timeout = timeout;
-        self
-    }
-
-    /// Sets the maximum connection lifetime.
-    pub fn with_max_lifetime(mut self, lifetime: Duration) -> Self {
-        self.max_lifetime = Some(lifetime);
-        self
-    }
-
-    /// Sets the maximum idle time.
-    pub fn with_max_idle_time(mut self, idle_time: Duration) -> Self {
-        self.max_idle_time = Some(idle_time);
-        self
-    }
-
-    /// Sets the health check interval.
-    pub fn with_health_check_interval(mut self, interval: Duration) -> Self {
-        self.health_check_interval = interval;
-        self
-    }
-}
-
-impl Default for PoolConfig {
-    fn default() -> Self {
-        Self {
-            max_size: 10,
-            min_size: 1,
-            acquire_timeout: Duration::from_secs(30),
-            max_lifetime: Some(Duration::from_secs(3600)), // 1 hour
-            max_idle_time: Some(Duration::from_secs(300)), // 5 minutes
-            health_check_interval: Duration::from_secs(60), // 1 minute
-        }
     }
 }
 
@@ -461,64 +313,6 @@ mod tests {
         assert!(config.managed);
         assert_eq!(config.connect_timeout, Duration::from_secs(10));
         assert!(config.capabilities.contains_key("browserName"));
-    }
-
-    #[test]
-    fn pool_config_builder() {
-        let config = PoolConfig::builder()
-            .with_max_size(20_usize)
-            .with_min_size(5_usize)
-            .with_acquire_timeout(Duration::from_secs(45))
-            .with_max_lifetime(Duration::from_secs(7200))
-            .build()
-            .expect("Should build successfully");
-
-        assert_eq!(config.max_size, 20);
-        assert_eq!(config.min_size, 5);
-        assert_eq!(config.acquire_timeout, Duration::from_secs(45));
-        assert_eq!(config.max_lifetime, Some(Duration::from_secs(7200)));
-    }
-
-    #[test]
-    fn pool_config_builder_validation() {
-        // Zero max_size should fail validation
-        let result = PoolConfig::builder().with_max_size(0_usize).build();
-        assert!(result.is_err());
-
-        // min_size > max_size should fail validation
-        let result = PoolConfig::builder()
-            .with_max_size(5_usize)
-            .with_min_size(10_usize)
-            .build();
-        assert!(result.is_err());
-
-        // Zero acquire timeout should fail validation
-        let result = PoolConfig::builder()
-            .with_acquire_timeout(Duration::ZERO)
-            .build();
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn pool_config_validation() {
-        // Valid config should pass
-        let config = PoolConfig::default();
-        assert!(config.validate().is_ok());
-
-        // Zero max_size should fail
-        let config = PoolConfig {
-            max_size: 0,
-            ..Default::default()
-        };
-        assert!(config.validate().is_err());
-
-        // min_size > max_size should fail
-        let config = PoolConfig {
-            min_size: 5,
-            max_size: 3,
-            ..Default::default()
-        };
-        assert!(config.validate().is_err());
     }
 
     #[test]
