@@ -1,59 +1,29 @@
-use std::future::{Future, ready};
+use std::future::ready;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 
-use bytes::Bytes;
-
-#[cfg(feature = "html")]
-use crate::backend::Backend;
-use crate::backend::{Client, Noop};
+use crate::backend::Noop;
 use crate::extract::{FromRef, State, Text};
 use crate::frontier::seed::Seed;
-use crate::request::http::Uri;
-use crate::request::http::header::{CONTENT_TYPE, HeaderValue};
-use crate::request::{Depth, Request, Response, ResponseExt, Tag, Tags};
+use crate::request::{Depth, Tag, Tags};
+use crate::testing::{MockPage, MockSite};
 use crate::worker::{Outcome, Worker};
-use crate::{Context, ErrorKind, Result, Router};
+use crate::{Context, ErrorKind, Router};
 
-/// A backend serving fixed pages, as if every request was redirected to
-/// `https://example.com/moved/<path>`.
-#[cfg(feature = "html")]
-#[derive(Clone)]
-struct Site;
-
-#[cfg(feature = "html")]
-impl Backend for Site {
-    type Client = Visit;
-
-    fn connect(&self) -> impl Future<Output = Result<Visit>> + Send {
-        ready(Ok(Visit(Mutex::new(""))))
-    }
-}
-
-/// A request to [`Site`], keeping the page it was served.
-struct Visit(Mutex<&'static str>);
-
-impl Client for Visit {
-    fn fetch(&self, request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
-        let path = request.uri().path().to_owned();
-        *self.0.lock().unwrap() = match path.as_str() {
-            "/" => {
-                r#"<title>Home</title><a href="a">a</a><a href="/b#top">b</a><a href="mailto:x@y">mail</a>"#
-            }
-            _ => "<title>Leaf</title>",
-        };
-
-        let mut head = Response::new(());
-        let content_type = HeaderValue::from_static("text/html; charset=utf-8");
-        head.headers_mut().insert(CONTENT_TYPE, content_type);
-        let moved = format!("https://example.com/moved{path}");
-        head.set_final_uri(moved.parse::<Uri>().unwrap());
-        ready(Ok(head))
-    }
-
-    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
-        ready(Ok(Bytes::from_static(self.0.lock().unwrap().as_bytes())))
-    }
+/// A site whose home page redirects to `/moved/`, linking to a relative,
+/// an absolute and a `mailto:` link.
+fn site() -> MockSite {
+    let home = r#"<title>Home</title><a href="a">a</a><a href="/b#top">b</a><a href="mailto:x@y">mail</a>"#;
+    let leaf = || MockPage::html("<title>Leaf</title>");
+    MockSite::new()
+        .page(
+            "https://example.com/",
+            MockPage::redirect("https://example.com/moved/"),
+        )
+        .page("https://example.com/moved/", MockPage::html(home))
+        .page("https://example.com/moved/a", leaf())
+        .page("https://example.com/b", leaf())
+        .page("https://example.com/leaf", leaf())
 }
 
 fn context(tag: Option<&str>) -> Context<Noop> {
@@ -179,10 +149,11 @@ async fn rejected_extractors_fail_and_optional_ones_do_not() {
 #[tokio::test]
 #[cfg(feature = "html")]
 async fn crawls_and_resolves_links_after_redirects() {
-    use crate::Crawler;
     use crate::dataset::{Data, InMemDataset};
     use crate::extract::Html;
     use crate::frontier::queue::Queue;
+    use crate::request::http::Uri;
+    use crate::{Crawler, Result};
 
     async fn page(uri: Uri, queue: Queue, data: Data<String>, page: Html) -> Result<()> {
         let title = page.title().unwrap_or_default();
@@ -192,7 +163,7 @@ async fn crawls_and_resolves_links_after_redirects() {
     }
 
     let router = Router::new().route("home", page).fallback(page);
-    let crawler = Crawler::new(Site, router)
+    let crawler = Crawler::new(site(), router)
         .with_dataset(InMemDataset::<String>::new())
         .with_seed(Seed::get("https://example.com/").unwrap().with_tag("home"));
 
@@ -221,16 +192,9 @@ async fn text_extractor_reads_the_body() {
         }
     }
 
-    let request = Seed::get("https://example.com/leaf")
-        .unwrap()
-        .into_request();
+    let visit = site().visit(Seed::get("https://example.com/leaf").unwrap());
     let router = Router::new().fallback(leaf);
-    assert!(matches!(
-        router
-            .handle(Context::new(request, Visit(Mutex::new(""))))
-            .await,
-        Outcome::Stop
-    ));
+    assert!(matches!(visit.run(&router).await, Outcome::Stop));
 }
 
 /// A hand-written [`Tags`] set, as `#[derive(Tags)]` generates it.
@@ -311,24 +275,10 @@ fn require_names_missing_tags() {
         .require::<Page>();
 }
 
-/// A client counting its fetches, serving `page` as the body.
-struct Counted(Arc<AtomicUsize>);
-
-impl Client for Counted {
-    fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
-        self.0.fetch_add(1, Ordering::SeqCst);
-        ready(Ok(Response::new(())))
-    }
-
-    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
-        ready(Ok(Bytes::from_static(b"page")))
-    }
-}
-
 #[tokio::test]
 async fn handler_tuples_share_one_fetch_and_stop_early() {
     let calls = Arc::new(AtomicUsize::new(0));
-    let fetches = Arc::new(AtomicUsize::new(0));
+    let site = MockSite::new().page("https://example.com/", MockPage::text("page"));
     let handler = |outcome: fn() -> Outcome| {
         let calls = calls.clone();
         move |Text(body): Text| {
@@ -340,10 +290,7 @@ async fn handler_tuples_share_one_fetch_and_stop_early() {
             }
         }
     };
-    let context = || {
-        let request = Seed::get("https://example.com/").unwrap().with_tag("page");
-        Context::new(request.into_request(), Counted(fetches.clone()))
-    };
+    let visit = || site.visit(Seed::get("https://example.com/").unwrap().with_tag("page"));
 
     // Every handler reads the body, and the request is fetched once.
     let all = (
@@ -351,10 +298,10 @@ async fn handler_tuples_share_one_fetch_and_stop_early() {
         handler(|| Outcome::Continue),
         handler(|| Outcome::Continue),
     );
-    let router: Router<Counted> = Router::new().route("page", all);
-    assert!(matches!(router.handle(context()).await, Outcome::Continue));
+    let router = Router::new().route("page", all);
+    assert!(matches!(visit().run(&router).await, Outcome::Continue));
     assert_eq!(calls.load(Ordering::SeqCst), 3);
-    assert_eq!(fetches.load(Ordering::SeqCst), 1);
+    assert_eq!(site.requests().len(), 1);
 
     // The first outcome other than `Continue` ends the tuple.
     calls.store(0, Ordering::SeqCst);
@@ -363,7 +310,7 @@ async fn handler_tuples_share_one_fetch_and_stop_early() {
         handler(|| Outcome::Stop),
         handler(|| Outcome::Continue),
     );
-    let router: Router<Counted> = Router::new().route("page", stopping);
-    assert!(matches!(router.handle(context()).await, Outcome::Stop));
+    let router = Router::new().route("page", stopping);
+    assert!(matches!(visit().run(&router).await, Outcome::Stop));
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }

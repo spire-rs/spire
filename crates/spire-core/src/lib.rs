@@ -10,6 +10,7 @@ mod error;
 pub mod frontier;
 pub mod request;
 mod sync;
+pub mod testing;
 pub mod worker;
 
 pub use http;

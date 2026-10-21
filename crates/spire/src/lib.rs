@@ -15,7 +15,7 @@ use spire_core::backend::Backend;
 #[cfg(feature = "robots")]
 #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
 pub use spire_core::crawler::Robots;
-pub use spire_core::{Context, Error, ErrorKind, Result, dataset, worker};
+pub use spire_core::{Context, Error, ErrorKind, Result, dataset, testing, worker};
 
 #[cfg(feature = "sitemap")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
