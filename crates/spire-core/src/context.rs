@@ -1,10 +1,12 @@
 //! The [`Context`] a worker handles.
 
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use bytes::Bytes;
 use tokio::sync::OnceCell;
+use tokio::time::Instant;
 
 use crate::Result;
 use crate::backend::Client;
@@ -12,6 +14,7 @@ use crate::dataset::{Data, Dataset, Datasets};
 use crate::frontier::memory::InMemFrontier;
 use crate::frontier::queue::Queue;
 use crate::request::{Request, Response, ResponseExt};
+use crate::sync::lock;
 
 /// A request being crawled, with everything needed to handle it.
 ///
@@ -27,7 +30,12 @@ pub struct Context<C> {
     queue: Queue,
     datasets: Arc<Datasets>,
     response: OnceCell<Response<()>>,
+    /// Where to record how long the fetch took, for adaptive host delays.
+    fetch_time: Option<FetchTime>,
 }
+
+/// How long a request's fetch took, shared with the crawler.
+pub(crate) type FetchTime = Arc<Mutex<Option<Duration>>>;
 
 impl<C> Context<C> {
     /// Creates a standalone context, e.g. to test a handler.
@@ -53,7 +61,14 @@ impl<C> Context<C> {
             queue,
             datasets,
             response: OnceCell::new(),
+            fetch_time: None,
         }
+    }
+
+    /// Records how long the fetch takes in `fetch_time`.
+    pub(crate) fn with_fetch_time(mut self, fetch_time: FetchTime) -> Self {
+        self.fetch_time = Some(fetch_time);
+        self
     }
 
     /// Replaces the queue, binding it to the request.
@@ -123,7 +138,12 @@ impl<C> Context<C> {
     {
         self.response
             .get_or_try_init(|| async {
-                let response = self.client.fetch(&self.request).await?;
+                let started = Instant::now();
+                let response = self.client.fetch(&self.request).await;
+                if let Some(fetch_time) = &self.fetch_time {
+                    *lock(fetch_time) = Some(started.elapsed());
+                }
+                let response = response?;
                 if let Some(uri) = response.final_uri() {
                     self.queue.rebase(uri.clone());
                 }

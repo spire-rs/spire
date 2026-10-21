@@ -21,7 +21,8 @@ use crate::{Context, TRACING_TARGET};
 /// tuple to do more with the same page.
 ///
 /// ```
-/// use spire::{FollowLinks, Router};
+/// use spire::handler::FollowLinks;
+/// use spire::Router;
 ///
 /// let router: Router<spire::backend::Noop> = Router::new()
 ///     .route("listing", FollowLinks::new("listing").select("a.next"))
@@ -105,7 +106,8 @@ where
 /// ```
 /// # #[cfg(feature = "macros")] {
 /// use spire::extract::Select;
-/// use spire::{Collect, FollowLinks, Router};
+/// use spire::handler::{Collect, FollowLinks};
+/// use spire::Router;
 ///
 /// #[derive(Debug, Select)]
 /// #[select("article.product")]

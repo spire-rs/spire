@@ -314,3 +314,37 @@ async fn handler_tuples_share_one_fetch_and_stop_early() {
     assert!(matches!(visit().run(&router).await, Outcome::Stop));
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
+
+#[tokio::test]
+async fn routers_run_inside_middleware() {
+    use crate::Crawler;
+    use crate::request::http::HeaderValue;
+    use crate::request::http::header::USER_AGENT;
+    use crate::testing::MockClient;
+    use crate::worker::WorkerExt;
+    use crate::worker::middleware::{self, Next, SetHeader};
+
+    let agents = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let record = {
+        let agents = Arc::clone(&agents);
+        middleware::from_fn(move |cx: Context<MockClient>, next: Next<MockClient>| {
+            let agent = cx.request().headers()[USER_AGENT].clone();
+            agents.lock().unwrap().push(agent);
+            next.run(cx)
+        })
+    };
+    let router = Router::new()
+        .route("page", || async {})
+        .layer(record)
+        .layer(SetHeader::new(
+            USER_AGENT,
+            HeaderValue::from_static("MyBot/1.0"),
+        ));
+
+    let site = MockSite::new().page("https://example.com/", MockPage::text(""));
+    let crawler = Crawler::new(site, router)
+        .with_seed(Seed::get("https://example.com/").unwrap().with_tag("page"));
+    let stats = crawler.run().await.unwrap();
+    assert_eq!((stats.succeeded, stats.failed), (1, 0));
+    assert_eq!(*agents.lock().unwrap(), ["MyBot/1.0"]);
+}

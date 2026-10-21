@@ -11,14 +11,16 @@ use std::io::Write;
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
+use spire::crawler::Robots;
 use spire::dataset::{Data, InMemDataset};
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
+use spire::handler::FollowSitemap;
 use spire::request::Tags;
 use spire::request::http::Uri;
 use spire::testing::{MockPage, MockSite};
-use spire::{Crawler, FollowSitemap, Result, Robots, Router};
+use spire::{Crawler, Result, Router};
 
 #[derive(Debug, Clone, Copy, Tags)]
 enum Page {

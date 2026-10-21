@@ -144,9 +144,12 @@ pub struct MockClient {
 }
 
 impl MockClient {
-    fn serve(&self, request: &Request) -> Result<Response<()>> {
+    async fn serve(&self, request: &Request) -> Result<Response<()>> {
         lock(&self.site.requests).push(request.uri().clone());
         let (page, served_from) = self.site.serve(request.uri())?;
+        if !page.latency.is_zero() {
+            tokio::time::sleep(page.latency).await;
+        }
 
         let mut head = Response::new(());
         *head.status_mut() = page.status;
@@ -162,7 +165,7 @@ impl MockClient {
 
 impl Client for MockClient {
     fn fetch(&self, request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
-        ready(self.serve(request))
+        self.serve(request)
     }
 
     fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {

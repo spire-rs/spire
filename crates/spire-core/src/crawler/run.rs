@@ -9,7 +9,8 @@ use tokio::time::{Instant, sleep_until, timeout};
 use tracing::Instrument;
 
 use crate::backend::Backend;
-use crate::context::Context;
+use crate::context::{Context, FetchTime};
+use crate::crawler::delay::{Feedback, Signal};
 use crate::crawler::hosts::{Admit, Hosts};
 #[cfg(feature = "robots")]
 use crate::crawler::robots::{BackendSource, RobotsCache, RobotsSource, Verdict};
@@ -74,9 +75,8 @@ enum Access {
 /// The state of a single run.
 struct Run {
     tasks: JoinSet<Outcome>,
-    /// The seeds of the running requests, with their host keys if hosts
-    /// are tracked.
-    in_flight: HashMap<Id, (Seed, Option<String>)>,
+    /// The running requests.
+    in_flight: HashMap<Id, InFlight>,
     robots: Option<RobotsRun>,
     hosts: Hosts,
     aborted: HashSet<Option<Tag>>,
@@ -84,6 +84,34 @@ struct Run {
     stopping: bool,
     grace: Option<Instant>,
     error: Option<Error>,
+}
+
+/// A running request.
+struct InFlight {
+    seed: Seed,
+    /// Its host's key, if hosts are tracked.
+    host: Option<String>,
+    /// How long its fetch took, if host delays adapt to it.
+    fetch_time: Option<FetchTime>,
+}
+
+/// How a request went, as far as its host's delay is concerned: a host
+/// asking to slow down, or timing out, is throttling the crawl.
+fn signal(outcome: &Outcome) -> Signal {
+    match outcome {
+        Outcome::Backoff { .. } => Signal::Throttled,
+        Outcome::Fail(error)
+            if error.kind() == ErrorKind::Timeout
+                || matches!(
+                    error.status().map(|status| status.as_u16()),
+                    Some(429 | 503)
+                ) =>
+        {
+            Signal::Throttled
+        }
+        Outcome::Fail(_) | Outcome::Retry { .. } => Signal::Failed,
+        Outcome::Continue | Outcome::Abort(_) | Outcome::Stop => Signal::Ok,
+    }
 }
 
 impl Run {
@@ -439,6 +467,7 @@ where
 
         run.started += 1;
         let host = run.hosts.start(&seed, Instant::now());
+        let fetch_time = run.hosts.adaptive().then(FetchTime::default);
 
         let backend = self.backend.clone();
         let worker = self.worker.clone();
@@ -456,6 +485,7 @@ where
         );
 
         let request = seed.clone().into_request();
+        let fetch_time_cx = fetch_time.clone();
         let task = async move {
             let started = Instant::now();
             let handle = async {
@@ -464,7 +494,10 @@ where
                     Err(error) => return Outcome::Fail(error),
                 };
                 let queue: Queue = queue.child_of(&request);
-                let cx = Context::from_parts(request, client, queue, datasets);
+                let mut cx = Context::from_parts(request, client, queue, datasets);
+                if let Some(fetch_time) = fetch_time_cx {
+                    cx = cx.with_fetch_time(fetch_time);
+                }
                 worker.handle(cx).await
             };
 
@@ -487,7 +520,12 @@ where
 
         // Boxed so spawning moves a pointer, not the whole request future.
         let id = run.tasks.spawn(Box::pin(task.instrument(span))).id();
-        run.in_flight.insert(id, (seed, host));
+        let in_flight = InFlight {
+            seed,
+            host,
+            fetch_time,
+        };
+        run.in_flight.insert(id, in_flight);
     }
 
     /// Records a finished request and reports its outcome to the frontier.
@@ -495,11 +533,11 @@ where
         let (id, outcome) = match joined {
             Ok(joined) => joined,
             Err(error) if error.is_cancelled() => {
-                let Some((seed, host)) = run.in_flight.remove(&error.id()) else {
+                let Some(InFlight { seed, host, .. }) = run.in_flight.remove(&error.id()) else {
                     return;
                 };
                 if let Some(host) = host {
-                    run.hosts.finished(&host);
+                    run.hosts.finished(&host, None);
                 }
                 self.tally(|stats| stats.cancelled += 1);
                 self.report(run, Report::Cancelled(seed)).await;
@@ -510,11 +548,20 @@ where
                 (error.id(), Outcome::Fail(failure))
             }
         };
-        let Some((seed, host)) = run.in_flight.remove(&id) else {
+        let Some(InFlight {
+            seed,
+            host,
+            fetch_time,
+        }) = run.in_flight.remove(&id)
+        else {
             return;
         };
         if let Some(host) = host {
-            run.hosts.finished(&host);
+            let feedback = fetch_time.map(|fetch_time| Feedback {
+                latency: *lock(&fetch_time),
+                signal: signal(&outcome),
+            });
+            run.hosts.finished(&host, feedback);
         }
         self.tally(|stats| stats.requests += 1);
 

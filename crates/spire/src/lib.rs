@@ -6,28 +6,18 @@
 #![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
 
 pub mod extract;
-mod handler;
+pub mod handler;
 mod routing;
 
 #[doc(hidden)]
 pub mod prelude;
 
 use spire_core::backend::Backend;
-#[cfg(feature = "robots")]
-#[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
-pub use spire_core::crawler::Robots;
 #[cfg(any(test, feature = "testing"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 pub use spire_core::testing;
 pub use spire_core::{Context, Error, ErrorKind, Result, dataset, worker};
 
-#[cfg(feature = "sitemap")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
-pub use crate::handler::FollowSitemap;
-pub use crate::handler::Handler;
-#[cfg(feature = "html")]
-#[cfg_attr(docsrs, doc(cfg(feature = "html")))]
-pub use crate::handler::{Collect, FollowLinks};
 pub use crate::routing::Router;
 
 /// Backends and the clients they hand out, plus the enabled HTTP and browser
@@ -40,6 +30,18 @@ pub mod backend {
     #[cfg(feature = "thirtyfour")]
     #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
     pub use spire_thirtyfour::{BrowserBackend, BrowserBuilder, BrowserSession, thirtyfour};
+}
+
+/// The crawler's settings and statistics; the [`Crawler`] itself is at the
+/// crate root.
+pub mod crawler {
+    #[cfg(feature = "robots")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
+    pub use spire_core::crawler::Robots;
+    pub use spire_core::crawler::{AdaptiveDelay, HostDelay, Stats};
+
+    #[cfg(doc)]
+    use crate::Crawler;
 }
 
 /// The frontier: requests waiting to be crawled.
@@ -87,3 +89,33 @@ const TRACING_TARGET: &str = "spire";
 #[cfg(all(doctest, feature = "full", feature = "testing"))]
 #[doc = include_str!("../README.md")]
 pub struct ReadmeDoctests;
+
+/// The book's examples, one item per chapter, compiled as doctests with
+/// every feature enabled. The book is not published with the crate, so this
+/// only builds in the repository.
+#[cfg(all(doctest, feature = "full", feature = "testing"))]
+mod book {
+    macro_rules! chapters {
+        ($($name:ident: $file:literal),* $(,)?) => {
+            $(
+                #[doc = include_str!(concat!("../../../book/src/", $file))]
+                struct $name;
+            )*
+        };
+    }
+
+    chapters! {
+        Introduction: "introduction.md",
+        FirstCrawl: "first-crawl.md",
+        Concepts: "concepts.md",
+        Routing: "routing.md",
+        Extracting: "extracting.md",
+        Datasets: "datasets.md",
+        Frontier: "frontier.md",
+        Politeness: "politeness.md",
+        Sitemaps: "sitemaps.md",
+        Browsers: "browsers.md",
+        Middleware: "middleware.md",
+        Testing: "testing.md",
+    }
+}

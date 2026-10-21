@@ -96,7 +96,7 @@ criterion = { workspace = true, features = [] }
 
 # Testing
 spire-core = { workspace = true, features = ["testing"] }
-tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "test-util"] }
 flate2 = { workspace = true, features = [] }
 
 [[bench]]

@@ -14,7 +14,7 @@ handler, and extract structured data, built on tokio.
 [![Crates.io](https://img.shields.io/crates/v/spire.svg?style=flat-square)](https://crates.io/crates/spire)
 [![Docs](https://img.shields.io/docsrs/spire?style=flat-square)](https://docs.rs/spire)
 
-[**docs.rs/spire**](https://docs.rs/spire) · [**crates.io/crates/spire**](https://crates.io/crates/spire) · [**github.com/spire-rs**](https://github.com/spire-rs)
+[**The Spire Book**](https://spire-rs.github.io/spire) · [**docs.rs/spire**](https://docs.rs/spire) · [**crates.io/crates/spire**](https://crates.io/crates/spire) · [**github.com/spire-rs**](https://github.com/spire-rs)
 
 </div>
 
@@ -89,8 +89,8 @@ async fn main() -> Result<()> {
 }
 ```
 
-The [`spire` crate](crates/spire/README.md) covers feature flags, typed
-extraction, browser automation and middleware.
+[The Spire Book](https://spire-rs.github.io/spire) is the guide: routing, extraction, the frontier,
+politeness, sitemaps, browsers, middleware and testing, chapter by chapter.
 
 ## Examples
 

@@ -8,8 +8,10 @@ mod sitemap;
 use std::future::Future;
 
 #[cfg(feature = "html")]
+#[cfg_attr(docsrs, doc(cfg(feature = "html")))]
 pub use html::{Collect, FollowLinks};
 #[cfg(feature = "sitemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
 pub use sitemap::FollowSitemap;
 
 use crate::Context;

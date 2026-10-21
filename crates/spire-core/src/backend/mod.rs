@@ -5,12 +5,14 @@
 //! that turns a [`Request`] into a [`Response`].
 
 mod noop;
+mod rotate;
 mod status;
 
 use std::future::Future;
 
 use bytes::Bytes;
 pub use noop::Noop;
+pub use rotate::Rotate;
 pub use status::StatusPolicy;
 
 use crate::Result;

@@ -837,3 +837,36 @@ mod resume {
         assert_eq!(pending, [("/flaky".to_owned(), 1), ("/slow".to_owned(), 0)]);
     }
 }
+
+/// Crawls three pages of one host answering in 200ms, with `delay`, and
+/// returns how long it took.
+async fn crawl_slow_host(delay: crate::crawler::HostDelay) -> Duration {
+    use crate::testing::{MockClient, MockPage, MockSite};
+
+    let page = MockPage::text("").with_latency(Duration::from_millis(200));
+    let site = (1..=3).fold(MockSite::new(), |site, i| {
+        site.page(&format!("https://example.com/{i}"), page.clone())
+    });
+    let worker = from_fn(|cx: Context<MockClient>| async move { cx.response().await.map(drop) });
+    let crawler = Crawler::new(site, worker)
+        .with_host_delay(delay)
+        .with_seeds((1..=3).map(|i| seed(&i.to_string())));
+
+    let stats = crawler.run().await.unwrap();
+    assert_eq!(stats.succeeded, 3);
+    stats.elapsed
+}
+
+#[tokio::test(start_paused = true)]
+async fn adaptive_host_delays_follow_response_times() {
+    use crate::crawler::HostDelay;
+
+    // Fixed: requests start at 0s, 1s and 2s, the last ending at 2.2s.
+    let fixed = crawl_slow_host(Duration::from_secs(1).into()).await;
+    assert_eq!(fixed, Duration::from_millis(2200));
+
+    // Adaptive, from 1s: the first 200ms response lowers the delay to 0.6s,
+    // and the second to 0.4s, so requests start at 0s, 1s and 1.6s.
+    let adaptive = crawl_slow_host(HostDelay::adaptive().into()).await;
+    assert_eq!(adaptive, Duration::from_millis(1800));
+}

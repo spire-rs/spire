@@ -1,5 +1,6 @@
 //! The [`Crawler`], which drives a crawl to completion.
 
+mod delay;
 mod hosts;
 #[cfg(feature = "robots")]
 mod robots;
@@ -13,6 +14,7 @@ use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+pub use delay::{AdaptiveDelay, HostDelay};
 #[cfg(feature = "robots")]
 #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
 pub use robots::Robots;
@@ -21,6 +23,7 @@ use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 use crate::Result;
+use crate::backend::Backend;
 use crate::crawler::hosts::HostPolicy;
 use crate::dataset::{Data, Dataset, Datasets};
 use crate::frontier::dynamic::DynFrontier;
@@ -30,6 +33,7 @@ use crate::frontier::queue::Queue;
 use crate::frontier::seed::Seed;
 use crate::frontier::{Frontier, FrontierExt};
 use crate::sync::lock;
+use crate::worker::Worker;
 
 /// The default number of requests handled at once.
 const DEFAULT_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
@@ -123,7 +127,14 @@ impl<B, W> Crawler<B, W> {
     /// Creates a crawler with an [`InMemFrontier::fifo`] frontier that
     /// retries with the default [`RetryPolicy`], no datasets, a concurrency
     /// of 8 and no limits.
-    pub fn new(backend: B, worker: W) -> Self {
+    ///
+    /// `worker` must handle the clients of `backend`, which also lets the
+    /// compiler infer a router's client type from the backend.
+    pub fn new(backend: B, worker: W) -> Self
+    where
+        B: Backend,
+        W: Worker<B::Client>,
+    {
         let frontier = InMemFrontier::fifo().retry_with(RetryPolicy::default());
         let settings = Settings {
             concurrency: DEFAULT_CONCURRENCY,
@@ -218,10 +229,12 @@ impl<B, W> Crawler<B, W> {
         self
     }
 
-    /// Waits at least `delay` between starting two requests to the same host.
+    /// Waits between starting two requests to the same host: a fixed
+    /// [`Duration`], or a delay per host adapted to how fast it answers with
+    /// [`HostDelay::adaptive`].
     #[must_use]
-    pub const fn with_host_delay(mut self, delay: Duration) -> Self {
-        self.settings.hosts.delay = delay;
+    pub fn with_host_delay(mut self, delay: impl Into<HostDelay>) -> Self {
+        self.settings.hosts.delay = delay.into();
         self
     }
 

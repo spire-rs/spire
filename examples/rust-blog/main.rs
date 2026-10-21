@@ -24,11 +24,13 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use spire::backend::HttpClient;
+use spire::crawler::Robots;
 use spire::dataset::{InMemDataset, JsonlDataset};
 use spire::frontier::FrontierExt;
 use spire::frontier::redb::RedbStore;
 use spire::frontier::seed::Seed;
-use spire::{Collect, Crawler, FollowLinks, FollowSitemap, Result, Robots, Router};
+use spire::handler::{Collect, FollowLinks, FollowSitemap};
+use spire::{Crawler, Result, Router};
 use tracing_subscriber::EnvFilter;
 
 use crate::handlers::{Blog, Post, post, visit};

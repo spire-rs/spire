@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
+use crate::crawler::delay::{Feedback, HostDelay};
 use crate::frontier::seed::Seed;
 
 /// How a crawl treats every host.
@@ -14,7 +15,7 @@ pub(crate) struct HostPolicy {
     /// Requests in flight per host at most; unlimited if `None`.
     pub(crate) max_concurrency: Option<NonZeroUsize>,
     /// Time between the starts of two requests to the same host.
-    pub(crate) delay: Duration,
+    pub(crate) delay: HostDelay,
 }
 
 /// What to do with a seed that is allowed to be crawled.
@@ -30,6 +31,8 @@ struct Host {
     in_flight: usize,
     next_start: Option<Instant>,
     delay: Duration,
+    /// The lowest the delay may go, e.g. a robots.txt `Crawl-delay`.
+    floor: Duration,
     parked: VecDeque<Seed>,
 }
 
@@ -71,7 +74,7 @@ impl Hosts {
         // Looked up first, so the key is only copied for a new host.
         if !self.by_key.contains_key(key) {
             let host = Host {
-                delay: self.policy.delay,
+                delay: self.policy.delay.initial(),
                 ..Host::default()
             };
             self.by_key.insert(key.to_owned(), host);
@@ -136,10 +139,20 @@ impl Hosts {
         }
     }
 
-    /// Records that a request to `key` finished.
-    pub(crate) fn finished(&mut self, key: &str) {
+    /// Whether delays adapt to responses, which then need [`Feedback`].
+    pub(crate) const fn adaptive(&self) -> bool {
+        matches!(self.policy.delay, HostDelay::Adaptive(_))
+    }
+
+    /// Records that a request to `key` finished, adapting the host's delay
+    /// to `feedback` if delays are adaptive.
+    pub(crate) fn finished(&mut self, key: &str, feedback: Option<Feedback>) {
+        let policy = self.policy;
         let host = self.host(key);
         host.in_flight = host.in_flight.saturating_sub(1);
+        if let (HostDelay::Adaptive(adaptive), Some(feedback)) = (policy.delay, feedback) {
+            host.delay = adaptive.next(host.delay, feedback).max(host.floor);
+        }
     }
 
     /// Raises the delay of `key` to at least `delay`, e.g. for a
@@ -147,6 +160,7 @@ impl Hosts {
     #[cfg(feature = "robots")]
     pub(crate) fn raise_delay(&mut self, key: &str, delay: Duration) {
         let host = self.host(key);
+        host.floor = host.floor.max(delay);
         host.delay = host.delay.max(delay);
     }
 
@@ -185,7 +199,7 @@ mod tests {
     fn policy(max: usize, delay: u64) -> HostPolicy {
         HostPolicy {
             max_concurrency: NonZeroUsize::new(max),
-            delay: Duration::from_secs(delay),
+            delay: Duration::from_secs(delay).into(),
         }
     }
 
@@ -209,7 +223,7 @@ mod tests {
         ));
         assert!(hosts.take_ready(now).is_none());
 
-        hosts.finished("a.com");
+        hosts.finished("a.com", None);
         assert_eq!(hosts.take_ready(now).unwrap().uri().path(), "/2");
         assert_eq!(hosts.parked(), 0);
     }
@@ -261,5 +275,44 @@ mod tests {
             hosts.start(&seed("https://a.com/"), now).as_deref(),
             Some("a.com")
         );
+    }
+
+    #[test]
+    fn adaptive_delays_follow_each_host_above_its_floor() {
+        use crate::crawler::delay::{AdaptiveDelay, Signal};
+
+        let now = Instant::now();
+        let policy = HostPolicy {
+            max_concurrency: None,
+            delay: AdaptiveDelay::new().into(),
+        };
+        let mut hosts = Hosts::new(policy, false);
+        let fast = Feedback {
+            latency: Some(Duration::ZERO),
+            signal: Signal::Ok,
+        };
+
+        // Each host starts at 1s, and halves towards a latency of zero.
+        assert!(hosts.adaptive());
+        assert_eq!(
+            hosts.start(&seed("https://a.com/"), now).as_deref(),
+            Some("a.com")
+        );
+        hosts.finished("a.com", Some(fast));
+        hosts.started("a.com", now);
+        assert_eq!(
+            hosts.by_key["a.com"].next_start,
+            Some(now + Duration::from_millis(500))
+        );
+
+        // A `Crawl-delay` is a floor the delay does not go under.
+        #[cfg(feature = "robots")]
+        {
+            hosts.raise_delay("b.com", Duration::from_secs(2));
+            hosts.started("b.com", now);
+            hosts.finished("b.com", Some(fast));
+            assert_eq!(hosts.by_key["b.com"].delay, Duration::from_secs(2));
+        }
+        assert_eq!(hosts.by_key["a.com"].delay, Duration::from_millis(500));
     }
 }
