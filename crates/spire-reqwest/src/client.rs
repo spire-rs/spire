@@ -1,16 +1,19 @@
 use std::future::{Future, ready};
+use std::sync::Mutex;
 
+use bytes::Bytes;
 use spire_core::backend::{Backend, Client, StatusPolicy};
 use spire_core::request::{Request, Response};
 use spire_core::{Error, ErrorKind, Result};
 
-use crate::conversion::{request_to_reqwest, response_from_reqwest};
+use crate::conversion::{head_from_reqwest, request_to_reqwest};
 
-/// An HTTP [`Backend`] and [`Client`] built on [`reqwest::Client`].
+/// An HTTP [`Backend`] built on [`reqwest::Client`].
 ///
-/// Every request of a crawl shares the underlying connection pool, cookie
-/// store and configuration of the wrapped client. Error statuses are turned
-/// into errors according to the [`StatusPolicy`].
+/// Every request of a crawl gets an [`HttpSession`], and all of them share
+/// the underlying connection pool, cookie store and configuration of the
+/// wrapped client. Error statuses are turned into errors according to the
+/// [`StatusPolicy`].
 ///
 /// # Examples
 ///
@@ -58,17 +61,6 @@ impl HttpClient {
     pub const fn status_policy(&self) -> StatusPolicy {
         self.status_policy
     }
-
-    async fn execute(self, request: Request) -> Result<Response> {
-        let uri = request.uri().clone();
-        let request = request_to_reqwest(request).map_err(|error| error.with_uri(uri.clone()))?;
-        let response = self
-            .client
-            .execute(request)
-            .await
-            .map_err(|error| classify(error).with_uri(uri.clone()))?;
-        self.status_policy.check(response_from_reqwest(response))
-    }
 }
 
 impl From<reqwest::Client> for HttpClient {
@@ -81,17 +73,69 @@ impl From<reqwest::Client> for HttpClient {
 }
 
 impl Backend for HttpClient {
-    type Client = Self;
+    type Client = HttpSession;
 
     fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send {
-        ready(Ok(self.clone()))
+        ready(Ok(HttpSession {
+            http: self.clone(),
+            body: Mutex::new(None),
+        }))
     }
 }
 
-impl Client for HttpClient {
-    fn fetch(self, request: Request) -> impl Future<Output = Result<Response>> + Send {
-        self.execute(request)
+/// The [`Client`] an [`HttpClient`] hands out for one request: it sends the
+/// request and keeps the body it receives.
+#[derive(Debug)]
+pub struct HttpSession {
+    http: HttpClient,
+    body: Mutex<Option<Bytes>>,
+}
+
+impl HttpSession {
+    /// Returns the [`HttpClient`] the session belongs to.
+    #[must_use]
+    pub const fn http(&self) -> &HttpClient {
+        &self.http
     }
+}
+
+impl Client for HttpSession {
+    async fn fetch(&self, request: &Request) -> Result<Response<()>> {
+        let uri = request.uri().clone();
+        let failed = |error: Error| error.with_uri(uri.clone());
+        let converted = request_to_reqwest(request).map_err(failed)?;
+        let response = self
+            .http
+            .client
+            .execute(converted)
+            .await
+            .map_err(|error| failed(classify(error)))?;
+
+        // An error status is rejected before its body is downloaded.
+        let head = self
+            .http
+            .status_policy
+            .check(head_from_reqwest(&response))?;
+        let body = response
+            .bytes()
+            .await
+            .map_err(|error| failed(classify(error)))?;
+        *lock(&self.body) = Some(body);
+        Ok(head)
+    }
+
+    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
+        let body = lock(&self.body).clone();
+        ready(body.ok_or_else(|| Error::worker("the request was not fetched yet")))
+    }
+}
+
+/// Locks a mutex, recovering it if a holder panicked: the body is replaced
+/// whole, so it is never left half-written.
+fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 /// Classifies a failed transfer, so the crawler only retries what may
@@ -113,21 +157,23 @@ fn classify(error: reqwest::Error) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use spire_core::request::Body;
-
     use super::*;
 
     #[tokio::test]
     async fn invalid_request_is_rejected_before_sending() {
-        let request = Request::new(Body::default());
-        let error = HttpClient::new().fetch(request).await.unwrap_err();
+        let session = HttpClient::new().connect().await.unwrap();
+        let error = session
+            .fetch(&Request::new(Bytes::new()))
+            .await
+            .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Invalid);
+        assert!(session.body().await.is_err());
     }
 
     #[tokio::test]
-    async fn connect_shares_the_client() {
+    async fn sessions_share_the_client() {
         let backend = HttpClient::new().with_status_policy(StatusPolicy::Accept);
-        let client = backend.connect().await.unwrap();
-        assert_eq!(client.status_policy(), StatusPolicy::Accept);
+        let session = backend.connect().await.unwrap();
+        assert_eq!(session.http().status_policy(), StatusPolicy::Accept);
     }
 }

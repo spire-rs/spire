@@ -1,0 +1,29 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "rust-blog"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+publish = false
+description = "A crawl of the Rust blog using every feature of the Spire framework"
+
+[[bin]]
+name = "rust-blog"
+path = "main.rs"
+
+[dependencies]
+# Async runtime and Spire framework
+spire = { workspace = true, features = ["reqwest", "macros", "robots", "sitemap", "serde", "redb"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+
+# Serialization of the stored posts
+serde = { workspace = true, features = ["derive"] }
+
+# Observability
+tracing = { workspace = true, features = [] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+[lints]
+workspace = true

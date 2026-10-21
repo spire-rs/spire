@@ -32,15 +32,13 @@ serde = ["dep:serde", "dep:serde_json", "tokio/fs", "tokio/io-util", "tokio/sync
 
 [dependencies]
 # Async runtime
-tokio = { workspace = true, features = ["rt", "time", "macros"] }
+tokio = { workspace = true, features = ["rt", "time", "macros", "sync"] }
 tokio-util = { workspace = true, features = [] }
 futures = { workspace = true, features = [] }
 
 # HTTP
 http = { workspace = true, features = [] }
 httpdate = { workspace = true, features = [] }
-http-body = { workspace = true, features = [] }
-http-body-util = { workspace = true, features = [] }
 
 # Derive macros & utilities
 bytes = { workspace = true, features = [] }

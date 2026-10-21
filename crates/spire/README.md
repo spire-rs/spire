@@ -64,14 +64,13 @@ Crawl a listing, follow its pagination and extract every product:
 # #[cfg(all(feature = "reqwest", feature = "macros"))]
 # mod example {
 use spire::backend::HttpClient;
-use spire::dataset::{Data, InMemDataset};
-use spire::extract::{Element, Html, Select};
+use spire::dataset::InMemDataset;
+use spire::extract::Select;
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
-use spire::frontier::queue::{Link, Queue};
 use spire::frontier::seed::Seed;
 use spire::request::Tags;
-use spire::{Crawler, Result, Router};
+use spire::{Collect, Crawler, FollowLinks, Result, Router};
 
 /// The kinds of page the crawl visits, routed by tag.
 #[derive(Debug, Clone, Copy, Tags)]
@@ -81,35 +80,23 @@ enum Page {
 }
 
 #[derive(Debug, Select)]
-#[select("article.product")]
+#[select("main.product")]
 struct Product {
-    #[select("h2")]
+    #[select("h1")]
     name: String,
     #[select(".price")]
     price: Option<f64>,
-    #[select("a", attr = "href")]
-    link: String,
-}
-
-/// Queues the next page and every product page of a listing.
-async fn listing(queue: Queue, page: Html) -> Result<()> {
-    let pages = page.links().into_iter().filter(|href| href.contains("?page="));
-    queue.follow_all(pages.map(|href| Link::from(href).with_tag(Page::Listing))).await?;
-    for product in page.select::<Vec<Product>>()? {
-        queue.follow(Link::from(product.link).with_tag(Page::Product)).await?;
-    }
-    Ok(())
-}
-
-/// Stores the product on its own page.
-async fn product(data: Data<Product>, Element(found): Element<Vec<Product>>) -> Result<()> {
-    data.write_all(found).await
 }
 
 async fn crawl() -> Result<()> {
     let router = Router::new()
-        .route(Page::Listing, listing)
-        .route(Page::Product, product)
+        // Two handlers on one listing page, fetched once: follow the next
+        // page and every product.
+        .route(Page::Listing, (
+            FollowLinks::new(Page::Listing).select("a.next"),
+            FollowLinks::new(Page::Product).select("article.product a"),
+        ))
+        .route(Page::Product, Collect::<Product>::new())
         .require::<Page>();
 
     let crawler = Crawler::new(HttpClient::default(), router)
@@ -125,6 +112,12 @@ async fn crawl() -> Result<()> {
 }
 # }
 ```
+
+`FollowLinks`, `Collect` and `FollowSitemap` cover the common jobs. Anything
+else is an async function of extractors, e.g.
+`async fn price(uri: Uri, Element(product): Element<Product>) -> Result<()>`,
+and mixes freely with them in a tuple of up to 4 handlers. They run in turn
+on the same page, and stop at the first that does not continue.
 
 Relative links resolve against the page they were found on, after redirects.
 Tags are not inherited: a followed link without one goes to the first
@@ -183,9 +176,10 @@ must be fetched over HTTP: a browser renders XML as a page.
 
 `BrowserBackend` drives real browsers over WebDriver BiDi, with the page's
 real status and headers, any request method, and a fresh browser profile per
-request. Body extractors such as `Html` load the page and read it. `View`
-loads the page without reading it and hands over the driver, to interact with
-the page first; `view.html()` then reads the page as rendered:
+request. The page is loaded once, by the first extractor that needs it, and
+body extractors such as `Html` read it as currently rendered. `View` hands
+over the driver to interact with the page; `view.html()` then reads it again,
+including what the interaction changed:
 
 ```rust,no_run
 # #[cfg(all(feature = "thirtyfour", feature = "html"))]

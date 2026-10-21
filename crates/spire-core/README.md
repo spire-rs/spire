@@ -58,7 +58,7 @@ use spire_core::{Context, Crawler, Result};
 
 async fn handle(cx: Context<Noop>) -> Result<Outcome> {
     let queue = cx.queue().clone();
-    let response = cx.fetch().await?;
+    let response = cx.response().await?;
     if response.status().as_u16() == 429 {
         return Ok(Outcome::backoff(std::time::Duration::from_secs(30)));
     }

@@ -29,7 +29,7 @@ pub trait Worker<C>: Send + Sync + 'static {
 /// use spire_core::{Context, Result};
 ///
 /// async fn handle(cx: Context<Noop>) -> Result<()> {
-///     let response = cx.fetch().await?;
+///     let response = cx.response().await?;
 ///     println!("status: {}", response.status());
 ///     Ok(())
 /// }

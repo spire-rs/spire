@@ -22,7 +22,7 @@ type Route<C> = Arc<dyn ErasedHandler<C>>;
 
 /// An object-safe [`Handler`] bound to its state.
 trait ErasedHandler<C>: Send + Sync + 'static {
-    fn call(&self, cx: Context<C>) -> BoxFuture<'static, Outcome>;
+    fn call<'a>(&'a self, cx: &'a Context<C>) -> BoxFuture<'a, Outcome>;
 }
 
 /// A handler and the state it is called with.
@@ -35,11 +35,11 @@ struct Bound<H, M, S> {
 impl<C, H, M, S> ErasedHandler<C> for Bound<H, M, S>
 where
     H: Handler<C, M, S>,
-    S: Clone + Send + Sync + 'static,
+    S: Send + Sync + 'static,
     M: 'static,
 {
-    fn call(&self, cx: Context<C>) -> BoxFuture<'static, Outcome> {
-        Box::pin(self.handler.clone().call(cx, self.state.clone()))
+    fn call<'a>(&'a self, cx: &'a Context<C>) -> BoxFuture<'a, Outcome> {
+        Box::pin(self.handler.call(cx, &self.state))
     }
 }
 
@@ -275,9 +275,9 @@ impl<C, S> Router<C, S> {
 
     /// Calls the route for the request: its tag's, else the first matching
     /// path route's for an untagged request, else the fallback.
-    fn dispatch(&self, cx: Context<C>) -> BoxFuture<'static, Outcome>
+    async fn dispatch(&self, cx: Context<C>) -> Outcome
     where
-        C: 'static,
+        C: Send + Sync + 'static,
     {
         let tag = cx.request().tag();
         tracing::trace!(
@@ -291,8 +291,8 @@ impl<C, S> Router<C, S> {
             None => self.path_route(cx.request().uri().path()),
         };
         match route.or(self.fallback.as_ref()) {
-            Some(route) => route.call(cx),
-            None => Box::pin(std::future::ready(unrouted(&cx))),
+            Some(route) => route.call(&cx).await,
+            None => unrouted(&cx),
         }
     }
 }
@@ -342,7 +342,7 @@ impl<C, S> fmt::Debug for Router<C, S> {
 
 impl<C, S> Worker<C> for Router<C, S>
 where
-    C: Send + 'static,
+    C: Send + Sync + 'static,
     S: Send + Sync + 'static,
 {
     fn handle(&self, cx: Context<C>) -> impl Future<Output = Outcome> + Send {

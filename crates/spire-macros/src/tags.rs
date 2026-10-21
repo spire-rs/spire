@@ -222,14 +222,14 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
 
         /// Extracts the request's tag, rejecting untagged requests and tags
         /// of no variant.
-        impl<__C, __S> ::spire::extract::FromContextRef<__C, __S> for #ident
+        impl<__C, __S> ::spire::extract::FromContext<__C, __S> for #ident
         where
             __C: ::core::marker::Sync,
             __S: ::core::marker::Sync,
         {
             type Rejection = ::spire::Error;
 
-            fn from_context_ref(
+            fn from_context(
                 cx: &::spire::Context<__C>,
                 _: &__S,
             ) -> impl ::core::future::Future<Output = ::spire::Result<Self>> + ::core::marker::Send

@@ -46,7 +46,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self> {
+    async fn from_context(cx: &Context<C>, state: &S) -> Result<Self> {
         let uri = cx.request().uri().clone();
         let Bytes(body) = Bytes::from_context(cx, state).await?;
         let parsed = tokio::task::spawn_blocking(move || parse(&body)).await;

@@ -89,7 +89,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self> {
+    async fn from_context(cx: &Context<C>, state: &S) -> Result<Self> {
         let Text(text) = Text::from_context(cx, state).await?;
         Ok(Self::parse(&text))
     }
@@ -189,7 +189,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self> {
+    async fn from_context(cx: &Context<C>, state: &S) -> Result<Self> {
         let html = Html::from_context(cx, state).await?;
         html.select().map(Self)
     }

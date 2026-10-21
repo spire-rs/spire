@@ -544,7 +544,7 @@ mod robots {
     use super::*;
     use crate::backend::{Backend, Client};
     use crate::crawler::Robots;
-    use crate::request::{Body, Request, Response};
+    use crate::request::{Request, Response};
     use crate::sync::lock;
 
     /// The robots.txt responses of each host: statuses and bodies.
@@ -570,22 +570,36 @@ mod robots {
     }
 
     impl Backend for Site {
-        type Client = Self;
+        type Client = Page;
 
-        fn connect(&self) -> impl Future<Output = crate::Result<Self>> + Send {
-            ready(Ok(self.clone()))
+        fn connect(&self) -> impl Future<Output = crate::Result<Page>> + Send {
+            let page = Page {
+                site: self.clone(),
+                body: Mutex::new(""),
+            };
+            ready(Ok(page))
         }
     }
 
-    impl Client for Site {
-        fn fetch(self, request: Request) -> impl Future<Output = crate::Result<Response>> + Send {
+    /// A request to a [`Site`], keeping the body it was served.
+    struct Page {
+        site: Site,
+        body: Mutex<&'static str>,
+    }
+
+    impl Client for Page {
+        fn fetch(
+            &self,
+            request: &Request,
+        ) -> impl Future<Output = crate::Result<Response<()>>> + Send {
             if request.uri().path() != "/robots.txt" {
-                return ready(Ok(Response::new(Body::from("page"))));
+                *lock(&self.body) = "page";
+                return ready(Ok(Response::new(())));
             }
 
-            self.fetches.fetch_add(1, Ordering::SeqCst);
+            self.site.fetches.fetch_add(1, Ordering::SeqCst);
             let host = request.uri().host().unwrap_or_default().to_owned();
-            let mut robots = lock(&self.robots);
+            let mut robots = lock(&self.site.robots);
             let script = robots.entry(host).or_default();
             let (status, body) = match script.len() {
                 0 => (404, ""),
@@ -593,9 +607,14 @@ mod robots {
                 _ => script.pop_front().unwrap_or((404, "")),
             };
 
-            let mut response = Response::new(Body::from(body));
+            *lock(&self.body) = body;
+            let mut response = Response::new(());
             *response.status_mut() = StatusCode::from_u16(status).unwrap();
             ready(Ok(response))
+        }
+
+        fn body(&self) -> impl Future<Output = crate::Result<bytes::Bytes>> + Send {
+            ready(Ok(bytes::Bytes::from_static(lock(&self.body).as_bytes())))
         }
     }
 
@@ -614,7 +633,7 @@ mod robots {
                 "User-agent: spire\nDisallow: /private\nCrawl-delay: 1\n",
             )],
         );
-        let crawler = Crawler::new(site, from_fn(|_: Context<Site>| async {}))
+        let crawler = Crawler::new(site, from_fn(|_: Context<Page>| async {}))
             .with_robots("spire")
             .with_seeds([seed("a"), seed("private/b"), seed("c")]);
 
@@ -629,7 +648,7 @@ mod robots {
     async fn fetches_with_a_separate_backend() {
         let crawl = Site::default().serve("example.com", &[(200, "")]);
         let robots = Site::default().serve("example.com", &[(200, PRIVATE)]);
-        let crawler = Crawler::new(crawl.clone(), from_fn(|_: Context<Site>| async {}))
+        let crawler = Crawler::new(crawl.clone(), from_fn(|_: Context<Page>| async {}))
             .with_robots(Robots::new("bot").with_backend(robots.clone()))
             .with_seeds([seed("public"), seed("private/page")]);
 
@@ -641,7 +660,7 @@ mod robots {
     #[tokio::test(start_paused = true)]
     async fn waits_while_unreachable_then_obeys() {
         let site = Site::default().serve("example.com", &[(503, ""), (503, ""), (200, PRIVATE)]);
-        let crawler = Crawler::new(site.clone(), from_fn(|_: Context<Site>| async {}))
+        let crawler = Crawler::new(site.clone(), from_fn(|_: Context<Page>| async {}))
             .with_robots("bot")
             .with_seeds([seed("public"), seed("private/page")]);
 
@@ -657,7 +676,7 @@ mod robots {
         let site = Site::default()
             .serve("down.com", &[(500, "")])
             .serve("up.com", &[(200, "")]);
-        let crawler = Crawler::new(site.clone(), from_fn(|_: Context<Site>| async {}))
+        let crawler = Crawler::new(site.clone(), from_fn(|_: Context<Page>| async {}))
             .with_robots(Robots::new("bot").with_unreachable_retries(2))
             .with_seeds([page("https://down.com/a"), page("https://up.com/b")]);
 
@@ -670,7 +689,7 @@ mod robots {
 
     #[tokio::test]
     async fn missing_robots_txt_allows_everything() {
-        let crawler = Crawler::new(Site::default(), from_fn(|_: Context<Site>| async {}))
+        let crawler = Crawler::new(Site::default(), from_fn(|_: Context<Page>| async {}))
             .with_robots("bot")
             .with_seeds([seed("a"), seed("private/b")]);
 
@@ -681,7 +700,7 @@ mod robots {
     #[tokio::test(start_paused = true)]
     async fn too_many_requests_counts_as_unreachable() {
         let site = Site::default().serve("example.com", &[(429, ""), (200, "")]);
-        let crawler = Crawler::new(site, from_fn(|_: Context<Site>| async {}))
+        let crawler = Crawler::new(site, from_fn(|_: Context<Page>| async {}))
             .with_robots("bot")
             .with_seed(seed("a"));
 
@@ -692,7 +711,7 @@ mod robots {
 
     #[tokio::test(start_paused = true)]
     async fn refetches_expired_rules() {
-        let worker = from_fn(|cx: Context<Site>| async move {
+        let worker = from_fn(|cx: Context<Page>| async move {
             sleep(Duration::from_mins(40)).await;
             if cx.request().depth().get() < 2 {
                 cx.queue().follow("next").await?;
@@ -713,7 +732,7 @@ mod robots {
     #[tokio::test]
     async fn schemes_have_separate_robots_txt() {
         let site = Site::default();
-        let crawler = Crawler::new(site.clone(), from_fn(|_: Context<Site>| async {}))
+        let crawler = Crawler::new(site.clone(), from_fn(|_: Context<Page>| async {}))
             .with_robots("bot")
             .with_seeds([page("http://example.com/a"), page("https://example.com/b")]);
 

@@ -16,6 +16,32 @@ and this project adheres to
   an index with the sitemap's own, queued in the order of their `<priority>`.
 - `spire-core`: `Robots::with_sitemaps` queues the sitemaps an origin's
   robots.txt lists, the first time it is fetched.
+- `spire`: a tuple of up to 4 handlers is a handler: they run in turn on the
+  same page, fetched once, and stop at the first outcome other than
+  `Outcome::Continue`.
+- `spire`: the `FollowLinks` handler follows a page's links with a tag,
+  optionally only those matching a CSS selector, and `Collect<T>` stores
+  every `T` of a page in its dataset (`html` feature).
+
+### Changed
+
+- **Breaking:** handlers and extractors borrow the `Context`, so any
+  extractor may read the response and several handlers can share one
+  request. `FromContextRef` and `FromContext` are merged into `FromContext`,
+  and the "only the last argument fetches" rule is gone.
+- **Breaking:** `Client::fetch(&self, &Request)` returns the response's head
+  and `Client::body(&self)` its content, and clients are `Sync`; `Context` fetches once, keeps the
+  head (`Context::response`) and reads the body from the client
+  (`Context::body`), so a browser page reads as currently rendered.
+- **Breaking:** `Request` and `Response` carry `Bytes`; the streaming `Body`
+  type is removed.
+- **Breaking:** `HttpClient` hands out an `HttpSession` per request.
+  `BrowserSession::navigate` and `Navigation` are removed: fetching
+  navigates, and `View` reads the status and headers from the head.
+
+### Removed
+
+- The `Client` and `Context` extractors, which needed to own the context.
 
 ## [0.2.0] - 2026-10-21
 

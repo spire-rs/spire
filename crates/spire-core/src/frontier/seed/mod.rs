@@ -12,14 +12,14 @@ mod repr;
 
 pub use fingerprint::Fingerprint;
 
-use crate::request::{Attempt, Body, Depth, Request, Tag};
+use crate::request::{Attempt, Depth, Request, Tag};
 use crate::{Error, Result};
 
 /// A request waiting in the frontier.
 ///
-/// Unlike a [`Request`], a seed owns its body as [`Bytes`], so it can be
-/// cloned for retries, inspected for deduplication and stored by persistent
-/// frontiers. The crawler turns it into a [`Request`] right before fetching.
+/// Unlike a [`Request`], a seed can be cloned for retries, fingerprinted for
+/// deduplication and stored by persistent frontiers. The crawler turns it
+/// into a [`Request`] right before fetching.
 #[derive(Debug, Clone)]
 pub struct Seed {
     method: Method,
@@ -189,7 +189,7 @@ impl Seed {
     /// attempt as extensions.
     #[must_use]
     pub fn into_request(self) -> Request {
-        let mut request = Request::new(Body::from(self.body));
+        let mut request = Request::new(self.body);
         *request.method_mut() = self.method;
         *request.uri_mut() = self.uri;
         *request.headers_mut() = self.headers;

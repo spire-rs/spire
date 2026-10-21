@@ -3,6 +3,9 @@
 use std::fmt;
 use std::sync::Arc;
 
+use bytes::Bytes;
+use tokio::sync::OnceCell;
+
 use crate::Result;
 use crate::backend::Client;
 use crate::dataset::{Data, Dataset, Datasets};
@@ -13,12 +16,17 @@ use crate::request::{Request, Response, ResponseExt};
 /// A request being crawled, with everything needed to handle it.
 ///
 /// It holds the [`Request`], a client to fetch it with, a [`Queue`] to add
-/// the links it leads to, and the crawl's datasets.
+/// the links it leads to, and the crawl's datasets. Handlers borrow it, so
+/// several of them can handle one request: the request is fetched once, by
+/// the first [`response`](Self::response) or [`body`](Self::body), and the
+/// response's head is kept. The body is always read from the client, so a
+/// browser page reads as currently rendered.
 pub struct Context<C> {
     request: Request,
     client: C,
     queue: Queue,
     datasets: Arc<Datasets>,
+    response: OnceCell<Response<()>>,
 }
 
 impl<C> Context<C> {
@@ -33,7 +41,7 @@ impl<C> Context<C> {
         Self::from_parts(request, client, queue, Arc::default())
     }
 
-    pub(crate) const fn from_parts(
+    pub(crate) fn from_parts(
         request: Request,
         client: C,
         queue: Queue,
@@ -44,6 +52,7 @@ impl<C> Context<C> {
             client,
             queue,
             datasets,
+            response: OnceCell::new(),
         }
     }
 
@@ -82,11 +91,6 @@ impl<C> Context<C> {
         &self.client
     }
 
-    /// Returns the client mutably.
-    pub const fn client_mut(&mut self) -> &mut C {
-        &mut self.client
-    }
-
     /// Returns the queue for the links this request leads to.
     #[must_use]
     pub const fn queue(&self) -> &Queue {
@@ -103,29 +107,43 @@ impl<C> Context<C> {
         self.datasets.get()
     }
 
-    /// Splits the context into its request and client.
-    #[must_use]
-    pub fn into_parts(self) -> (Request, C) {
-        (self.request, self.client)
-    }
-
-    /// Fetches the response for the request.
+    /// Returns the response's head, fetching the request on the first call.
     ///
-    /// Links followed through the queue, including clones taken earlier,
-    /// resolve against the URI the response was served from from then on.
+    /// Later calls return the same head without fetching again. A failed
+    /// fetch is not kept: the next call tries again. Once fetched, links
+    /// followed through the queue, including clones taken earlier, resolve
+    /// against the URI the response was served from.
     ///
     /// # Errors
     ///
-    /// Returns an error if the client fails to fetch the response.
-    pub async fn fetch(self) -> Result<Response>
+    /// Returns an error if the client fails to fetch the request.
+    pub async fn response(&self) -> Result<&Response<()>>
     where
         C: Client,
     {
-        let response = self.client.fetch(self.request).await?;
-        if let Some(uri) = response.final_uri() {
-            self.queue.rebase(uri.clone());
-        }
-        Ok(response)
+        self.response
+            .get_or_try_init(|| async {
+                let response = self.client.fetch(&self.request).await?;
+                if let Some(uri) = response.final_uri() {
+                    self.queue.rebase(uri.clone());
+                }
+                Ok(response)
+            })
+            .await
+    }
+
+    /// Returns the response's body, fetching the request first if needed:
+    /// the bytes received, or a browser page as currently rendered.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be fetched or its body read.
+    pub async fn body(&self) -> Result<Bytes>
+    where
+        C: Client,
+    {
+        self.response().await?;
+        self.client.body().await
     }
 }
 
@@ -135,12 +153,16 @@ impl<C> fmt::Debug for Context<C> {
             .field("method", self.request.method())
             .field("uri", self.request.uri())
             .field("queue", &self.queue)
+            .field("fetched", &self.response.initialized())
             .finish_non_exhaustive()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::future::Future;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
     use crate::backend::Noop;
     use crate::dataset::InMemDataset;
@@ -159,7 +181,50 @@ mod tests {
         assert_eq!(cx.queue().size_hint(), Some(1));
         assert_eq!(cx.request().depth(), Depth::ROOT);
 
-        let response = cx.fetch().await.unwrap();
+        let response = cx.response().await.unwrap();
         assert!(response.status().is_success());
+    }
+
+    /// Counts its fetches, failing the first `fail` of them, and serves a
+    /// body that changes after the fetch, as a browser page can.
+    struct Counting {
+        fetches: AtomicUsize,
+        fail: usize,
+        body: std::sync::Mutex<&'static str>,
+    }
+
+    impl Client for Counting {
+        fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
+            let fetch = self.fetches.fetch_add(1, Ordering::SeqCst);
+            std::future::ready(if fetch < self.fail {
+                Err(crate::Error::new(crate::ErrorKind::Http))
+            } else {
+                Ok(Response::new(()))
+            })
+        }
+
+        fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
+            let body = *self.body.lock().unwrap();
+            std::future::ready(Ok(Bytes::from_static(body.as_bytes())))
+        }
+    }
+
+    #[tokio::test]
+    async fn fetches_once_and_reads_the_current_body() {
+        let request = Seed::get("https://example.com/").unwrap().into_request();
+        let client = Counting {
+            fetches: AtomicUsize::new(0),
+            fail: 1,
+            body: std::sync::Mutex::new("loaded"),
+        };
+        let cx = Context::new(request, client);
+
+        // A failed fetch is tried again; a successful one is kept.
+        assert!(cx.response().await.is_err());
+        assert_eq!(cx.body().await.unwrap(), "loaded");
+        *cx.client().body.lock().unwrap() = "clicked";
+        assert_eq!(cx.body().await.unwrap(), "clicked");
+        assert!(cx.response().await.unwrap().status().is_success());
+        assert_eq!(cx.client().fetches.load(Ordering::SeqCst), 2);
     }
 }

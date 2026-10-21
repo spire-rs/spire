@@ -4,7 +4,9 @@
 
 use std::future::{Future, ready};
 use std::io::Write;
+use std::sync::Mutex;
 
+use bytes::Bytes;
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use spire::backend::{Backend, Client};
@@ -13,7 +15,7 @@ use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
 use spire::request::http::{StatusCode, Uri};
-use spire::request::{Body, Request, Response, Tags};
+use spire::request::{Request, Response, Tags};
 use spire::{Crawler, FollowSitemap, Result, Robots, Router};
 
 #[derive(Debug, Clone, Copy, Tags)]
@@ -35,15 +37,18 @@ fn gzip(text: &str) -> Vec<u8> {
 }
 
 impl Backend for Site {
-    type Client = Self;
+    type Client = Visit;
 
-    fn connect(&self) -> impl Future<Output = Result<Self>> + Send {
-        ready(Ok(Self))
+    fn connect(&self) -> impl Future<Output = Result<Visit>> + Send {
+        ready(Ok(Visit(Mutex::new(Bytes::new()))))
     }
 }
 
-impl Client for Site {
-    fn fetch(self, request: Request) -> impl Future<Output = Result<Response>> + Send {
+/// A request to [`Site`], keeping the body it was served.
+struct Visit(Mutex<Bytes>);
+
+impl Client for Visit {
+    fn fetch(&self, request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
         let body: Vec<u8> = match request.uri().path() {
             "/robots.txt" => {
                 b"User-agent: *\nDisallow: /private\nSitemap: https://shop.test/sitemap.xml\n"
@@ -67,12 +72,17 @@ impl Client for Site {
             }
             "/" | "/products/1" | "/products/4" => b"<html></html>".to_vec(),
             _ => {
-                let mut response = Response::new(Body::default());
-                *response.status_mut() = StatusCode::NOT_FOUND;
-                return ready(Ok(response));
+                let mut head = Response::new(());
+                *head.status_mut() = StatusCode::NOT_FOUND;
+                return ready(Ok(head));
             }
         };
-        ready(Ok(Response::new(Body::from(body))))
+        *self.0.lock().unwrap() = Bytes::from(body);
+        ready(Ok(Response::new(())))
+    }
+
+    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
+        ready(Ok(self.0.lock().unwrap().clone()))
     }
 }
 

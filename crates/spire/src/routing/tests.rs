@@ -1,43 +1,58 @@
 use std::future::{Future, ready};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
-use crate::backend::{Backend, Client, Noop};
+use bytes::Bytes;
+
+#[cfg(feature = "html")]
+use crate::backend::Backend;
+use crate::backend::{Client, Noop};
 use crate::extract::{FromRef, State, Text};
 use crate::frontier::seed::Seed;
 use crate::request::http::Uri;
 use crate::request::http::header::{CONTENT_TYPE, HeaderValue};
-use crate::request::{Body, Depth, Request, Response, ResponseExt, Tag, Tags};
+use crate::request::{Depth, Request, Response, ResponseExt, Tag, Tags};
 use crate::worker::{Outcome, Worker};
 use crate::{Context, ErrorKind, Result, Router};
 
 /// A backend serving fixed pages, as if every request was redirected to
 /// `https://example.com/moved/<path>`.
+#[cfg(feature = "html")]
 #[derive(Clone)]
 struct Site;
 
+#[cfg(feature = "html")]
 impl Backend for Site {
-    type Client = Self;
+    type Client = Visit;
 
-    fn connect(&self) -> impl Future<Output = Result<Self>> + Send {
-        ready(Ok(Self))
+    fn connect(&self) -> impl Future<Output = Result<Visit>> + Send {
+        ready(Ok(Visit(Mutex::new(""))))
     }
 }
 
-impl Client for Site {
-    fn fetch(self, request: Request) -> impl Future<Output = Result<Response>> + Send {
+/// A request to [`Site`], keeping the page it was served.
+struct Visit(Mutex<&'static str>);
+
+impl Client for Visit {
+    fn fetch(&self, request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
         let path = request.uri().path().to_owned();
-        let html = match path.as_str() {
+        *self.0.lock().unwrap() = match path.as_str() {
             "/" => {
                 r#"<title>Home</title><a href="a">a</a><a href="/b#top">b</a><a href="mailto:x@y">mail</a>"#
             }
             _ => "<title>Leaf</title>",
         };
 
-        let mut response = Response::new(Body::from(html));
+        let mut head = Response::new(());
         let content_type = HeaderValue::from_static("text/html; charset=utf-8");
-        response.headers_mut().insert(CONTENT_TYPE, content_type);
+        head.headers_mut().insert(CONTENT_TYPE, content_type);
         let moved = format!("https://example.com/moved{path}");
-        response.set_final_uri(moved.parse::<Uri>().unwrap());
-        ready(Ok(response))
+        head.set_final_uri(moved.parse::<Uri>().unwrap());
+        ready(Ok(head))
+    }
+
+    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
+        ready(Ok(Bytes::from_static(self.0.lock().unwrap().as_bytes())))
     }
 }
 
@@ -211,7 +226,9 @@ async fn text_extractor_reads_the_body() {
         .into_request();
     let router = Router::new().fallback(leaf);
     assert!(matches!(
-        router.handle(Context::new(request, Site)).await,
+        router
+            .handle(Context::new(request, Visit(Mutex::new(""))))
+            .await,
         Outcome::Stop
     ));
 }
@@ -292,4 +309,61 @@ fn require_names_missing_tags() {
     let _ = Router::<Noop>::new()
         .route(Page::List, named)
         .require::<Page>();
+}
+
+/// A client counting its fetches, serving `page` as the body.
+struct Counted(Arc<AtomicUsize>);
+
+impl Client for Counted {
+    fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        ready(Ok(Response::new(())))
+    }
+
+    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
+        ready(Ok(Bytes::from_static(b"page")))
+    }
+}
+
+#[tokio::test]
+async fn handler_tuples_share_one_fetch_and_stop_early() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let fetches = Arc::new(AtomicUsize::new(0));
+    let handler = |outcome: fn() -> Outcome| {
+        let calls = calls.clone();
+        move |Text(body): Text| {
+            let calls = calls.clone();
+            async move {
+                assert_eq!(body, "page");
+                calls.fetch_add(1, Ordering::SeqCst);
+                outcome()
+            }
+        }
+    };
+    let context = || {
+        let request = Seed::get("https://example.com/").unwrap().with_tag("page");
+        Context::new(request.into_request(), Counted(fetches.clone()))
+    };
+
+    // Every handler reads the body, and the request is fetched once.
+    let all = (
+        handler(|| Outcome::Continue),
+        handler(|| Outcome::Continue),
+        handler(|| Outcome::Continue),
+    );
+    let router: Router<Counted> = Router::new().route("page", all);
+    assert!(matches!(router.handle(context()).await, Outcome::Continue));
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+    assert_eq!(fetches.load(Ordering::SeqCst), 1);
+
+    // The first outcome other than `Continue` ends the tuple.
+    calls.store(0, Ordering::SeqCst);
+    let stopping = (
+        handler(|| Outcome::Continue),
+        handler(|| Outcome::Stop),
+        handler(|| Outcome::Continue),
+    );
+    let router: Router<Counted> = Router::new().route("page", stopping);
+    assert!(matches!(router.handle(context()).await, Outcome::Stop));
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }

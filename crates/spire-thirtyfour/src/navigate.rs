@@ -35,7 +35,7 @@ const RESPONSE_GRACE: Duration = Duration::from_secs(2);
 
 /// The response a navigation ended on, after redirects.
 #[derive(Debug, Clone)]
-pub struct Navigation {
+pub(crate) struct Navigation {
     uri: Uri,
     status: StatusCode,
     headers: HeaderMap,
@@ -44,19 +44,19 @@ pub struct Navigation {
 impl Navigation {
     /// Returns the URI of the page, after redirects.
     #[must_use]
-    pub const fn uri(&self) -> &Uri {
+    pub(crate) const fn uri(&self) -> &Uri {
         &self.uri
     }
 
     /// Returns the status of the page's response.
     #[must_use]
-    pub const fn status(&self) -> StatusCode {
+    pub(crate) const fn status(&self) -> StatusCode {
         self.status
     }
 
     /// Returns the headers of the page's response.
     #[must_use]
-    pub const fn headers(&self) -> &HeaderMap {
+    pub(crate) const fn headers(&self) -> &HeaderMap {
         &self.headers
     }
 
