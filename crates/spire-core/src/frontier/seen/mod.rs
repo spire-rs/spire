@@ -1,9 +1,11 @@
 //! Seen sets: what a [`Dedup`](crate::frontier::Dedup) frontier remembers.
 
+mod bloom;
 mod memory;
 
 use std::future::Future;
 
+pub use bloom::{BloomSeen, BloomSnapshot};
 pub use memory::InMemSeen;
 
 use crate::Result;

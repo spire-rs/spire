@@ -42,7 +42,7 @@ pub use facade::{AllowedHosts, Dedup, Filter, MaxDepth, Retry, RetryPolicy, TagB
 pub use memory::InMemFrontier;
 pub use queue::{Link, Queue};
 pub use seed::{Fingerprint, Seed};
-pub use seen::{InMemSeen, SeenSet};
+pub use seen::{BloomSeen, BloomSnapshot, InMemSeen, SeenSet};
 use tokio::time::Instant;
 
 use crate::Result;
