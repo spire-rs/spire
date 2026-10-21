@@ -48,6 +48,7 @@ spire = { version = "0.2.0", features = ["reqwest", "macros"] }
 | `html` (default) | The `Html` and `Element` extractors and the `Select` trait |
 | `macros` | `#[derive(Select)]` |
 | `robots` | Obeying robots.txt (RFC 9309) with `Crawler::with_robots`, optionally fetched through a separate backend |
+| `sitemap` | The `Sitemap` extractor and `FollowSitemap` handler, for XML and text sitemaps, gzipped or not |
 | `serde` | Serializable seeds for snapshots, and the `JsonlDataset` output |
 | `redb` | `RedbStore`: a crash-safe frontier and seen set on disk |
 | `reqwest` | The `HttpClient` backend |
@@ -132,6 +133,51 @@ fallback. `require` fails at startup if a variant has no route, and a handler
 serving several variants takes `page: Page` as an argument. A URL is fetched
 once whatever its tag. Error statuses become failures: `5xx` and `429` are
 retried, honouring `Retry-After`.
+
+### Sitemaps
+
+With the `sitemap` feature, the `FollowSitemap` handler follows sitemaps:
+every page is queued with one tag, and every sitemap of an index with the tag
+of the sitemap itself. Seed sitemaps yourself, or let `Robots::with_sitemaps`
+queue the ones each site's robots.txt lists:
+
+```rust,no_run
+# #[cfg(all(feature = "reqwest", feature = "sitemap", feature = "robots", feature = "macros"))]
+# mod example {
+use spire::backend::HttpClient;
+use spire::frontier::FrontierExt;
+use spire::frontier::memory::InMemFrontier;
+use spire::frontier::seed::Seed;
+use spire::request::Tags;
+use spire::{Crawler, FollowSitemap, Result, Robots, Router};
+
+#[derive(Debug, Clone, Copy, Tags)]
+enum Page {
+    Home,
+    Sitemap,
+    Product,
+}
+
+async fn product() {}
+
+async fn crawl() -> Result<()> {
+    let router = Router::new()
+        .route(Page::Home, || async {})
+        .route(Page::Sitemap, FollowSitemap::new(Page::Product))
+        .route(Page::Product, product);
+
+    let crawler = Crawler::new(HttpClient::default(), router)
+        .with_frontier(InMemFrontier::fifo().dedup().allow_hosts(["example.com"]))
+        .with_robots(Robots::new("MyBot").with_sitemaps(Page::Sitemap))
+        .with_seed(Seed::get("https://example.com/")?.with_tag(Page::Home));
+    crawler.run().await?;
+    Ok(())
+}
+# }
+```
+
+The `Sitemap` extractor parses a sitemap for a handler of your own. Sitemaps
+must be fetched over HTTP: a browser renders XML as a page.
 
 ### Browser Automation
 

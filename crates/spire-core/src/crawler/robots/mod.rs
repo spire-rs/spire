@@ -11,6 +11,7 @@ pub(crate) use cache::{RobotsCache, Verdict};
 pub(crate) use source::{BackendSource, RobotsSource};
 
 use crate::backend::Backend;
+use crate::request::Tag;
 
 /// How a crawl fetches and obeys robots.txt, see
 /// [`Crawler::with_robots`](crate::Crawler::with_robots).
@@ -30,7 +31,8 @@ use crate::backend::Backend;
 ///
 /// robots.txt is fetched with the crawl's backend unless
 /// [`with_backend`](Self::with_backend) sets another, e.g. an HTTP client
-/// for a browser crawl.
+/// for a browser crawl. [`with_sitemaps`](Self::with_sitemaps) also queues
+/// the sitemaps it lists.
 ///
 /// ```
 /// use std::time::Duration;
@@ -49,6 +51,7 @@ pub struct Robots {
     pub(crate) max_age: Duration,
     pub(crate) retries: u32,
     pub(crate) retry_delay: Duration,
+    pub(crate) sitemaps: Option<Tag>,
 }
 
 impl Robots {
@@ -62,6 +65,7 @@ impl Robots {
             max_age: Duration::from_hours(24),
             retries: 3,
             retry_delay: Duration::from_secs(30),
+            sitemaps: None,
         }
     }
 
@@ -85,6 +89,18 @@ impl Robots {
     #[must_use]
     pub const fn with_unreachable_retries(mut self, retries: u32) -> Self {
         self.retries = retries;
+        self
+    }
+
+    /// Queues the sitemaps an origin's robots.txt lists in `Sitemap:` lines,
+    /// tagged `tag`, the first time it is fetched.
+    ///
+    /// They go through the frontier like any other seed, so its scope,
+    /// deduplication and depth limits apply. Route the tag to a handler that
+    /// parses them, e.g. `FollowSitemap` in `spire`.
+    #[must_use]
+    pub fn with_sitemaps(mut self, tag: impl Into<Tag>) -> Self {
+        self.sitemaps = Some(tag.into());
         self
     }
 
@@ -117,6 +133,7 @@ impl fmt::Debug for Robots {
             .field("max_age", &self.max_age)
             .field("retries", &self.retries)
             .field("retry_delay", &self.retry_delay)
+            .field("sitemaps", &self.sitemaps)
             .finish()
     }
 }

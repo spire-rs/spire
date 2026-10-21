@@ -36,6 +36,7 @@ queue for links to follow, or a dataset to store results in.
 - **Typed routing**: route by tags, checked by the compiler with `#[derive(Tags)]`, or by URL path patterns.
 - **Extractors**: parse HTML into structs with `#[derive(Select)]`, deserialize JSON, or drive the browser with `View`.
 - **Polite crawling**: per-host concurrency and delays, robots.txt per RFC 9309, retries with `Retry-After` and backoff.
+- **Sitemaps**: follow XML and text sitemaps and indexes, gzipped or not, found through robots.txt or seeded directly.
 - **Frontiers**: deduplication with URL normalization, depth limits, host filters, priorities, and a Bloom filter for huge crawls.
 - **Crash safety**: a redb-backed frontier and seen set that resume a crawl after a crash.
 

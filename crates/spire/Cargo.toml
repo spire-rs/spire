@@ -25,7 +25,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Default feature set: HTML parsing, and rustls for any enabled backend
 default = ["html", "rustls-tls"]
 # Every feature except `native-tls`
-full = ["html", "macros", "robots", "serde", "redb", "reqwest", "thirtyfour", "rustls-tls"]
+full = ["html", "macros", "robots", "sitemap", "serde", "redb", "reqwest", "thirtyfour", "rustls-tls"]
 
 # The `Html` and `Element` extractors and the `Select` trait
 html = ["dep:scraper"]
@@ -34,6 +34,8 @@ macros = ["html", "dep:spire-macros"]
 
 # Fetching and obeying robots.txt, see `Crawler::with_robots`
 robots = ["spire-core/robots"]
+# The `Sitemap` extractor and `FollowSitemap` handler, plain or gzipped
+sitemap = ["dep:sitemapo", "dep:flate2", "dep:tokio"]
 # Serializable seeds for snapshots, and the `JsonlDataset` output
 serde = ["spire-core/serde"]
 
@@ -72,6 +74,11 @@ serde_json = { workspace = true, features = [] }
 scraper = { workspace = true, optional = true, features = [] }
 encoding_rs = { workspace = true, features = [] }
 
+# Sitemaps, parsed off the async threads
+sitemapo = { workspace = true, optional = true, features = [] }
+flate2 = { workspace = true, optional = true, features = [] }
+tokio = { workspace = true, optional = true, features = ["rt"] }
+
 # Derive macros & utilities
 bytes = { workspace = true, features = [] }
 derive_more = { workspace = true, features = ["deref", "deref_mut"] }
@@ -82,6 +89,7 @@ tracing = { workspace = true, features = [] }
 [dev-dependencies]
 # Testing
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
+flate2 = { workspace = true, features = [] }
 
 [lints]
 workspace = true
