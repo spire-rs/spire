@@ -16,6 +16,9 @@ pub use spire_core::crawler::Robots;
 pub use spire_core::{
     Context, Error, ErrorKind, Result, backend, dataset, frontier, http, request, service, worker,
 };
+#[cfg(feature = "redb")]
+#[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
+pub use spire_redb::{RedbFrontier, RedbSeen, RedbStore, RedbStoreBuilder};
 #[cfg(feature = "reqwest")]
 #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
 pub use spire_reqwest::{HttpClient, StatusPolicy, reqwest};

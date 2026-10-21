@@ -52,6 +52,7 @@ spire = { version = "0.2.0", features = ["reqwest", "macros"] }
 | `macros` | `#[derive(Select)]` |
 | `robots` | Obeying robots.txt (RFC 9309) with `Crawler::with_robots`, optionally fetched through a separate backend |
 | `serde` | Serializable seeds for snapshots, and the `JsonlDataset` output |
+| `redb` | `RedbStore`: a crash-safe frontier and seen set on disk |
 | `reqwest` | The `HttpClient` backend |
 | `thirtyfour` | The `BrowserBackend` (WebDriver) backend |
 | `rustls` (default), `native-tls` | TLS for the enabled backends |

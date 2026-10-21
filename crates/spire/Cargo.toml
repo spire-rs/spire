@@ -26,7 +26,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Default feature set: HTML parsing, and rustls for any enabled backend
 default = ["html", "rustls"]
 # Every feature except `native-tls`
-full = ["html", "macros", "robots", "serde", "reqwest", "thirtyfour", "rustls"]
+full = ["html", "macros", "robots", "serde", "redb", "reqwest", "thirtyfour", "rustls"]
 
 # The `Html`, `Element` and `Elements` extractors and the `Select` trait
 html = ["dep:scraper"]
@@ -37,6 +37,9 @@ macros = ["html", "dep:spire-macros"]
 robots = ["spire-core/robots"]
 # Serializable seeds for snapshots, and the `JsonlDataset` output
 serde = ["spire-core/serde"]
+
+# Crash-safe frontier and seen set stored in redb
+redb = ["dep:spire-redb"]
 
 # HTTP backend built on reqwest
 reqwest = ["dep:spire-reqwest"]
@@ -52,6 +55,7 @@ native-tls = ["spire-reqwest?/native-tls", "spire-thirtyfour?/native-tls"]
 # Internal crates
 spire-core = { workspace = true, features = [] }
 spire-macros = { workspace = true, optional = true, features = [] }
+spire-redb = { workspace = true, optional = true, features = [] }
 spire-reqwest = { workspace = true, optional = true, features = [] }
 spire-thirtyfour = { workspace = true, optional = true, features = [] }
 

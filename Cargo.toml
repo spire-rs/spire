@@ -6,6 +6,7 @@ members = [
     "./crates/spire",
     "./crates/spire-core",
     "./crates/spire-macros",
+    "./crates/spire-redb",
     "./crates/spire-reqwest",
     "./crates/spire-thirtyfour",
     "./examples/*",
@@ -15,6 +16,7 @@ default-members = [
     "./crates/spire",
     "./crates/spire-core",
     "./crates/spire-macros",
+    "./crates/spire-redb",
     "./crates/spire-reqwest",
     "./crates/spire-thirtyfour",
 ]
@@ -49,6 +51,7 @@ double_must_use = "allow"
 spire = { path = "./crates/spire", version = "0.2.0" }
 spire-core = { path = "./crates/spire-core", version = "0.2.0" }
 spire-macros = { path = "./crates/spire-macros", version = "0.2.0" }
+spire-redb = { path = "./crates/spire-redb", version = "0.2.0" }
 spire-reqwest = { path = "./crates/spire-reqwest", version = "0.2.0" }
 spire-thirtyfour = { path = "./crates/spire-thirtyfour", version = "0.2.0" }
 
@@ -85,6 +88,9 @@ derive_more = { version = "2.1", features = [] }
 # Primitive datatypes
 jiff = { version = "0.2", features = [] }
 url = { version = "2.5", features = [] }
+
+# Storage
+redb = { version = "4.4", features = [] }
 
 # Politeness
 robotxt = { version = "0.7", default-features = false, features = ["parser"] }
