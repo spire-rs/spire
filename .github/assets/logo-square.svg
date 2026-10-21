@@ -1,0 +1,21 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Spire logo, square variant: "the apex", a letter A without its crossbar,
+    which also reads as a spire. Deep verdigris on a warm paper tile. Full-bleed
+    square (no squircle), for contexts that supply their own corner mask or want
+    sharp corners. This SVG is a master; the PNG is rendered from it.
+  -->
+  <defs>
+    <!-- Paper ground, slightly lit from the top. -->
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7f4ec"/>
+      <stop offset="1" stop-color="#e7e1d3"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Square tile: sharp 90° corners, no squircle clip. -->
+  <rect width="1024" height="1024" fill="url(#ground)"/>
+  <!-- Apex at 512,200; feet 232→322 and 702→792 on the 844 baseline; the inner
+       apex sits at 512,407, so both legs keep a constant width. -->
+  <polygon fill="#1f3b36" points="232,844 512,200 792,844 702,844 512,407 322,844"/>
+</svg>

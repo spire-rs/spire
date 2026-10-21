@@ -1,3 +1,7 @@
+<div align="center">
+
+<img src=".github/assets/logo.png" alt="Spire" width="104" height="104" />
+
 # Spire
 
 [![Build Status][action-badge]][action-url]
@@ -6,6 +10,8 @@
 [![Crate Coverage][coverage-badge]][coverage-url]
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
+
+</div>
 
 [action-badge]: https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yml?branch=main&label=build&logo=github&style=flat-square
 [action-url]: https://github.com/spire-rs/spire/actions/workflows/build.yml
