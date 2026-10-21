@@ -1,0 +1,4 @@
+# https://doc.rust-lang.org/clippy/lint_configuration.html
+
+# Product names that are not code identifiers; ".." keeps clippy's defaults.
+doc-valid-idents = ["WebDriver", ".."]

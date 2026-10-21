@@ -24,194 +24,163 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 
 ## Features
 
-- **Flexible Architecture**: Built on tower's Service trait for composable
-  middleware
-- **Multiple Backends**: Support for HTTP (reqwest) and `WebDriver` (thirtyfour)
-  backends
-- **Type-Safe Routing**: Tag-based routing with compile-time safety
-- **Async First**: Powered by tokio for high-performance concurrent scraping
-- **Ergonomic Extractors**: Extract data from requests with a clean, type-safe
-  API
-- **Graceful Shutdown**: Built-in support for clean shutdown and resource
-  cleanup
-- **Observability**: Optional tracing support for debugging and monitoring
+- **Tag-based routing**: requests carry a tag that picks their handler, with
+  handlers written as async functions of typed extractors.
+- **Declarative extraction**: parse pages with `Html`, or derive `Select` to
+  turn CSS selectors into structs.
+- **A real frontier**: deduplication, depth limits, retries with backoff and
+  per-tag pauses that honour `Retry-After`.
+- **Concurrent by default**: requests run concurrently up to a limit, and the
+  crawl ends once nothing is queued or in flight.
+- **Two backends**: plain HTTP through reqwest, and real browsers through
+  WebDriver for pages that need JavaScript.
+- **Tower all the way**: any tower middleware wraps routes, clients or
+  backends.
 
 ## Installation
 
-Add this to your `Cargo.toml`:
-
 ```toml
 [dependencies]
-spire = "0.2.0"
+spire = { version = "0.2.0", features = ["reqwest", "macros"] }
 ```
 
 ### Feature Flags
 
-- **`reqwest`** - Enables the reqwest-based HTTP client backend
-- **`thirtyfour`** - Enables the WebDriver/browser automation backend
-- **`macros`** - Enables procedural macros for deriving extractors
-- **`tracing`** - Enables tracing/logging support
-- **`trace`** - Enables detailed trace-level instrumentation
-- **`metric`** - Enables metrics collection
-- **`rustls`** - Use rustls for TLS connections (enabled by default)
-- **`native-tls`** - Use native system TLS library for connections
-- **`full`** - Enables all features (macros, tracing, reqwest, thirtyfour,
-  rustls)
-
-### TLS Configuration
-
-By default, Spire uses rustls for TLS connections. You can choose between
-different TLS implementations:
-
-```toml
-# Default: uses rustls
-[dependencies]
-spire = "0.2.0"
-
-# Explicitly use rustls
-[dependencies]
-spire = { version = "0.2.0", features = ["rustls"], default-features = false }
-
-# Use native TLS (system TLS library)
-[dependencies]
-spire = { version = "0.2.0", features = ["native-tls"], default-features = false }
-
-# Use with specific backends
-[dependencies]
-spire = { version = "0.2.0", features = ["reqwest", "native-tls"], default-features = false }
-```
+| Feature | Enables |
+|---|---|
+| `html` (default) | The `Html`, `Element` and `Elements` extractors and the `Select` trait |
+| `macros` | `#[derive(Select)]` |
+| `robots` | Obeying robots.txt (RFC 9309) with `Crawler::with_robots`, optionally fetched through a separate backend |
+| `serde` | Serializable seeds for snapshots, and the `JsonlDataset` output |
+| `reqwest` | The `HttpClient` backend |
+| `thirtyfour` | The `BrowserBackend` (WebDriver) backend |
+| `rustls` (default), `native-tls` | TLS for the enabled backends |
+| `full` | Everything except `native-tls` |
 
 ## Quick Start
 
-### HTTP Scraping with Reqwest
+Crawl a listing, follow its pagination and extract every product:
 
 ```rust,no_run
-use spire::context::RequestQueue;
+# #[cfg(all(feature = "reqwest", feature = "macros"))]
+# mod example {
 use spire::dataset::InMemDataset;
-use spire::extract::{State, Text};
-use spire::{Client, HttpClient, Result, Router};
+use spire::extract::{Elements, Html, Select};
+use spire::frontier::{FrontierExt, InMemFrontier, Link, Queue, Seed};
+use spire::{Crawler, HttpClient, Result, Router};
 
-#[derive(Clone)]
-struct AppState {
-    api_key: String,
+#[derive(Debug, Select)]
+#[select("article.product")]
+struct Product {
+    #[select("h2")]
+    name: String,
+    #[select(".price")]
+    price: Option<f64>,
+    #[select("a", attr = "href")]
+    link: String,
 }
 
-async fn scrape_handler(
-    State(state): State<AppState>,
-    queue: RequestQueue,
-    Text(html): Text,
-) -> Result<()> {
-    println!("Scraped {} bytes with API key: {}", html.len(), state.api_key);
-
-    // Queue more requests
-    queue.append_with_tag("main", "https://example.com/page2").await?;
-
+/// Queues the next page and every product page of a listing.
+async fn listing(queue: Queue, page: Html) -> Result<()> {
+    let pages = page.links().into_iter().filter(|href| href.contains("?page="));
+    queue.follow_all(pages).await?;
+    for product in page.select_all::<Product>()? {
+        queue.follow(Link::from(product.link).with_tag("product")).await?;
+    }
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Create router
+/// Stores the product on its own page.
+async fn product(data: spire::dataset::Data<Product>, Elements(found): Elements<Product>) -> Result<()> {
+    data.write_all(found).await
+}
+
+async fn crawl() -> Result<()> {
     let router = Router::new()
-        .route("main", scrape_handler)
-        .with_state(AppState {
-            api_key: "my-api-key".to_string(),
-        });
+        .route("listing", listing)
+        .route("product", product);
 
-    // Create backend and client
-    let backend = HttpClient::default();
-    let client = Client::new(backend, router)
-        .with_request_queue(InMemDataset::stack())
-        .with_dataset(InMemDataset::<String>::new());
+    let crawler = Crawler::new(HttpClient::default(), router)
+        .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3).tag_backoff())
+        .with_dataset(InMemDataset::<Product>::new())
+        .with_concurrency(16)
+        .with_seed(Seed::get("https://example.com/products")?.with_tag("listing"));
 
-    // Start initial request
-    client
-        .request_queue()
-        .append_with_tag("main", "https://example.com")
-        .await?;
-
-    // Run the client
-    client.run().await?;
-
+    let stats = crawler.run().await?;
+    let products = crawler.dataset::<Product>()?.read_all().await?;
+    println!("{} products in {} requests", products.len(), stats.requests);
     Ok(())
 }
+# }
 ```
 
-### Browser Automation with `ThirtyFour`
+Relative links resolve against the page they were found on, after redirects;
+followed links inherit the tag of their page unless given one. Error statuses
+become failures: `5xx` and `429` are retried, honouring `Retry-After`.
+
+### Browser Automation
+
+`BrowserBackend` drives real browsers over WebDriver. Body extractors load
+the page; `View` exposes the driver to interact with it:
 
 ```rust,no_run
-use spire::dataset::InMemDataset;
+# #[cfg(feature = "thirtyfour")]
+# mod example {
+use spire::extract::Html;
 use spire::extract::driver::View;
-use spire::{BrowserBackend, Client, Result, Router};
+use spire::frontier::Seed;
+use spire::{BrowserBackend, Crawler, Result, Router};
 
-async fn browser_handler(View(driver): View) -> Result<()> {
-    println!("Processing page: {:?}", driver.title().await);
+async fn rendered(View(driver): View, page: Html) -> Result<()> {
+    println!("{:?} at {:?}", page.title(), driver.current_url().await);
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create router
-    let router = Router::new().route("main", browser_handler);
-
-    // Create browser pool backend
+async fn crawl() -> Result<()> {
     let backend = BrowserBackend::builder()
-        .with_unmanaged("http://localhost:4444")
+        .remote("http://localhost:4444")
+        .max_sessions(4)
         .build()?;
 
-    let client = Client::new(backend, router)
-        .with_request_queue(InMemDataset::stack())
-        .with_dataset(InMemDataset::<String>::new());
+    let router = Router::new().route("page", rendered);
+    let crawler = Crawler::new(backend, router)
+        .with_seed(Seed::get("https://example.com/")?.with_tag("page"));
+    crawler.run().await?;
 
-    // Start initial request
-    client
-        .request_queue()
-        .append_with_tag("main", "https://example.com")
-        .await?;
-
-    // Run the client
-    client.run().await?;
-
+    // Quit the browser sessions instead of dropping them.
+    crawler.backend().close().await;
     Ok(())
 }
+# }
 ```
 
 ## Architecture
 
-Spire is built on several key abstractions:
-
-- **Router**: Routes requests to handlers based on tags
-- **Handler**: Async functions that process requests and extract data
-- **Extractor**: Type-safe data extraction from request context
-- **Backend**: Pluggable backend for HTTP or browser automation
-- **Dataset**: Storage for scraped data and request queues
+- **`Crawler`** pops seeds from the frontier, runs them concurrently through
+  the backend and the router, and reports each outcome back.
+- **`Frontier`** holds the seeds; facades add deduplication, depth limits,
+  retries and per-tag backoff.
+- **`Backend`** hands out a client per request: `HttpClient` or a pooled
+  `BrowserSession`.
+- **`Router`** picks the handler for a request by its tag; handlers return
+  anything that converts into an `Outcome`.
+- **Datasets** store what handlers scrape, one per item type.
 
 ## Middleware
 
-Spire integrates seamlessly with the tower ecosystem:
+Routes are tower services, so tower middleware wraps them with
+`Router::layer`; errors from middleware fail the request:
 
-```rust,ignore
-use tower::ServiceBuilder;
-use tower::timeout::TimeoutLayer;
+```rust
 use std::time::Duration;
-use spire::prelude::*;
 
-async fn handler() -> Result<(), Box<dyn std::error::Error>> {
-    Ok(())
-}
+use spire::Router;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let router = Router::new()
-        .route("main", handler)
-        .layer(
-            ServiceBuilder::new()
-                .timeout(Duration::from_secs(30))
-                .into_inner()
-        );
-    
-    Ok(())
-}
+async fn handler() {}
+
+let router: Router<spire::backend::Noop> = Router::new()
+    .route("page", handler)
+    .layer(tower::timeout::TimeoutLayer::new(Duration::from_secs(30)));
 ```
 
 ## Contributing
@@ -221,8 +190,8 @@ guidelines.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE)
-file for details.
+This project is licensed under the MIT License - see the
+[LICENSE](../../LICENSE.txt) file for details.
 
 ## Acknowledgments
 

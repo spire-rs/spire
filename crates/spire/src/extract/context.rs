@@ -1,117 +1,134 @@
 use std::convert::Infallible;
+use std::future::{Future, ready};
 
 use derive_more::{Deref, DerefMut};
-use spire_core::dataset::future::DataSink;
-use spire_core::http;
 
-use crate::context::{Context, RequestQueue, Tag, TaskExt};
 use crate::dataset::Data;
-use crate::dataset::future::DataStream;
 use crate::extract::{FromContext, FromContextRef};
+use crate::frontier::Queue;
+use crate::http::Uri;
+use crate::request::{Attempt, Depth, RequestExt, Tag};
+use crate::{Context, Error, Result};
 
-/// [`Backend`]-specific client extractor.
-///
-/// [`Backend`]: crate::backend::Backend
+/// Extracts a clone of the backend client handling the request.
 #[must_use]
-#[derive(Clone, Deref, DerefMut)]
+#[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Client<C>(pub C);
 
-#[spire_core::async_trait]
 impl<C, S> FromContextRef<C, S> for Client<C>
 where
-    C: Clone + Sync,
+    C: Clone + Send + Sync,
+    S: Sync,
 {
     type Rejection = Infallible;
 
-    #[inline]
-    async fn from_context_ref(cx: &Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(cx.as_client_ref().clone()))
+    fn from_context_ref(
+        cx: &Context<C>,
+        _: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        ready(Ok(Self(cx.client().clone())))
     }
 }
 
-#[spire_core::async_trait]
 impl<C, S> FromContext<C, S> for Context<C>
 where
-    C: Send + Sync,
+    C: Send,
+    S: Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context(cx: Self, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx)
+    fn from_context(cx: Self, _: &S) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        ready(Ok(cx))
     }
 }
 
-#[spire_core::async_trait]
-impl<C, S> FromContextRef<C, S> for http::Uri
+impl<C, S> FromContextRef<C, S> for Uri
 where
     C: Sync,
+    S: Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx.get_ref().uri().clone())
+    fn from_context_ref(
+        cx: &Context<C>,
+        _: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        ready(Ok(cx.request().uri().clone()))
     }
 }
 
-#[spire_core::async_trait]
-impl<C, S> FromContextRef<C, S> for RequestQueue
+impl<C, S> FromContextRef<C, S> for Queue
 where
     C: Sync,
+    S: Sync,
 {
     type Rejection = Infallible;
 
-    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx.request_queue())
+    fn from_context_ref(
+        cx: &Context<C>,
+        _: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        ready(Ok(cx.queue().clone()))
     }
 }
 
-#[spire_core::async_trait]
+/// Rejects untagged requests; extract `Option<Tag>` in a fallback handler.
 impl<C, S> FromContextRef<C, S> for Tag
 where
     C: Sync,
+    S: Sync,
 {
-    type Rejection = Infallible;
+    type Rejection = Error;
 
-    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx.get_ref().tag().clone())
+    fn from_context_ref(cx: &Context<C>, _: &S) -> impl Future<Output = Result<Self>> + Send {
+        ready({
+            let tag = cx.request().tag().cloned();
+            tag.ok_or_else(|| Error::worker("request has no tag"))
+        })
     }
 }
 
-#[spire_core::async_trait]
+impl<C, S> FromContextRef<C, S> for Depth
+where
+    C: Sync,
+    S: Sync,
+{
+    type Rejection = Infallible;
+
+    fn from_context_ref(
+        cx: &Context<C>,
+        _: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        ready(Ok(cx.request().depth()))
+    }
+}
+
+impl<C, S> FromContextRef<C, S> for Attempt
+where
+    C: Sync,
+    S: Sync,
+{
+    type Rejection = Infallible;
+
+    fn from_context_ref(
+        cx: &Context<C>,
+        _: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        ready(Ok(cx.request().attempt()))
+    }
+}
+
+/// Rejects with a [`Dataset`](crate::ErrorKind::Dataset) error if no dataset
+/// is registered for `T` on the crawler.
 impl<C, S, T> FromContextRef<C, S> for Data<T>
 where
     C: Sync,
-    T: Send + Sync + 'static,
+    S: Sync,
+    T: Send + 'static,
 {
-    type Rejection = Infallible;
+    type Rejection = Error;
 
-    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx.dataset::<T>())
-    }
-}
-
-#[spire_core::async_trait]
-impl<C, S, T> FromContextRef<C, S> for DataSink<T>
-where
-    C: Sync,
-    T: Send + Sync + 'static,
-{
-    type Rejection = Infallible;
-
-    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx.dataset::<T>().into_sink())
-    }
-}
-
-#[spire_core::async_trait]
-impl<C, S, T> FromContextRef<C, S> for DataStream<T>
-where
-    C: Sync,
-    T: Send + Sync + 'static,
-{
-    type Rejection = Infallible;
-
-    async fn from_context_ref(cx: &Context<C>, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(cx.dataset::<T>().into_stream())
+    fn from_context_ref(cx: &Context<C>, _: &S) -> impl Future<Output = Result<Self>> + Send {
+        ready(cx.dataset::<T>())
     }
 }

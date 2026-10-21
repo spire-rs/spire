@@ -16,96 +16,80 @@
 [coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
 [coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
-Browser automation backend for Spire.
-
-This crate provides [`BrowserBackend`], a browser automation backend
-implementation that integrates with the Spire web scraping framework using the
-[thirtyfour](https://github.com/stevepryde/thirtyfour) `WebDriver` library.
+Browser automation backend for Spire, built on
+[thirtyfour](https://github.com/stevepryde/thirtyfour) (WebDriver).
 
 ## Overview
 
-`spire-thirtyfour` provides a browser automation backend implementation for
-Spire built on top of the [thirtyfour](https://github.com/stevepryde/thirtyfour)
-`WebDriver` library.
+`BrowserBackend` keeps a pool of WebDriver sessions and hands one to every
+request. Fetching a request navigates to it and returns the rendered page
+source, so JavaScript-heavy pages scrape like any other. Through `Deref`, the
+session also exposes the full `WebDriver` API for clicking, scrolling and
+waiting on the page.
 
-The backend implements the `Backend` trait from `spire-core` and creates
-`BrowserConnection` instances that implement the `Client` trait for performing
-browser-based operations.
-
-## Features
-
-- **Built on thirtyfour**: Leverages the powerful thirtyfour `WebDriver` library
-- **Spire Integration**: Seamlessly integrates with the Spire web scraping
-  framework
-- **Browser Automation**: Control real browsers for JavaScript-heavy websites
-  and SPAs
-- **Async/Await**: Fully async implementation for concurrent browser operations
-- **TLS Support**: Choose between rustls (default) and native TLS
-  implementations
+- **Endpoints**: remote WebDriver servers (chromedriver, geckodriver, Selenium
+  grids), rotated between in turn, or drivers downloaded and spawned
+  automatically with the `manager` feature.
+- **Pooling**: sessions start on demand up to a limit and are reused; storage
+  and cookies are cleared between requests unless you keep them.
+- **Errors**: WebDriver failures map to `spire_core::ErrorKind`s, so timeouts
+  and navigation failures are retried while page bugs are not.
 
 ## Usage
 
-This crate is typically not used directly. Instead, enable the `thirtyfour`
-feature in the main `spire` crate and refer to the
-[spire documentation](https://docs.rs/spire) for usage examples and guides.
+Enable the `thirtyfour` feature of the main `spire` crate, or depend on this
+crate directly to use the backend with `spire-core`:
 
 ```toml
 [dependencies]
 spire = { version = "0.2.0", features = ["thirtyfour"] }
 ```
 
-### TLS Configuration
+```rust,no_run
+use std::time::Duration;
 
-By default, `spire-thirtyfour` uses rustls for TLS connections. You can choose
-between different TLS implementations:
+use spire_thirtyfour::BrowserBackend;
 
-```toml
-# Default: uses rustls
-[dependencies]
-spire-thirtyfour = "0.2.0"
+# async fn example() -> spire_core::Result<()> {
+let backend = BrowserBackend::builder()
+    .remote("http://localhost:4444")
+    .max_sessions(4)
+    .page_load_timeout(Duration::from_secs(20))
+    .build()?;
 
-# Explicitly use rustls
-[dependencies]
-spire-thirtyfour = { version = "0.2.0", features = ["rustls"], default-features = false }
-
-# Use native TLS (system TLS library)
-[dependencies]
-spire-thirtyfour = { version = "0.2.0", features = ["native-tls"], default-features = false }
+// Crawl with `spire::Crawler::new(backend.clone(), router)`, then quit the
+// sessions; sessions that are dropped instead block the runtime.
+backend.close().await;
+# Ok(())
+# }
 ```
 
-For advanced usage and custom configurations, see the
-[API documentation](https://docs.rs/spire-thirtyfour).
+Sessions start headless Chrome by default. Pass your own capabilities for
+another browser or for browser flags:
 
-## Prerequisites
+```rust
+use spire_thirtyfour::BrowserBackend;
+use spire_thirtyfour::thirtyfour::DesiredCapabilities;
 
-Browser automation requires a `WebDriver` server. For Chrome:
-
-```bash
-# ChromeDriver is automatically managed by thirtyfour
-# Ensure Chrome browser is installed and accessible
+let builder = BrowserBackend::builder()
+    .remote("http://localhost:4444")
+    .capabilities(DesiredCapabilities::firefox());
 ```
 
-For other browsers, see the
-[thirtyfour documentation](https://docs.rs/thirtyfour/) for setup instructions.
+## Features
 
-## Error Handling
+- **`rustls`** (default): TLS to the WebDriver server through rustls.
+- **`native-tls`**: TLS through the platform's native library.
+- **`manager`**: `BrowserBuilder::managed` downloads, caches and spawns the
+  driver for the browser in the capabilities. The browser itself must be
+  installed.
 
-All thirtyfour `WebDriver` errors are automatically converted to
-`spire_core::Error` types. This includes browser connection errors, element
-interaction failures, navigation timeouts, and JavaScript execution errors.
+## Limitations
 
-## Performance Considerations
-
-- Browser instances are resource-intensive compared to HTTP clients.
-- Connection pooling helps manage browser lifecycle and memory usage.
-- Consider configuring appropriate pool sizes based on available system
-  resources.
-- Browser startup time can be significant; pool warm-up strategies may improve
-  performance.
-- JavaScript execution and page rendering add latency compared to HTTP-only
-  scraping.
-- Consider headless mode for better performance when visual rendering is not
-  required.
+WebDriver cannot report the status or headers of a navigation, nor send
+custom request headers or bodies. Responses are always `200 OK` with an HTML
+content type, and only `GET` requests are supported. Use `spire-reqwest` for
+plain HTTP.
 
 ## Contributing
 

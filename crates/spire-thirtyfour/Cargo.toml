@@ -1,58 +1,53 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [package]
 name = "spire-thirtyfour"
+description = "Thirtyfour-based browser automation backend for Spire web scraping framework"
+readme = "./README.md"
+keywords = ["crawler", "scraper", "browser", "webdriver"]
+categories = ["asynchronous", "web-programming"]
+
 version = { workspace = true }
-edition = { workspace = true }
 rust-version = { workspace = true }
+edition = { workspace = true }
 license = { workspace = true }
 publish = { workspace = true }
-readme = "./README.md"
 
 authors = { workspace = true }
 repository = { workspace = true }
 homepage = { workspace = true }
 documentation = { workspace = true }
 
-description = "Thirtyfour-based browser automation backend for Spire web scraping framework"
-keywords = ["crawler", "scraper", "browser", "webdriver"]
-categories = ["asynchronous", "web-programming"]
-
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
+# Default feature set (rustls for TLS)
 default = ["rustls"]
+
+# TLS to the WebDriver server through rustls, with no system dependencies
 rustls = ["thirtyfour/rustls"]
+# TLS to the WebDriver server through the platform's native library
 native-tls = ["thirtyfour/native-tls"]
+
+# Managed endpoints: drivers are downloaded, cached and spawned automatically
+manager = ["thirtyfour/manager"]
 
 [dependencies]
 # Spire
 spire-core = { workspace = true, features = [] }
 
 # Browser automation
-thirtyfour = { workspace = true }
+thirtyfour = { workspace = true, features = [] }
 deadpool = { workspace = true, features = [] }
 
-# HTTP
-http = { workspace = true, features = [] }
-
-# Async runtime
-tokio = { workspace = true, features = ["time"] }
-
-# (De)serialization
-serde_json = { workspace = true, features = [] }
-
-# Derive macros
-thiserror = { workspace = true, features = [] }
-derive_builder = { workspace = true, features = [] }
-derive_more = { workspace = true, features = [] }
-
-# Utilities
-bytes = { workspace = true, features = [] }
+# Observability
+tracing = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
-tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["rt", "macros"] }
 
 [lints]
 workspace = true

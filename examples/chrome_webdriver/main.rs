@@ -18,11 +18,11 @@ mod data;
 use std::time::Duration;
 
 use data::PageData;
-use spire::context::RequestQueue;
-use spire::dataset::future::Data;
-use spire::dataset::{Dataset, DatasetBatchExt, InMemDataset};
+use spire::dataset::{Data, InMemDataset};
+use spire::extract::Html;
 use spire::extract::driver::View;
-use spire::{BrowserBackend, Client, Result, Router, http};
+use spire::frontier::Seed;
+use spire::{BrowserBackend, Crawler, Result, Router, http};
 
 /// Handler for processing pages that require browser rendering.
 ///
@@ -30,7 +30,12 @@ use spire::{BrowserBackend, Client, Result, Router, http};
 /// using `WebDriver` for JavaScript-heavy or dynamically rendered pages. It shows
 /// how to wait for page content to load, extract basic page information, and
 /// store structured data about browser-rendered pages.
-async fn scrape_browser_page(uri: http::Uri, data_store: Data<PageData>, view: View) -> Result<()> {
+async fn scrape_browser_page(
+    uri: http::Uri,
+    data_store: Data<PageData>,
+    view: View,
+    page: Html,
+) -> Result<()> {
     let url = uri.to_string();
     tracing::info!("Processing browser page: {}", url);
 
@@ -38,33 +43,22 @@ async fn scrape_browser_page(uri: http::Uri, data_store: Data<PageData>, view: V
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Extract page information using WebDriver
-    let title = view.title().await.map_err(|e| {
-        spire::Error::new(
-            spire::ErrorKind::Backend,
-            format!("Failed to get title: {e}"),
-        )
-    })?;
+    let title = view
+        .title()
+        .await
+        .map_err(|e| spire::Error::backend(format!("Failed to get title: {e}")))?;
 
-    let page_source = view.source().await.map_err(|e| {
-        spire::Error::new(
-            spire::ErrorKind::Backend,
-            format!("Failed to get page source: {e}"),
-        )
-    })?;
-
-    let current_url = view.current_url().await.map_err(|e| {
-        spire::Error::new(
-            spire::ErrorKind::Backend,
-            format!("Failed to get current URL: {e}"),
-        )
-    })?;
+    let current_url = view
+        .current_url()
+        .await
+        .map_err(|e| spire::Error::backend(format!("Failed to get current URL: {e}")))?;
 
     tracing::info!("Extracted title: {} from {}", title, current_url);
 
     let page_data = PageData::new(
         current_url.to_string(),
         title,
-        page_source.len(),
+        page.html().len(),
         "Browser".to_string(),
     );
 
@@ -81,6 +75,7 @@ async fn scrape_dynamic_content(
     uri: http::Uri,
     data_store: Data<PageData>,
     view: View,
+    page: Html,
 ) -> Result<()> {
     let url = uri.to_string();
     tracing::info!("Processing dynamic content page: {}", url);
@@ -88,33 +83,22 @@ async fn scrape_dynamic_content(
     // Wait longer for dynamic content to load
     tokio::time::sleep(Duration::from_secs(3)).await;
 
-    let title = view.title().await.map_err(|e| {
-        spire::Error::new(
-            spire::ErrorKind::Backend,
-            format!("Failed to get title: {e}"),
-        )
-    })?;
+    let title = view
+        .title()
+        .await
+        .map_err(|e| spire::Error::backend(format!("Failed to get title: {e}")))?;
 
-    let current_url = view.current_url().await.map_err(|e| {
-        spire::Error::new(
-            spire::ErrorKind::Backend,
-            format!("Failed to get current URL: {e}"),
-        )
-    })?;
-
-    let page_source = view.source().await.map_err(|e| {
-        spire::Error::new(
-            spire::ErrorKind::Backend,
-            format!("Failed to get page source: {e}"),
-        )
-    })?;
+    let current_url = view
+        .current_url()
+        .await
+        .map_err(|e| spire::Error::backend(format!("Failed to get current URL: {e}")))?;
 
     tracing::info!("Dynamic content loaded: {} from {}", title, current_url);
 
     let page_data = PageData::new(
         current_url.to_string(),
         title,
-        page_source.len(),
+        page.html().len(),
         "Dynamic Browser".to_string(),
     );
 
@@ -122,32 +106,22 @@ async fn scrape_dynamic_content(
     Ok(())
 }
 
-/// Creates and configures the browser client with `WebDriver` backend.
-fn create_browser_client() -> Result<Client<BrowserBackend>> {
+/// Creates the crawler with its `WebDriver` backend and initial requests.
+fn create_crawler() -> Result<Crawler<BrowserBackend>> {
     let browser_backend = BrowserBackend::builder()
-        .with_unmanaged("http://127.0.0.1:4444")
+        .remote("http://127.0.0.1:4444")
         .build()?;
 
     let router = Router::new()
         .route("browser_page", scrape_browser_page)
         .route("dynamic_content", scrape_dynamic_content);
 
-    Ok(Client::new(browser_backend, router)
-        .with_request_queue(InMemDataset::stack())
-        .with_dataset(InMemDataset::<PageData>::new()))
-}
+    let crawler = Crawler::new(browser_backend, router)
+        .with_dataset(InMemDataset::<PageData>::new())
+        .with_seed(Seed::get("https://httpbin.org/html")?.with_tag("browser_page"))
+        .with_seed(Seed::get("https://httpbin.org/delay/1")?.with_tag("dynamic_content"));
 
-/// Queues initial browser automation requests for processing.
-async fn queue_initial_requests(queue: &RequestQueue) -> Result<()> {
-    queue
-        .append_with_tag("browser_page", "https://httpbin.org/html")
-        .await?;
-
-    queue
-        .append_with_tag("dynamic_content", "https://httpbin.org/delay/1")
-        .await?;
-
-    Ok(())
+    Ok(crawler)
 }
 
 /// Displays the browser automation results from processed pages.
@@ -185,23 +159,21 @@ async fn main() -> Result<()> {
     tracing::info!("Ensure Chrome browser is installed and accessible");
     tracing::info!("WebDriver will attempt to connect to http://127.0.0.1:4444");
 
-    // Attempt to create browser client
-    match create_browser_client() {
-        Ok(client) => {
+    // Attempt to create the crawler
+    match create_crawler() {
+        Ok(crawler) => {
             tracing::info!("Browser backend initialized successfully");
 
-            // Queue initial requests
-            let queue = client.request_queue();
-            queue_initial_requests(&queue).await?;
-
             tracing::info!("Starting browser automation");
-
-            // Execute browser automation
-            client.run().await?;
+            let stats = crawler.run().await?;
+            tracing::info!(?stats, "Browser automation finished");
 
             // Display results
-            let dataset = client.dataset::<PageData>();
+            let dataset = crawler.dataset::<PageData>()?;
             display_results(&dataset).await?;
+
+            // Quit the browser sessions instead of dropping them.
+            crawler.backend().close().await;
 
             tracing::info!("Chrome WebDriver example completed successfully");
         }

@@ -15,7 +15,7 @@ path = "main.rs"
 
 [dependencies]
 # Async runtime and Spire framework
-spire = { workspace = true, features = ["thirtyfour", "tracing"] }
+spire = { workspace = true, features = ["thirtyfour"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 
 # Serialization and data types

@@ -16,70 +16,78 @@
 [coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
 [coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
-Core types and traits for the spire web scraping framework.
+The crawl engine behind [`spire`](https://crates.io/crates/spire): the
+crawler, its frontier, backends, workers and datasets.
 
 ## Overview
 
-`spire-core` provides the foundational abstractions and types used throughout
-the spire ecosystem. This crate contains the core traits, error types, context
-structures, and dataset interfaces that power spire's flexible architecture.
+- A [`Backend`] hands out a [`Client`] per request: an HTTP client, a pooled
+  browser session, or anything else that turns a request into a response.
+- A [`Worker`] handles each request and returns an [`Outcome`]: continue,
+  retry, back off, stop or fail.
+- The [`Frontier`] holds the [`Seed`]s waiting to be crawled. Facades add
+  deduplication, a depth limit, retries and per-tag backoff on top of any
+  storage.
+- The [`Crawler`] runs requests concurrently until the frontier is empty and
+  nothing is in flight.
 
-## Usage
-
-This crate is typically not used directly. Instead, use the main `spire` crate
-which re-exports these types:
-
-```toml
-[dependencies]
-spire = "0.2.0"
-```
-
-If you're implementing custom backends or extending spire's functionality, you
-may need to depend on `spire-core` directly:
-
-```toml
-[dependencies]
-spire-core = "0.2.0"
-```
+Crawls are bounded and polite: crawl scope (`allow_hosts`, `filter`), request
+and time budgets, per-request deadlines, per-host concurrency and delays, and
+robots.txt with the `robots` feature. With the `serde` feature, seeds are
+serializable, so a stopped crawl's frontier and seen set can be snapshotted
+and restored, and `JsonlDataset` writes results as JSON Lines.
 
 ## Feature Flags
 
-- **`tracing`** - Enables tracing support
-- **`metric`** - Enables metrics collection
+- **`robots`**: fetch and obey robots.txt with `Crawler::with_robots`.
+- **`serde`**: serializable `Seed` and `Fingerprint`, and `JsonlDataset`.
+
+Most users depend on `spire`, which adds a router, handlers and extractors on
+top of this crate. Depend on `spire-core` directly to implement a backend, a
+frontier or a dataset.
 
 ## Example
 
-Implementing a custom backend:
+```rust
+use spire_core::backend::Noop;
+use spire_core::frontier::{FrontierExt, InMemFrontier, Seed};
+use spire_core::worker::{Outcome, from_fn};
+use spire_core::{Context, Crawler, Result};
 
-```rust,ignore
-use spire_core::backend::{Backend, Client};
-use spire_core::context::{Request, Response};
-use spire_core::Result;
-
-#[derive(Clone)]
-struct MyBackend;
-
-#[async_trait::async_trait]
-impl Backend for MyBackend {
-    type Client = MyClient;
-    
-    async fn connect(&self) -> Result<Self::Client> {
-        Ok(MyClient)
+async fn handle(cx: Context<Noop>) -> Result<Outcome> {
+    let queue = cx.queue().clone();
+    let response = cx.fetch().await?;
+    if response.status().as_u16() == 429 {
+        return Ok(Outcome::backoff(std::time::Duration::from_secs(30)));
     }
+
+    queue.follow("https://example.com/next").await?;
+    Ok(Outcome::Continue)
 }
 
-struct MyClient;
+# async fn example() -> Result<()> {
+let frontier = InMemFrontier::fifo()
+    .dedup()
+    .max_depth(3)
+    .retry(3)
+    .tag_backoff();
 
-#[async_trait::async_trait]
-impl Client for MyClient {
-    async fn resolve(self, req: Request) -> Result<Response> {
-        // Custom request handling
-        todo!()
-    }
-}
+let stats = Crawler::new(Noop, from_fn(handle))
+    .with_frontier(frontier)
+    .with_concurrency(16)
+    .with_seed(Seed::get("https://example.com/")?)
+    .run()
+    .await?;
+
+println!("crawled {} requests in {:?}", stats.requests, stats.elapsed);
+# Ok(())
+# }
 ```
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE)
-file for details.
+[`Backend`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Backend.html
+[`Client`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Client.html
+[`Worker`]: https://docs.rs/spire-core/latest/spire_core/worker/trait.Worker.html
+[`Outcome`]: https://docs.rs/spire-core/latest/spire_core/worker/enum.Outcome.html
+[`Frontier`]: https://docs.rs/spire-core/latest/spire_core/frontier/trait.Frontier.html
+[`Seed`]: https://docs.rs/spire-core/latest/spire_core/frontier/struct.Seed.html
+[`Crawler`]: https://docs.rs/spire-core/latest/spire_core/struct.Crawler.html

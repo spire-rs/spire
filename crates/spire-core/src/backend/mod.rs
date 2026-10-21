@@ -1,80 +1,38 @@
-//! Core traits and utilities for data retrieval backends.
+//! Backends and the clients they hand out.
 //!
-//! This module provides the foundational traits for implementing backends and clients
-//! in the Spire web scraping framework.
-//!
-//! # Core Traits
-//!
-//! - [`Backend`] - Creates and manages client instances
-//! - [`Client`] - Fetches responses for HTTP requests
-//! - [`Worker`] - Processes contexts and returns flow control
-//!
-//! # Concrete Implementations
-//!
-//! Concrete backend implementations are provided in separate crates:
-//!
-//! - `spire-reqwest` - HTTP client backend using Reqwest/Tower
-//! - `spire-thirtyfour` - `WebDriver` browser automation backend
-//!
-//! # Utilities
-//!
-//! - [`Trace`] - Tracing middleware for backends, clients, and workers
-//! - [`Metric`] - Metrics collection middleware for workers
-//! - [`Noop`] - No-op implementations for testing and debugging
-//!
-//! [`Trace`]: utils::Trace
-//! [`Metric`]: utils::Metric
-//! [`Noop`]: utils::Noop
+//! A [`Backend`] is shared by the whole crawl and hands out one [`Client`]
+//! per request: an HTTP client, a pooled browser session, or anything else
+//! that turns a [`Request`] into a [`Response`].
 
-use tower::{Service, ServiceExt};
+mod noop;
 
-use crate::{Error, Result};
+use std::future::Future;
 
-mod client;
-pub mod utils;
-mod worker;
+pub use noop::Noop;
 
-pub use client::Client;
-pub use worker::Worker;
+use crate::Result;
+use crate::request::{Request, Response};
 
-/// Core trait for creating client instances.
-///
-/// A `Backend` is responsible for managing and providing [`Client`] instances
-/// that can fetch HTTP responses. It is automatically implemented for cloneable
-/// Tower services that return clients.
-///
-/// # Examples
-///
-/// ```no_run
-/// use spire_core::backend::Backend;
-///
-/// async fn use_backend<B: Backend>(backend: B) {
-///     let client = backend.connect().await.unwrap();
-///     // Use the client to fetch responses
-/// }
-/// ```
-#[async_trait::async_trait]
-pub trait Backend: Clone + Send + Sized + 'static {
-    /// Associated client type.
+/// Hands out a [`Client`] for every request of a crawl.
+pub trait Backend: Send + Sync + 'static {
+    /// The client used to fetch a single request.
     type Client: Client;
 
-    /// Returns a [`Self::Client`] from the backend.
-    async fn connect(&self) -> Result<Self::Client>;
+    /// Returns a client for the next request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no client can be created, e.g. when a pool is
+    /// exhausted or a browser fails to start.
+    fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send;
 }
 
-#[async_trait::async_trait]
-impl<S, T> Backend for S
-where
-    S: Service<(), Response = T, Error = Error> + Clone + Send + Sync + 'static,
-    S::Future: Send + 'static,
-    T: Client,
-{
-    type Client = T;
-
-    #[inline]
-    async fn connect(&self) -> Result<Self::Client> {
-        let mut copy = self.clone();
-        let ready = copy.ready().await?;
-        ready.call(()).await
-    }
+/// Fetches the [`Response`] for a single [`Request`].
+pub trait Client: Send + 'static {
+    /// Fetches the response for the request, consuming the client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent or the transfer fails.
+    fn fetch(self, request: Request) -> impl Future<Output = Result<Response>> + Send;
 }

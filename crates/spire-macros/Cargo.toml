@@ -2,21 +2,21 @@
 
 [package]
 name = "spire-macros"
+description = "Procedural macros for Spire web scraping framework"
+readme = "./README.md"
+keywords = ["crawler", "scraper", "web", "framework"]
+categories = ["asynchronous", "web-programming"]
+
 version = { workspace = true }
-edition = { workspace = true }
 rust-version = { workspace = true }
+edition = { workspace = true }
 license = { workspace = true }
 publish = { workspace = true }
-readme = "./README.md"
 
 authors = { workspace = true }
 repository = { workspace = true }
 homepage = { workspace = true }
 documentation = { workspace = true }
-
-categories = ["asynchronous", "web-programming"]
-keywords = ["crawler", "scraper", "web", "framework"]
-description = "Procedural macros for Spire web scraping framework"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -27,6 +27,8 @@ proc-macro = true
 path = "src/lib.rs"
 
 [dependencies]
+# Proc macros
+proc-macro2 = { workspace = true, features = [] }
 syn = { workspace = true, features = [] }
 quote = { workspace = true, features = [] }
 

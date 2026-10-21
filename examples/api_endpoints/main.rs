@@ -14,11 +14,10 @@ use std::collections::HashMap;
 
 use data::{ApiMetadata, User};
 use serde_json::Value;
-use spire::context::RequestQueue;
-use spire::dataset::future::Data;
-use spire::dataset::{Dataset, DatasetBatchExt, InMemDataset};
+use spire::dataset::{Data, InMemDataset};
 use spire::extract::{Json, Text};
-use spire::{Client, HttpClient, Result, Router, http};
+use spire::frontier::{FrontierExt, InMemFrontier, Queue, Seed};
+use spire::{Crawler, HttpClient, Result, Router, http};
 
 /// Handler for processing structured JSON API responses.
 ///
@@ -59,13 +58,8 @@ async fn process_dynamic_json(
     let url = uri.to_string();
     tracing::info!("Processing dynamic JSON from: {}", url);
 
-    let json_string = serde_json::to_string(&data).map_err(|e| {
-        spire::Error::with_source(
-            spire::ErrorKind::Context,
-            "failed to serialize JSON",
-            Box::new(e),
-        )
-    })?;
+    let json_string = serde_json::to_string(&data)
+        .map_err(|e| spire::Error::worker("failed to serialize JSON").with_source(e))?;
 
     let fields_count = count_json_fields(&data);
 
@@ -138,7 +132,7 @@ async fn process_text_content(
 /// automated API exploration and link following.
 async fn process_json_with_discovery(
     uri: http::Uri,
-    queue: RequestQueue,
+    queue: Queue,
     data_store: Data<String>,
     Json(data): Json<HashMap<String, Value>>,
 ) -> Result<()> {
@@ -161,7 +155,9 @@ async fn process_json_with_discovery(
             && link_url.starts_with("http")
             && discovered_endpoints < 2
         {
-            queue.append_with_tag("dynamic_json", link_url).await?;
+            queue
+                .follow(Seed::get(link_url)?.with_tag("dynamic_json"))
+                .await?;
             discovered_endpoints += 1;
             tracing::info!("Discovered endpoint: {}", link_url);
         }
@@ -219,8 +215,8 @@ async fn process_standard_json(
     Ok(())
 }
 
-/// Creates and configures the HTTP client with JSON processing routes.
-fn create_client() -> Client<HttpClient> {
+/// Creates the crawler with its JSON processing routes and initial requests.
+fn create_crawler() -> Result<Crawler<HttpClient>> {
     let router = Router::new()
         .route("structured_json", process_structured_json)
         .route("dynamic_json", process_dynamic_json)
@@ -228,42 +224,32 @@ fn create_client() -> Client<HttpClient> {
         .route("json_discovery", process_json_with_discovery)
         .route("standard_json", process_standard_json);
 
-    Client::new(HttpClient::default(), router)
-        .with_request_queue(InMemDataset::stack())
+    // The same endpoint is seeded twice under different tags, so the frontier
+    // retries but does not deduplicate.
+    let seeds = [
+        ("standard_json", "https://httpbin.org/json"),
+        ("dynamic_json", "https://httpbin.org/uuid"),
+        ("text_content", "https://httpbin.org/robots.txt"),
+        ("structured_json", "https://httpbin.org/json"),
+    ]
+    .into_iter()
+    .map(|(tag, url)| Seed::get(url).map(|seed| seed.with_tag(tag)))
+    .collect::<Result<Vec<_>>>()?;
+
+    let crawler = Crawler::new(HttpClient::default(), router)
+        .with_frontier(InMemFrontier::fifo().retry(2))
         .with_dataset(InMemDataset::<User>::new())
         .with_dataset(InMemDataset::<ApiMetadata>::new())
         .with_dataset(InMemDataset::<String>::new())
-}
+        .with_seeds(seeds);
 
-/// Queues initial API requests for processing.
-async fn queue_initial_requests(queue: &RequestQueue) -> Result<()> {
-    // JSON API with structured data
-    queue
-        .append_with_tag("standard_json", "https://httpbin.org/json")
-        .await?;
-
-    // UUID endpoint for dynamic processing
-    queue
-        .append_with_tag("dynamic_json", "https://httpbin.org/uuid")
-        .await?;
-
-    // Text content for mixed processing
-    queue
-        .append_with_tag("text_content", "https://httpbin.org/robots.txt")
-        .await?;
-
-    // Another JSON endpoint for user data
-    queue
-        .append_with_tag("structured_json", "https://httpbin.org/json")
-        .await?;
-
-    Ok(())
+    Ok(crawler)
 }
 
 /// Displays the processing results from all datasets.
-async fn display_results(client: &Client<HttpClient>) -> Result<()> {
+async fn display_results(crawler: &Crawler<HttpClient>) -> Result<()> {
     // Display users
-    let user_dataset = client.dataset::<User>();
+    let user_dataset = crawler.dataset::<User>()?;
     let users = user_dataset.read_all().await?;
     tracing::info!("Processed {} users:", users.len());
     for user in users {
@@ -271,7 +257,7 @@ async fn display_results(client: &Client<HttpClient>) -> Result<()> {
     }
 
     // Display API metadata
-    let metadata_dataset = client.dataset::<ApiMetadata>();
+    let metadata_dataset = crawler.dataset::<ApiMetadata>()?;
     let metadata = metadata_dataset.read_all().await?;
     tracing::info!("Collected metadata from {} APIs:", metadata.len());
     for meta in metadata {
@@ -284,7 +270,7 @@ async fn display_results(client: &Client<HttpClient>) -> Result<()> {
     }
 
     // Display text processing results
-    let string_dataset = client.dataset::<String>();
+    let string_dataset = crawler.dataset::<String>()?;
     let strings = string_dataset.read_all().await?;
     tracing::info!("Collected {} processing results", strings.len());
     for (i, entry) in strings.iter().enumerate() {
@@ -322,20 +308,13 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting Spire API Endpoints Example");
 
-    // Create client and router
-    let client = create_client();
-
-    // Queue initial API requests
-    let queue = client.request_queue();
-    queue_initial_requests(&queue).await?;
+    let crawler = create_crawler()?;
 
     tracing::info!("Starting JSON API processing");
+    let stats = crawler.run().await?;
+    tracing::info!(?stats, "JSON API processing finished");
 
-    // Execute the API processing
-    client.run().await?;
-
-    // Display results
-    display_results(&client).await?;
+    display_results(&crawler).await?;
 
     tracing::info!("API endpoints example completed successfully");
     Ok(())

@@ -2,62 +2,69 @@
 
 [package]
 name = "spire-core"
+description = "Core types and traits for Spire web scraping framework"
+readme = "./README.md"
+keywords = ["crawler", "scraper", "web", "framework"]
+categories = ["asynchronous", "web-programming"]
+
 version = { workspace = true }
-edition = { workspace = true }
 rust-version = { workspace = true }
+edition = { workspace = true }
 license = { workspace = true }
 publish = { workspace = true }
-readme = "./README.md"
 
 authors = { workspace = true }
 repository = { workspace = true }
 homepage = { workspace = true }
 documentation = { workspace = true }
 
-categories = ["asynchronous", "web-programming"]
-keywords = ["crawler", "scraper", "web", "framework"]
-description = "Core types and traits for Spire web scraping framework"
-
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
+# Default feature set (none for minimal dependencies)
 default = []
-full = ["tracing", "metric"]
 
-# Observability
-tracing = ["dep:tracing"]
-metric = ["tower/load"]
+# Fetching and obeying robots.txt, see `Crawler::with_robots`
+robots = ["dep:robotxt"]
+# Serializable seeds and fingerprints for snapshots, and `JsonlDataset`
+serde = ["dep:serde", "dep:serde_json", "tokio/fs", "tokio/io-util", "tokio/sync"]
 
 [dependencies]
+# Async runtime
+tokio = { workspace = true, features = ["rt", "time", "macros"] }
+tokio-util = { workspace = true, features = [] }
+futures = { workspace = true, features = [] }
+
 # Tower ecosystem
 tower = { workspace = true, features = [] }
-
-# Async
-futures = { workspace = true, features = [] }
-async-trait = { workspace = true, features = [] }
-tokio = { workspace = true, features = ["rt", "sync"] }
-tokio-util = { workspace = true, features = [] }
 
 # HTTP
 http = { workspace = true, features = [] }
 http-body = { workspace = true, features = [] }
 http-body-util = { workspace = true, features = [] }
 
-# Utilities
+# Derive macros & utilities
 bytes = { workspace = true, features = [] }
-pin-project-lite = { workspace = true, features = [] }
 thiserror = { workspace = true, features = [] }
-derive_more = { workspace = true, features = ["full"] }
 
-# Optional: Observability
-tracing = { workspace = true, optional = true, features = [] }
+# Primitive datatypes
+url = { workspace = true, features = [] }
+
+# (De)serialization
+serde = { workspace = true, optional = true, features = ["derive"] }
+serde_json = { workspace = true, optional = true, features = [] }
+
+# Politeness
+robotxt = { workspace = true, optional = true, features = [] }
+
+# Observability
+tracing = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
-tokio = { workspace = true, features = ["rt", "macros", "time"] }
-tracing-test = { workspace = true, features = [] }
+tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
 
 [lints]
 workspace = true

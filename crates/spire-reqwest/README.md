@@ -29,9 +29,8 @@ of the popular [reqwest](https://github.com/seanmonstar/reqwest) library. This
 backend enables high-performance HTTP-based web scraping with support for
 cookies, headers, redirects, and other HTTP features.
 
-The backend implements the `Backend` trait from `spire-core` and creates
-`HttpConnection` instances that implement the `Client` trait for performing HTTP
-requests.
+`HttpClient` implements both the `Backend` and `Client` traits from
+`spire-core`: every request of a crawl shares one connection pool.
 
 ## Features
 
@@ -53,24 +52,27 @@ in the main `spire` crate and refer to the
 spire = { version = "0.2.0", features = ["reqwest"] }
 ```
 
-### TLS Configuration
+### Features
 
-By default, `spire-reqwest` uses rustls for TLS connections. You can choose
-between different TLS implementations:
+TLS through rustls, HTTP/2 and system proxies are on by default. Everything else is opt-in:
 
 ```toml
-# Default: uses rustls
 [dependencies]
-spire-reqwest = "0.2.0"
+spire-reqwest = { version = "0.2.0", features = ["gzip", "brotli", "cookies"] }
 
-# Explicitly use rustls
-[dependencies]
-spire-reqwest = { version = "0.2.0", features = ["rustls"], default-features = false }
-
-# Use native TLS (system TLS library)
-[dependencies]
-spire-reqwest = { version = "0.2.0", features = ["native-tls"], default-features = false }
+# Native TLS instead of rustls
+spire-reqwest = { version = "0.2.0", default-features = false, features = ["native-tls", "http2"] }
 ```
+
+| Feature | Enables |
+|---|---|
+| `rustls` (default), `native-tls` | TLS implementation |
+| `http2` (default) | HTTP/2 negotiation |
+| `system-proxy` (default) | Proxies from the environment and system settings |
+| `gzip`, `brotli`, `zstd`, `deflate` | Transparent response decompression |
+| `cookies` | A cookie store shared by the whole crawl |
+| `socks` | SOCKS5 proxies |
+| `hickory-dns` | DNS through hickory instead of the system resolver |
 
 For advanced usage and custom configurations, see the
 [API documentation](https://docs.rs/spire-reqwest).
@@ -89,29 +91,45 @@ let reqwest_client = reqwest::Client::builder()
     .build()
     .unwrap();
 
-let backend = HttpClient::from_client(reqwest_client);
+let backend = HttpClient::from(reqwest_client);
 ```
 
-### Creating from Tower Service
+### Composing with Tower
+
+`HttpClient` is a `tower::Service`, so middleware composes with it and
+`ServiceClient` turns the result back into a spire `Client`:
 
 ```rust
-use spire_reqwest::{HttpClient, HttpService, client_to_service};
+use spire_core::service::ServiceClient;
+use spire_reqwest::HttpClient;
 
-let reqwest_client = reqwest::Client::new();
-let service: HttpService = client_to_service(reqwest_client);
-let backend = HttpClient::from_service(service);
+let client = ServiceClient(tower::ServiceBuilder::new().service(HttpClient::new()));
 ```
 
 ## Error Handling
 
-All reqwest errors are automatically converted to `spire_core::Error` types.
-This includes network errors, HTTP errors, and parsing errors.
+Failed transfers are classified so the crawler retries only what may succeed
+next time: timeouts and connection errors are retried, invalid requests and
+redirect loops are not.
+
+Error statuses follow the client's `StatusPolicy`. By default, `408`, `429`
+and `5xx` become retryable errors, with `429` and `503` pausing the request's
+tag for as long as `Retry-After` asks, and other `4xx` become errors that are
+not retried. `StatusPolicy::Accept` returns every response to the handler
+instead:
+
+```rust
+use spire_reqwest::{HttpClient, StatusPolicy};
+
+let backend = HttpClient::new().with_status_policy(StatusPolicy::Accept);
+```
+
+Responses record the URL they were served from after redirects, available
+through `spire_core::request::ResponseExt::final_uri`.
 
 ## Performance Considerations
 
 - The reqwest client maintains connection pools automatically.
-- Multiple `HttpConnection` instances can share the same underlying reqwest
-  client.
 - Cookies and session state are maintained per reqwest client instance.
 - Consider reusing `HttpClient` instances when possible to benefit from
   connection pooling.

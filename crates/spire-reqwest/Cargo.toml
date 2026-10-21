@@ -1,46 +1,72 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [package]
 name = "spire-reqwest"
+description = "Reqwest-based HTTP client backend for Spire web scraping framework"
+readme = "./README.md"
+keywords = ["crawler", "scraper", "web", "reqwest"]
+categories = ["asynchronous", "web-programming"]
+
 version = { workspace = true }
-edition = { workspace = true }
 rust-version = { workspace = true }
+edition = { workspace = true }
 license = { workspace = true }
 publish = { workspace = true }
-readme = "./README.md"
 
 authors = { workspace = true }
 repository = { workspace = true }
 homepage = { workspace = true }
 documentation = { workspace = true }
 
-description = "Reqwest-based HTTP client backend for Spire web scraping framework"
-keywords = ["crawler", "scraper", "web", "reqwest"]
-categories = ["asynchronous", "web-programming"]
-
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["rustls"]
+# Default feature set: rustls, HTTP/2 and system proxies
+default = ["rustls", "http2", "system-proxy"]
+
+# TLS through rustls, with no system dependencies
 rustls = ["reqwest/rustls"]
+# TLS through the platform's native library (OpenSSL, Secure Transport, SChannel)
 native-tls = ["reqwest/native-tls"]
+
+# HTTP/2 negotiation over TLS
+http2 = ["reqwest/http2"]
+# Proxies from the environment and system settings
+system-proxy = ["reqwest/system-proxy"]
+
+# Transparent response decompression
+gzip = ["reqwest/gzip"]
+brotli = ["reqwest/brotli"]
+zstd = ["reqwest/zstd"]
+deflate = ["reqwest/deflate"]
+
+# A cookie store shared by every request of the crawl
+cookies = ["reqwest/cookies"]
+# SOCKS5 proxies
+socks = ["reqwest/socks"]
+# DNS resolution through hickory instead of the system resolver
+hickory-dns = ["reqwest/hickory-dns"]
 
 [dependencies]
 # Spire
 spire-core = { workspace = true, features = [] }
+
+# Async runtime
+futures = { workspace = true, features = [] }
 
 # Tower ecosystem
 tower = { workspace = true, features = [] }
 
 # HTTP client
 reqwest = { workspace = true, features = [] }
-
-# Utilities
-bytes = { workspace = true, features = [] }
+httpdate = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
 tokio = { workspace = true, features = ["rt", "macros"] }
+bytes = { workspace = true, features = [] }
 http-body-util = { workspace = true, features = [] }
 
 [lints]

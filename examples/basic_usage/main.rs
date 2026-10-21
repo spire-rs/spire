@@ -9,27 +9,23 @@
 mod data;
 
 use data::PageContent;
-use spire::context::RequestQueue;
-use spire::dataset::future::Data;
-use spire::dataset::{Dataset, DatasetBatchExt, InMemDataset};
+use spire::dataset::{Data, InMemDataset};
 use spire::extract::{Html, Text};
-use spire::{Client, HttpClient, Result, Router, http};
+use spire::frontier::{FrontierExt, InMemFrontier, Seed};
+use spire::{Crawler, HttpClient, Result, Router, http};
 
 /// Handler for processing HTML pages.
 ///
 /// This handler demonstrates how to extract HTML content from responses and
 /// store basic page data in custom datasets.
-async fn scrape_html_page(
-    uri: http::Uri,
-    data_store: Data<PageContent>,
-    Html(document): Html,
-) -> Result<()> {
+async fn scrape_html_page(uri: http::Uri, data_store: Data<PageContent>, page: Html) -> Result<()> {
     let url = uri.to_string();
     tracing::info!("Processing HTML page: {}", url);
 
-    let content_length = document.len();
-    let page_content = PageContent::new(url, "text/html".to_string(), content_length)
-        .with_title("HTML Page".to_string());
+    let content_length = page.html().len();
+    let title = page.title().unwrap_or_else(|| "HTML Page".to_string());
+    let page_content =
+        PageContent::new(url, "text/html".to_string(), content_length).with_title(title);
 
     data_store.write(page_content).await?;
     Ok(())
@@ -72,28 +68,19 @@ async fn scrape_text_content(
     Ok(())
 }
 
-/// Creates and configures the client
-fn create_client() -> Client<HttpClient> {
+/// Creates and configures the crawler with its initial requests.
+fn create_crawler() -> Result<Crawler<HttpClient>> {
     let router = Router::new()
         .route("text_content", scrape_text_content)
         .route("html_page", scrape_html_page);
 
-    Client::new(HttpClient::default(), router)
-        .with_request_queue(InMemDataset::stack())
+    let crawler = Crawler::new(HttpClient::default(), router)
+        .with_frontier(InMemFrontier::fifo().dedup().retry(2))
         .with_dataset(InMemDataset::<PageContent>::new())
-}
+        .with_seed(Seed::get("https://httpbin.org/html")?.with_tag("html_page"))
+        .with_seed(Seed::get("https://httpbin.org/robots.txt")?.with_tag("text_content"));
 
-/// Queues initial requests
-async fn queue_initial_requests(queue: &RequestQueue) -> Result<()> {
-    queue
-        .append_with_tag("html_page", "https://httpbin.org/html")
-        .await?;
-
-    queue
-        .append_with_tag("text_content", "https://httpbin.org/robots.txt")
-        .await?;
-
-    Ok(())
+    Ok(crawler)
 }
 
 /// Displays the scraping results
@@ -134,20 +121,14 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting Spire Basic Usage Example");
 
-    // Create router and client
-    let client = create_client();
-
-    // Queue initial requests
-    let queue = client.request_queue();
-    queue_initial_requests(&queue).await?;
+    let crawler = create_crawler()?;
 
     tracing::info!("Starting scraping process");
-
-    // Execute the scraping process
-    client.run().await?;
+    let stats = crawler.run().await?;
+    tracing::info!(?stats, "Scraping process finished");
 
     // Display results
-    let dataset = client.dataset::<PageContent>();
+    let dataset = crawler.dataset::<PageContent>()?;
     display_results(&dataset).await?;
 
     tracing::info!("Basic usage example completed successfully");

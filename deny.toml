@@ -43,6 +43,10 @@ allow = [
     "Unlicense",
     "CC0-1.0",
     "Zlib",
+    # Weak copyleft; pulled in transitively by scraper's CSS selector engine
+    # (cssparser, selectors). File-level copyleft only — using these crates
+    # as-is does not affect our source.
+    "MPL-2.0",
 ]
 
 # For compound licenses, we'll be permissive and only block if they contain denied licenses

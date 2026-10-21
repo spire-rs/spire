@@ -26,38 +26,43 @@ using the `macros` feature flag in the main `spire` crate.
 
 ## Macros
 
-### `Select` Derive Macro
+### `Select`
 
-The `Select` derive macro generates implementations of the `Select` trait,
-allowing you to declaratively extract structured data from HTML:
+Derives `spire::extract::Select`, turning CSS selectors on the fields of a
+struct into extraction from HTML:
 
 ```rust,ignore
-use spire::extract::Select;
+use spire::extract::{Elements, Select};
 
 #[derive(Debug, Select)]
+#[select("article.product")]
 struct Product {
-    #[select(css = "h1.title")]
+    #[select("h2")]
     name: String,
-    
-    #[select(css = ".price", attr = "data-price")]
-    price: f64,
-    
-    #[select(css = ".description")]
-    description: String,
+    #[select(".price")]
+    price: Option<f64>,
+    #[select("a.tag")]
+    tags: Vec<String>,
+    #[select("a.more", attr = "href")]
+    link: String,
 }
-```
 
-This enables type-safe extraction in your handlers:
-
-```rust,ignore
-use spire::extract::Elements;
-
-async fn handler(Elements(products): Elements<Vec<Product>>) {
+async fn handler(Elements(products): Elements<Product>) {
     for product in products {
-        println!("{}: ${}", product.name, product.price);
+        println!("{}: {:?}", product.name, product.price);
     }
 }
 ```
+
+- The container's `#[select("...")]` is optional: each match becomes one
+  value. Without it, the whole document is one value.
+- Every field needs `#[select("css")]`, `#[select("css", attr = "name")]`,
+  or `#[select(attr = "name")]` for an attribute of the matched element
+  itself.
+- The field type decides how many matches it takes: `Option<T>` the first if
+  any, `Vec<T>` all of them, any other `T` exactly the first. Values are the
+  element's text, trimmed with whitespace collapsed, or the attribute, parsed
+  with `FromStr`.
 
 ## Usage
 
@@ -69,19 +74,10 @@ in the main `spire` crate:
 spire = { version = "0.2.0", features = ["macros"] }
 ```
 
-The macros will then be available through the `spire` prelude:
-
-```rust,ignore
-use spire::prelude::*;
-use spire::extract::Select;
-
-#[derive(Select)]
-struct MyData {
-    // ...
-}
-```
+The derive is then available as `spire::extract::Select`, next to the trait
+of the same name.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE)
-file for details.
+This project is licensed under the MIT License - see the
+[LICENSE](../../LICENSE.txt) file for details.

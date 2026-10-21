@@ -15,7 +15,7 @@ path = "main.rs"
 
 [dependencies]
 # Async runtime and Spire framework
-spire = { workspace = true, features = ["reqwest", "tracing", "macros"] }
+spire = { workspace = true, features = ["reqwest", "macros"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 
 # Serialization
