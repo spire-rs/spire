@@ -1,7 +1,7 @@
 //! Browser automation: rendering pages in Chrome over WebDriver.
 //!
 //! `View` navigates the browser and hands the handler its session; the page
-//! is read with `view.html()` once the handler is done interacting, so it
+//! is parsed with `view.snapshot()` once the handler is done interacting, so it
 //! includes whatever scripts rendered. Links are followed as with any other
 //! backend.
 //!
@@ -49,7 +49,7 @@ async fn rendered(queue: Queue, data: Data<Rendered>, view: View) -> Result<()> 
         .await
         .map_err(|error| Error::backend("failed to read the url").with_source(error))?;
 
-    let page = view.html().await?;
+    let page = view.snapshot().await?;
     let links = page.links();
     data.write(Rendered {
         url: url.to_string(),

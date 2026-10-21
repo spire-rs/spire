@@ -30,6 +30,13 @@ fmt: ## Fixes code formatting.
 	@cargo +nightly fmt --all
 	@$(call log,Formatting fixed!)
 
+# Benchmarks
+.PHONY: bench
+bench: ## Runs the criterion benchmarks; pass flags with ARGS, e.g. ARGS=crawler.
+	@$(call log,Running benchmarks...)
+	@cargo bench --workspace --all-features --bench '*' -- $(ARGS)
+	@$(call log,Reports are in target/criterion.)
+
 # Security Commands (mirror GitHub Actions)
 .PHONY: security
 security: ## Runs security checks locally (cargo deny).

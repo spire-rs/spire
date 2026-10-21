@@ -48,20 +48,20 @@ use spire_core::worker::from_fn;
 use spire_core::{Context, Crawler};
 use spire_redb::RedbStore;
 
-# async fn example() -> spire_core::Result<()> {
-let store = RedbStore::open("crawl.redb").await?;
-let frontier = store.frontier().dedup_with(store.seen()).retry(3);
+async fn example() -> spire_core::Result<()> {
+    let store = RedbStore::open("crawl.redb").await?;
+    let frontier = store.frontier().dedup_with(store.seen()).retry(3);
 
-let worker = from_fn(|_: Context<Noop>| async {});
-let crawler = Crawler::new(Noop, worker)
-    .with_frontier(frontier)
-    .with_seed(Seed::get("https://example.com/")?);
+    let worker = from_fn(|_: Context<Noop>| async {});
+    let crawler = Crawler::new(Noop, worker)
+        .with_frontier(frontier)
+        .with_seed(Seed::get("https://example.com/")?);
 
-// After a crash, opening the same file resumes where the crawl stopped;
-// seeds pushed again are refused as already seen.
-crawler.run().await?;
-# Ok(())
-# }
+    // After a crash, opening the same file resumes where the crawl stopped;
+    // seeds pushed again are refused as already seen.
+    crawler.run().await?;
+    Ok(())
+}
 ```
 
 ## Contributing

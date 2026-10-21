@@ -17,6 +17,11 @@ authors = { workspace = true }
 repository = { workspace = true }
 documentation = { workspace = true }
 
+[lib]
+# Only the criterion benches run with `cargo bench`, not the lib harness,
+# which would reject criterion's flags
+bench = false
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
@@ -38,8 +43,15 @@ serde_json = { workspace = true, features = [] }
 tracing = { workspace = true, features = [] }
 
 [dev-dependencies]
+# Benchmarking
+criterion = { workspace = true, features = [] }
+
 # Testing
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync"] }
+
+[[bench]]
+name = "redb"
+harness = false
 
 [lints]
 workspace = true

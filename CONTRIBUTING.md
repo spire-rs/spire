@@ -94,6 +94,29 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
   cargo test --workspace --no-default-features
   ```
 
+### Benchmarks
+
+The criterion benchmarks in each crate's `benches/` measure the hot paths:
+the crawler's own overhead, frontiers, seeds and seen sets, the redb store,
+routing, HTML extraction and sitemap parsing. Run them all, or filter by
+name:
+
+```bash
+make bench
+make bench ARGS=frontier
+```
+
+To check a change for regressions, save a baseline on `main` and compare
+your branch against it:
+
+```bash
+make bench ARGS="--save-baseline main"
+make bench ARGS="--baseline main"
+```
+
+CI compiles the benchmarks but does not run them: timings on shared runners
+are too noisy to gate a merge. Reports are written to `target/criterion`.
+
 ## Code Style
 
 This project follows the standard Rust style guidelines:

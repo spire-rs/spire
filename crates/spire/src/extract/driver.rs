@@ -16,9 +16,10 @@ use crate::{Context, Error, Result};
 /// hands over the browser, to interact with the page.
 ///
 /// Through [`Deref`], `View` exposes the full [`WebDriver`] API, pointed at
-/// the request's tab. [`html`](Self::html) reads the page as currently
+/// the request's tab, to query and interact with the live page.
+/// [`snapshot`](Self::snapshot) parses a copy of the page as currently
 /// rendered, including what scripts and interaction changed since it
-/// loaded; an [`Html`] argument reads it too, but before the handler runs.
+/// loaded; an [`Html`] argument takes one too, but before the handler runs.
 /// Relative links followed through the queue resolve against the URI the
 /// browser ended up on.
 ///
@@ -37,7 +38,7 @@ use crate::{Context, Error, Result};
 ///     if let Ok(more) = view.find(By::Css("button.more")).await {
 ///         let _ = more.click().await;
 ///     }
-///     let page = view.html().await?;
+///     let page = view.snapshot().await?;
 ///     queue.follow_all(page.links()).await?;
 ///     Ok(())
 /// }
@@ -68,14 +69,17 @@ impl View {
         self.driver.clone()
     }
 
-    /// Parses the page as currently rendered.
+    /// Parses a copy of the page as currently rendered, to search it
+    /// locally, e.g. with [`Html::select`]. It does not change with the page:
+    /// take another after interacting. Use `find` to query
+    /// the live page instead.
     ///
     /// # Errors
     ///
     /// Returns an error if the browser cannot be reached.
     #[cfg(feature = "html")]
     #[cfg_attr(docsrs, doc(cfg(feature = "html")))]
-    pub async fn html(&self) -> Result<Html> {
+    pub async fn snapshot(&self) -> Result<Html> {
         let source =
             self.driver.source().await.map_err(|error| {
                 Error::backend("failed to read the page source").with_source(error)

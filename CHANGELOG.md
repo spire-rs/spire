@@ -19,6 +19,9 @@ and this project adheres to
 - `spire`: a tuple of up to 4 handlers is a handler: they run in turn on the
   same page, fetched once, and stop at the first outcome other than
   `Outcome::Continue`.
+- Criterion benchmarks of the hot paths, run with `make bench`: the
+  crawler's overhead, frontiers, seeds, seen sets, the redb store, routing,
+  HTML extraction and sitemap parsing.
 - `spire`: the `FollowLinks` handler follows a page's links with a tag,
   optionally only those matching a CSS selector, and `Collect<T>` stores
   every `T` of a page in its dataset (`html` feature).
@@ -35,9 +38,14 @@ and this project adheres to
   (`Context::body`), so a browser page reads as currently rendered.
 - **Breaking:** `Request` and `Response` carry `Bytes`; the streaming `Body`
   type is removed.
+- **Breaking:** `View::html` is `View::snapshot`, to tell the parsed copy
+  apart from the browser's own live queries such as `find`.
 - **Breaking:** `HttpClient` hands out an `HttpSession` per request.
   `BrowserSession::navigate` and `Navigation` are removed: fetching
   navigates, and `View` reads the status and headers from the head.
+- Path routes match about 25 times faster: a pattern's literal prefix and
+  suffix rule out most paths at once, and matching no longer allocates per
+  character.
 
 ### Removed
 
