@@ -1,6 +1,12 @@
 //! Handlers: async functions of extractors that handle a request.
 
+#[cfg(feature = "sitemap")]
+mod sitemap;
+
 use std::future::Future;
+
+#[cfg(feature = "sitemap")]
+pub use sitemap::FollowSitemap;
 
 use crate::Context;
 use crate::extract::{FromContext, FromContextRef};

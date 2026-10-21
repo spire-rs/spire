@@ -27,6 +27,8 @@ pub(crate) mod context;
 mod driver;
 #[cfg(feature = "html")]
 pub(crate) mod html;
+#[cfg(feature = "sitemap")]
+mod sitemap;
 mod state;
 
 use std::convert::Infallible;
@@ -40,6 +42,13 @@ pub use driver::View;
 #[cfg(feature = "html")]
 #[cfg_attr(docsrs, doc(cfg(feature = "html")))]
 pub use html::{Element, Html, Select};
+#[cfg(feature = "sitemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
+pub use sitemap::Sitemap;
+/// The sitemap parser behind [`Sitemap`]: its records and their attributes.
+#[cfg(feature = "sitemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
+pub use sitemapo;
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 pub use spire_macros::Select;

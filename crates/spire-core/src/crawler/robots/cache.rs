@@ -42,6 +42,17 @@ struct Origin {
     parked: VecDeque<Seed>,
 }
 
+/// What a fetched robots.txt changes.
+#[derive(Debug, Default)]
+pub(crate) struct Fetched {
+    /// Seeds that waited for the rules, to admit now.
+    pub(crate) released: Vec<Seed>,
+    /// The origin's `Crawl-delay`.
+    pub(crate) delay: Option<Duration>,
+    /// Sitemaps the rules list, to queue, see [`Robots::with_sitemaps`].
+    pub(crate) sitemaps: Vec<Seed>,
+}
+
 /// The robots.txt rules of every origin, fetched and refreshed as RFC 9309
 /// describes. Origins are keyed by scheme, host and port: `http://` and
 /// `https://` of a host have separate robots.txt files.
@@ -141,14 +152,24 @@ impl RobotsCache {
         key: &str,
         result: Result<Rules, Error>,
         now: Instant,
-    ) -> (Vec<Seed>, Option<Duration>) {
+    ) -> Fetched {
         let Some(entry) = self.origins.get_mut(key) else {
-            return (Vec::new(), None);
+            return Fetched::default();
         };
         let (attempt, stale) = match &entry.state {
             State::Fetching { attempt, stale } => (*attempt, stale.clone()),
-            State::Blocked { .. } | State::Ready { .. } => return (Vec::new(), None),
+            State::Blocked { .. } | State::Ready { .. } => return Fetched::default(),
         };
+
+        // Sitemaps are queued once, from the origin's first rules.
+        let mut sitemaps = Vec::new();
+        if let (Ok(rules), None, Some(tag)) = (&result, &stale, &self.config.sitemaps) {
+            let seeds = rules
+                .sitemaps()
+                .iter()
+                .filter_map(|url| Seed::get(url.as_str()).ok());
+            sitemaps.extend(seeds.map(|seed| seed.with_tag(tag.clone())));
+        }
 
         let rules = match (result, stale) {
             (Ok(rules), _) => Arc::new(rules),
@@ -161,7 +182,7 @@ impl RobotsCache {
                 let retry_at = now + self.config.retry_delay(attempt);
                 tracing::info!(target: TRACING_TARGET, origin = %key, %error, attempt, "robots.txt unreachable, retrying");
                 entry.state = State::Blocked { attempt, retry_at };
-                return (Vec::new(), None);
+                return Fetched::default();
             }
             (Err(error), None) => {
                 tracing::warn!(target: TRACING_TARGET, origin = %key, %error, "robots.txt unreachable, skipping the origin");
@@ -176,7 +197,11 @@ impl RobotsCache {
         };
         let released: Vec<Seed> = entry.parked.drain(..).collect();
         self.parked -= released.len();
-        (released, delay)
+        Fetched {
+            released,
+            delay,
+            sitemaps,
+        }
     }
 
     /// Starts fetching robots.txt again for blocked origins due a retry.
@@ -229,6 +254,7 @@ impl RobotsCache {
 mod tests {
     use super::*;
     use crate::ErrorKind;
+    use crate::request::Tag;
 
     fn seed(uri: &str) -> Seed {
         Seed::get(uri).unwrap()
@@ -282,12 +308,13 @@ mod tests {
             ["https://a.com/robots.txt", "http://a.com/robots.txt"]
         );
 
-        let (released, delay) = cache.fetched(
+        let ready = cache.fetched(
             "https://a.com",
             Ok(rules("User-agent: *\nDisallow: /private\nCrawl-delay: 2")),
             now,
         );
-        assert_eq!((released.len(), delay), (2, Some(Duration::from_secs(2))));
+        let delay = Some(Duration::from_secs(2));
+        assert_eq!((ready.released.len(), ready.delay), (2, delay));
         assert_eq!(cache.parked(), 1);
         assert!(matches!(
             cache.admit(seed("https://a.com/x"), now),
@@ -309,7 +336,7 @@ mod tests {
         assert!(
             cache
                 .fetched("https://a.com", unreachable(), now)
-                .0
+                .released
                 .is_empty()
         );
         assert_eq!(cache.earliest(), Some(now + Duration::from_secs(30)));
@@ -318,8 +345,8 @@ mod tests {
         cache.retry_due(now + Duration::from_secs(30));
         assert_eq!(cache.take_fetches().len(), 1);
 
-        let (released, _) = cache.fetched("https://a.com", unreachable(), now);
-        assert_eq!(released.len(), 1);
+        let fetched = cache.fetched("https://a.com", unreachable(), now);
+        assert_eq!(fetched.released.len(), 1);
         assert!(matches!(
             cache.admit(seed("https://a.com/x"), now),
             Verdict::Disallow(_)
@@ -364,5 +391,48 @@ mod tests {
             cache.admit(seed("https://a.com/old"), later + hour),
             Verdict::Allow(_)
         ));
+    }
+
+    #[test]
+    fn queues_listed_sitemaps_once() {
+        let txt = "Sitemap: https://a.com/sitemap.xml\nSitemap: https://cdn.a.com/news.xml";
+        let now = Instant::now();
+        let hour = Duration::from_hours(1);
+        let robots = Robots::new("bot")
+            .with_max_age(hour)
+            .with_sitemaps("sitemap");
+        let mut cache = RobotsCache::new(robots);
+        cache.admit(seed("https://a.com/"), now);
+        cache.take_fetches();
+
+        let fetched = cache.fetched("https://a.com", Ok(rules(txt)), now);
+        let sitemaps: Vec<_> = fetched
+            .sitemaps
+            .iter()
+            .map(|seed| (seed.uri().to_string(), seed.tag().map(Tag::to_string)))
+            .collect();
+        let tag = Some("sitemap".to_owned());
+        assert_eq!(
+            sitemaps,
+            [
+                ("https://a.com/sitemap.xml".to_owned(), tag.clone()),
+                ("https://cdn.a.com/news.xml".to_owned(), tag),
+            ]
+        );
+
+        // Refreshed rules do not queue them again.
+        cache.admit(seed("https://a.com/"), now + hour);
+        let fetched = cache.fetched("https://a.com", Ok(rules(txt)), now + hour);
+        assert!(fetched.sitemaps.is_empty());
+
+        // Without `with_sitemaps`, nothing is queued.
+        let mut cache = RobotsCache::new(Robots::new("bot"));
+        cache.admit(seed("https://a.com/"), now);
+        assert!(
+            cache
+                .fetched("https://a.com", Ok(rules(txt)), now)
+                .sitemaps
+                .is_empty()
+        );
     }
 }

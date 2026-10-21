@@ -365,14 +365,20 @@ where
         let Some(robots) = &mut run.robots else {
             return;
         };
-        let (released, delay) = robots.cache.fetched(&origin, result, Instant::now());
-        if let Some(delay) = delay {
+        let fetched = robots.cache.fetched(&origin, result, Instant::now());
+        if let Some(delay) = fetched.delay {
             let host = origin
                 .split_once("://")
                 .map_or(origin.as_str(), |(_, host)| host);
             run.hosts.raise_delay(host, delay);
         }
-        for seed in released {
+        for seed in fetched.sitemaps {
+            let uri = seed.uri().clone();
+            if let Err(error) = self.queue().push(seed).await {
+                tracing::warn!(target: TRACING_TARGET, %uri, %error, "failed to queue a sitemap");
+            }
+        }
+        for seed in fetched.released {
             self.admit(run, seed).await;
         }
     }

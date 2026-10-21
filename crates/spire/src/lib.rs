@@ -15,6 +15,9 @@ use spire_core::backend::Backend;
 pub use spire_core::crawler::Robots;
 pub use spire_core::{Context, Error, ErrorKind, Result, dataset, worker};
 
+#[cfg(feature = "sitemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
+pub use crate::handler::FollowSitemap;
 pub use crate::handler::Handler;
 pub use crate::routing::Router;
 

@@ -8,6 +8,15 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `spire`: the `sitemap` feature. The `Sitemap` extractor parses XML and text
+  sitemaps and sitemap indexes, gzipped or not, with `sitemapo`, and the
+  `FollowSitemap` handler follows them: pages with one tag, the sitemaps of
+  an index with the sitemap's own, queued in the order of their `<priority>`.
+- `spire-core`: `Robots::with_sitemaps` queues the sitemaps an origin's
+  robots.txt lists, the first time it is fetched.
+
 ## [0.2.0] - 2026-10-21
 
 The first working release; 0.1.0 only reserved the crate names. Requires
