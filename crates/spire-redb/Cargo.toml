@@ -37,6 +37,7 @@ tokio = { workspace = true, features = ["rt"] }
 redb = { workspace = true, features = [] }
 
 # (De)serialization
+serde = { workspace = true, features = [] }
 serde_json = { workspace = true, features = [] }
 
 # Observability

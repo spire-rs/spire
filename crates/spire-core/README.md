@@ -35,12 +35,15 @@ Crawls are bounded and polite: crawl scope (`allow_hosts`, `filter`), request
 and time budgets, per-request deadlines, per-host concurrency and delays, and
 robots.txt with the `robots` feature. With the `serde` feature, seeds are
 serializable, so a stopped crawl's frontier and seen set can be snapshotted
-and restored, and `JsonlDataset` writes results as JSON Lines.
+and restored. `JsonlDataset` and `CsvDataset`, with the `json` and `csv`
+features, write results to files.
 
 ## Feature Flags
 
 - **`robots`**: fetch and obey robots.txt with `Crawler::with_robots`.
-- **`serde`**: serializable `Seed` and `Fingerprint`, and `JsonlDataset`.
+- **`serde`**: serializable `Seed`, `Fingerprint` and `BloomSnapshot`.
+- **`json`**: `JsonlDataset`, writing results as JSON Lines.
+- **`csv`**: `CsvDataset`, writing results as CSV.
 
 Most users depend on `spire`, which adds a router, handlers and extractors on
 top of this crate. Depend on `spire-core` directly to implement a backend, a

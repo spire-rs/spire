@@ -18,15 +18,23 @@ impl RedbSeen {
     }
 
     /// Returns the number of fingerprints seen.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.store.count(SEEN).unwrap_or_default()
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Frontier`](spire_core::ErrorKind::Frontier) error if the
+    /// store cannot be read.
+    pub fn len(&self) -> Result<usize> {
+        self.store.count(SEEN)
     }
 
     /// Whether nothing was seen yet.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Frontier`](spire_core::ErrorKind::Frontier) error if the
+    /// store cannot be read.
+    pub fn is_empty(&self) -> Result<bool> {
+        self.len().map(|len| len == 0)
     }
 }
 
@@ -34,7 +42,6 @@ impl fmt::Debug for RedbSeen {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RedbSeen")
             .field("store", &self.store)
-            .field("len", &self.len())
             .finish()
     }
 }
@@ -66,7 +73,7 @@ mod tests {
         }
 
         let seen = RedbStore::open(&path.0).await.unwrap().seen();
-        assert_eq!(seen.len(), 1);
+        assert_eq!(seen.len().unwrap(), 1);
         assert!(!seen.insert(seed("a").fingerprint()).await.unwrap());
         assert!(seen.insert(seed("b").fingerprint()).await.unwrap());
     }

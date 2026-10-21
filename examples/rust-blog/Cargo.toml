@@ -15,7 +15,7 @@ path = "main.rs"
 
 [dependencies]
 # Async runtime and Spire framework
-spire = { workspace = true, features = ["reqwest", "macros", "robots", "sitemap", "serde", "redb"] }
+spire = { workspace = true, features = ["reqwest", "macros", "robots", "sitemap", "json", "redb"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
 
 # Serialization of the stored posts

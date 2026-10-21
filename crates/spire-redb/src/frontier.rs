@@ -29,9 +29,13 @@ impl RedbFrontier {
     }
 
     /// Returns the number of seeds popped and not yet reported.
-    #[must_use]
-    pub fn in_flight(&self) -> usize {
-        self.store.count(IN_FLIGHT).unwrap_or_default()
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Frontier`](spire_core::ErrorKind::Frontier) error if the
+    /// store cannot be read.
+    pub fn in_flight(&self) -> Result<usize> {
+        self.store.count(IN_FLIGHT)
     }
 }
 
@@ -39,7 +43,6 @@ impl fmt::Debug for RedbFrontier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RedbFrontier")
             .field("store", &self.store)
-            .field("queued", &self.size_hint())
             .finish()
     }
 }
@@ -114,7 +117,7 @@ impl Frontier for RedbFrontier {
     }
 
     fn size_hint(&self) -> Option<usize> {
-        self.store.count(QUEUE)
+        self.store.count(QUEUE).ok()
     }
 }
 
@@ -171,7 +174,7 @@ pub(crate) mod tests {
             order.push(name);
         }
         assert_eq!(order, ["high", "first", "second", "low"]);
-        assert_eq!(frontier.in_flight(), 4);
+        assert_eq!(frontier.in_flight().unwrap(), 4);
     }
 
     #[tokio::test]
@@ -197,7 +200,7 @@ pub(crate) mod tests {
         }
 
         let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
-        assert_eq!(frontier.in_flight(), 0);
+        assert_eq!(frontier.in_flight().unwrap(), 0);
         let mut left = Vec::new();
         while let Next::Ready(seed) = frontier.pop().await.unwrap() {
             left.push(seed.tag().map(ToString::to_string).unwrap());
@@ -220,6 +223,6 @@ pub(crate) mod tests {
             after: None,
         };
         assert_eq!(frontier.report(retry).await.unwrap(), Ack::RetryRefused);
-        assert_eq!(frontier.in_flight(), 0);
+        assert_eq!(frontier.in_flight().unwrap(), 0);
     }
 }

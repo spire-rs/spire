@@ -5,11 +5,12 @@ use std::time::{Duration, Instant};
 
 use redb::{
     Database, Durability, ReadTransaction, ReadableDatabase, ReadableTable, ReadableTableMetadata,
-    TableDefinition, WriteTransaction,
+    TableDefinition, TableError, WriteTransaction,
 };
 use spire_core::{Error, ErrorKind, Result};
 
 use crate::codec;
+use crate::dataset::RedbDataset;
 use crate::frontier::RedbFrontier;
 use crate::seen::RedbSeen;
 
@@ -25,7 +26,8 @@ pub(crate) const META: TableDefinition<&str, u64> = TableDefinition::new("meta")
 /// The key of the next insertion sequence in [`META`].
 pub(crate) const NEXT_SEQUENCE: &str = "next_sequence";
 
-/// A redb database holding a crawl's [`RedbFrontier`] and [`RedbSeen`].
+/// A redb database holding a crawl's [`RedbFrontier`], [`RedbSeen`] and
+/// [`RedbDataset`]s.
 ///
 /// Every change is committed as it happens, so a crawl survives a crash:
 /// reopening the store queues again the seeds that were in flight, which
@@ -186,6 +188,14 @@ impl RedbStore {
         RedbSeen::new(self.clone())
     }
 
+    /// Returns the dataset stored in this database under `name`, created on
+    /// its first write. Each name is a separate table: give each item type
+    /// its own, and keep a name when renaming the type to keep its items.
+    #[must_use]
+    pub fn dataset<T>(&self, name: &str) -> RedbDataset<T> {
+        RedbDataset::new(self.clone(), name)
+    }
+
     /// Returns the path of the database.
     #[must_use]
     pub fn path(&self) -> &Path {
@@ -220,14 +230,19 @@ impl RedbStore {
         f(&txn).map_err(storage_error)
     }
 
-    /// Returns the number of entries in `table`.
-    pub(crate) fn count<K, V>(&self, table: TableDefinition<'static, K, V>) -> Option<usize>
+    /// Returns the number of entries in `table`, zero if it was never
+    /// created.
+    pub(crate) fn count<K, V>(&self, table: TableDefinition<'_, K, V>) -> Result<usize>
     where
         K: redb::Key + 'static,
         V: redb::Value + 'static,
     {
-        let len = self.read(|txn| Ok(txn.open_table(table)?.len()?)).ok()?;
-        usize::try_from(len).ok()
+        let len = self.read(|txn| match txn.open_table(table) {
+            Ok(table) => Ok(table.len()?),
+            Err(TableError::TableDoesNotExist(_)) => Ok(0),
+            Err(error) => Err(error.into()),
+        })?;
+        Ok(usize::try_from(len).unwrap_or(usize::MAX))
     }
 }
 

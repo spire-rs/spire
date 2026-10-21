@@ -32,8 +32,12 @@ default = []
 
 # Fetching and obeying robots.txt, see `Crawler::with_robots`
 robots = ["dep:robotxt"]
-# Serializable seeds and fingerprints for snapshots, and `JsonlDataset`
-serde = ["dep:serde", "dep:serde_json", "tokio/fs", "tokio/io-util", "tokio/sync"]
+# Serializable seeds, fingerprints and Bloom filters, for snapshots
+serde = ["dep:serde"]
+# `JsonlDataset`, writing results as JSON Lines
+json = ["serde", "dep:serde_json", "tokio/fs", "tokio/io-util"]
+# `CsvDataset`, writing results as CSV
+csv = ["serde", "dep:csv", "tokio/fs", "tokio/io-util"]
 # `MockSite` and `Visit`, to test handlers without a network
 testing = []
 
@@ -57,6 +61,7 @@ url = { workspace = true, features = [] }
 # (De)serialization
 serde = { workspace = true, optional = true, features = ["derive"] }
 serde_json = { workspace = true, optional = true, features = [] }
+csv = { workspace = true, optional = true, features = [] }
 
 # Politeness
 robotxt = { workspace = true, optional = true, features = [] }
@@ -70,6 +75,7 @@ criterion = { workspace = true, features = [] }
 
 # Testing
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
+serde_json = { workspace = true, features = [] }
 
 [[bench]]
 name = "crawler"
