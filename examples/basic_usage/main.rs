@@ -55,9 +55,9 @@ async fn scrape_text_content(
     let word_count = content.split_whitespace().count();
     let char_count = content.chars().count();
 
-    metadata.push(format!("Lines: {}", line_count));
-    metadata.push(format!("Words: {}", word_count));
-    metadata.push(format!("Characters: {}", char_count));
+    metadata.push(format!("Lines: {line_count}"));
+    metadata.push(format!("Words: {word_count}"));
+    metadata.push(format!("Characters: {char_count}"));
 
     // Check if it looks like robots.txt
     if content.to_lowercase().contains("user-agent") {

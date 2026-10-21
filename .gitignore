@@ -12,7 +12,6 @@ Thumbs.db
 # Rust
 debug/
 target/
-Cargo.lock
 **/*.rs.bk
 *.pdb
 
@@ -45,3 +44,5 @@ temp/
 # Other
 .ignore*/
 LLM.md
+.claude
+CLAUDE.md

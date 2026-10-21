@@ -90,11 +90,13 @@ pub struct Html(pub String);
 
 impl Html {
     /// Get a reference to the raw HTML string.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Convert into the raw HTML string.
+    #[must_use]
     pub fn into_string(self) -> String {
         self.0
     }

@@ -5,6 +5,10 @@ use std::time::Duration;
 use derive_builder::Builder;
 
 /// Configuration for browser behavior.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent behavior toggles"
+)]
 #[derive(Debug, Clone, Builder)]
 #[builder(
     name = "BrowserBehaviorConfigBuilder",
@@ -97,6 +101,7 @@ impl BrowserBehaviorConfig {
     }
 
     /// Creates a new browser configuration builder.
+    #[must_use]
     pub fn builder() -> BrowserBehaviorConfigBuilder {
         BrowserBehaviorConfigBuilder::default()
     }

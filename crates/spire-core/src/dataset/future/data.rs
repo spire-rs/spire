@@ -48,6 +48,7 @@ where
 
     /// Returns a reference to the underlying [`BoxCloneDataset`].
     #[inline]
+    #[must_use]
     pub const fn as_dataset(&self) -> &BoxCloneDataset<T, E> {
         &self.0
     }

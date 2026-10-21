@@ -34,7 +34,7 @@ async fn process_structured_json(
     tracing::info!("Processing structured JSON from: {}", url);
 
     // Create a user from JSON data
-    let user = User::from_json(json_data, url.clone())?;
+    let user = User::from_json(&json_data, url.clone());
 
     tracing::info!(
         "Processed user: {} (ID: {}, URL: {})",
@@ -124,8 +124,7 @@ async fn process_text_content(
 
     data_store
         .write(format!(
-            "{}: {} ({} bytes, {} lines)",
-            content_type, url, content_length, line_count
+            "{content_type}: {url} ({content_length} bytes, {line_count} lines)"
         ))
         .await?;
 
@@ -157,21 +156,21 @@ async fn process_json_with_discovery(
     // Look for common URL patterns in the JSON response
     let mut discovered_endpoints = 0;
 
-    for (_key, value) in &data {
-        if let Some(link_url) = value.as_str() {
-            if link_url.starts_with("http") && discovered_endpoints < 2 {
-                queue.append_with_tag("dynamic_json", link_url).await?;
-                discovered_endpoints += 1;
-                tracing::info!("Discovered endpoint: {}", link_url);
-            }
+    for value in data.values() {
+        if let Some(link_url) = value.as_str()
+            && link_url.starts_with("http")
+            && discovered_endpoints < 2
+        {
+            queue.append_with_tag("dynamic_json", link_url).await?;
+            discovered_endpoints += 1;
+            tracing::info!("Discovered endpoint: {}", link_url);
         }
     }
 
     if discovered_endpoints > 0 {
         data_store
             .write(format!(
-                "Discovered {} additional endpoints from {}",
-                discovered_endpoints, url
+                "Discovered {discovered_endpoints} additional endpoints from {url}"
             ))
             .await?;
     }
@@ -205,7 +204,7 @@ async fn process_standard_json(
                 Value::Object(obj) => format!("Object{{{}}}", obj.len()),
                 Value::Null => "null".to_string(),
             };
-            extracted_info.push(format!("{}: {}", key, value_summary));
+            extracted_info.push(format!("{key}: {value_summary}"));
         }
 
         for info in extracted_info {
@@ -214,7 +213,7 @@ async fn process_standard_json(
     }
 
     data_store
-        .write(format!("Processed standard JSON from {}", url))
+        .write(format!("Processed standard JSON from {url}"))
         .await?;
 
     Ok(())

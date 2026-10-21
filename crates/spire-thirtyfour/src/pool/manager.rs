@@ -10,15 +10,15 @@ use thirtyfour::prelude::*;
 
 use crate::client::BrowserConfig as WebDriverConfig;
 
-/// Manager that creates and manages WebDriver instances in a deadpool.
+/// Manager that creates and manages `WebDriver` instances in a deadpool.
 ///
 /// This manager implements deadpool's `Manager` trait to handle the lifecycle
-/// of WebDriver instances, including creation, health checking, and recycling.
-/// It supports multiple WebDriver configurations and can distribute connections
+/// of `WebDriver` instances, including creation, health checking, and recycling.
+/// It supports multiple `WebDriver` configurations and can distribute connections
 /// across different browser endpoints.
 #[derive(Debug, Clone)]
 pub struct BrowserManager {
-    /// WebDriver server configurations indexed by connection ID
+    /// `WebDriver` server configurations indexed by connection ID
     configs: Arc<HashMap<u64, WebDriverConfig>>,
     /// Connection ID counter for round-robin selection
     connection_counter: Arc<AtomicU64>,
@@ -29,7 +29,7 @@ pub struct BrowserManager {
 }
 
 impl BrowserManager {
-    /// Creates a new WebDriverManager with default settings.
+    /// Creates a new `WebDriverManager` with default settings.
     pub(crate) fn new() -> Self {
         Self {
             configs: Arc::new(HashMap::new()),
@@ -39,7 +39,7 @@ impl BrowserManager {
         }
     }
 
-    /// Adds a WebDriver configuration to the manager.
+    /// Adds a `WebDriver` configuration to the manager.
     ///
     /// Each configuration represents a potential browser connection endpoint.
     /// The manager will distribute connection requests across all configured endpoints.
@@ -74,7 +74,7 @@ impl BrowserManager {
         self.configs.values().next()
     }
 
-    /// Creates a WebDriver instance with retry logic.
+    /// Creates a `WebDriver` instance with retry logic.
     async fn create_webdriver(&self) -> Result<WebDriver> {
         let config = self.select_config().ok_or_else(|| {
             Error::new(ErrorKind::Backend, "No WebDriver configurations available")
@@ -112,7 +112,7 @@ impl BrowserManager {
         unreachable!("Loop should have returned or errored");
     }
 
-    /// Performs a health check on a WebDriver instance.
+    /// Performs a health check on a `WebDriver` instance.
     async fn health_check_webdriver(&self, driver: &WebDriver) -> Result<bool> {
         match driver.current_url().await {
             Ok(_) => Ok(true),

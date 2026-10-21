@@ -41,13 +41,11 @@ impl<C, S> TagRouter<C, S> {
         }
 
         let tag_copy = tag.clone();
-        if self.endpoints.insert(tag, endpoint).is_some() {
-            panic!(
-                "route conflict: tag '{:?}' has already been registered. \
-                 Each tag can only be used once per router.",
-                tag_copy
-            );
-        }
+        assert!(
+            self.endpoints.insert(tag, endpoint).is_none(),
+            "route conflict: tag '{tag_copy:?}' has already been registered. \
+             Each tag can only be used once per router."
+        );
     }
 
     /// Inserts a fallback endpoint.
@@ -56,12 +54,11 @@ impl<C, S> TagRouter<C, S> {
     ///
     /// Panics if a fallback handler has already been set.
     pub fn fallback(&mut self, endpoint: Endpoint<C, S>) {
-        if self.fallback.replace(endpoint).is_some() {
-            panic!(
-                "fallback conflict: a fallback handler has already been set. \
-                 Use Router::merge() to combine routers instead of setting multiple fallbacks."
-            );
-        }
+        assert!(
+            self.fallback.replace(endpoint).is_none(),
+            "fallback conflict: a fallback handler has already been set. \
+             Use Router::merge() to combine routers instead of setting multiple fallbacks."
+        );
     }
 
     /// Applies a transformation function to all endpoints.

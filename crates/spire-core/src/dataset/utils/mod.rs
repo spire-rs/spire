@@ -24,10 +24,13 @@
 //! ## Type Erasure
 //!
 //! ```no_run
+//! use std::convert::Infallible;
+//!
+//! use spire_core::dataset::utils::BoxDataset;
 //! use spire_core::dataset::{DatasetExt, InMemDataset};
 //!
 //! // Store different dataset types in a vector
-//! let datasets: Vec<Box<dyn Dataset<String>>> = vec![
+//! let datasets: Vec<BoxDataset<String, Infallible>> = vec![
 //!     InMemDataset::queue().boxed(),
 //!     InMemDataset::stack().boxed(),
 //! ];
@@ -41,7 +44,7 @@
 //! // Store URLs as normalized lowercase
 //! let dataset = InMemDataset::<String>::queue()
 //!     .map_data(
-//!         |url: &str| url.to_lowercase(),
+//!         |url: String| url.to_lowercase(),
 //!         |url: String| url,
 //!     );
 //! ```
@@ -177,11 +180,11 @@ pub trait DatasetExt<T>: Dataset<T> {
     /// // Store strings as uppercase, retrieve as lowercase
     /// let dataset = InMemDataset::<String>::queue()
     ///     .map_data(
-    ///         |s: &str| s.to_uppercase(),
+    ///         |s: String| s.to_uppercase(),
     ///         |s: String| s.to_lowercase(),
     ///     );
     ///
-    /// dataset.write("Hello").await?;
+    /// dataset.write("Hello".to_owned()).await?;
     /// assert_eq!(dataset.read().await?, Some("hello".to_string()));
     /// # Ok(())
     /// # }
@@ -198,10 +201,12 @@ pub trait DatasetExt<T>: Dataset<T> {
     /// # Examples
     ///
     /// ```no_run
+    /// use std::convert::Infallible;
+    ///
     /// use spire_core::dataset::{DatasetExt, InMemDataset};
     ///
     /// let dataset = InMemDataset::<i32>::queue()
-    ///     .map_err(|_infallible| "Never happens");
+    ///     .map_err(|_: Infallible| "Never happens");
     /// ```
     fn map_err<F>(self, from: F) -> MapErr<Self, F>
     where

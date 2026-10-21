@@ -15,7 +15,7 @@ pub struct PageContent {
 }
 
 impl PageContent {
-    /// Creates a new PageContent instance with basic information.
+    /// Creates a new `PageContent` instance with basic information.
     pub fn new(url: String, content_type: String, content_length: usize) -> Self {
         Self {
             url,

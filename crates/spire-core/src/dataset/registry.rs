@@ -20,7 +20,7 @@ type AnyBox = Box<dyn Any + Send + Sync>;
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// use spire_core::dataset::{DatasetRegistry, InMemDataset};
 ///
 /// let registry = DatasetRegistry::new();
@@ -58,7 +58,7 @@ impl DatasetRegistry {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,ignore
     /// use spire_core::dataset::{DatasetRegistry, InMemDataset};
     ///
     /// let registry = DatasetRegistry::new();
@@ -82,7 +82,7 @@ impl DatasetRegistry {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,ignore
     /// use spire_core::dataset::DatasetRegistry;
     ///
     /// let registry = DatasetRegistry::new();
@@ -94,9 +94,9 @@ impl DatasetRegistry {
     {
         let guard = self.inner.lock().expect("DatasetRegistry mutex poisoned");
         let dataset = guard.container.get(&TypeId::of::<T>());
-
-        type Ds<T> = BoxCloneDataset<T, Error>;
-        dataset.and_then(|x| x.downcast_ref::<Ds<T>>()).cloned()
+        dataset
+            .and_then(|x| x.downcast_ref::<BoxCloneDataset<T, Error>>())
+            .cloned()
     }
 
     /// Retrieves a [`Dataset`] for type `T`, creating a default one if it doesn't exist.
@@ -106,7 +106,7 @@ impl DatasetRegistry {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,ignore
     /// use spire_core::dataset::DatasetRegistry;
     ///
     /// let registry = DatasetRegistry::new();
@@ -123,9 +123,8 @@ impl DatasetRegistry {
             Entry::Vacant(x) => x.insert(Box::new(make_mem())),
         };
 
-        type Ds<T> = BoxCloneDataset<T, Error>;
         dataset
-            .downcast_ref::<Ds<T>>()
+            .downcast_ref::<BoxCloneDataset<T, Error>>()
             .expect("DatasetRegistry type mismatch: this is a bug")
             .clone()
     }

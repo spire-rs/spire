@@ -37,8 +37,11 @@ use crate::{Error, Result};
 /// ## Wrapping Individual Services
 ///
 /// ```no_run
-/// use spire_core::backend::utils::Trace;
+/// use spire_core::backend::utils::{Noop, Trace};
+/// use spire_core::Client;
 ///
+/// # let my_backend = Noop::default();
+/// # let my_worker = Noop::default();
 /// let backend = Trace::new(my_backend);
 /// let worker = Trace::new(my_worker);
 /// let client = Client::new(backend, worker);
@@ -47,9 +50,10 @@ use crate::{Error, Result};
 /// ## Using with Tower Layers
 ///
 /// ```no_run
-/// use spire_core::backend::utils::TraceLayer;
+/// use spire_core::backend::utils::{Noop, TraceLayer};
 /// use tower::ServiceBuilder;
 ///
+/// # let my_backend = Noop::default();
 /// let backend = ServiceBuilder::new()
 ///     .layer(TraceLayer::new())
 ///     .service(my_backend);
@@ -79,8 +83,9 @@ impl<S> Trace<S> {
     /// # Examples
     ///
     /// ```no_run
-    /// use spire_core::backend::utils::Trace;
+    /// use spire_core::backend::utils::{Noop, Trace};
     ///
+    /// # let my_service = Noop::default();
     /// let traced = Trace::new(my_service);
     /// ```
     pub fn new(inner: S) -> Self {
@@ -248,9 +253,10 @@ impl<T, E> Future for TraceFuture<T, E> {
 /// # Examples
 ///
 /// ```no_run
-/// use spire_core::backend::utils::TraceLayer;
+/// use spire_core::backend::utils::{Noop, TraceLayer};
 /// use tower::ServiceBuilder;
 ///
+/// # let my_backend = Noop::default();
 /// let service = ServiceBuilder::new()
 ///     .layer(TraceLayer::new())
 ///     .service(my_backend);

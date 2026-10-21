@@ -6,6 +6,7 @@ version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
+publish = false
 description = "Basic usage example for Spire web scraping framework"
 
 [[bin]]
@@ -17,9 +18,8 @@ path = "main.rs"
 spire = { workspace = true, features = ["reqwest", "tracing", "macros"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 
-# Serialization and HTML parsing
+# Serialization
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true, features = [] }
 
 # Data types
 jiff = { workspace = true, features = ["serde"] }
@@ -27,3 +27,6 @@ jiff = { workspace = true, features = ["serde"] }
 # Observability
 tracing = { workspace = true, features = [] }
 tracing-subscriber = { workspace = true, features = [] }
+
+[lints]
+workspace = true

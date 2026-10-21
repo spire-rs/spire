@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_debug_output() {
         let backend = BrowserBackend::default();
-        let debug_str = format!("{:?}", backend);
+        let debug_str = format!("{backend:?}");
         assert!(debug_str.contains("BrowserBackend"));
         assert!(debug_str.contains("pool_size"));
     }

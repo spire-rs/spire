@@ -1,4 +1,4 @@
-//! Data structures for the chrome_webdriver example.
+//! Data structures for the `chrome_webdriver` example.
 
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -14,7 +14,7 @@ pub struct PageData {
 }
 
 impl PageData {
-    /// Creates a new PageData instance.
+    /// Creates a new `PageData` instance.
     pub fn new(
         url: String,
         title: String,

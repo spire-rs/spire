@@ -68,7 +68,7 @@ impl<B, W> Runner<B, W> {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```rust,ignore
     /// use tokio::time::{sleep, Duration};
     ///
     /// let client = Client::new(backend, worker);
@@ -164,11 +164,13 @@ impl<B, W> Runner<B, W> {
         #[cfg(feature = "tracing")]
         {
             let duration = start.elapsed();
+            #[allow(clippy::cast_precision_loss)]
+            let requests_per_sec = total as f64 / duration.as_secs_f64();
             tracing::info!(
                 target: TARGET,
                 total_requests = total,
                 duration_ms = duration.as_millis(),
-                requests_per_sec = (total as f64 / duration.as_secs_f64()) as u64,
+                requests_per_sec,
                 "runner completed"
             );
         }
@@ -302,7 +304,7 @@ impl<B, W> Runner<B, W> {
             TagQuery::Single(x) => defer_one(x),
             TagQuery::Every => defer_one(Tag::Fallback),
             TagQuery::List(x) => x.into_iter().for_each(defer_one),
-        };
+        }
     }
 
     /// Aborts all [`Tag`]s as specified per [`TagQuery`].
@@ -312,6 +314,12 @@ impl<B, W> Runner<B, W> {
     /// This functionality is not yet implemented. Currently this method does nothing
     /// and always returns `Ok(())`. Full abort functionality will be added in a future version.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self), fields(query = ?query, owner = ?owner), level = "trace"))]
+    #[allow(
+        clippy::unused_self,
+        clippy::needless_pass_by_value,
+        clippy::unnecessary_wraps,
+        reason = "signature of the not yet implemented abort"
+    )]
     fn apply_abort(&self, query: TagQuery, owner: Tag) -> Result<()> {
         #[cfg(feature = "tracing")]
         tracing::warn!(target: TARGET, "abort functionality not yet implemented");

@@ -49,7 +49,7 @@ use crate::pool::manager::BrowserManager;
 #[derive(Default, Display)]
 #[display("BrowserBuilder(configs: {}, max_size: {:?})", self.configs.len(), self.max_size)]
 pub struct BrowserBuilder {
-    /// WebDriver configurations
+    /// `WebDriver` configurations
     configs: Vec<WebDriverConfig>,
     /// Maximum pool size
     max_size: Option<usize>,
@@ -84,17 +84,17 @@ impl BrowserBuilder {
         Self::default()
     }
 
-    /// Adds an unmanaged WebDriver connection to the pool.
+    /// Adds an unmanaged `WebDriver` connection to the pool.
     ///
     /// This is a convenience method for quick setup. The connection points to an
-    /// already-running WebDriver server (e.g., Selenium Grid, ChromeDriver, GeckoDriver).
+    /// already-running `WebDriver` server (e.g., Selenium Grid, `ChromeDriver`, `GeckoDriver`).
     /// Uses default configuration and timeouts.
     ///
     /// For more control, use [`with_config`](Self::with_config) instead.
     ///
     /// # Arguments
     ///
-    /// * `addr` - WebDriver server address (e.g., "http://localhost:4444")
+    /// * `addr` - `WebDriver` server address (e.g., "<http://localhost:4444>")
     ///
     /// # Examples
     ///
@@ -112,7 +112,7 @@ impl BrowserBuilder {
         self
     }
 
-    /// Adds a managed WebDriver connection to the pool.
+    /// Adds a managed `WebDriver` connection to the pool.
     ///
     /// This creates a managed browser process that will be spawned and controlled
     /// by the pool. Useful for environments where you want full control over the
@@ -120,7 +120,7 @@ impl BrowserBuilder {
     ///
     /// # Arguments
     ///
-    /// * `addr` - WebDriver server address where the managed process will run
+    /// * `addr` - `WebDriver` server address where the managed process will run
     ///
     /// # Examples
     ///
@@ -137,14 +137,14 @@ impl BrowserBuilder {
         self
     }
 
-    /// Adds a custom WebDriver configuration to the pool.
+    /// Adds a custom `WebDriver` configuration to the pool.
     ///
     /// This provides full control over browser capabilities, timeouts,
     /// and connection settings.
     ///
     /// # Arguments
     ///
-    /// * `config` - Fully configured WebDriver configuration
+    /// * `config` - Fully configured `WebDriver` configuration
     ///
     /// # Examples
     ///
@@ -174,11 +174,11 @@ impl BrowserBuilder {
         Ok(self)
     }
 
-    /// Adds multiple WebDriver configurations to the pool.
+    /// Adds multiple `WebDriver` configurations to the pool.
     ///
     /// # Arguments
     ///
-    /// * `configs` - Vector of WebDriver configurations
+    /// * `configs` - Vector of `WebDriver` configurations
     ///
     /// # Examples
     ///
@@ -329,7 +329,7 @@ impl BrowserBuilder {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - No WebDriver configurations have been added
+    /// - No `WebDriver` configurations have been added
     /// - Any configuration is invalid (when validation is enabled)
     /// - Pool configuration is invalid (e.g., zero max size)
     /// - Pool creation fails
@@ -388,7 +388,7 @@ impl BrowserBuilder {
         let pool = pool_builder.build().map_err(|e| {
             Error::new(
                 ErrorKind::Backend,
-                format!("Failed to create browser connection pool: {}", e),
+                format!("Failed to create browser connection pool: {e}"),
             )
         })?;
 
@@ -499,7 +499,7 @@ mod tests {
         let builder = BrowserBuilder::new()
             .with_unmanaged("http://localhost:4444")
             .with_max_pool_size(10);
-        let display_str = format!("{}", builder);
+        let display_str = format!("{builder}");
         assert!(display_str.contains("configs: 1"));
         assert!(display_str.contains("max_size: Some(10)"));
     }

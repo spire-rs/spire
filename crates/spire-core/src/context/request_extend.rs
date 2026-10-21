@@ -55,6 +55,7 @@ impl Tag {
     }
 
     /// Creates a new [`Tag`] from a static string slice.
+    #[must_use]
     pub const fn from_static(value: &'static str) -> Self {
         Self::Sequence(Cow::Borrowed(value))
     }
@@ -94,6 +95,7 @@ impl Depth {
     /// Creates a new [`Depth`] extension.
     ///
     /// If `depth` is 0, uses the minimum value (1) instead.
+    #[must_use]
     pub fn new(depth: u32) -> Self {
         Self(NonZeroU32::new(depth).unwrap_or_else(|| {
             debug_assert!(false, "Depth::new called with 0, using MIN instead");
@@ -102,6 +104,7 @@ impl Depth {
     }
 
     /// Returns the depth as a primitive type.
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0.get()
     }

@@ -4,6 +4,7 @@ version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
+publish = { workspace = true }
 readme = "./README.md"
 
 authors = { workspace = true }
@@ -20,20 +21,13 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["rustls-tls"]
-rustls-tls = ["thirtyfour/rustls-tls"]
+default = ["rustls"]
+rustls = ["thirtyfour/rustls"]
 native-tls = ["thirtyfour/native-tls"]
 
 [dependencies]
 # Spire
 spire-core = { workspace = true, features = [] }
-
-# Tower ecosystem
-tower = { workspace = true, features = [] }
-
-# Async
-futures = { workspace = true, features = [] }
-async-trait = { workspace = true, features = [] }
 
 # Browser automation
 thirtyfour = { workspace = true }
@@ -41,17 +35,12 @@ deadpool = { workspace = true, features = [] }
 
 # HTTP
 http = { workspace = true, features = [] }
-http-body-util = { workspace = true, features = [] }
 
 # Async runtime
-tokio = { workspace = true, features = ["time", "fs"] }
+tokio = { workspace = true, features = ["time"] }
 
-# Serialization
-serde = { workspace = true, features = [] }
+# (De)serialization
 serde_json = { workspace = true, features = [] }
-
-# Time handling
-jiff = { workspace = true, features = ["serde"] }
 
 # Derive macros
 thiserror = { workspace = true, features = [] }
@@ -63,4 +52,7 @@ bytes = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
-tokio = { workspace = true, features = [] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
+[lints]
+workspace = true

@@ -4,6 +4,7 @@ version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
+publish = { workspace = true }
 readme = "./README.md"
 
 authors = { workspace = true }
@@ -20,8 +21,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["rustls-tls"]
-rustls-tls = ["reqwest/rustls-tls"]
+default = ["rustls"]
+rustls = ["reqwest/rustls"]
 native-tls = ["reqwest/native-tls"]
 
 [dependencies]
@@ -31,13 +32,7 @@ spire-core = { workspace = true, features = [] }
 # Tower ecosystem
 tower = { workspace = true, features = [] }
 
-# Async
-futures = { workspace = true, features = [] }
-
-# HTTP
-http = { workspace = true, features = [] }
-http-body = { workspace = true, features = [] }
-http-body-util = { workspace = true, features = [] }
+# HTTP client
 reqwest = { workspace = true, features = [] }
 
 # Utilities
@@ -45,4 +40,8 @@ bytes = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
-tokio = { workspace = true, features = [] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+http-body-util = { workspace = true, features = [] }
+
+[lints]
+workspace = true

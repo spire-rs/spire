@@ -12,10 +12,10 @@ use thirtyfour::prelude::*;
 use crate::pool::BrowserBehaviorConfig;
 use crate::pool::manager::BrowserManager;
 
-/// Browser connection that provides direct access to a pooled WebDriver instance.
+/// Browser connection that provides direct access to a pooled `WebDriver` instance.
 ///
 /// This connection implements `Deref` and `DerefMut` to provide transparent access
-/// to the underlying WebDriver, allowing you to call any WebDriver method directly
+/// to the underlying `WebDriver`, allowing you to call any `WebDriver` method directly
 /// on the connection instance.
 ///
 /// # Examples
@@ -30,7 +30,7 @@ use crate::pool::manager::BrowserManager;
 /// let title = connection.title().await?;
 /// ```
 pub struct BrowserConnection {
-    /// The pooled WebDriver instance
+    /// The pooled `WebDriver` instance
     driver: Object<BrowserManager>,
     /// Client configuration for request processing
     config: BrowserBehaviorConfig,
@@ -41,7 +41,7 @@ impl BrowserConnection {
     ///
     /// # Arguments
     ///
-    /// * `driver` - A pooled WebDriver instance from the browser pool
+    /// * `driver` - A pooled `WebDriver` instance from the browser pool
     ///
     /// # Examples
     ///
@@ -57,11 +57,11 @@ impl BrowserConnection {
         }
     }
 
-    /// Creates a new BrowserConnection with custom client configuration.
+    /// Creates a new `BrowserConnection` with custom client configuration.
     ///
     /// # Arguments
     ///
-    /// * `driver` - A pooled WebDriver instance from the browser pool
+    /// * `driver` - A pooled `WebDriver` instance from the browser pool
     /// * `config` - Client configuration for request processing behavior
     ///
     /// # Examples
@@ -123,11 +123,11 @@ impl Client for BrowserConnection {
     /// Resolves an HTTP request using browser automation.
     ///
     /// This method performs a simplified browser automation workflow:
-    /// 1. Navigates to the request URL using the underlying WebDriver
+    /// 1. Navigates to the request URL using the underlying `WebDriver`
     /// 2. Extracts the page content based on configuration
     /// 3. Returns an HTTP response with the extracted content
     ///
-    /// The connection can be used like a regular WebDriver through Deref,
+    /// The connection can be used like a regular `WebDriver` through Deref,
     /// so you have full control over the browser behavior.
     async fn resolve(mut self, req: Request) -> Result<Response> {
         // Extract URL from request
@@ -152,7 +152,7 @@ impl Client for BrowserConnection {
             );
 
             if let Err(e) = self.execute(script, vec![]).await {
-                eprintln!("Failed to set user agent: {}", e);
+                eprintln!("Failed to set user agent: {e}");
                 // Continue anyway - this is not critical
             }
         }
@@ -161,7 +161,7 @@ impl Client for BrowserConnection {
         self.goto(&url_string).await.map_err(|e| {
             Error::new(
                 spire_core::ErrorKind::Backend,
-                format!("Failed to navigate to {}: {}", url_string, e),
+                format!("Failed to navigate to {url_string}: {e}"),
             )
         })?;
 
@@ -189,7 +189,7 @@ impl Client for BrowserConnection {
             content = self.source().await.map_err(|e| {
                 Error::new(
                     spire_core::ErrorKind::Backend,
-                    format!("Failed to extract HTML: {}", e),
+                    format!("Failed to extract HTML: {e}"),
                 )
             })?;
         } else if self.config.extract_text {
@@ -222,7 +222,7 @@ impl Client for BrowserConnection {
             .map_err(|e| {
                 Error::new(
                     spire_core::ErrorKind::Backend,
-                    format!("Failed to build response: {}", e),
+                    format!("Failed to build response: {e}"),
                 )
             })?;
 
@@ -239,8 +239,8 @@ mod tests {
         // We can't create a real connection without a pool in tests,
         // but we can test that the Debug impl compiles
         let config = BrowserBehaviorConfig::default();
-        let debug_str = format!("{:?}", config);
-        assert!(!debug_str.is_empty());
+        let debug_str = format!("{config:?}");
+        assert_ne!(debug_str, "");
     }
 
     #[test]

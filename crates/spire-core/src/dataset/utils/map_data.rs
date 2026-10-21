@@ -41,11 +41,11 @@ use crate::dataset::Dataset;
 /// // Normalize strings to uppercase when storing
 /// let dataset = InMemDataset::<String>::queue()
 ///     .map_data(
-///         |s: &str| s.to_uppercase(),
+///         |s: String| s.to_uppercase(),
 ///         |s: String| s, // Keep as-is when reading
 ///     );
 ///
-/// dataset.write("hello").await?;
+/// dataset.write("hello".to_owned()).await?;
 /// assert_eq!(dataset.read().await?, Some("HELLO".to_string()));
 /// # Ok(())
 /// # }
@@ -55,20 +55,21 @@ use crate::dataset::Dataset;
 ///
 /// ```no_run
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
-/// use serde::{Deserialize, Serialize};
 ///
-/// #[derive(Serialize, Deserialize)]
 /// struct User {
 ///     name: String,
 ///     age: u32,
 /// }
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {
-/// // Store User objects as JSON strings
+/// // Store User objects as `name:age` strings
 /// let dataset = InMemDataset::<String>::queue()
 ///     .map_data(
-///         |user: User| serde_json::to_string(&user).unwrap(),
-///         |json: String| serde_json::from_str(&json).unwrap(),
+///         |user: User| format!("{}:{}", user.name, user.age),
+///         |encoded: String| {
+///             let (name, age) = encoded.split_once(':').unwrap();
+///             User { name: name.into(), age: age.parse().unwrap() }
+///         },
 ///     );
 ///
 /// dataset.write(User { name: "Alice".into(), age: 30 }).await?;

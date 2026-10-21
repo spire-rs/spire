@@ -54,6 +54,7 @@ pub enum TagQuery {
 
 impl TagQuery {
     /// Matches a [`Tag`] to the owned [`TagQuery`].
+    #[must_use]
     pub fn is_match(&self, tag: &Tag, owner: &Tag) -> bool {
         match self {
             Self::Owner => !owner.is_fallback() && tag == owner,

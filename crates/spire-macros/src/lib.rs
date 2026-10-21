@@ -6,8 +6,6 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, GenericParam, parse_macro_input, parse_quote};
 
-// use proc_macro2::TokenStream as TokenStream2;
-
 /// Automatically generates the `Select` trait for a `struct`.
 #[proc_macro_derive(Select)]
 pub fn derive_select(input: TokenStream) -> TokenStream {

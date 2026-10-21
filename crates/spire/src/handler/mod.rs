@@ -272,11 +272,7 @@ mod tests {
             "test"
         }
 
-        let handler1 = test_handler;
-        let handler2 = test_handler;
-
-        // Both should be callable
-        let _h1 = handler1;
-        let _h2 = handler2;
+        fn assert_clone<T: Clone>(_: &T) {}
+        assert_clone(&test_handler);
     }
 }

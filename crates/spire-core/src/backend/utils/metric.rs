@@ -35,8 +35,10 @@ use crate::{Error, Result};
 /// ## Basic Usage
 ///
 /// ```no_run
-/// use spire_core::backend::utils::Metric;
+/// use spire_core::backend::utils::{Metric, Noop};
+/// use tower::load::Load;
 ///
+/// # let my_worker = Noop::default();
 /// let worker = Metric::new(my_worker);
 ///
 /// // After processing requests
@@ -47,9 +49,10 @@ use crate::{Error, Result};
 /// ## Using with Tower Layers
 ///
 /// ```no_run
-/// use spire_core::backend::utils::MetricLayer;
+/// use spire_core::backend::utils::{MetricLayer, Noop};
 /// use tower::ServiceBuilder;
 ///
+/// # let my_worker = Noop::default();
 /// let worker = ServiceBuilder::new()
 ///     .layer(MetricLayer::new())
 ///     .service(my_worker);
@@ -82,8 +85,9 @@ impl<S> Metric<S> {
     /// # Examples
     ///
     /// ```no_run
-    /// use spire_core::backend::utils::Metric;
+    /// use spire_core::backend::utils::{Metric, Noop};
     ///
+    /// # let my_worker = Noop::default();
     /// let worker = Metric::new(my_worker);
     /// ```
     pub fn new(inner: S) -> Self {
@@ -135,7 +139,7 @@ where
                 FlowControl::Skip | FlowControl::Hold(..) | FlowControl::Fail(..) => {
                     metrics.failure.fetch_add(1, Ordering::SeqCst);
                 }
-            };
+            }
 
             Ok(flow_control)
         };
@@ -191,9 +195,10 @@ impl Future for MetricFuture {
 /// # Examples
 ///
 /// ```no_run
-/// use spire_core::backend::utils::MetricLayer;
+/// use spire_core::backend::utils::{MetricLayer, Noop};
 /// use tower::ServiceBuilder;
 ///
+/// # let my_worker = Noop::default();
 /// let worker = ServiceBuilder::new()
 ///     .layer(MetricLayer::new())
 ///     .service(my_worker);

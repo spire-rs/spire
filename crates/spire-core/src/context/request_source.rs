@@ -27,7 +27,7 @@ use crate::context::{Body, Request};
 /// let source = RequestSource::from(request);
 /// ```
 ///
-/// ## Using with RequestQueue methods
+/// ## Using with `RequestQueue` methods
 ///
 /// ```no_run
 /// use spire_core::context::{RequestQueue, Tag, RequestSource};
@@ -47,6 +47,7 @@ use crate::context::{Body, Request};
 /// # Ok(())
 /// # }
 /// ```
+#[expect(clippy::large_enum_variant, reason = "short-lived conversion type")]
 #[derive(Debug)]
 pub enum RequestSource {
     /// An existing HTTP request

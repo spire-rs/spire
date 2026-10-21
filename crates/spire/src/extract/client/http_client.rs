@@ -4,9 +4,9 @@ use crate::HttpClient;
 use crate::context::Context;
 use crate::extract::FromContextRef;
 
-/// HttpBackend extractor for accessing the underlying HTTP client.
+/// `HttpBackend` extractor for accessing the underlying HTTP client.
 ///
-/// Extracts the HttpClient instance from the context, providing direct access
+/// Extracts the `HttpClient` instance from the context, providing direct access
 /// to the HTTP client for advanced operations, custom requests, or accessing
 /// client configuration when using the reqwest backend.
 ///

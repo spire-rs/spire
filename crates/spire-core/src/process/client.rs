@@ -5,6 +5,7 @@
 
 use std::cmp::max;
 use std::fmt;
+use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
@@ -31,13 +32,20 @@ use crate::{Error, Result};
 ///
 /// ```no_run
 /// use spire_core::Client;
+/// # use spire_core::backend::utils::Noop;
 ///
+/// # async fn example() -> spire_core::Result<()> {
+/// # let backend = Noop::default();
+/// # let worker = Noop::default();
+/// # let request = http::Request::get("https://example.com/").body(())?;
 /// let client = Client::new(backend, worker)
 ///     .with_concurrency_limit(10)
 ///     .with_initial_request(request);
 ///
 /// let processed = client.run().await?;
 /// println!("Processed {} requests", processed);
+/// # Ok(())
+/// # }
 /// ```
 #[must_use]
 pub struct Client<B, W> {
@@ -60,7 +68,10 @@ where
     ///
     /// ```no_run
     /// use spire_core::Client;
+    /// # use spire_core::backend::utils::Noop;
     ///
+    /// # let my_backend = Noop::default();
+    /// # let my_worker = Noop::default();
     /// let client = Client::new(my_backend, my_worker);
     /// ```
     pub fn new(backend: B, inner: W) -> Self {
@@ -89,12 +100,19 @@ where
     ///
     /// ```no_run
     /// use spire_core::Client;
+    /// # use spire_core::backend::utils::Noop;
     ///
+    /// # async fn example() -> spire_core::Result<()> {
+    /// # let backend = Noop::default();
+    /// # let worker = Noop::default();
+    /// # let request = http::Request::get("https://example.com/").body(())?;
     /// let client = Client::new(backend, worker)
     ///     .with_initial_request(request);
     ///
     /// let count = client.run().await?;
     /// println!("Processed {} requests", count);
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
@@ -123,9 +141,17 @@ where
     ///
     /// ```no_run
     /// use spire_core::Client;
+    /// # use spire_core::backend::utils::Noop;
     ///
+    /// # async fn example() -> spire_core::Result<()> {
+    /// # let backend = Noop::default();
+    /// # let worker = Noop::default();
+    /// # let single_request = spire_core::context::Request::get("https://example.com/")
+    /// #     .body(spire_core::context::Body::default())?;
     /// let client = Client::new(backend, worker);
     /// client.run_once(single_request).await?;
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
@@ -183,14 +209,24 @@ impl<B, W> Client<B, W> {
     /// ```no_run
     /// use http::Request;
     /// use spire_core::Client;
+    /// # use spire_core::backend::utils::Noop;
     ///
+    /// # fn example() -> spire_core::Result<()> {
+    /// # let backend = Noop::default();
+    /// # let worker = Noop::default();
     /// let request = Request::builder()
     ///     .uri("https://example.com")
     ///     .body(())?;
     ///
     /// let client = Client::new(backend, worker)
     ///     .with_initial_request(request);
+    /// # Ok(())
+    /// # }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub fn with_initial_request<R>(self, request: Request<R>) -> Self
@@ -220,7 +256,10 @@ impl<B, W> Client<B, W> {
     /// ```no_run
     /// use http::Request;
     /// use spire_core::Client;
+    /// # use spire_core::backend::utils::Noop;
     ///
+    /// # let backend = Noop::default();
+    /// # let worker = Noop::default();
     /// let urls = vec!["https://example.com/1", "https://example.com/2"];
     /// let requests: Vec<_> = urls.into_iter()
     ///     .map(|url| Request::builder().uri(url).body(()).unwrap())
@@ -229,6 +268,10 @@ impl<B, W> Client<B, W> {
     /// let client = Client::new(backend, worker)
     ///     .with_initial_requests(requests);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     ///
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub fn with_initial_requests<T, R>(self, requests: T) -> Self
@@ -264,7 +307,10 @@ impl<B, W> Client<B, W> {
     ///
     /// ```no_run
     /// use spire_core::Client;
+    /// # use spire_core::backend::utils::Noop;
     ///
+    /// # let backend = Noop::default();
+    /// # let worker = Noop::default();
     /// let client = Client::new(backend, worker)
     ///     .with_concurrency_limit(20); // Process up to 20 requests concurrently
     /// ```
@@ -297,6 +343,7 @@ impl<B, W> Client<B, W> {
     /// ```no_run
     /// use spire_core::Client;
     /// use spire_core::dataset::InMemDataset;
+    /// # use spire_core::backend::utils::Noop;
     ///
     /// #[derive(Clone)]
     /// struct Product {
@@ -304,6 +351,8 @@ impl<B, W> Client<B, W> {
     ///     price: f64,
     /// }
     ///
+    /// # let backend = Noop::default();
+    /// # let worker = Noop::default();
     /// let client = Client::new(backend, worker)
     ///     .with_dataset(InMemDataset::<Product>::queue());
     /// ```
@@ -335,6 +384,7 @@ impl<B, W> Client<B, W> {
     /// ```no_run
     /// use spire_core::Client;
     /// use spire_core::dataset::Dataset;
+    /// # use spire_core::backend::utils::Noop;
     ///
     /// #[derive(Clone)]
     /// struct Product {
@@ -342,6 +392,9 @@ impl<B, W> Client<B, W> {
     ///     price: f64,
     /// }
     ///
+    /// # async fn example() -> spire_core::Result<()> {
+    /// # let backend = Noop::default();
+    /// # let worker = Noop::default();
     /// let client = Client::new(backend, worker);
     /// client.run().await?;
     ///
@@ -350,6 +403,8 @@ impl<B, W> Client<B, W> {
     /// while let Some(product) = products.read().await? {
     ///     println!("{}: ${}", product.name, product.price);
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// [`InMemDataset`]: crate::dataset::InMemDataset
@@ -369,26 +424,29 @@ impl<B, W> Client<B, W> {
     /// # Examples
     ///
     /// ```no_run
-    /// use tokio::time::{sleep, Duration};
     /// use spire_core::Client;
+    /// # use spire_core::backend::utils::Noop;
     ///
+    /// # async fn example() -> spire_core::Result<()> {
+    /// # let backend = Noop::default();
+    /// # let worker = Noop::default();
+    /// # let request = http::Request::get("https://example.com/").body(())?;
     /// let client = Client::new(backend, worker)
     ///     .with_initial_request(request);
     ///
     /// let shutdown = client.shutdown_token();
     ///
-    /// // Spawn runner in background
-    /// let handle = tokio::spawn(async move {
-    ///     client.run().await
+    /// // Trigger shutdown from another task, e.g. on a signal or timeout
+    /// tokio::spawn(async move {
+    ///     shutdown.cancel();
     /// });
     ///
-    /// // Trigger shutdown after 5 seconds
-    /// sleep(Duration::from_secs(5)).await;
-    /// shutdown.cancel();
-    ///
-    /// // Wait for graceful shutdown
-    /// handle.await.unwrap().unwrap();
+    /// // Runs until the queue is empty or a graceful shutdown completes
+    /// client.run().await?;
+    /// # Ok(())
+    /// # }
     /// ```
+    #[must_use]
     pub fn shutdown_token(&self) -> tokio_util::sync::CancellationToken {
         self.inner.shutdown_token()
     }
@@ -420,7 +478,7 @@ impl<B, W> Client<B, W> {
     /// [`RequestQueue`]: crate::context::RequestQueue
     pub fn request_queue(&self) -> RequestQueue {
         let dataset = self.inner.datasets.get::<Request>();
-        RequestQueue::new(dataset, std::num::NonZeroU32::new(1).unwrap())
+        RequestQueue::new(dataset, NonZeroU32::MIN)
     }
 }
 

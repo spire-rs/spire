@@ -116,6 +116,11 @@ impl RequestQueue {
     ///
     /// This method will attach the queue's default tag and depth if they are set,
     /// but will not override existing extensions on the request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` cannot be converted into a [`Request`] or
+    /// if the underlying dataset fails to accept it.
     pub async fn append<S>(&self, source: S) -> Result<()>
     where
         S: TryInto<RequestSource>,
@@ -131,6 +136,11 @@ impl RequestQueue {
     ///
     /// This method increases the request's depth by 1 compared to the queue's current depth,
     /// and applies default tag if set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` cannot be converted into a [`Request`] or
+    /// if the underlying dataset fails to accept it.
     pub async fn branch<S>(&self, source: S) -> Result<()>
     where
         S: TryInto<RequestSource>,
@@ -157,6 +167,11 @@ impl RequestQueue {
     ///
     /// The tag will override any existing tag on the request, but default depth
     /// will still be applied if set and not already present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` cannot be converted into a [`Request`] or
+    /// if the underlying dataset fails to accept it.
     pub async fn append_with_tag<S>(&self, tag: impl Into<Tag>, source: S) -> Result<()>
     where
         S: TryInto<RequestSource>,
@@ -180,6 +195,11 @@ impl RequestQueue {
     ///
     /// This combines the behavior of `branch` and `append_with_tag` - it sets the
     /// provided tag and increases the depth by 1.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` cannot be converted into a [`Request`] or
+    /// if the underlying dataset fails to accept it.
     pub async fn branch_with_tag<S>(&self, tag: impl Into<Tag>, source: S) -> Result<()>
     where
         S: TryInto<RequestSource>,
@@ -287,7 +307,7 @@ mod tests {
         let queue = create_test_queue()
             .with_default_tag(Tag::from("test"))
             .with_default_depth(Depth::new(3));
-        let debug_str = format!("{:?}", queue);
+        let debug_str = format!("{queue:?}");
         assert!(debug_str.contains("RequestQueue"));
         assert!(debug_str.contains("has_default_tag: true"));
         assert!(debug_str.contains("has_default_depth: true"));

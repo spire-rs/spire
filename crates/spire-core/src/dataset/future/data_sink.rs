@@ -84,6 +84,10 @@ impl<T, E> DataSink<T, E> {
     }
 
     /// Convenience method to push data to the sink.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying sink fails to accept the item.
     pub async fn push(&mut self, item: T) -> Result<(), E> {
         use futures::SinkExt;
         self.send(item).await

@@ -385,6 +385,10 @@ impl<C, S> Router<C, S> {
     ///     .route(tag, handler)
     ///     .layer(ServiceBuilder::new().layer(my_middleware));
     /// ```
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "matches the by-value `layer` convention of tower and axum"
+    )]
     pub fn layer<L>(self, layer: L) -> Self
     where
         C: 'static,

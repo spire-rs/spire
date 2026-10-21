@@ -30,15 +30,15 @@ use crate::dataset::Dataset;
 /// # }
 /// ```
 ///
-/// ## Converting to anyhow::Error
+/// ## Converting to a Boxed Error
 ///
 /// ```no_run
+/// use spire_core::BoxError;
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
-/// use anyhow::Error;
 ///
-/// # async fn example() -> Result<(), Error> {
+/// # async fn example() -> Result<(), BoxError> {
 /// let dataset = InMemDataset::<i32>::queue()
-///     .map_err(|e| anyhow::anyhow!("Dataset error: {:?}", e));
+///     .map_err(|e| BoxError::from(format!("Dataset error: {e:?}")));
 ///
 /// dataset.write(42).await?;
 /// # Ok(())

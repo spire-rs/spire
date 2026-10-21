@@ -12,7 +12,7 @@
 //!
 //! # Examples
 //!
-//! ## Using DataStream
+//! ## Using `DataStream`
 //!
 //! ```no_run
 //! use futures::StreamExt;
@@ -31,7 +31,7 @@
 //! # }
 //! ```
 //!
-//! ## Using DataSink
+//! ## Using `DataSink`
 //!
 //! ```no_run
 //! use futures::SinkExt;

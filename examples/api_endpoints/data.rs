@@ -16,7 +16,7 @@ pub struct User {
 
 impl User {
     /// Creates a new User from JSON data and source URL.
-    pub fn from_json(data: Value, source_url: String) -> spire::Result<Self> {
+    pub fn from_json(data: &Value, source_url: String) -> Self {
         // Try to extract user-like information from various JSON structures
         let (name, email, id) = if let Some(obj) = data.as_object() {
             // Look for slideshow data (httpbin.org/json structure)
@@ -32,12 +32,12 @@ impl User {
                         .unwrap_or("Unknown Author");
 
                     (
-                        format!("{} ({})", title, author),
+                        format!("{title} ({author})"),
                         format!(
                             "{}@api.example.com",
                             author.to_lowercase().replace(' ', ".")
                         ),
-                        Self::generate_id_from_string(&title),
+                        Self::generate_id_from_string(title),
                     )
                 } else {
                     ("API Data".to_string(), "api@example.com".to_string(), 1)
@@ -54,8 +54,8 @@ impl User {
                 // Generic object handling
                 let name = obj.keys().next().map_or("object", |v| v).to_string();
                 (
-                    format!("API Object User ({})", name),
-                    format!("{}@api.example.com", name),
+                    format!("API Object User ({name})"),
+                    format!("{name}@api.example.com"),
                     Self::generate_id_from_string(&name),
                 )
             }
@@ -63,7 +63,7 @@ impl User {
             // Direct UUID string
             (
                 format!("String User {}", &uuid_str[..8.min(uuid_str.len())]),
-                format!("string@api.example.com"),
+                "string@api.example.com".to_string(),
                 Self::generate_id_from_string(uuid_str),
             )
         } else {
@@ -75,13 +75,13 @@ impl User {
             )
         };
 
-        Ok(Self {
+        Self {
             id,
             name,
             email,
             source_url,
             processed_at: Timestamp::now(),
-        })
+        }
     }
 
     /// Generates a deterministic ID from a string.
@@ -91,7 +91,7 @@ impl User {
 
         let mut hasher = DefaultHasher::new();
         input.hash(&mut hasher);
-        (hasher.finish() % 100000) + 1
+        (hasher.finish() % 100_000) + 1
     }
 }
 

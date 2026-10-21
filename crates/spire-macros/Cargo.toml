@@ -6,6 +6,7 @@ version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
+publish = { workspace = true }
 readme = "./README.md"
 
 authors = { workspace = true }
@@ -26,7 +27,8 @@ proc-macro = true
 path = "src/lib.rs"
 
 [dependencies]
-# Proc macro utilities
-proc-macro2 = { workspace = true, features = [] }
 syn = { workspace = true, features = [] }
 quote = { workspace = true, features = [] }
+
+[lints]
+workspace = true

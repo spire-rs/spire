@@ -13,6 +13,7 @@ use crate::dataset::Dataset;
 /// # Examples
 ///
 /// ```no_run
+/// use spire_core::dataset::utils::BoxDataset;
 /// use spire_core::dataset::{Dataset, DatasetExt, InMemDataset};
 ///
 /// # async fn example() -> Result<(), std::convert::Infallible> {
@@ -35,7 +36,8 @@ use crate::dataset::Dataset;
 /// their concrete types at compile time:
 ///
 /// ```no_run
-/// use spire_core::dataset::{BoxDataset, DatasetExt, InMemDataset};
+/// use spire_core::dataset::utils::BoxDataset;
+/// use spire_core::dataset::{DatasetExt, InMemDataset};
 ///
 /// fn create_dataset(use_queue: bool) -> BoxDataset<i32, std::convert::Infallible> {
 ///     if use_queue {

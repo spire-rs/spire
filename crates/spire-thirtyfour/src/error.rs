@@ -7,20 +7,20 @@ use thiserror::Error;
 /// Specific error types for browser operations.
 #[derive(Debug, Error)]
 pub enum BrowserError {
-    /// Failed to connect to WebDriver server
+    /// Failed to connect to `WebDriver` server
     #[error("Failed to connect to WebDriver server at '{url}': {source}")]
     ConnectionFailed {
-        /// WebDriver server URL that failed
+        /// `WebDriver` server URL that failed
         url: String,
         /// Underlying connection error
         #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 
-    /// WebDriver server returned an error
-    #[error("WebDriver error{}: {error}", context.as_ref().map(|c| format!(" during {}", c)).unwrap_or_default())]
+    /// `WebDriver` server returned an error
+    #[error("WebDriver error{}: {error}", context.as_ref().map(|c| format!(" during {c}")).unwrap_or_default())]
     WebDriverError {
-        /// The underlying WebDriver error
+        /// The underlying `WebDriver` error
         #[source]
         error: Box<WebDriverError>,
         /// Additional context about the operation that failed
@@ -28,7 +28,7 @@ pub enum BrowserError {
     },
 
     /// Browser session is invalid or expired
-    #[error("Invalid browser session{}: {reason}", session_id.as_ref().map(|id| format!(" '{}'", id)).unwrap_or_default())]
+    #[error("Invalid browser session{}: {reason}", session_id.as_ref().map(|id| format!(" '{id}'")).unwrap_or_default())]
     InvalidSession {
         /// Session ID if available
         session_id: Option<String>,
@@ -55,7 +55,7 @@ pub enum BrowserError {
     },
 
     /// Configuration error
-    #[error("Configuration error{}: {message}", field.as_ref().map(|f| format!(" in '{}'", f)).unwrap_or_default())]
+    #[error("Configuration error{}: {message}", field.as_ref().map(|f| format!(" in '{f}'")).unwrap_or_default())]
     Configuration {
         /// Description of the configuration issue
         message: String,
@@ -64,7 +64,7 @@ pub enum BrowserError {
     },
 
     /// Browser process management error
-    #[error("Process '{operation}' failed{}: {message}", exit_code.map(|c| format!(" with exit code {}", c)).unwrap_or_default())]
+    #[error("Process '{operation}' failed{}: {message}", exit_code.map(|c| format!(" with exit code {c}")).unwrap_or_default())]
     ProcessError {
         /// Process operation that failed
         operation: String,
@@ -75,7 +75,7 @@ pub enum BrowserError {
     },
 
     /// Element interaction error
-    #[error("Element operation '{operation}' failed{}: {reason}", selector.as_ref().map(|s| format!(" on selector '{}'", s)).unwrap_or_default())]
+    #[error("Element operation '{operation}' failed{}: {reason}", selector.as_ref().map(|s| format!(" on selector '{s}'")).unwrap_or_default())]
     ElementError {
         /// Type of element operation
         operation: String,
@@ -86,7 +86,7 @@ pub enum BrowserError {
     },
 
     /// Navigation error
-    #[error("Navigation to '{url}' failed: {error_type}{}", details.as_ref().map(|d| format!(" ({})", d)).unwrap_or_default())]
+    #[error("Navigation to '{url}' failed: {error_type}{}", details.as_ref().map(|d| format!(" ({d})")).unwrap_or_default())]
     NavigationError {
         /// URL being navigated to
         url: String,
@@ -175,7 +175,8 @@ impl BrowserError {
         }
     }
 
-    /// Creates a WebDriver error with optional context.
+    /// Creates a `WebDriver` error with optional context.
+    #[must_use]
     pub fn webdriver(error: WebDriverError, context: Option<String>) -> Self {
         Self::WebDriverError {
             error: Box::new(error),
@@ -201,6 +202,7 @@ impl BrowserError {
     }
 
     /// Creates a pool exhausted error.
+    #[must_use]
     pub fn pool_exhausted(pool_size: usize, active_connections: usize) -> Self {
         Self::PoolExhausted {
             pool_size,
@@ -325,43 +327,44 @@ impl BrowserError {
     #[must_use]
     pub fn is_retryable(&self) -> bool {
         match self {
-            Self::ConnectionFailed { .. } => true,
             Self::WebDriverError { error, .. } => is_webdriver_error_retryable(error.as_ref()),
-            Self::InvalidSession { .. } => false, // Usually requires new session
-            Self::Timeout { .. } => true,
-            Self::PoolExhausted { .. } => true,
-            Self::Configuration { .. } => false,
-            Self::ProcessError { .. } => false,
-            Self::ElementError { .. } => false, // Usually a logic error
             Self::NavigationError { error_type, .. } => matches!(
                 error_type,
                 NavigationErrorType::NetworkError
                     | NavigationErrorType::Timeout
                     | NavigationErrorType::HttpError(500..=599)
             ),
-            Self::ScriptError { .. } => false,
-            Self::ResourceError { .. } => true,
-            Self::CapabilityError { .. } => false,
-            Self::OperationFailed { .. } => true,
+            Self::ConnectionFailed { .. }
+            | Self::Timeout { .. }
+            | Self::PoolExhausted { .. }
+            | Self::ResourceError { .. }
+            | Self::OperationFailed { .. } => true,
+            // Invalid sessions usually require a new session, element errors
+            // are usually logic errors.
+            Self::InvalidSession { .. }
+            | Self::Configuration { .. }
+            | Self::ProcessError { .. }
+            | Self::ElementError { .. }
+            | Self::ScriptError { .. }
+            | Self::CapabilityError { .. } => false,
         }
     }
 
     /// Returns the error kind for Spire error categorization.
+    #[must_use]
     pub fn error_kind(&self) -> ErrorKind {
         match self {
-            Self::ConnectionFailed { .. } => ErrorKind::Http,
-            Self::WebDriverError { .. } => ErrorKind::Backend,
-            Self::InvalidSession { .. } => ErrorKind::Backend,
+            Self::ConnectionFailed { .. } | Self::NavigationError { .. } => ErrorKind::Http,
             Self::Timeout { .. } => ErrorKind::Timeout,
-            Self::PoolExhausted { .. } => ErrorKind::Backend,
-            Self::Configuration { .. } => ErrorKind::Backend,
-            Self::ProcessError { .. } => ErrorKind::Backend,
-            Self::ElementError { .. } => ErrorKind::Worker,
-            Self::NavigationError { .. } => ErrorKind::Http,
-            Self::ScriptError { .. } => ErrorKind::Worker,
+            Self::ElementError { .. } | Self::ScriptError { .. } => ErrorKind::Worker,
             Self::ResourceError { .. } => ErrorKind::Io,
-            Self::CapabilityError { .. } => ErrorKind::Backend,
-            Self::OperationFailed { .. } => ErrorKind::Backend,
+            Self::WebDriverError { .. }
+            | Self::InvalidSession { .. }
+            | Self::PoolExhausted { .. }
+            | Self::Configuration { .. }
+            | Self::ProcessError { .. }
+            | Self::CapabilityError { .. }
+            | Self::OperationFailed { .. } => ErrorKind::Backend,
         }
     }
 }
@@ -391,7 +394,7 @@ impl From<NavigationErrorType> for BrowserError {
     }
 }
 
-/// Determines if a WebDriver error is retryable.
+/// Determines if a `WebDriver` error is retryable.
 fn is_webdriver_error_retryable(_error: &WebDriverError) -> bool {
     // For now, be conservative and consider most WebDriver errors as non-retryable
     // This can be refined based on specific error types as needed

@@ -101,6 +101,10 @@ impl<T> InMemDataset<T> {
     /// let dataset = InMemDataset::<String>::queue()
     ///     .reserved(1000);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     pub fn reserved(self, additional: usize) -> Self {
         {
             let mut guard = self

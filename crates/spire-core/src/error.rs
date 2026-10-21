@@ -42,6 +42,7 @@ pub enum ErrorKind {
 
 impl ErrorKind {
     /// Returns a string representation of the error kind.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Http => "http",
@@ -90,6 +91,8 @@ impl fmt::Display for ErrorKind {
 /// ## Error Handling
 ///
 /// ```no_run
+/// use std::error::Error as _;
+///
 /// use spire_core::{Error, ErrorKind};
 ///
 /// # let result: Result<(), Error> = Err(Error::new(ErrorKind::Timeout, "timeout"));

@@ -90,7 +90,7 @@
 //! ## Feature Flags
 //!
 //! This crate requires exactly one TLS implementation:
-//! - `rustls-tls` - Use rustls for TLS (recommended)
+//! - `rustls` - Use rustls for TLS (recommended)
 //! - `native-tls` - Use system's native TLS implementation
 //!
 //! ## Integration with Spire
@@ -118,8 +118,8 @@
 #![doc = include_str!("../README.md")]
 
 // Ensure at least one TLS feature is enabled
-#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
-compile_error!("At least one TLS feature must be enabled: 'rustls-tls' or 'native-tls'");
+#[cfg(not(any(feature = "rustls", feature = "native-tls")))]
+compile_error!("At least one TLS feature must be enabled: 'rustls' or 'native-tls'");
 
 mod client;
 mod error;

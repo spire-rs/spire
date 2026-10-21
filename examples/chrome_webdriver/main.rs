@@ -1,17 +1,17 @@
-//! Chrome WebDriver automation example demonstrating browser-based scraping with Spire.
+//! Chrome `WebDriver` automation example demonstrating browser-based scraping with Spire.
 //!
 //! This example showcases the browser automation capabilities of the Spire framework
-//! using the thirtyfour backend with Chrome WebDriver. It demonstrates how to set up
+//! using the thirtyfour backend with Chrome `WebDriver`. It demonstrates how to set up
 //! browser-based web scraping for JavaScript-heavy pages, handle dynamic content
 //! loading, extract data from rendered web pages, and manage browser automation
 //! workflows with proper error handling.
 //!
 //! The example covers basic browser page processing, dynamic content handling,
-//! WebDriver integration patterns, and graceful error handling when WebDriver
+//! `WebDriver` integration patterns, and graceful error handling when `WebDriver`
 //! services are unavailable.
 //!
 //! Prerequisites: Chrome browser must be installed and accessible.
-//! ChromeDriver is automatically managed by the thirtyfour library.
+//! `ChromeDriver` is automatically managed by the thirtyfour library.
 
 mod data;
 
@@ -27,7 +27,7 @@ use spire::{BrowserBackend, Client, Result, Router, http};
 /// Handler for processing pages that require browser rendering.
 ///
 /// This handler demonstrates basic browser navigation and content extraction
-/// using WebDriver for JavaScript-heavy or dynamically rendered pages. It shows
+/// using `WebDriver` for JavaScript-heavy or dynamically rendered pages. It shows
 /// how to wait for page content to load, extract basic page information, and
 /// store structured data about browser-rendered pages.
 async fn scrape_browser_page(uri: http::Uri, data_store: Data<PageData>, view: View) -> Result<()> {
@@ -41,21 +41,21 @@ async fn scrape_browser_page(uri: http::Uri, data_store: Data<PageData>, view: V
     let title = view.title().await.map_err(|e| {
         spire::Error::new(
             spire::ErrorKind::Backend,
-            format!("Failed to get title: {}", e),
+            format!("Failed to get title: {e}"),
         )
     })?;
 
     let page_source = view.source().await.map_err(|e| {
         spire::Error::new(
             spire::ErrorKind::Backend,
-            format!("Failed to get page source: {}", e),
+            format!("Failed to get page source: {e}"),
         )
     })?;
 
     let current_url = view.current_url().await.map_err(|e| {
         spire::Error::new(
             spire::ErrorKind::Backend,
-            format!("Failed to get current URL: {}", e),
+            format!("Failed to get current URL: {e}"),
         )
     })?;
 
@@ -91,21 +91,21 @@ async fn scrape_dynamic_content(
     let title = view.title().await.map_err(|e| {
         spire::Error::new(
             spire::ErrorKind::Backend,
-            format!("Failed to get title: {}", e),
+            format!("Failed to get title: {e}"),
         )
     })?;
 
     let current_url = view.current_url().await.map_err(|e| {
         spire::Error::new(
             spire::ErrorKind::Backend,
-            format!("Failed to get current URL: {}", e),
+            format!("Failed to get current URL: {e}"),
         )
     })?;
 
     let page_source = view.source().await.map_err(|e| {
         spire::Error::new(
             spire::ErrorKind::Backend,
-            format!("Failed to get page source: {}", e),
+            format!("Failed to get page source: {e}"),
         )
     })?;
 
@@ -122,7 +122,7 @@ async fn scrape_dynamic_content(
     Ok(())
 }
 
-/// Creates and configures the browser client with WebDriver backend.
+/// Creates and configures the browser client with `WebDriver` backend.
 fn create_browser_client() -> Result<Client<BrowserBackend>> {
     let browser_backend = BrowserBackend::builder()
         .with_unmanaged("http://127.0.0.1:4444")

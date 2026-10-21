@@ -6,6 +6,7 @@ version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
+publish = false
 description = "Chrome WebDriver automation example for Spire web scraping framework"
 
 [[bin]]
@@ -24,3 +25,6 @@ jiff = { workspace = true, features = ["serde"] }
 # Observability
 tracing = { workspace = true, features = [] }
 tracing-subscriber = { workspace = true, features = [] }
+
+[lints]
+workspace = true

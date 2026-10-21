@@ -26,7 +26,7 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
 
 - **Flexible Architecture**: Built on tower's Service trait for composable
   middleware
-- **Multiple Backends**: Support for HTTP (reqwest) and WebDriver (thirtyfour)
+- **Multiple Backends**: Support for HTTP (reqwest) and `WebDriver` (thirtyfour)
   backends
 - **Type-Safe Routing**: Tag-based routing with compile-time safety
 - **Async First**: Powered by tokio for high-performance concurrent scraping
@@ -53,10 +53,10 @@ spire = "0.2.0"
 - **`tracing`** - Enables tracing/logging support
 - **`trace`** - Enables detailed trace-level instrumentation
 - **`metric`** - Enables metrics collection
-- **`rustls-tls`** - Use rustls for TLS connections (enabled by default)
+- **`rustls`** - Use rustls for TLS connections (enabled by default)
 - **`native-tls`** - Use native system TLS library for connections
 - **`full`** - Enables all features (macros, tracing, reqwest, thirtyfour,
-  rustls-tls)
+  rustls)
 
 ### TLS Configuration
 
@@ -64,13 +64,13 @@ By default, Spire uses rustls for TLS connections. You can choose between
 different TLS implementations:
 
 ```toml
-# Default: uses rustls-tls
+# Default: uses rustls
 [dependencies]
 spire = "0.2.0"
 
 # Explicitly use rustls
 [dependencies]
-spire = { version = "0.2.0", features = ["rustls-tls"], default-features = false }
+spire = { version = "0.2.0", features = ["rustls"], default-features = false }
 
 # Use native TLS (system TLS library)
 [dependencies]
@@ -86,11 +86,10 @@ spire = { version = "0.2.0", features = ["reqwest", "native-tls"], default-featu
 ### HTTP Scraping with Reqwest
 
 ```rust,no_run
-use spire::prelude::*;
-use spire::extract::{Text, State};
-use spire::context::{RequestQueue, Tag};
-use spire::HttpClient;
+use spire::context::RequestQueue;
 use spire::dataset::InMemDataset;
+use spire::extract::{State, Text};
+use spire::{Client, HttpClient, Result, Router};
 
 #[derive(Clone)]
 struct AppState {
@@ -99,19 +98,19 @@ struct AppState {
 
 async fn scrape_handler(
     State(state): State<AppState>,
-    Text(html): Text,
     queue: RequestQueue,
-) -> Result<(), Box<dyn std::error::Error>> {
+    Text(html): Text,
+) -> Result<()> {
     println!("Scraped {} bytes with API key: {}", html.len(), state.api_key);
 
     // Queue more requests
-    queue.push("page2", "https://example.com/page2").await?;
+    queue.append_with_tag("main", "https://example.com/page2").await?;
 
     Ok(())
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
     // Create router
     let router = Router::new()
         .route("main", scrape_handler)
@@ -126,8 +125,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_dataset(InMemDataset::<String>::new());
 
     // Start initial request
-    client.queue()
-        .push("main", "https://example.com")
+    client
+        .request_queue()
+        .append_with_tag("main", "https://example.com")
         .await?;
 
     // Run the client
@@ -137,27 +137,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Browser Automation with ThirtyFour
+### Browser Automation with `ThirtyFour`
 
 ```rust,no_run
-use spire::prelude::*;
-use spire::extract::State;
-use spire::context::{RequestQueue, Tag};
-use spire::BrowserBackend;
 use spire::dataset::InMemDataset;
+use spire::extract::driver::View;
+use spire::{BrowserBackend, Client, Result, Router};
 
-async fn browser_handler(
-    queue: RequestQueue,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Processing page with browser");
+async fn browser_handler(View(driver): View) -> Result<()> {
+    println!("Processing page: {:?}", driver.title().await);
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create router
-    let router = Router::new()
-        .route("main", browser_handler);
+    let router = Router::new().route("main", browser_handler);
 
     // Create browser pool backend
     let backend = BrowserBackend::builder()
@@ -169,8 +164,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_dataset(InMemDataset::<String>::new());
 
     // Start initial request
-    client.queue()
-        .push("main", "https://example.com")
+    client
+        .request_queue()
+        .append_with_tag("main", "https://example.com")
         .await?;
 
     // Run the client

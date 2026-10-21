@@ -20,13 +20,13 @@ Browser automation backend for Spire.
 
 This crate provides [`BrowserBackend`], a browser automation backend
 implementation that integrates with the Spire web scraping framework using the
-[thirtyfour](https://github.com/stevepryde/thirtyfour) WebDriver library.
+[thirtyfour](https://github.com/stevepryde/thirtyfour) `WebDriver` library.
 
 ## Overview
 
 `spire-thirtyfour` provides a browser automation backend implementation for
 Spire built on top of the [thirtyfour](https://github.com/stevepryde/thirtyfour)
-WebDriver library.
+`WebDriver` library.
 
 The backend implements the `Backend` trait from `spire-core` and creates
 `BrowserConnection` instances that implement the `Client` trait for performing
@@ -34,7 +34,7 @@ browser-based operations.
 
 ## Features
 
-- **Built on thirtyfour**: Leverages the powerful thirtyfour WebDriver library
+- **Built on thirtyfour**: Leverages the powerful thirtyfour `WebDriver` library
 - **Spire Integration**: Seamlessly integrates with the Spire web scraping
   framework
 - **Browser Automation**: Control real browsers for JavaScript-heavy websites
@@ -60,13 +60,13 @@ By default, `spire-thirtyfour` uses rustls for TLS connections. You can choose
 between different TLS implementations:
 
 ```toml
-# Default: uses rustls-tls
+# Default: uses rustls
 [dependencies]
 spire-thirtyfour = "0.2.0"
 
 # Explicitly use rustls
 [dependencies]
-spire-thirtyfour = { version = "0.2.0", features = ["rustls-tls"], default-features = false }
+spire-thirtyfour = { version = "0.2.0", features = ["rustls"], default-features = false }
 
 # Use native TLS (system TLS library)
 [dependencies]
@@ -78,7 +78,7 @@ For advanced usage and custom configurations, see the
 
 ## Prerequisites
 
-Browser automation requires a WebDriver server. For Chrome:
+Browser automation requires a `WebDriver` server. For Chrome:
 
 ```bash
 # ChromeDriver is automatically managed by thirtyfour
@@ -90,7 +90,7 @@ For other browsers, see the
 
 ## Error Handling
 
-All thirtyfour WebDriver errors are automatically converted to
+All thirtyfour `WebDriver` errors are automatically converted to
 `spire_core::Error` types. This includes browser connection errors, element
 interaction failures, navigation timeouts, and JavaScript execution errors.
 

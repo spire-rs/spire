@@ -45,6 +45,10 @@ impl<C> Context<C> {
 
     /// Resolves the [`Request`] and returns [`Response`] or [`Error`].
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying [`Client`] fails to resolve the request.
+    ///
     /// [`Error`]: crate::Error
     pub async fn resolve(self) -> Result<Response>
     where

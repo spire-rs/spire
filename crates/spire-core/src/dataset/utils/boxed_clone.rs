@@ -37,12 +37,12 @@ use crate::dataset::Dataset;
 /// let dataset = InMemDataset::<i32>::queue().boxed_clone();
 ///
 /// let dataset_clone = dataset.clone();
-/// tokio::spawn(async move {
+/// let handle = tokio::spawn(async move {
 ///     dataset_clone.write(42).await.unwrap();
 /// });
 ///
 /// // Original dataset shares the same underlying storage
-/// tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+/// handle.await.unwrap();
 /// assert_eq!(dataset.read().await?, Some(42));
 /// # Ok(())
 /// # }

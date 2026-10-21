@@ -59,13 +59,13 @@ By default, `spire-reqwest` uses rustls for TLS connections. You can choose
 between different TLS implementations:
 
 ```toml
-# Default: uses rustls-tls
+# Default: uses rustls
 [dependencies]
 spire-reqwest = "0.2.0"
 
 # Explicitly use rustls
 [dependencies]
-spire-reqwest = { version = "0.2.0", features = ["rustls-tls"], default-features = false }
+spire-reqwest = { version = "0.2.0", features = ["rustls"], default-features = false }
 
 # Use native TLS (system TLS library)
 [dependencies]
