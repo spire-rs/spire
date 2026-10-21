@@ -49,7 +49,7 @@ in the main `spire` crate and refer to the
 
 ```toml
 [dependencies]
-spire = { version = "0.2.0", features = ["reqwest"] }
+spire = { version = "0.3.0", features = ["reqwest"] }
 ```
 
 ### Features
@@ -58,10 +58,10 @@ TLS through rustls, HTTP/2 and system proxies are on by default. Everything else
 
 ```toml
 [dependencies]
-spire-reqwest = { version = "0.2.0", features = ["gzip", "brotli", "cookies"] }
+spire-reqwest = { version = "0.3.0", features = ["gzip", "brotli", "cookies"] }
 
 # Native TLS instead of rustls
-spire-reqwest = { version = "0.2.0", default-features = false, features = ["native-tls", "http2"] }
+spire-reqwest = { version = "0.3.0", default-features = false, features = ["native-tls", "http2"] }
 ```
 
 | Feature | Enables |

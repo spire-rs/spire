@@ -38,7 +38,7 @@ The flexible crawler and scraper framework for Rust, built on
 
 ```toml
 [dependencies]
-spire = { version = "0.2.0", features = ["reqwest", "macros"] }
+spire = { version = "0.3.0", features = ["reqwest", "macros"] }
 ```
 
 ### Feature Flags

@@ -22,7 +22,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 rust-version = "1.95"
 edition = "2024"
 license = "MIT"
@@ -50,12 +50,12 @@ allow_attributes_without_reason = "deny"
 # See for more details: https://github.com/rust-lang/cargo/issues/11329
 
 # Internal crates
-spire = { path = "./crates/spire", version = "0.2.0" }
-spire-core = { path = "./crates/spire-core", version = "0.2.0" }
-spire-macros = { path = "./crates/spire-macros", version = "0.2.0" }
-spire-redb = { path = "./crates/spire-redb", version = "0.2.0" }
-spire-reqwest = { path = "./crates/spire-reqwest", version = "0.2.0" }
-spire-thirtyfour = { path = "./crates/spire-thirtyfour", version = "0.2.0" }
+spire = { path = "./crates/spire", version = "0.3.0" }
+spire-core = { path = "./crates/spire-core", version = "0.3.0" }
+spire-macros = { path = "./crates/spire-macros", version = "0.3.0" }
+spire-redb = { path = "./crates/spire-redb", version = "0.3.0" }
+spire-reqwest = { path = "./crates/spire-reqwest", version = "0.3.0" }
+spire-thirtyfour = { path = "./crates/spire-thirtyfour", version = "0.3.0" }
 
 # Async runtime
 tokio = { version = "1.54", features = [] }

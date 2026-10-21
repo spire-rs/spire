@@ -25,9 +25,17 @@ participating, you are expected to uphold this code.
 
 ### Prerequisites
 
-- Rust 1.83 or later
+- Rust 1.95 or later, and a nightly toolchain for formatting
 - Git
 - Familiarity with async Rust and the Tokio ecosystem
+- [cargo-deny](https://github.com/EmbarkStudios/cargo-deny) and
+  [cargo-machete](https://github.com/bnjbvr/cargo-machete), for the security
+  and dependency checks
+
+```bash
+rustup toolchain install nightly --component rustfmt
+cargo install cargo-deny cargo-machete --locked
+```
 
 1. Fork the repository on GitHub
 2. Clone your fork locally:
@@ -44,24 +52,23 @@ participating, you are expected to uphold this code.
 
 ### Building the Project
 
+The `Makefile` mirrors the CI checks:
+
 ```bash
-# Navigate to the workspace
-cd spire
-
-# Build the project
-cargo build
-
-# Build with all features
+# Build the project with all features
 cargo build --all-features
 
-# Run tests
-cargo test --workspace --all-features
+# Check, format, clippy, tests, docs and machete, as CI runs them
+make ci
 
-# Check formatting
-cargo fmt --all -- --check
+# Fix the formatting with nightly rustfmt
+make fmt
 
-# Run clippy
-cargo clippy --workspace --all-targets --all-features -- -D warnings
+# Check advisories, licenses and sources with cargo-deny
+make security
+
+# Package and verify every publishable crate
+make publish-dry-run
 ```
 
 ## Making Changes
@@ -121,7 +128,8 @@ are too noisy to gate a merge. Reports are written to `target/criterion`.
 
 This project follows the standard Rust style guidelines:
 
-- Run `cargo fmt` before committing
+- Format with nightly rustfmt (`make fmt`), which applies the import grouping
+  in `rustfmt.toml`
 - Ensure `cargo clippy` passes with no warnings
 - Add documentation comments (`///`) for public APIs
 - Keep functions focused and reasonably sized
@@ -187,9 +195,9 @@ If you find a bug, please create an issue on GitHub with:
 
 **Environment**
 
-- Rust version: [e.g. 1.83.0]
+- Rust version: [e.g. 1.95.0]
 - OS: [e.g. Ubuntu 22.04]
-- Spire version: [e.g. 0.2.0]
+- Spire version: [e.g. 0.3.0]
 
 **Additional context** Any other relevant information.
 ```
@@ -205,17 +213,10 @@ We welcome feature requests! Please create an issue with:
 
 ## Questions?
 
-If you have questions about contributing, feel free to:
-
-- Open a discussion on GitHub
-- Ask in the issue tracker
+If you have questions about contributing, feel free to ask in the issue
+tracker.
 
 ## License
 
 By contributing, you agree that your contributions will be licensed under the
 MIT License.
-
-## Recognition
-
-Contributors will be recognized in the project's README and releases. Thank you
-for making this project better!

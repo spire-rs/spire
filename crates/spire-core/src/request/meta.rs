@@ -193,8 +193,21 @@ pub(crate) struct Meta {
 
 /// Reads crawl metadata from a [`Request`](crate::request::Request).
 ///
-/// The crawler stores the [`Tag`], [`Depth`] and [`Attempt`] of every request
-/// in its extensions, when it turns a seed into the request.
+/// A request gets its [`Tag`], [`Depth`] and [`Attempt`] from the seed it is
+/// made from, in [`Seed::into_request`]. A request built any other way has
+/// no tag, the root depth and the first attempt; to give one metadata, e.g.
+/// to test a handler, build it from a seed:
+///
+/// ```
+/// use spire_core::frontier::seed::Seed;
+/// use spire_core::request::{RequestExt, Tag};
+///
+/// let request = Seed::get("https://example.com/")?.with_tag("page").into_request();
+/// assert_eq!(request.tag(), Some(&Tag::from("page")));
+/// # Ok::<_, spire_core::Error>(())
+/// ```
+///
+/// [`Seed::into_request`]: crate::frontier::seed::Seed::into_request
 pub trait RequestExt {
     /// Returns the tag, if the request has one.
     fn tag(&self) -> Option<&Tag>;

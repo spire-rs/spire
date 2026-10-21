@@ -49,7 +49,7 @@ crate directly to use the backend with `spire-core`:
 
 ```toml
 [dependencies]
-spire = { version = "0.2.0", features = ["thirtyfour"] }
+spire = { version = "0.3.0", features = ["thirtyfour"] }
 ```
 
 ```rust,no_run

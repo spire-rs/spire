@@ -8,6 +8,11 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-21
+
+A redesign around one shared page per request, with sitemaps, built-in
+handlers, benchmarks and a faster crawler. Breaking changes are marked.
+
 ### Added
 
 - `spire`: the `sitemap` feature. The `Sitemap` extractor parses XML and text
@@ -49,6 +54,9 @@ and this project adheres to
   are spawned, crawl metadata is one request extension, and a seed's
   headers and body are boxed, as most seeds have neither.
 - **Breaking:** `Seed::headers` and `Seed::body` are no longer `const`.
+- **Breaking:** requests get their tag, depth and attempt only from
+  `Seed::into_request`; a `Tag` inserted into a request's extensions by hand
+  is no longer read.
 - Path routes match about 25 times faster: a pattern's literal prefix and
   suffix rule out most paths at once, and matching no longer allocates per
   character.
@@ -103,6 +111,7 @@ Rust 1.95.
 
 - Initial placeholder release for name reservation
 
-[Unreleased]: https://github.com/spire-rs/spire/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/spire-rs/spire/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/spire-rs/spire/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/spire-rs/spire/releases/tag/v0.2.0
 [0.1.0]: https://crates.io/crates/spire/0.1.0
