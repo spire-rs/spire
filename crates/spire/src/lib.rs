@@ -16,7 +16,7 @@ use spire_core::backend::Backend;
 #[cfg(any(test, feature = "testing"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 pub use spire_core::testing;
-pub use spire_core::{Context, Error, ErrorKind, Result, dataset, worker};
+pub use spire_core::{Context, Error, ErrorKind, Result, worker};
 
 pub use crate::routing::Router;
 
@@ -42,6 +42,21 @@ pub mod crawler {
 
     #[cfg(doc)]
     use crate::Crawler;
+}
+
+/// Datasets: where handlers store what they scrape.
+pub mod dataset {
+    // Listed by name, so the documentation shows the features of this crate.
+    #[cfg(feature = "csv")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "csv")))]
+    pub use spire_core::dataset::CsvDataset;
+    #[cfg(feature = "json")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
+    pub use spire_core::dataset::JsonlDataset;
+    pub use spire_core::dataset::{Data, Dataset, InMemDataset};
+    #[cfg(feature = "redb")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
+    pub use spire_redb::RedbDataset;
 }
 
 /// The frontier: requests waiting to be crawled.

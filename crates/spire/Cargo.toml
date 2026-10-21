@@ -30,7 +30,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Default feature set: HTML parsing, and rustls for any enabled backend
 default = ["html", "rustls-tls"]
 # Every feature except `native-tls` and `testing`
-full = ["html", "macros", "robots", "sitemap", "serde", "redb", "reqwest", "thirtyfour", "rustls-tls"]
+full = ["html", "macros", "robots", "sitemap", "serde", "json", "csv", "redb", "reqwest", "thirtyfour", "rustls-tls"]
 
 # The `Html` and `Element` extractors and the `Select` trait
 html = ["dep:scraper"]
@@ -41,8 +41,12 @@ macros = ["html", "dep:spire-macros"]
 robots = ["spire-core/robots"]
 # The `Sitemap` extractor and `FollowSitemap` handler, plain or gzipped
 sitemap = ["dep:sitemapo", "dep:flate2", "dep:tokio"]
-# Serializable seeds for snapshots, and the `JsonlDataset` output
+# Serializable seeds for snapshots
 serde = ["spire-core/serde"]
+# The `JsonlDataset` output
+json = ["serde", "spire-core/json"]
+# The `CsvDataset` output
+csv = ["serde", "spire-core/csv"]
 # `MockSite` and `Visit`, to test handlers without a network
 testing = ["spire-core/testing"]
 

@@ -19,8 +19,10 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 | `thirtyfour` | `BrowserBackend`, the WebDriver backend |
 | `robots` | Obeying robots.txt with `Crawler::with_robots` |
 | `sitemap` | The `Sitemap` extractor and the `FollowSitemap` handler |
-| `serde` | Serializable seeds for snapshots, and `JsonlDataset` |
-| `redb` | `RedbStore`, a crash-safe frontier and seen set on disk |
+| `serde` | Serializable seeds for snapshots |
+| `json` | `JsonlDataset` |
+| `csv` | `CsvDataset` |
+| `redb` | `RedbStore`, a crash-safe frontier, seen set and datasets on disk |
 | `rustls-tls` (default), `native-tls` | TLS for the enabled backends |
 | `testing` | `MockSite` and `Visit`, to test handlers without a network |
 | `full` | Everything except `native-tls` and `testing` |

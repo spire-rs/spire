@@ -47,7 +47,7 @@ removes them: `read` takes one, and `read_all` takes every item.
 
 ## JSON Lines
 
-`JsonlDataset`, with the `serde` feature, appends every item to a file as
+`JsonlDataset`, with the `json` feature, appends every item to a file as
 one line of JSON, for items that implement `Serialize`:
 
 ```rust,no_run
@@ -68,9 +68,80 @@ let titles = JsonlDataset::<Title>::create("titles.jsonl").await?;
 ```
 
 Each item is written and flushed as it is stored, so it survives a crash of
-the crawl, though not of the machine. A crawl resumed after a crash may
+the crawl, though not of the machine. The file is locked while the dataset
+is open, so a second dataset on the same file, in this crawl or another,
+fails to open. A crawl resumed after a crash may
 crawl a page again, writing its items twice: deduplicate by a key such as
 the URL when reading the file.
+
+## CSV
+
+`CsvDataset`, with the `csv` feature, appends every item to a CSV file as
+one row, after a header row of its field names:
+
+```rust,no_run
+use serde::Serialize;
+use spire::dataset::CsvDataset;
+
+#[derive(Serialize)]
+struct Product {
+    name: String,
+    price: Option<f64>,
+}
+
+# async fn example() -> spire::Result<()> {
+// `create` truncates the file; `append` adds to it, with a header row only
+// if it is empty.
+let products = CsvDataset::<Product>::create("products.csv").await?;
+# Ok(())
+# }
+```
+
+Items must be flat: fields of strings, numbers, booleans, or `Option`s of
+them. An item with a nested struct or a list fails to write. Like JSON
+Lines, rows are flushed as they are written, and a resumed crawl may write
+a page's rows twice.
+
+## In the crawl's database
+
+With the `redb` feature, a `RedbStore` holds datasets next to the frontier
+and the seen set, so one file holds the whole crawl. Items are stored as
+JSON, for types that implement both `Serialize` and `Deserialize`, and read
+back in the order they were written:
+
+```rust,no_run
+use serde::{Deserialize, Serialize};
+use spire::backend::HttpClient;
+use spire::frontier::FrontierExt;
+use spire::frontier::redb::RedbStore;
+use spire::frontier::seed::Seed;
+use spire::{Crawler, Result, Router};
+
+#[derive(Serialize, Deserialize)]
+struct Product {
+    name: String,
+    price: Option<f64>,
+}
+
+# async fn crawl(router: Router<<HttpClient as spire::backend::Backend>::Client>) -> Result<()> {
+let store = RedbStore::open("crawl.redb").await?;
+let crawler = Crawler::new(HttpClient::default(), router)
+    .with_frontier(store.frontier().dedup_with(store.seen()))
+    // Each dataset is a table, by name.
+    .with_dataset(store.dataset::<Product>("products"))
+    .with_seed(Seed::get("https://example.com/")?);
+crawler.run().await?;
+
+let products = crawler.dataset::<Product>()?.read_all().await?;
+# Ok(())
+# }
+```
+
+Items are committed as they are written, and synced to disk with the
+frontier, so after a crash the reopened store has every item written before
+it. As with files, a page whose items were committed just before the crash
+may be crawled again and write them twice. Reading takes items out of the
+table: read them once the crawl is over.
 
 ## Your own
 

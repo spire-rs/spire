@@ -94,5 +94,43 @@ async fn resumes_after_a_crash() {
     assert_eq!(first, [0, 1, 2]);
     assert_eq!(second, [3, 4, 5, 6, 7, 8, 9]);
     assert_eq!(stats.requests, 7);
-    assert_eq!(store.frontier().in_flight(), 0);
+    assert_eq!(store.frontier().in_flight().unwrap(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn datasets_in_the_store_resume_after_an_aborted_crawl() {
+    let path = TempPath(
+        std::env::temp_dir().join(format!("spire-redb-crash-data-{}.redb", std::process::id())),
+    );
+    let start = || Seed::get("https://example.com/0").unwrap();
+
+    // First run: pages 0 to 2 are written to the store, then the crawl dies.
+    let reached = Arc::new(Notify::new());
+    let store = RedbStore::open(&path.0).await.unwrap();
+    let crawler = Crawler::new(Noop, chain(Some(3), reached.clone()))
+        .with_concurrency(1)
+        .with_frontier(store.frontier().dedup_with(store.seen()))
+        .with_dataset(store.dataset::<u32>("pages"))
+        .with_seed(start());
+    drop(store);
+    let running = tokio::spawn(async move { crawler.run().await });
+    reached.notified().await;
+    running.abort();
+    let _ = running.await;
+
+    // Second run: the same dataset, so the file ends up with every page.
+    let store = reopen(&path.0).await;
+    let pages = store.dataset::<u32>("pages");
+    assert_eq!(pages.len().unwrap(), 3);
+    let crawler = Crawler::new(Noop, chain(None, Arc::new(Notify::new())))
+        .with_frontier(store.frontier().dedup_with(store.seen()))
+        .with_dataset(pages.clone())
+        .with_seed(start());
+    crawler.run().await.unwrap();
+
+    let pages = spire_core::dataset::Data::new(pages)
+        .read_all()
+        .await
+        .unwrap();
+    assert_eq!(pages, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 }

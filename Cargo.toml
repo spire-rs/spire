@@ -76,6 +76,7 @@ deadpool = { version = "0.13", features = ["rt_tokio_1"] }
 # (De)serialization
 serde = { version = "1.0", features = [] }
 serde_json = { version = "1.0", features = [] }
+csv = { version = "1.4", features = [] }
 base64 = { version = "0.23", features = [] }
 
 # Derive macros & utilities

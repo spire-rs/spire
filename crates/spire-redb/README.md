@@ -20,8 +20,8 @@ Crash-safe frontier and seen set for Spire, stored in
 
 ## Overview
 
-A `RedbStore` is one database file holding a crawl's queue and the URLs it
-has seen:
+A `RedbStore` is one database file holding a crawl's queue, the URLs it
+has seen, and what it scraped:
 
 - **`RedbFrontier`** queues seeds by priority, then in insertion order. A
   popped seed stays recorded as in flight until it is reported, so the seeds
@@ -29,6 +29,10 @@ has seen:
   crawled again: requests are at least once, never lost.
 - **`RedbSeen`** deduplicates exactly, on disk, so memory stays flat however
   large the crawl.
+- **`RedbDataset`** stores a crawl's results as a table per dataset, as
+  JSON, read back in the order they were written. Items survive a crash as
+  the frontier does; a page whose items were committed just before a crash
+  may be crawled again and write them twice.
 
 Every change is a committed transaction. Commits are synced to disk at most
 once a second: a crash rolls the store back to its last synced commit, a
@@ -52,9 +56,12 @@ async fn example() -> spire_core::Result<()> {
     let store = RedbStore::open("crawl.redb").await?;
     let frontier = store.frontier().dedup_with(store.seen()).retry(3);
 
-    let worker = from_fn(|_: Context<Noop>| async {});
+    let worker = from_fn(|cx: Context<Noop>| async move {
+        cx.dataset::<String>()?.write(cx.request().uri().to_string()).await
+    });
     let crawler = Crawler::new(Noop, worker)
         .with_frontier(frontier)
+        .with_dataset(store.dataset::<String>("pages"))
         .with_seed(Seed::get("https://example.com/")?);
 
     // After a crash, opening the same file resumes where the crawl stopped;

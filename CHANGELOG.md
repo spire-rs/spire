@@ -10,6 +10,16 @@ and this project adheres to
 
 ### Added
 
+- `spire-redb`: `RedbDataset`, a dataset stored as a table in a `RedbStore`
+  next to the frontier, from `RedbStore::dataset(name)`, so one file holds
+  the whole crawl. Re-exported as `spire::dataset::RedbDataset`.
+- `spire-core`: `CsvDataset`, behind the new `csv` feature, which appends
+  every item to a CSV file as a row after a header row. Every row must have
+  the columns of the first, and appending checks the file's header.
+- `spire-core`: `Dataset::read_batch` takes several items at once, by
+  default one by one. `InMemDataset` and `RedbDataset` take a batch in one
+  step. `Data::read_all` reads in batches of `READ_BATCH`, and
+  `Data::into_batches` streams batches.
 - `spire-core`: middleware, re-exported in `spire::worker`. A `Middleware`
   runs around a worker for every request, with the `Next` worker to pass it
   on to: it can change the request, check the response's head before any
@@ -36,6 +46,16 @@ and this project adheres to
 
 ### Changed
 
+- `JsonlDataset` and `CsvDataset` lock their file, so opening one file twice,
+  in one process or two, fails instead of mixing writes, and a write that
+  fails partway is cut off instead of leaving half an item.
+- **Breaking:** `RedbSeen::len`, `RedbSeen::is_empty` and
+  `RedbFrontier::in_flight` return a `Result`, so a storage error is no
+  longer reported as an empty table, and their `Debug` no longer reads the
+  store.
+- **Breaking:** `JsonlDataset` needs the new `json` feature. `serde` now only
+  makes seeds, fingerprints and Bloom filters serializable, without
+  `serde_json` or tokio's file features.
 - **Breaking:** `Crawler::new` requires its worker to handle the backend's
   clients. A router's client type is then inferred from the backend where
   the crawler is built, not only once it runs.

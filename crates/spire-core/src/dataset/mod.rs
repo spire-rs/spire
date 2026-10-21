@@ -23,21 +23,28 @@
 //! # }
 //! ```
 
+#[cfg(feature = "csv")]
+mod csv;
 mod data;
-#[cfg(feature = "serde")]
+#[cfg(any(feature = "json", feature = "csv"))]
+mod file;
+#[cfg(feature = "json")]
 mod jsonl;
 mod memory;
 mod registry;
 
 use std::future::Future;
 
-pub use data::Data;
-#[cfg(feature = "serde")]
-#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+pub use data::{Data, READ_BATCH};
+#[cfg(feature = "json")]
+#[cfg_attr(docsrs, doc(cfg(feature = "json")))]
 pub use jsonl::JsonlDataset;
 pub use memory::InMemDataset;
 pub(crate) use registry::Datasets;
 
+#[cfg(feature = "csv")]
+#[cfg_attr(docsrs, doc(cfg(feature = "csv")))]
+pub use self::csv::CsvDataset;
 use crate::Result;
 
 /// Stores items of type `T`.
@@ -55,6 +62,32 @@ pub trait Dataset<T>: Send + Sync + 'static {
     ///
     /// Returns an error if the underlying storage fails.
     fn read(&self) -> impl Future<Output = Result<Option<T>>> + Send;
+
+    /// Takes up to `max` items at once, in the order [`read`](Self::read)
+    /// takes them; fewer, or none, once the dataset runs out.
+    ///
+    /// The default reads them one by one. Storage that can take several
+    /// items at once, such as in a single transaction, overrides it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying storage fails. Items taken before
+    /// the error are lost to the caller.
+    fn read_batch(&self, max: usize) -> impl Future<Output = Result<Vec<T>>> + Send
+    where
+        T: Send,
+    {
+        async move {
+            let mut items = Vec::new();
+            while items.len() < max {
+                match self.read().await? {
+                    Some(item) => items.push(item),
+                    None => break,
+                }
+            }
+            Ok(items)
+        }
+    }
 
     /// Returns the number of stored items, if known.
     fn size_hint(&self) -> Option<usize> {
