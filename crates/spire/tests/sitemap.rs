@@ -1,21 +1,23 @@
 //! A crawl seeded only through robots.txt and sitemaps.
 
-#![cfg(all(feature = "sitemap", feature = "robots", feature = "macros"))]
+#![cfg(all(
+    feature = "sitemap",
+    feature = "robots",
+    feature = "macros",
+    feature = "testing"
+))]
 
-use std::future::{Future, ready};
 use std::io::Write;
-use std::sync::Mutex;
 
-use bytes::Bytes;
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use spire::backend::{Backend, Client};
 use spire::dataset::{Data, InMemDataset};
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
-use spire::request::http::{StatusCode, Uri};
-use spire::request::{Request, Response, Tags};
+use spire::request::Tags;
+use spire::request::http::Uri;
+use spire::testing::{MockPage, MockSite};
 use spire::{Crawler, FollowSitemap, Result, Robots, Router};
 
 #[derive(Debug, Clone, Copy, Tags)]
@@ -25,65 +27,39 @@ enum Page {
     Product,
 }
 
-/// A site whose robots.txt points to a sitemap index of a plain and a
-/// gzipped sitemap.
-#[derive(Clone)]
-struct Site;
-
 fn gzip(text: &str) -> Vec<u8> {
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(text.as_bytes()).unwrap();
     encoder.finish().unwrap()
 }
 
-impl Backend for Site {
-    type Client = Visit;
+/// A site whose robots.txt points to a sitemap index of a plain and a
+/// gzipped sitemap.
+fn site() -> MockSite {
+    let robots = "User-agent: *\nDisallow: /private\nSitemap: https://shop.test/sitemap.xml\n";
+    let index = r#"<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <sitemap><loc>https://shop.test/products.xml</loc></sitemap>
+        <sitemap><loc>https://shop.test/archive.xml.gz</loc></sitemap>
+    </sitemapindex>"#;
+    let products = r#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <url><loc>https://shop.test/products/1</loc></url>
+        <url><loc>https://shop.test/private/2</loc></url>
+        <url><loc>https://elsewhere.test/products/3</loc></url>
+    </urlset>"#;
+    let archive = gzip("https://shop.test/products/4\nhttps://shop.test/products/1\n");
 
-    fn connect(&self) -> impl Future<Output = Result<Visit>> + Send {
-        ready(Ok(Visit(Mutex::new(Bytes::new()))))
+    let mut site = MockSite::new()
+        .page("https://shop.test/robots.txt", MockPage::text(robots))
+        .page("https://shop.test/sitemap.xml", MockPage::xml(index))
+        .page("https://shop.test/products.xml", MockPage::xml(products))
+        .page("https://shop.test/archive.xml.gz", MockPage::text(archive));
+    for page in ["/", "/products/1", "/products/4"] {
+        site = site.page(
+            &format!("https://shop.test{page}"),
+            MockPage::html("<html></html>"),
+        );
     }
-}
-
-/// A request to [`Site`], keeping the body it was served.
-struct Visit(Mutex<Bytes>);
-
-impl Client for Visit {
-    fn fetch(&self, request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
-        let body: Vec<u8> = match request.uri().path() {
-            "/robots.txt" => {
-                b"User-agent: *\nDisallow: /private\nSitemap: https://shop.test/sitemap.xml\n"
-                    .to_vec()
-            }
-            "/sitemap.xml" => {
-                br#"<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-                <sitemap><loc>https://shop.test/products.xml</loc></sitemap>
-                <sitemap><loc>https://shop.test/archive.xml.gz</loc></sitemap>
-            </sitemapindex>"#
-                    .to_vec()
-            }
-            "/products.xml" => br#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-                <url><loc>https://shop.test/products/1</loc></url>
-                <url><loc>https://shop.test/private/2</loc></url>
-                <url><loc>https://elsewhere.test/products/3</loc></url>
-            </urlset>"#
-                .to_vec(),
-            "/archive.xml.gz" => {
-                gzip("https://shop.test/products/4\nhttps://shop.test/products/1\n")
-            }
-            "/" | "/products/1" | "/products/4" => b"<html></html>".to_vec(),
-            _ => {
-                let mut head = Response::new(());
-                *head.status_mut() = StatusCode::NOT_FOUND;
-                return ready(Ok(head));
-            }
-        };
-        *self.0.lock().unwrap() = Bytes::from(body);
-        ready(Ok(Response::new(())))
-    }
-
-    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
-        ready(Ok(self.0.lock().unwrap().clone()))
-    }
+    site
 }
 
 #[tokio::test]
@@ -97,7 +73,7 @@ async fn crawls_the_sitemaps_robots_txt_lists() {
         .route(Page::Sitemap, FollowSitemap::new(Page::Product))
         .route(Page::Product, product)
         .require::<Page>();
-    let crawler = Crawler::new(Site, router)
+    let crawler = Crawler::new(site(), router)
         .with_frontier(InMemFrontier::fifo().dedup().allow_hosts(["shop.test"]))
         .with_robots(Robots::new("bot").with_sitemaps(Page::Sitemap))
         .with_dataset(InMemDataset::<String>::new())
@@ -137,7 +113,7 @@ async fn follows_untagged_sitemaps_by_path() {
         .route_path("/*.xml", FollowSitemap::new(Page::Product))
         .route_path("/*.xml.gz", FollowSitemap::new(Page::Product))
         .route(Page::Product, product);
-    let crawler = Crawler::new(Site, router)
+    let crawler = Crawler::new(site(), router)
         .with_frontier(InMemFrontier::fifo().dedup().allow_hosts(["shop.test"]))
         .with_dataset(InMemDataset::<String>::new())
         .with_seed(Seed::get("https://shop.test/sitemap.xml").unwrap());

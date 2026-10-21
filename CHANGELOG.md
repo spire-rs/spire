@@ -8,6 +8,15 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `spire-core`: the `testing` module, re-exported as `spire::testing` behind
+  the `testing` feature, to test handlers without a network. `MockSite` is a
+  backend serving fixed `MockPage`s by URL, with redirects and the real
+  backends' status policy, and records what was fetched. `MockSite::visit`
+  runs one request through a router or worker, so its outcome, the seeds it
+  queued and the items it wrote can be checked without crawling further.
+
 ## [0.3.0] - 2026-10-21
 
 A redesign around one shared page per request, with sitemaps, built-in

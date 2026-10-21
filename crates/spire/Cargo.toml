@@ -29,7 +29,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 # Default feature set: HTML parsing, and rustls for any enabled backend
 default = ["html", "rustls-tls"]
-# Every feature except `native-tls`
+# Every feature except `native-tls` and `testing`
 full = ["html", "macros", "robots", "sitemap", "serde", "redb", "reqwest", "thirtyfour", "rustls-tls"]
 
 # The `Html` and `Element` extractors and the `Select` trait
@@ -43,6 +43,8 @@ robots = ["spire-core/robots"]
 sitemap = ["dep:sitemapo", "dep:flate2", "dep:tokio"]
 # Serializable seeds for snapshots, and the `JsonlDataset` output
 serde = ["spire-core/serde"]
+# `MockSite` and `Visit`, to test handlers without a network
+testing = ["spire-core/testing"]
 
 # Crash-safe frontier and seen set stored in redb
 redb = ["dep:spire-redb"]
@@ -93,6 +95,7 @@ tracing = { workspace = true, features = [] }
 criterion = { workspace = true, features = [] }
 
 # Testing
+spire-core = { workspace = true, features = ["testing"] }
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
 flate2 = { workspace = true, features = [] }
 

@@ -34,6 +34,8 @@ default = []
 robots = ["dep:robotxt"]
 # Serializable seeds and fingerprints for snapshots, and `JsonlDataset`
 serde = ["dep:serde", "dep:serde_json", "tokio/fs", "tokio/io-util", "tokio/sync"]
+# `MockSite` and `Visit`, to test handlers without a network
+testing = []
 
 [dependencies]
 # Async runtime
