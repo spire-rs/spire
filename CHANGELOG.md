@@ -10,11 +10,14 @@ and this project adheres to
 
 ### Added
 
-- N/A
+- `View` extractor now wraps the browser `WebDriver` (`spire::extract::driver::View`).
 
 ### Changed
 
-- N/A
+- **Breaking:** TLS feature `rustls-tls` renamed to `rustls` on `spire`, `spire-reqwest` and
+  `spire-thirtyfour`, matching upstream `reqwest` 0.13 and `thirtyfour` 0.38.
+- Updated `reqwest` to 0.13, `thirtyfour` to 0.38, `deadpool` to 0.13 and `syn` to 3.0.
+- MSRV raised to 1.95.
 
 ### Deprecated
 
@@ -26,7 +29,8 @@ and this project adheres to
 
 ### Fixed
 
-- N/A
+- `spire-core` declared no `tokio` features and failed to build outside the workspace.
+- `spire-reqwest` dropped request and response bodies; both are now streamed through.
 
 ### Security
 

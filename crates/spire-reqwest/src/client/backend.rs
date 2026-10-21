@@ -66,6 +66,7 @@ impl HttpClient {
     ///
     /// let client = HttpClient::from_client(reqwest_client);
     /// ```
+    #[must_use]
     pub fn from_client(client: reqwest::Client) -> Self {
         Self {
             inner: HttpClientInner::Client(client),
@@ -112,7 +113,7 @@ impl HttpClient {
 
     /// Creates a new [`HttpClient`] from an [`HttpService`].
     ///
-    /// This is a convenience method for creating an HttpClient from the standard
+    /// This is a convenience method for creating an `HttpClient` from the standard
     /// [`HttpService`] type alias used throughout the Spire framework.
     ///
     /// # Examples
@@ -125,6 +126,7 @@ impl HttpClient {
     /// let service: HttpService = client_to_service(client);
     /// let client = HttpClient::from_http_service(service);
     /// ```
+    #[must_use]
     pub fn from_http_service(service: HttpService) -> Self {
         Self {
             inner: HttpClientInner::Service(Arc::new(Mutex::new(service))),
@@ -134,6 +136,7 @@ impl HttpClient {
     /// Creates a new [`HttpClient`] with default configuration.
     ///
     /// This creates a basic HTTP client with default reqwest configuration.
+    #[must_use]
     pub fn new() -> Self {
         Self::from_client(reqwest::Client::new())
     }
@@ -172,16 +175,13 @@ impl Client for HttpClient {
         match self.inner {
             HttpClientInner::Client(client) => {
                 // Convert spire request to reqwest request
-                let reqwest_req = request_to_reqwest(req);
+                let request = request_to_reqwest(req)?;
 
                 // Perform the HTTP request
-                let reqwest_res = client
-                    .execute(reqwest_req)
-                    .await
-                    .map_err(Error::from_boxed)?;
+                let rw_response = client.execute(request).await.map_err(Error::from_boxed)?;
 
                 // Convert reqwest response to spire response
-                let response = response_from_reqwest(reqwest_res);
+                let response = response_from_reqwest(rw_response);
 
                 Ok(response)
             }
@@ -207,7 +207,7 @@ impl Backend for HttpClient {
 
     /// Creates a new HTTP client connection by cloning this client.
     ///
-    /// Since HttpClient now implements Client directly, connecting simply
+    /// Since `HttpClient` now implements Client directly, connecting simply
     /// returns a clone of the current client, allowing for efficient reuse.
     async fn connect(&self) -> Result<Self::Client> {
         Ok(self.clone())
@@ -253,7 +253,7 @@ mod test {
     #[test]
     fn test_debug() {
         let client = HttpClient::default();
-        let debug_str = format!("{:?}", client);
+        let debug_str = format!("{client:?}");
         assert!(debug_str.contains("HttpClient"));
     }
 

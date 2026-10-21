@@ -1,6 +1,6 @@
 use spire_core::Error;
 use spire_core::context::{Request, Response};
-use tower::ServiceBuilder;
+use tower::service_fn;
 use tower::util::BoxCloneService;
 
 use super::conversion::{request_to_reqwest, response_from_reqwest};
@@ -27,12 +27,16 @@ pub type HttpService = BoxCloneService<Request, Response, Error>;
 /// let client = Client::new();
 /// let service = client_to_service(client);
 /// ```
+#[must_use]
 pub fn client_to_service(client: reqwest::Client) -> HttpService {
-    let svc = ServiceBuilder::default()
-        .map_request(request_to_reqwest)
-        .map_response(response_from_reqwest)
-        .map_err(|x: reqwest::Error| -> Error { Error::from_boxed(x) })
-        .service(client);
+    let svc = service_fn(move |req: Request| {
+        let client = client.clone();
+        async move {
+            let request = request_to_reqwest(req)?;
+            let rw_response = client.execute(request).await.map_err(Error::from_boxed)?;
+            Ok(response_from_reqwest(rw_response))
+        }
+    });
 
     BoxCloneService::new(svc)
 }
