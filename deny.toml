@@ -47,6 +47,9 @@ allow = [
     # (cssparser, selectors). File-level copyleft only: using these crates
     # as-is does not affect our source.
     "MPL-2.0",
+    # Permissive license for data; webpki-roots ships Mozilla's root
+    # certificates under it, pulled in by thirtyfour's WebDriver BiDi client.
+    "CDLA-Permissive-2.0",
 ]
 
 # For compound licenses, we'll be permissive and only block if they contain denied licenses
