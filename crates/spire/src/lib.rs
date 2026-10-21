@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![doc = include_str!("../README.md")]
+// The README is the crate's documentation. Its examples need several
+// features, so they are doctested only with `full`, through `ReadmeDoctests`.
+#![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
 
 pub mod extract;
 mod handler;
@@ -76,3 +78,8 @@ pub mod __private {
 
 /// Tracing target for routing and extraction.
 const TRACING_TARGET: &str = "spire";
+
+/// The README's examples, compiled as doctests with every feature enabled.
+#[cfg(all(doctest, feature = "full"))]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;

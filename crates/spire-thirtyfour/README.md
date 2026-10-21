@@ -49,7 +49,7 @@ crate directly to use the backend with `spire-core`:
 
 ```toml
 [dependencies]
-spire = { version = "0.2.0", features = ["thirtyfour"] }
+spire = { version = "0.3.0", features = ["thirtyfour"] }
 ```
 
 ```rust,no_run
@@ -57,18 +57,18 @@ use std::time::Duration;
 
 use spire_thirtyfour::BrowserBackend;
 
-# async fn example() -> spire_core::Result<()> {
-let backend = BrowserBackend::builder()
-    .remote("http://localhost:4444")
-    .max_sessions(4)
-    .page_load_timeout(Duration::from_secs(20))
-    .build()?;
+async fn example() -> spire_core::Result<()> {
+    let backend = BrowserBackend::builder()
+        .remote("http://localhost:4444")
+        .max_sessions(4)
+        .page_load_timeout(Duration::from_secs(20))
+        .build()?;
 
-// Crawl with `spire::Crawler::new(backend.clone(), router)`, then quit the
-// sessions; sessions that are dropped instead block the runtime.
-backend.close().await;
-# Ok(())
-# }
+    // Crawl with `spire::Crawler::new(backend.clone(), router)`, then quit the
+    // sessions; sessions that are dropped instead block the runtime.
+    backend.close().await;
+    Ok(())
+}
 ```
 
 Sessions start headless Chrome by default. Pass your own capabilities for

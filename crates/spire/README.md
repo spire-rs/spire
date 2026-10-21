@@ -38,7 +38,7 @@ The flexible crawler and scraper framework for Rust, built on
 
 ```toml
 [dependencies]
-spire = { version = "0.2.0", features = ["reqwest", "macros"] }
+spire = { version = "0.3.0", features = ["reqwest", "macros"] }
 ```
 
 ### Feature Flags
@@ -61,8 +61,6 @@ spire = { version = "0.2.0", features = ["reqwest", "macros"] }
 Crawl a listing, follow its pagination and extract every product:
 
 ```rust,no_run
-# #[cfg(all(feature = "reqwest", feature = "macros"))]
-# mod example {
 use spire::backend::HttpClient;
 use spire::dataset::InMemDataset;
 use spire::extract::Select;
@@ -110,7 +108,6 @@ async fn crawl() -> Result<()> {
     println!("{} products in {} requests", products.len(), stats.requests);
     Ok(())
 }
-# }
 ```
 
 `FollowLinks`, `Collect` and `FollowSitemap` cover the common jobs. Anything
@@ -135,8 +132,6 @@ of the sitemap itself. Seed sitemaps yourself, or let `Robots::with_sitemaps`
 queue the ones each site's robots.txt lists:
 
 ```rust,no_run
-# #[cfg(all(feature = "reqwest", feature = "sitemap", feature = "robots", feature = "macros"))]
-# mod example {
 use spire::backend::HttpClient;
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
@@ -166,7 +161,6 @@ async fn crawl() -> Result<()> {
     crawler.run().await?;
     Ok(())
 }
-# }
 ```
 
 The `Sitemap` extractor parses a sitemap for a handler of your own. Sitemaps
@@ -178,12 +172,10 @@ must be fetched over HTTP: a browser renders XML as a page.
 real status and headers, any request method, and a fresh browser profile per
 request. The page is loaded once, by the first extractor that needs it, and
 body extractors such as `Html` read it as currently rendered. `View` hands
-over the driver to interact with the page; `view.html()` then reads it again,
+over the driver to interact with the page; `view.snapshot()` then parses it again,
 including what the interaction changed:
 
 ```rust,no_run
-# #[cfg(all(feature = "thirtyfour", feature = "html"))]
-# mod example {
 use spire::backend::BrowserBackend;
 use spire::backend::thirtyfour::By;
 use spire::extract::View;
@@ -195,7 +187,7 @@ async fn rendered(queue: Queue, view: View) -> Result<()> {
     if let Ok(more) = view.find(By::Css("button.more")).await {
         let _ = more.click().await;
     }
-    let page = view.html().await?;
+    let page = view.snapshot().await?;
     println!("{:?} at {:?}", page.title(), view.current_url().await);
     queue.follow_all(page.links()).await?;
     Ok(())
@@ -216,7 +208,6 @@ async fn crawl() -> Result<()> {
     crawler.backend().close().await;
     Ok(())
 }
-# }
 ```
 
 ## Architecture

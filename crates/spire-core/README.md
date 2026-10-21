@@ -67,23 +67,23 @@ async fn handle(cx: Context<Noop>) -> Result<Outcome> {
     Ok(Outcome::Continue)
 }
 
-# async fn example() -> Result<()> {
-let frontier = InMemFrontier::fifo()
-    .dedup()
-    .max_depth(3)
-    .retry(3)
-    .tag_backoff();
+async fn example() -> Result<()> {
+    let frontier = InMemFrontier::fifo()
+        .dedup()
+        .max_depth(3)
+        .retry(3)
+        .tag_backoff();
 
-let stats = Crawler::new(Noop, from_fn(handle))
-    .with_frontier(frontier)
-    .with_concurrency(16)
-    .with_seed(Seed::get("https://example.com/")?)
-    .run()
-    .await?;
+    let stats = Crawler::new(Noop, from_fn(handle))
+        .with_frontier(frontier)
+        .with_concurrency(16)
+        .with_seed(Seed::get("https://example.com/")?)
+        .run()
+        .await?;
 
-println!("crawled {} requests in {:?}", stats.requests, stats.elapsed);
-# Ok(())
-# }
+    println!("crawled {} requests in {:?}", stats.requests, stats.elapsed);
+    Ok(())
+}
 ```
 
 [`Backend`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Backend.html

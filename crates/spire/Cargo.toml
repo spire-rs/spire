@@ -17,6 +17,11 @@ authors = { workspace = true }
 repository = { workspace = true }
 documentation = { workspace = true }
 
+[lib]
+# Only the criterion benches run with `cargo bench`, not the lib harness,
+# which would reject criterion's flags
+bench = false
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
@@ -84,9 +89,26 @@ derive_more = { workspace = true, features = ["deref", "deref_mut"] }
 tracing = { workspace = true, features = [] }
 
 [dev-dependencies]
+# Benchmarking
+criterion = { workspace = true, features = [] }
+
 # Testing
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
 flate2 = { workspace = true, features = [] }
+
+[[bench]]
+name = "routing"
+harness = false
+
+[[bench]]
+name = "extract"
+harness = false
+required-features = ["macros"]
+
+[[bench]]
+name = "sitemap"
+harness = false
+required-features = ["sitemap"]
 
 [lints]
 workspace = true
