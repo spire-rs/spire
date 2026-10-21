@@ -17,7 +17,7 @@
 [coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
 Browser automation backend for Spire, built on
-[thirtyfour](https://github.com/stevepryde/thirtyfour) (WebDriver).
+[thirtyfour](https://github.com/stevepryde/thirtyfour) and WebDriver BiDi.
 
 ## Overview
 
@@ -27,11 +27,18 @@ source, so JavaScript-heavy pages scrape like any other. Through `Deref`, the
 session also exposes the full `WebDriver` API for clicking, scrolling and
 waiting on the page.
 
+- **Real responses**: navigation goes through WebDriver BiDi, so responses
+  carry the page's real status and headers, after redirects. Error statuses
+  follow the same `StatusPolicy` as HTTP backends: `5xx`, `408` and `429`
+  are retried, honouring `Retry-After`, and other `4xx` are rejected.
+- **Any request**: requests are sent with their method, headers and body, so
+  `POST` forms and custom headers work.
+- **Isolation**: every request gets a tab in a fresh browser profile, so no
+  cookies or storage carry over; `keep_session_state` shares one profile
+  instead, e.g. for a logged-in crawl.
 - **Endpoints**: remote WebDriver servers (chromedriver, geckodriver, Selenium
   grids), rotated between in turn, or drivers downloaded and spawned
   automatically with the `manager` feature.
-- **Pooling**: sessions start on demand up to a limit and are reused; storage
-  and cookies are cleared between requests unless you keep them.
 - **Errors**: WebDriver failures map to `spire_core::ErrorKind`s, so timeouts
   and navigation failures are retried while page bugs are not.
 
@@ -78,18 +85,21 @@ let builder = BrowserBackend::builder()
 
 ## Features
 
-- **`rustls`** (default): TLS to the WebDriver server through rustls.
+- **`rustls-tls`** (default): TLS to the WebDriver server through rustls.
 - **`native-tls`**: TLS through the platform's native library.
 - **`manager`**: `BrowserBuilder::managed` downloads, caches and spawns the
   driver for the browser in the capabilities. The browser itself must be
   installed.
 
-## Limitations
+## Requirements
 
-WebDriver cannot report the status or headers of a navigation, nor send
-custom request headers or bodies. Responses are always `200 OK` with an HTML
-content type, and only `GET` requests are supported. Use `spire-reqwest` for
-plain HTTP.
+The WebDriver server must support WebDriver BiDi, as current chromedriver and
+geckodriver do; starting a session on one without it fails. A response's body
+is the rendered document serialized as HTML, so its content type is always
+`text/html; charset=utf-8`, whatever the server sent.
+
+The tests in `tests/bidi.rs` run against a real browser when `SPIRE_WEBDRIVER`
+names a WebDriver server, e.g. `SPIRE_WEBDRIVER=http://127.0.0.1:4444`.
 
 ## Contributing
 

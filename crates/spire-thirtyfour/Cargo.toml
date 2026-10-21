@@ -23,10 +23,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 # Default feature set (rustls for TLS)
-default = ["rustls"]
+default = ["rustls-tls"]
 
 # TLS to the WebDriver server through rustls, with no system dependencies
-rustls = ["thirtyfour/rustls"]
+rustls-tls = ["thirtyfour/rustls"]
 # TLS to the WebDriver server through the platform's native library
 native-tls = ["thirtyfour/native-tls"]
 
@@ -37,9 +37,20 @@ manager = ["thirtyfour/manager"]
 # Spire
 spire-core = { workspace = true, features = [] }
 
-# Browser automation
-thirtyfour = { workspace = true, features = [] }
+# Browser automation, over WebDriver BiDi
+thirtyfour = { workspace = true, features = ["bidi"] }
 deadpool = { workspace = true, features = [] }
+
+# Async runtime
+tokio = { workspace = true, features = ["time", "macros"] }
+futures = { workspace = true, features = [] }
+
+# HTTP
+http-body-util = { workspace = true, features = [] }
+
+# Encoding of BiDi request bodies and headers
+serde_json = { workspace = true, features = [] }
+base64 = { workspace = true, features = [] }
 
 # Observability
 tracing = { workspace = true, features = [] }
@@ -47,6 +58,7 @@ tracing = { workspace = true, features = [] }
 [dev-dependencies]
 # Testing
 tokio = { workspace = true, features = ["rt", "macros"] }
+http-body-util = { workspace = true, features = [] }
 
 [lints]
 workspace = true

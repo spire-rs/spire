@@ -7,7 +7,7 @@
 **The flexible crawler and scraper framework for Rust.**
 
 Crawl websites over HTTP or in real browsers, route every page to a typed
-handler, and extract structured data, built on tokio and tower.
+handler, and extract structured data, built on tokio.
 
 [![Build](https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yml?branch=main&label=build&style=flat-square)](https://github.com/spire-rs/spire/actions/workflows/build.yml)
 [![Security](https://img.shields.io/github/actions/workflow/status/spire-rs/spire/security.yml?branch=main&label=security&style=flat-square)](https://github.com/spire-rs/spire/actions/workflows/security.yml)
@@ -38,7 +38,6 @@ queue for links to follow, or a dataset to store results in.
 - **Polite crawling**: per-host concurrency and delays, robots.txt per RFC 9309, retries with `Retry-After` and backoff.
 - **Frontiers**: deduplication with URL normalization, depth limits, host filters, priorities, and a Bloom filter for huge crawls.
 - **Crash safety**: a redb-backed frontier and seen set that resume a crawl after a crash.
-- **Tower integration**: wrap routes in tower middleware such as timeouts and rate limits.
 
 ## Requirements
 
@@ -58,9 +57,13 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 Crawl a site two links deep and print every title:
 
 ```rust
+use spire::backend::HttpClient;
 use spire::extract::Html;
-use spire::frontier::{FrontierExt, InMemFrontier, Queue, Seed};
-use spire::{Crawler, HttpClient, Result, Router};
+use spire::frontier::FrontierExt;
+use spire::frontier::memory::InMemFrontier;
+use spire::frontier::queue::Queue;
+use spire::frontier::seed::Seed;
+use spire::{Crawler, Result, Router};
 
 /// Prints the title of every page and follows its links.
 async fn page(queue: Queue, page: Html) -> Result<()> {

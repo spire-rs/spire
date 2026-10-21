@@ -2,7 +2,9 @@ use std::fmt;
 use std::future::Future;
 
 use crate::Result;
-use crate::frontier::{Ack, Admission, Frontier, InMemSeen, Next, Report, Seed, SeenSet};
+use crate::frontier::seed::Seed;
+use crate::frontier::seen::{InMemSeen, SeenSet};
+use crate::frontier::{Ack, Admission, Frontier, Next, Report};
 
 /// A facade that refuses seeds seen before, see [`Seed::fingerprint`].
 ///
@@ -55,8 +57,9 @@ impl<F: Frontier, S: SeenSet> Frontier for Dedup<F, S> {
 
 #[cfg(test)]
 mod tests {
+    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::test_util::{pop_path, seed};
-    use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
+    use crate::frontier::{Admission, Frontier, FrontierExt};
 
     #[tokio::test]
     async fn refuses_duplicates() {

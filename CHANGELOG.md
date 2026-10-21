@@ -10,7 +10,7 @@ and this project adheres to
 
 ### Added
 
-- `View` extractor (`spire::extract::driver::View`) navigates the browser
+- `View` extractor (`spire::extract::View`) navigates the browser
   without reading the page and holds the session for the handler, exposing the
   `WebDriver`; `View::html` parses the page as currently rendered.
   `BrowserSession::navigate` and `page_source` back it.
@@ -18,8 +18,6 @@ and this project adheres to
   `Retry` and `TagBackoff` facades, chained with `FrontierExt`.
 - `Crawler::run` returns `Stats`; `Outcome::Backoff` pauses a tag (e.g. on 429)
   and retries the request.
-- `spire_core::service` adapters (`ServiceBackend`, `ServiceClient`,
-  `ServiceWorker`) for tower services; `HttpClient` is a `tower::Service`.
 - `spire-reqwest`: `StatusPolicy` turns error statuses into errors (`5xx`, `408`
   and `429` retried, `Retry-After` honoured, other `4xx` rejected); `http2`,
   `charset`, `system-proxy`, compression, `cookies`, `socks` and `hickory-dns`
@@ -32,10 +30,10 @@ and this project adheres to
   fragments and skips non-`http(s)` links; `Link` sets a tag on a link;
   `Queue::follow_all`.
 - `spire`: `Html` is a parsed document (scraper) with `title`, `links`,
-  `select_one` and `select_all`; `#[derive(Select)]` extracts structs with CSS
-  selectors through the `Element` and `Elements` extractors.
-- `spire`: `Text` decodes by the response charset; `Attempt` extractor;
-  `Router::layer` accepts fallible tower middleware such as timeouts.
+  `select`; `#[derive(Select)]` extracts structs with CSS selectors through
+  the `Element` extractor: `Element<T>` for the first match,
+  `Element<Option<T>>` if it may be missing, `Element<Vec<T>>` for every one.
+- `spire`: `Text` decodes by the response charset; `Attempt` extractor.
 - Crawl scope (`FrontierExt::filter`, `allow_hosts`), budgets
   (`Crawler::with_max_requests`, `with_time_limit`), per-request deadlines
   (`with_request_timeout`) and a shutdown grace period.
@@ -68,6 +66,11 @@ and this project adheres to
   attributes); `Router::require` checks every variant has a route, and the
   enum is an extractor, so a handler can take its variant as an argument.
 - Every handled request is logged at `debug` with its outcome and duration.
+- `spire-thirtyfour` speaks WebDriver BiDi: responses carry the page's real
+  status and headers, error statuses follow the `StatusPolicy`, requests are
+  sent with their method, headers and body, and every request gets a fresh
+  browser profile. `BrowserSession::navigate` returns a `Navigation`, and
+  `View::status` and `View::headers` describe the page's response.
 - `Router::route_path` and `route_path_service` route untagged requests by
   path pattern (`*` within a segment, `**` across segments).
 
@@ -75,18 +78,33 @@ and this project adheres to
 
 - **Breaking:** followed links no longer inherit the tag of their page; an
   untagged link goes to the path routes or the fallback.
-- **Breaking:** TLS feature `rustls-tls` renamed to `rustls` on `spire`, `spire-reqwest` and
-  `spire-thirtyfour`, matching upstream `reqwest` 0.13 and `thirtyfour` 0.38.
+- **Breaking:** `spire-thirtyfour` requires a WebDriver server with BiDi.
+- **Breaking:** `StatusPolicy` moved to `spire_core::backend`, shared by the
+  HTTP and browser backends; `spire-reqwest` re-exports it.
+- **Breaking:** frontier items live in public submodules of `frontier`
+  (`seed`, `queue`, `memory`, `facade`, `seen`) instead of being re-exported
+  from it; the traits and `Admission`, `Next`, `Report` and `Ack` stay at
+  its root.
+- **Breaking:** in `spire`, backend types are under `spire::backend`
+  (`HttpClient`, `BrowserBackend`, ...), the redb types under
+  `spire::frontier::redb`, the `http` crate is `spire::request::http`,
+  `View` is `spire::extract::View`, and the
+  `handler` and `routing` modules are private, with `Router` and `Handler`
+  at the crate root.
+- **Breaking:** the `TRACING_TARGET` constants are private.
 - Updated `reqwest` to 0.13, `thirtyfour` to 0.38, `deadpool` to 0.13 and `syn` to 3.0.
 - MSRV raised to 1.95.
 - **Breaking:** `spire-core` redesigned. `Client` (the runner) is now `Crawler`;
-  `FlowControl` is now `Outcome`; `RequestQueue` is now `frontier::Queue` with
+  `FlowControl` is now `Outcome`; `RequestQueue` is now `frontier::queue::Queue` with
   `push` and `follow`; `Backend`, `Client`, `Worker`, `Dataset` and `Frontier`
   are native async traits instead of `async_trait`.
 - **Breaking:** datasets must be registered on the `Crawler`; asking for an
   unregistered type is an error instead of a silent in-memory default.
-- **Breaking:** `HttpClient` wraps a `reqwest::Client` only; use
-  `spire_core::service::ServiceClient` to compose tower middleware.
+- **Breaking:** `HttpClient` wraps a `reqwest::Client` only.
+- **Breaking:** tower is no longer a dependency. The crawler covers what its
+  middleware did (request timeouts, retries, backoff, per-host limits), so
+  `Router::layer`, the `*_service` routes, `HandlerService` and
+  `HttpClient`'s `Service` impl are gone; routes are plain handlers.
 - **Breaking:** `spire-thirtyfour` redesigned: `BrowserBuilder::remote`
   replaces `with_unmanaged`, `BrowserSession` replaces `BrowserConnection`,
   capabilities are thirtyfour's own (headless Chrome by default), and

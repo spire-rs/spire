@@ -4,23 +4,44 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::fmt;
 use std::future::Future;
-use std::task::{Context as TaskContext, Poll};
+use std::marker::PhantomData;
+use std::sync::Arc;
 
-use futures::FutureExt;
 use futures::future::BoxFuture;
-use tower::util::BoxCloneSyncService;
-use tower::{Layer, Service, ServiceExt};
 
 mod path;
 
 use self::path::PathPattern;
 use crate::handler::Handler;
 use crate::request::{RequestExt, Tag, Tags};
-use crate::worker::{IntoOutcome, Outcome, Worker};
+use crate::worker::{Outcome, Worker};
 use crate::{Context, Error, TRACING_TARGET};
 
-/// A type-erased route: a tower service from a [`Context`] to an [`Outcome`].
-pub type Route<C> = BoxCloneSyncService<Context<C>, Outcome, std::convert::Infallible>;
+/// A handler bound to its state, with its type erased.
+type Route<C> = Arc<dyn ErasedHandler<C>>;
+
+/// An object-safe [`Handler`] bound to its state.
+trait ErasedHandler<C>: Send + Sync + 'static {
+    fn call(&self, cx: Context<C>) -> BoxFuture<'static, Outcome>;
+}
+
+/// A handler and the state it is called with.
+struct Bound<H, M, S> {
+    handler: H,
+    state: S,
+    marker: PhantomData<fn() -> M>,
+}
+
+impl<C, H, M, S> ErasedHandler<C> for Bound<H, M, S>
+where
+    H: Handler<C, M, S>,
+    S: Clone + Send + Sync + 'static,
+    M: 'static,
+{
+    fn call(&self, cx: Context<C>) -> BoxFuture<'static, Outcome> {
+        Box::pin(self.handler.clone().call(cx, self.state.clone()))
+    }
+}
 
 /// Routes requests to handlers by their [`Tag`], or else their path.
 ///
@@ -39,7 +60,7 @@ pub type Route<C> = BoxCloneSyncService<Context<C>, Outcome, std::convert::Infal
 /// ```
 /// use spire::Router;
 /// use spire::extract::Text;
-/// use spire::frontier::Queue;
+/// use spire::frontier::queue::Queue;
 ///
 /// async fn list(queue: Queue) -> spire::Result<()> {
 ///     queue.follow("/items/1").await?;
@@ -92,23 +113,8 @@ impl<C, S> Router<C, S> {
         H: Handler<C, M, S>,
         M: 'static,
     {
-        let service = handler.with_state(self.state.clone());
-        self.insert(tag.into(), Route::new(service))
-    }
-
-    /// Routes requests tagged `tag` to a tower service.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `tag` already has a route.
-    pub fn route_service<T>(self, tag: impl Into<Tag>, service: T) -> Self
-    where
-        C: Send + 'static,
-        T: Service<Context<C>, Response: IntoOutcome, Error: IntoOutcome>,
-        T: Clone + Send + Sync + 'static,
-        T::Future: Send + 'static,
-    {
-        self.insert(tag.into(), erase(service))
+        let route = self.bind(handler);
+        self.insert(tag.into(), route)
     }
 
     /// Routes untagged requests whose path matches `pattern` to `handler`.
@@ -139,24 +145,8 @@ impl<C, S> Router<C, S> {
         H: Handler<C, M, S>,
         M: 'static,
     {
-        let service = handler.with_state(self.state.clone());
-        self.insert_path(PathPattern::new(pattern), Route::new(service))
-    }
-
-    /// Routes untagged requests whose path matches `pattern` to a tower
-    /// service; see [`route_path`](Self::route_path).
-    ///
-    /// # Panics
-    ///
-    /// Panics if `pattern` does not start with `/` or already has a route.
-    pub fn route_path_service<T>(self, pattern: &str, service: T) -> Self
-    where
-        C: Send + 'static,
-        T: Service<Context<C>, Response: IntoOutcome, Error: IntoOutcome>,
-        T: Clone + Send + Sync + 'static,
-        T::Future: Send + 'static,
-    {
-        self.insert_path(PathPattern::new(pattern), erase(service))
+        let route = self.bind(handler);
+        self.insert_path(PathPattern::new(pattern), route)
     }
 
     /// Routes requests no tag or path route takes to `handler`.
@@ -167,20 +157,7 @@ impl<C, S> Router<C, S> {
         H: Handler<C, M, S>,
         M: 'static,
     {
-        let service = handler.with_state(self.state.clone());
-        self.fallback = Some(Route::new(service));
-        self
-    }
-
-    /// Routes requests no tag or path route takes to a tower service.
-    pub fn fallback_service<T>(mut self, service: T) -> Self
-    where
-        C: Send + 'static,
-        T: Service<Context<C>, Response: IntoOutcome, Error: IntoOutcome>,
-        T: Clone + Send + Sync + 'static,
-        T::Future: Send + 'static,
-    {
-        self.fallback = Some(erase(service));
+        self.fallback = Some(self.bind(handler));
         self
     }
 
@@ -256,42 +233,19 @@ impl<C, S> Router<C, S> {
         self
     }
 
-    /// Wraps every route, path route and the fallback in a tower [`Layer`].
-    ///
-    /// Routes added afterwards are not wrapped. The layer's errors become
-    /// failed requests.
-    ///
-    /// ```
-    /// use std::time::Duration;
-    ///
-    /// use spire::Router;
-    ///
-    /// async fn handler() {}
-    ///
-    /// let router: Router<spire::backend::Noop> = Router::new()
-    ///     .route("page", handler)
-    ///     .layer(tower::timeout::TimeoutLayer::new(Duration::from_secs(30)));
-    /// ```
-    pub fn layer<L>(mut self, layer: L) -> Self
+    /// Binds `handler` to the router's state.
+    fn bind<H, M>(&self, handler: H) -> Route<C>
     where
         C: Send + 'static,
-        L: Layer<Route<C>>,
-        L::Service: Service<Context<C>, Response: IntoOutcome, Error: IntoOutcome>,
-        L::Service: Clone + Send + Sync + 'static,
-        <L::Service as Service<Context<C>>>::Future: Send + 'static,
+        S: Clone + Send + Sync + 'static,
+        H: Handler<C, M, S>,
+        M: 'static,
     {
-        let fallback = self.fallback.take().unwrap_or_else(|| Route::new(Unrouted));
-        self.fallback = Some(erase(layer.layer(fallback)));
-        self.routes = self
-            .routes
-            .into_iter()
-            .map(|(tag, route)| (tag, erase(layer.layer(route))))
-            .collect();
-        self.paths = std::mem::take(&mut self.paths)
-            .into_iter()
-            .map(|(pattern, route)| (pattern, erase(layer.layer(route))))
-            .collect();
-        self
+        Arc::new(Bound {
+            handler,
+            state: self.state.clone(),
+            marker: PhantomData,
+        })
     }
 
     fn insert(mut self, tag: Tag, route: Route<C>) -> Self {
@@ -321,9 +275,9 @@ impl<C, S> Router<C, S> {
 
     /// Calls the route for the request: its tag's, else the first matching
     /// path route's for an untagged request, else the fallback.
-    fn dispatch(&self, cx: Context<C>) -> impl Future<Output = Outcome> + Send + use<C, S>
+    fn dispatch(&self, cx: Context<C>) -> BoxFuture<'static, Outcome>
     where
-        C: Send + 'static,
+        C: 'static,
     {
         let tag = cx.request().tag();
         tracing::trace!(
@@ -336,79 +290,24 @@ impl<C, S> Router<C, S> {
             Some(tag) => self.routes.get(tag),
             None => self.path_route(cx.request().uri().path()),
         };
-        let route = route.or(self.fallback.as_ref()).cloned();
-        async move {
-            let route = route.unwrap_or_else(|| Route::new(Unrouted));
-            match route.oneshot(cx).await {
-                Ok(outcome) => outcome,
-                Err(never) => match never {},
-            }
+        match route.or(self.fallback.as_ref()) {
+            Some(route) => route.call(cx),
+            None => Box::pin(std::future::ready(unrouted(&cx))),
         }
     }
 }
 
-/// Erases a service into a [`Route`].
-fn erase<C, T>(service: T) -> Route<C>
-where
-    C: Send + 'static,
-    T: Service<Context<C>, Response: IntoOutcome, Error: IntoOutcome>,
-    T: Clone + Send + Sync + 'static,
-    T::Future: Send + 'static,
-{
-    Route::new(Outcomes(service))
-}
-
-/// Turns a service's responses and errors, including readiness errors, into
-/// [`Outcome`]s.
-#[derive(Clone)]
-struct Outcomes<T>(T);
-
-impl<C, T> Service<Context<C>> for Outcomes<T>
-where
-    C: Send + 'static,
-    T: Service<Context<C>, Response: IntoOutcome, Error: IntoOutcome>,
-    T: Clone + Send + 'static,
-    T::Future: Send + 'static,
-{
-    type Error = std::convert::Infallible;
-    type Future = BoxFuture<'static, Result<Outcome, Self::Error>>;
-    type Response = Outcome;
-
-    fn poll_ready(&mut self, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, cx: Context<C>) -> Self::Future {
-        let service = self.0.clone();
-        async move { Ok(service.oneshot(cx).await.into_outcome()) }.boxed()
-    }
-}
-
-/// The default fallback: fails requests nothing routes.
-#[derive(Debug, Clone, Copy)]
-struct Unrouted;
-
-impl<C> Service<Context<C>> for Unrouted {
-    type Error = std::convert::Infallible;
-    type Future = std::future::Ready<Result<Outcome, Self::Error>>;
-    type Response = Outcome;
-
-    fn poll_ready(&mut self, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, cx: Context<C>) -> Self::Future {
-        let request = cx.request();
-        let message = match request.tag() {
-            Some(tag) => format!("no route for tag `{tag}`"),
-            None => format!(
-                "no path or fallback route for untagged `{}`",
-                request.uri().path()
-            ),
-        };
-        let error = Error::worker(message);
-        std::future::ready(Ok(Outcome::Fail(error)))
-    }
+/// Fails a request nothing routes.
+fn unrouted<C>(cx: &Context<C>) -> Outcome {
+    let request = cx.request();
+    let message = match request.tag() {
+        Some(tag) => format!("no route for tag `{tag}`"),
+        None => format!(
+            "no path or fallback route for untagged `{}`",
+            request.uri().path()
+        ),
+    };
+    Outcome::Fail(Error::worker(message))
 }
 
 impl<C> Default for Router<C> {
@@ -448,25 +347,6 @@ where
 {
     fn handle(&self, cx: Context<C>) -> impl Future<Output = Outcome> + Send {
         self.dispatch(cx)
-    }
-}
-
-/// Routers nest: a router is a service usable as another router's route.
-impl<C, S> Service<Context<C>> for Router<C, S>
-where
-    C: Send + 'static,
-    S: Send + Sync + 'static,
-{
-    type Error = std::convert::Infallible;
-    type Future = BoxFuture<'static, Result<Outcome, Self::Error>>;
-    type Response = Outcome;
-
-    fn poll_ready(&mut self, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, cx: Context<C>) -> Self::Future {
-        self.dispatch(cx).map(Ok).boxed()
     }
 }
 

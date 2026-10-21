@@ -6,11 +6,15 @@
 //! queues the next until [`LAST_PAGE`].
 
 use serde::Deserialize;
+use spire::backend::HttpClient;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::Json;
-use spire::frontier::{FrontierExt, InMemFrontier, Link, Queue, Seed};
+use spire::frontier::FrontierExt;
+use spire::frontier::memory::InMemFrontier;
+use spire::frontier::queue::{Link, Queue};
+use spire::frontier::seed::Seed;
 use spire::request::Tags;
-use spire::{Crawler, Error, HttpClient, Result, Router};
+use spire::{Crawler, Error, Result, Router};
 use tracing_subscriber::EnvFilter;
 
 /// The last page of the paginated endpoint.

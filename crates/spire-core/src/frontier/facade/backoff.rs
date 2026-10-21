@@ -6,7 +6,8 @@ use std::sync::Mutex;
 use tokio::time::Instant;
 
 use crate::Result;
-use crate::frontier::{Ack, Admission, Frontier, Next, Report, Seed};
+use crate::frontier::seed::Seed;
+use crate::frontier::{Ack, Admission, Frontier, Next, Report};
 use crate::request::Tag;
 use crate::sync::lock;
 
@@ -171,8 +172,9 @@ mod tests {
     use tokio::time::advance;
 
     use super::*;
+    use crate::frontier::FrontierExt;
+    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::test_util::{pop_path, seed};
-    use crate::frontier::{FrontierExt, InMemFrontier};
 
     fn backoff(tag: Option<&str>, secs: u64) -> Report {
         Report::Backoff {

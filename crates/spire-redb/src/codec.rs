@@ -1,6 +1,6 @@
 //! Seeds stored as JSON.
 
-use spire_core::frontier::Seed;
+use spire_core::frontier::seed::Seed;
 use spire_core::{Error, ErrorKind, Result};
 
 /// Encodes a seed.

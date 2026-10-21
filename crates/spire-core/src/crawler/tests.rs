@@ -6,7 +6,10 @@ use tokio::time::{Instant, sleep};
 
 use crate::backend::Noop;
 use crate::dataset::InMemDataset;
-use crate::frontier::{FrontierExt, InMemFrontier, RetryPolicy, Seed};
+use crate::frontier::FrontierExt;
+use crate::frontier::facade::RetryPolicy;
+use crate::frontier::memory::InMemFrontier;
+use crate::frontier::seed::Seed;
 use crate::request::RequestExt;
 use crate::worker::{Outcome, from_fn};
 use crate::{Context, Crawler, Error, ErrorKind};
@@ -722,7 +725,8 @@ mod robots {
 mod resume {
     use super::*;
     use crate::dataset::Data;
-    use crate::frontier::{Fingerprint, InMemSeen};
+    use crate::frontier::seed::Fingerprint;
+    use crate::frontier::seen::InMemSeen;
 
     /// Visits `/0` through `/9`, each page linking to the next.
     async fn chain(cx: Context<Noop>) -> crate::Result<()> {

@@ -2,7 +2,7 @@
 
 [package]
 name = "spire"
-description = "The flexible scraper framework powered by tokio and tower"
+description = "The flexible crawler and scraper framework for Rust"
 readme = "./README.md"
 keywords = ["crawler", "scraper", "web", "framework"]
 categories = ["asynchronous", "web-programming"]
@@ -23,11 +23,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 # Default feature set: HTML parsing, and rustls for any enabled backend
-default = ["html", "rustls"]
+default = ["html", "rustls-tls"]
 # Every feature except `native-tls`
-full = ["html", "macros", "robots", "serde", "redb", "reqwest", "thirtyfour", "rustls"]
+full = ["html", "macros", "robots", "serde", "redb", "reqwest", "thirtyfour", "rustls-tls"]
 
-# The `Html`, `Element` and `Elements` extractors and the `Select` trait
+# The `Html` and `Element` extractors and the `Select` trait
 html = ["dep:scraper"]
 # `#[derive(Select)]` for declarative extraction with CSS selectors
 macros = ["html", "dep:spire-macros"]
@@ -46,7 +46,7 @@ reqwest = ["dep:spire-reqwest"]
 thirtyfour = ["dep:spire-thirtyfour"]
 
 # TLS through rustls for the enabled backends
-rustls = ["spire-reqwest?/rustls", "spire-thirtyfour?/rustls"]
+rustls-tls = ["spire-reqwest?/rustls-tls", "spire-thirtyfour?/rustls-tls"]
 # TLS through the platform's native library for the enabled backends
 native-tls = ["spire-reqwest?/native-tls", "spire-thirtyfour?/native-tls"]
 
@@ -60,9 +60,6 @@ spire-thirtyfour = { workspace = true, optional = true, features = [] }
 
 # Async runtime
 futures = { workspace = true, features = [] }
-
-# Tower ecosystem
-tower = { workspace = true, features = ["util"] }
 
 # HTTP
 http-body-util = { workspace = true, features = [] }
@@ -85,7 +82,6 @@ tracing = { workspace = true, features = [] }
 [dev-dependencies]
 # Testing
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
-tower = { workspace = true, features = ["timeout"] }
 
 [lints]
 workspace = true

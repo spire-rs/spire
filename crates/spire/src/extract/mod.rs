@@ -5,11 +5,11 @@
 //! the last may implement [`FromContext`] and consume it, typically to fetch
 //! the response.
 //!
-//! - Request and crawl: [`http::Uri`](crate::http::Uri), [`Tag`], an enum
+//! - Request and crawl: [`Uri`](crate::request::http::Uri), [`Tag`], an enum
 //!   deriving [`Tags`],
 //!   [`Depth`], [`Attempt`], [`Queue`] and [`Data`].
 //! - Response body: [`Bytes`], [`Text`], [`Json`], and with the `html`
-//!   feature [`Html`], [`Element`] and [`Elements`].
+//!   feature [`Html`] and [`Element`].
 //! - Everything else: [`State`], [`Client`] and the [`Context`] itself.
 //!
 //! Wrapping an extractor in `Option` or `Result` makes it infallible.
@@ -18,14 +18,13 @@
 //! [`Tags`]: crate::request::Tags
 //! [`Depth`]: crate::request::Depth
 //! [`Attempt`]: crate::request::Attempt
-//! [`Queue`]: crate::frontier::Queue
+//! [`Queue`]: crate::frontier::queue::Queue
 //! [`Data`]: crate::dataset::Data
 
 mod content;
 pub(crate) mod context;
 #[cfg(feature = "thirtyfour")]
-#[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-pub mod driver;
+mod driver;
 #[cfg(feature = "html")]
 pub(crate) mod html;
 mod state;
@@ -35,9 +34,12 @@ use std::future::Future;
 
 pub use content::{Bytes, Json, Text};
 pub use context::Client;
+#[cfg(feature = "thirtyfour")]
+#[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
+pub use driver::View;
 #[cfg(feature = "html")]
 #[cfg_attr(docsrs, doc(cfg(feature = "html")))]
-pub use html::{Element, Elements, Html, Select};
+pub use html::{Element, Html, Select};
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 pub use spire_macros::Select;

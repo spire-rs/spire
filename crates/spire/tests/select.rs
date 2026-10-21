@@ -46,7 +46,7 @@ struct MoreLink {
 
 #[test]
 fn derives_container_and_field_selectors() {
-    let products: Vec<Product> = Html::parse(PAGE).select_all().unwrap();
+    let products: Vec<Product> = Html::parse(PAGE).select::<Vec<_>>().unwrap();
     assert_eq!(products.len(), 2);
     assert_eq!(products[0].price, Some(12.5));
     assert_eq!(products[0].tags, ["home", "light"]);
@@ -56,7 +56,7 @@ fn derives_container_and_field_selectors() {
 
 #[test]
 fn derives_document_level_values() {
-    let shop: Shop = Html::parse(PAGE).select_one().unwrap();
+    let shop: Shop = Html::parse(PAGE).select().unwrap();
     assert_eq!(shop.title, "The Shop");
     assert_eq!(shop.id, 7);
     assert_eq!(shop.names, ["Lamp", "Chair"]);
@@ -64,16 +64,14 @@ fn derives_document_level_values() {
 
 #[test]
 fn derives_attributes_of_the_root_element() {
-    let links: Vec<MoreLink> = Html::parse(PAGE).select_all().unwrap();
+    let links: Vec<MoreLink> = Html::parse(PAGE).select::<Vec<_>>().unwrap();
     let hrefs: Vec<_> = links.into_iter().map(|link| link.href).collect();
     assert_eq!(hrefs, ["/lamp", "/chair"]);
 }
 
 #[test]
 fn reports_missing_fields() {
-    let error = Html::parse("<p>empty</p>")
-        .select_one::<Shop>()
-        .unwrap_err();
+    let error = Html::parse("<p>empty</p>").select::<Shop>().unwrap_err();
     assert_eq!(
         error.to_string(),
         "`Shop.title`: no element matches `h1.shop`"

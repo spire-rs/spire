@@ -1,17 +1,10 @@
-use std::convert::Infallible;
 use std::future::{Future, ready};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
-
-use tower::layer::layer_fn;
-use tower::service_fn;
 
 use crate::backend::{Backend, Client, Noop};
 use crate::extract::{FromRef, State, Text};
-use crate::frontier::Seed;
-use crate::http::Uri;
-use crate::http::header::{CONTENT_TYPE, HeaderValue};
+use crate::frontier::seed::Seed;
+use crate::request::http::Uri;
+use crate::request::http::header::{CONTENT_TYPE, HeaderValue};
 use crate::request::{Body, Depth, Request, Response, ResponseExt, Tag, Tags};
 use crate::worker::{Outcome, Worker};
 use crate::{Context, ErrorKind, Result, Router};
@@ -118,53 +111,6 @@ fn duplicate_routes_panic() {
 }
 
 #[tokio::test]
-async fn layers_wrap_routes_and_fallback() {
-    let calls = Arc::new(AtomicUsize::new(0));
-    let counter = calls.clone();
-    let counting = layer_fn(move |route: super::Route<Noop>| {
-        let counter = counter.clone();
-        service_fn(move |cx| {
-            counter.fetch_add(1, Ordering::SeqCst);
-            tower::ServiceExt::oneshot(route.clone(), cx)
-        })
-    });
-    let router = Router::new().route("page", named).layer(counting);
-
-    let _ = router.handle(context(Some("page"))).await;
-    let _ = router.handle(context(None)).await;
-    assert_eq!(calls.load(Ordering::SeqCst), 2);
-}
-
-#[tokio::test(start_paused = true)]
-async fn layer_errors_fail_the_request() {
-    async fn slow() {
-        tokio::time::sleep(Duration::from_mins(1)).await;
-    }
-
-    let timeout = tower::timeout::TimeoutLayer::new(Duration::from_secs(1));
-    let router = Router::new().route("page", slow).layer(timeout);
-    assert!(matches!(
-        router.handle(context(Some("page"))).await,
-        Outcome::Fail(_)
-    ));
-}
-
-#[tokio::test]
-async fn services_and_nested_routers_route() {
-    let inner = Router::new().fallback(|| async { Outcome::Stop });
-    let echo = service_fn(|_: Context<Noop>| async { Ok::<_, Infallible>(Outcome::retry()) });
-    let router = Router::new()
-        .route_service("echo", echo)
-        .fallback_service(inner);
-
-    assert!(matches!(
-        router.handle(context(Some("echo"))).await,
-        Outcome::Retry { .. }
-    ));
-    assert!(matches!(router.handle(context(None)).await, Outcome::Stop));
-}
-
-#[tokio::test]
 async fn state_is_shared_with_handlers() {
     #[derive(Clone)]
     struct AppState {
@@ -221,7 +167,7 @@ async fn crawls_and_resolves_links_after_redirects() {
     use crate::Crawler;
     use crate::dataset::{Data, InMemDataset};
     use crate::extract::Html;
-    use crate::frontier::Queue;
+    use crate::frontier::queue::Queue;
 
     async fn page(uri: Uri, queue: Queue, data: Data<String>, page: Html) -> Result<()> {
         let title = page.title().unwrap_or_default();
@@ -322,25 +268,6 @@ fn duplicate_path_routes_panic() {
     let a = Router::<Noop>::new().route_path("/items/*", named);
     let b = Router::new().route_path("/items/*", named);
     let _ = a.merge(b);
-}
-
-#[tokio::test]
-async fn layers_wrap_path_routes() {
-    let calls = Arc::new(AtomicUsize::new(0));
-    let counter = calls.clone();
-    let counting = layer_fn(move |route: super::Route<Noop>| {
-        let counter = counter.clone();
-        service_fn(move |cx| {
-            counter.fetch_add(1, Ordering::SeqCst);
-            tower::ServiceExt::oneshot(route.clone(), cx)
-        })
-    });
-    let router = Router::new()
-        .route_path("/**", || async { Outcome::Stop })
-        .layer(counting);
-
-    assert!(matches!(router.handle(context(None)).await, Outcome::Stop));
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]

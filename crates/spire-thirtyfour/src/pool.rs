@@ -10,15 +10,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use deadpool::managed::{Manager, Metrics, RecycleError, RecycleResult};
+use spire_core::backend::StatusPolicy;
 use spire_core::{Error, Result};
 use thirtyfour::error::WebDriverResult;
 use thirtyfour::{Capabilities, WebDriver};
 
-use crate::error::from_webdriver;
+use crate::error::{from_bidi, from_webdriver};
 
-/// Clears what a page leaves in a session: storage, cookies and the page.
-const RESET_STORAGE: &str =
-    "try { window.localStorage.clear(); window.sessionStorage.clear(); } catch (_) {}";
+/// The user context every browser starts with; it cannot be removed.
+const DEFAULT_USER_CONTEXT: &str = "default";
 
 /// Where sessions are started.
 #[derive(Clone)]
@@ -64,10 +64,13 @@ impl fmt::Display for Endpoint {
 pub(crate) struct Sessions {
     pub(crate) endpoints: Vec<Endpoint>,
     pub(crate) next: AtomicUsize,
+    /// Capabilities with WebDriver BiDi enabled.
     pub(crate) capabilities: Capabilities,
     pub(crate) page_load_timeout: Duration,
     pub(crate) max_age: Option<Duration>,
-    pub(crate) reset: bool,
+    /// Whether every request gets a fresh browser profile.
+    pub(crate) isolate: bool,
+    pub(crate) status_policy: StatusPolicy,
 }
 
 impl Sessions {
@@ -88,10 +91,21 @@ pub(crate) async fn quit(driver: WebDriver) {
     }
 }
 
-async fn reset(driver: &WebDriver) -> WebDriverResult<()> {
-    driver.execute(RESET_STORAGE, Vec::new()).await?;
-    driver.delete_all_cookies().await?;
-    driver.goto("about:blank").await
+/// Removes the browser profiles the session's requests used, closing their
+/// tabs, cookies and storage with them.
+async fn remove_profiles(driver: &WebDriver) -> Result<()> {
+    let bidi = driver.bidi().await.map_err(from_webdriver)?;
+    let browser = bidi.browser();
+    let profiles = browser.get_user_contexts().await.map_err(from_bidi)?;
+    for profile in profiles.user_contexts {
+        if profile.user_context.as_str() != DEFAULT_USER_CONTEXT {
+            browser
+                .remove_user_context(profile.user_context)
+                .await
+                .map_err(from_bidi)?;
+        }
+    }
+    Ok(())
 }
 
 impl Manager for Sessions {
@@ -108,6 +122,11 @@ impl Manager for Sessions {
                     .with_message(format!("failed to start a session on {endpoint}"))
             })?;
 
+        if let Err(error) = driver.bidi().await {
+            quit(driver).await;
+            let message = format!("{endpoint} does not support WebDriver BiDi");
+            return Err(from_webdriver(error).with_message(message));
+        }
         if let Err(error) = driver.set_page_load_timeout(self.page_load_timeout).await {
             quit(driver).await;
             return Err(from_webdriver(error).with_message("failed to set the page load timeout"));
@@ -123,16 +142,11 @@ impl Manager for Sessions {
             return Err(RecycleError::message("session reached its maximum age"));
         }
 
-        let checked = if self.reset {
-            reset(driver).await
-        } else {
-            driver.current_url().await.map(drop)
-        };
-
-        if let Err(error) = checked {
+        // Listing the profiles also checks the session is alive.
+        if let Err(error) = remove_profiles(driver).await {
             quit(driver.clone()).await;
             return Err(RecycleError::Backend(
-                from_webdriver(error).with_message("session failed to recycle"),
+                error.with_message("session failed to recycle"),
             ));
         }
         Ok(())
@@ -146,7 +160,8 @@ impl fmt::Debug for Sessions {
             .field("endpoints", &endpoints)
             .field("page_load_timeout", &self.page_load_timeout)
             .field("max_age", &self.max_age)
-            .field("reset", &self.reset)
+            .field("isolate", &self.isolate)
+            .field("status_policy", &self.status_policy)
             .finish_non_exhaustive()
     }
 }

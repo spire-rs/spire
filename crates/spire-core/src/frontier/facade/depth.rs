@@ -1,7 +1,8 @@
 use std::future::Future;
 
 use crate::Result;
-use crate::frontier::{Ack, Admission, Frontier, Next, Report, Seed};
+use crate::frontier::seed::Seed;
+use crate::frontier::{Ack, Admission, Frontier, Next, Report};
 use crate::request::Depth;
 
 /// A facade that refuses seeds deeper than a limit.
@@ -48,8 +49,9 @@ impl<F: Frontier> Frontier for MaxDepth<F> {
 
 #[cfg(test)]
 mod tests {
+    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::test_util::seed;
-    use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
+    use crate::frontier::{Admission, Frontier, FrontierExt};
     use crate::request::Depth;
 
     #[tokio::test]

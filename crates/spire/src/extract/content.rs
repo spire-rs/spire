@@ -5,8 +5,8 @@ use serde::de::DeserializeOwned;
 
 use crate::backend::Client;
 use crate::extract::FromContext;
-use crate::http::HeaderMap;
-use crate::http::header::CONTENT_TYPE;
+use crate::request::http::HeaderMap;
+use crate::request::http::header::CONTENT_TYPE;
 use crate::{Context, Error, ErrorKind, Result};
 
 /// Fetches the response and collects its body.
@@ -102,7 +102,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::HeaderValue;
+    use crate::request::http::HeaderValue;
 
     fn headers(content_type: &'static str) -> HeaderMap {
         let mut headers = HeaderMap::new();

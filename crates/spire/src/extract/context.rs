@@ -6,8 +6,8 @@ use derive_more::{Deref, DerefMut};
 
 use crate::dataset::Data;
 use crate::extract::{FromContext, FromContextRef};
-use crate::frontier::Queue;
-use crate::http::Uri;
+use crate::frontier::queue::Queue;
+use crate::request::http::Uri;
 use crate::request::{Attempt, Depth, RequestExt, Tag, Tags};
 use crate::{Context, Error, Result};
 

@@ -16,11 +16,10 @@
 [coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
 [coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
-The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
-[tower][tower-rs/tower].
+The flexible crawler and scraper framework for Rust, built on
+[tokio][tokio-rs/tokio].
 
 [tokio-rs/tokio]: https://github.com/tokio-rs/tokio/
-[tower-rs/tower]: https://github.com/tower-rs/tower/
 
 ## Features
 
@@ -34,8 +33,6 @@ The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
   crawl ends once nothing is queued or in flight.
 - **Two backends**: plain HTTP through reqwest, and real browsers through
   WebDriver for pages that need JavaScript.
-- **Tower all the way**: any tower middleware wraps routes, clients or
-  backends.
 
 ## Installation
 
@@ -48,14 +45,14 @@ spire = { version = "0.2.0", features = ["reqwest", "macros"] }
 
 | Feature | Enables |
 |---|---|
-| `html` (default) | The `Html`, `Element` and `Elements` extractors and the `Select` trait |
+| `html` (default) | The `Html` and `Element` extractors and the `Select` trait |
 | `macros` | `#[derive(Select)]` |
 | `robots` | Obeying robots.txt (RFC 9309) with `Crawler::with_robots`, optionally fetched through a separate backend |
 | `serde` | Serializable seeds for snapshots, and the `JsonlDataset` output |
 | `redb` | `RedbStore`: a crash-safe frontier and seen set on disk |
 | `reqwest` | The `HttpClient` backend |
 | `thirtyfour` | The `BrowserBackend` (WebDriver) backend |
-| `rustls` (default), `native-tls` | TLS for the enabled backends |
+| `rustls-tls` (default), `native-tls` | TLS for the enabled backends |
 | `full` | Everything except `native-tls` |
 
 ## Quick Start
@@ -65,11 +62,15 @@ Crawl a listing, follow its pagination and extract every product:
 ```rust,no_run
 # #[cfg(all(feature = "reqwest", feature = "macros"))]
 # mod example {
+use spire::backend::HttpClient;
 use spire::dataset::{Data, InMemDataset};
-use spire::extract::{Elements, Html, Select};
-use spire::frontier::{FrontierExt, InMemFrontier, Link, Queue, Seed};
+use spire::extract::{Element, Html, Select};
+use spire::frontier::FrontierExt;
+use spire::frontier::memory::InMemFrontier;
+use spire::frontier::queue::{Link, Queue};
+use spire::frontier::seed::Seed;
 use spire::request::Tags;
-use spire::{Crawler, HttpClient, Result, Router};
+use spire::{Crawler, Result, Router};
 
 /// The kinds of page the crawl visits, routed by tag.
 #[derive(Debug, Clone, Copy, Tags)]
@@ -93,14 +94,14 @@ struct Product {
 async fn listing(queue: Queue, page: Html) -> Result<()> {
     let pages = page.links().into_iter().filter(|href| href.contains("?page="));
     queue.follow_all(pages.map(|href| Link::from(href).with_tag(Page::Listing))).await?;
-    for product in page.select_all::<Product>()? {
+    for product in page.select::<Vec<Product>>()? {
         queue.follow(Link::from(product.link).with_tag(Page::Product)).await?;
     }
     Ok(())
 }
 
 /// Stores the product on its own page.
-async fn product(data: Data<Product>, Elements(found): Elements<Product>) -> Result<()> {
+async fn product(data: Data<Product>, Element(found): Element<Vec<Product>>) -> Result<()> {
     data.write_all(found).await
 }
 
@@ -134,18 +135,21 @@ retried, honouring `Retry-After`.
 
 ### Browser Automation
 
-`BrowserBackend` drives real browsers over WebDriver. Body extractors such as
-`Html` load the page and read it. `View` loads the page without reading it and
-hands over the driver, to interact with the page first; `view.html()` then
-reads the page as rendered:
+`BrowserBackend` drives real browsers over WebDriver BiDi, with the page's
+real status and headers, any request method, and a fresh browser profile per
+request. Body extractors such as `Html` load the page and read it. `View`
+loads the page without reading it and hands over the driver, to interact with
+the page first; `view.html()` then reads the page as rendered:
 
 ```rust,no_run
 # #[cfg(all(feature = "thirtyfour", feature = "html"))]
 # mod example {
-use spire::extract::driver::View;
-use spire::frontier::{Queue, Seed};
-use spire::thirtyfour::By;
-use spire::{BrowserBackend, Crawler, Result, Router};
+use spire::backend::BrowserBackend;
+use spire::backend::thirtyfour::By;
+use spire::extract::View;
+use spire::frontier::queue::Queue;
+use spire::frontier::seed::Seed;
+use spire::{Crawler, Result, Router};
 
 async fn rendered(queue: Queue, view: View) -> Result<()> {
     if let Ok(more) = view.find(By::Css("button.more")).await {
@@ -187,25 +191,6 @@ async fn crawl() -> Result<()> {
   anything that converts into an `Outcome`.
 - **Datasets** store what handlers scrape, one per item type.
 
-## Middleware
-
-Routes are tower services, so tower middleware wraps them with
-`Router::layer`; errors from middleware fail the request:
-
-```rust
-use std::time::Duration;
-
-use spire::Router;
-use spire::backend::Noop;
-use tower::timeout::TimeoutLayer;
-
-async fn handler() {}
-
-let router: Router<Noop> = Router::new()
-    .route("page", handler)
-    .layer(TimeoutLayer::new(Duration::from_secs(30)));
-```
-
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for
@@ -219,7 +204,6 @@ This project is licensed under the MIT License; see the
 ## Acknowledgments
 
 - Built on [tokio][tokio-rs/tokio] for async runtime
-- Uses [tower][tower-rs/tower] for middleware composition
 - Routing pattern inspired by [axum][tokio-rs/axum]
 
 [tokio-rs/axum]: https://github.com/tokio-rs/axum/

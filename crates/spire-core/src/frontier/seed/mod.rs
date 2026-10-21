@@ -1,3 +1,6 @@
+//! Seeds: [`Seed`], a request waiting in the frontier, and its
+//! [`Fingerprint`].
+
 use bytes::Bytes;
 use http::header::IntoHeaderName;
 use http::{HeaderMap, HeaderValue, Method, Uri};
@@ -82,7 +85,7 @@ impl Seed {
     }
 
     /// Sets the priority, `0` by default; frontiers that order by priority,
-    /// such as [`InMemFrontier::priority`](crate::frontier::InMemFrontier::priority),
+    /// such as [`InMemFrontier::priority`](crate::frontier::memory::InMemFrontier::priority),
     /// crawl higher priorities first.
     #[must_use]
     pub const fn with_priority(mut self, priority: i32) -> Self {

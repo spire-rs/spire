@@ -117,7 +117,7 @@ impl IntoOutcome for Error {
 impl IntoOutcome for BoxError {
     /// Fails with the error, keeping its kind if it is an [`Error`] and
     /// classifying it as a [`Worker`](crate::ErrorKind::Worker) error
-    /// otherwise, e.g. for errors of tower middleware.
+    /// otherwise.
     fn into_outcome(self) -> Outcome {
         Outcome::Fail(Error::from_boxed(crate::ErrorKind::Worker, self))
     }

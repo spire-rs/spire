@@ -9,7 +9,6 @@ pub mod dataset;
 mod error;
 pub mod frontier;
 pub mod request;
-pub mod service;
 mod sync;
 pub mod worker;
 
@@ -20,4 +19,4 @@ pub use crate::crawler::Crawler;
 pub use crate::error::{BoxError, Error, ErrorKind, Result};
 
 /// Tracing target for crawler operations.
-pub const TRACING_TARGET: &str = "spire_core";
+const TRACING_TARGET: &str = "spire_core";

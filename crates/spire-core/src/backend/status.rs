@@ -1,13 +1,13 @@
 use std::time::{Duration, SystemTime};
 
-use spire_core::http::header::RETRY_AFTER;
-use spire_core::http::{HeaderMap, StatusCode};
-use spire_core::request::{Response, ResponseExt};
-use spire_core::{Error, ErrorKind, Result};
+use http::header::RETRY_AFTER;
+use http::{HeaderMap, StatusCode};
 
-/// How an [`HttpClient`] treats error statuses.
-///
-/// [`HttpClient`]: crate::HttpClient
+use crate::request::{Response, ResponseExt};
+use crate::{Error, ErrorKind, Result};
+
+/// How a backend treats error statuses, e.g. `HttpClient` from
+/// `spire-reqwest` or `BrowserBackend` from `spire-thirtyfour`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StatusPolicy {
@@ -27,8 +27,14 @@ pub enum StatusPolicy {
 }
 
 impl StatusPolicy {
-    /// Applies the policy to a response.
-    pub(crate) fn apply(self, response: Response) -> Result<Response> {
+    /// Applies the policy to a response, returning it unless its status is
+    /// an error under the policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error the status maps to, with its final URI and any
+    /// `Retry-After` delay.
+    pub fn check<B>(self, response: Response<B>) -> Result<Response<B>> {
         let status = response.status();
         if self == Self::Accept || !(status.is_client_error() || status.is_server_error()) {
             return Ok(response);
@@ -78,7 +84,7 @@ fn retry_after(headers: &HeaderMap) -> Option<Duration> {
 
 #[cfg(test)]
 mod tests {
-    use spire_core::http::{HeaderValue, Uri};
+    use http::{HeaderValue, Uri};
 
     use super::*;
 
@@ -95,14 +101,14 @@ mod tests {
 
     fn classify(status: u16, retry_after: Option<&'static str>) -> Error {
         StatusPolicy::Classify
-            .apply(response(status, retry_after))
+            .check(response(status, retry_after))
             .unwrap_err()
     }
 
     #[test]
     fn success_and_redirects_pass() {
         for status in [200, 204, 301, 304] {
-            assert!(StatusPolicy::Classify.apply(response(status, None)).is_ok());
+            assert!(StatusPolicy::Classify.check(response(status, None)).is_ok());
         }
     }
 
@@ -138,6 +144,6 @@ mod tests {
 
     #[test]
     fn accept_returns_everything() {
-        assert!(StatusPolicy::Accept.apply(response(500, None)).is_ok());
+        assert!(StatusPolicy::Accept.check(response(500, None)).is_ok());
     }
 }

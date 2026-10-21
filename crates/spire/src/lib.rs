@@ -3,8 +3,8 @@
 #![doc = include_str!("../README.md")]
 
 pub mod extract;
-pub mod handler;
-pub mod routing;
+mod handler;
+mod routing;
 
 #[doc(hidden)]
 pub mod prelude;
@@ -13,23 +13,40 @@ use spire_core::backend::Backend;
 #[cfg(feature = "robots")]
 #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
 pub use spire_core::crawler::Robots;
-pub use spire_core::{
-    Context, Error, ErrorKind, Result, backend, dataset, frontier, http, service, worker,
-};
-#[cfg(feature = "redb")]
-#[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
-pub use spire_redb::{RedbFrontier, RedbSeen, RedbStore, RedbStoreBuilder};
-#[cfg(feature = "reqwest")]
-#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-pub use spire_reqwest::{HttpClient, StatusPolicy, reqwest};
-#[cfg(feature = "thirtyfour")]
-#[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-pub use spire_thirtyfour::{BrowserBackend, BrowserBuilder, BrowserSession, thirtyfour};
+pub use spire_core::{Context, Error, ErrorKind, Result, dataset, worker};
 
+pub use crate::handler::Handler;
 pub use crate::routing::Router;
+
+/// Backends and the clients they hand out, plus the enabled HTTP and browser
+/// backends.
+pub mod backend {
+    pub use spire_core::backend::*;
+    #[cfg(feature = "reqwest")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
+    pub use spire_reqwest::{HttpClient, reqwest};
+    #[cfg(feature = "thirtyfour")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
+    pub use spire_thirtyfour::{
+        BrowserBackend, BrowserBuilder, BrowserSession, Navigation, thirtyfour,
+    };
+}
+
+/// The frontier: requests waiting to be crawled.
+pub mod frontier {
+    pub use spire_core::frontier::*;
+
+    /// A crash-safe frontier and seen set, stored in redb.
+    #[cfg(feature = "redb")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
+    pub mod redb {
+        pub use spire_redb::{RedbFrontier, RedbSeen, RedbStore, RedbStoreBuilder};
+    }
+}
 
 /// Requests, responses and their crawl metadata.
 pub mod request {
+    pub use spire_core::http;
     pub use spire_core::request::*;
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
@@ -54,4 +71,4 @@ pub mod __private {
 }
 
 /// Tracing target for routing and extraction.
-pub const TRACING_TARGET: &str = "spire";
+const TRACING_TARGET: &str = "spire";

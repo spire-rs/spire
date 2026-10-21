@@ -34,6 +34,9 @@ documentation = "https://docs.rs/spire"
 
 # Shared lints for every crate (opt in with `[lints] workspace = true`).
 # The whole of `clippy::pedantic` is denied.
+[workspace.lints.rust]
+missing_docs = "deny"
+
 [workspace.lints.clippy]
 pedantic = { level = "deny", priority = -1 }
 # Lint exceptions are `#[expect]`s with a reason, so stale ones are reported.
@@ -59,9 +62,6 @@ tokio = { version = "1.54", features = [] }
 tokio-util = { version = "0.7", features = [] }
 futures = { version = "0.3", features = [] }
 
-# Tower ecosystem
-tower = { version = "0.5", features = ["util"] }
-
 # HTTP
 http = { version = "1.5", features = [] }
 http-body = { version = "1.1", features = [] }
@@ -78,6 +78,7 @@ deadpool = { version = "0.13", features = ["rt_tokio_1"] }
 # (De)serialization
 serde = { version = "1.0", features = [] }
 serde_json = { version = "1.0", features = [] }
+base64 = { version = "0.23", features = [] }
 
 # Derive macros & utilities
 bytes = { version = "1.12", features = [] }

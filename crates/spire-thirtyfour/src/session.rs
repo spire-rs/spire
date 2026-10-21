@@ -1,35 +1,58 @@
 use std::fmt;
 use std::ops::Deref;
+use std::time::Duration;
 
 use deadpool::managed::Object;
-use spire_core::backend::Client;
-use spire_core::http::header::{CONTENT_TYPE, HeaderValue};
-use spire_core::http::{Method, Uri};
+use http_body_util::BodyExt;
+use spire_core::backend::{Client, StatusPolicy};
+use spire_core::http::header::{
+    CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HeaderValue, TRANSFER_ENCODING,
+};
 use spire_core::request::{Body, Request, Response, ResponseExt};
 use spire_core::{Error, Result};
 use thirtyfour::WebDriver;
+use thirtyfour::bidi::{BiDi, BrowsingContextId};
 
 use crate::error::from_webdriver;
+use crate::navigate::{Navigation, Overrides, navigate};
 use crate::pool::Sessions;
 
 /// A pooled WebDriver session, handed out for one request.
 ///
-/// [`fetch`](Client::fetch) navigates to the request URI and returns the
-/// rendered page source; [`navigate`](Self::navigate) only navigates, for
-/// handlers that drive the page themselves. Through [`Deref`], the session
-/// also exposes the full [`WebDriver`] API for interacting with the page; it
-/// returns to the pool when dropped.
+/// Each request gets a tab of its own, in a fresh browser profile unless the
+/// backend keeps session state, so cookies and storage do not leak between
+/// requests. [`fetch`](Client::fetch) navigates the tab to the request URI
+/// and returns the rendered page; [`navigate`](Self::navigate) only
+/// navigates, for handlers that drive the page themselves. Through
+/// [`Deref`], the session also exposes the full [`WebDriver`] API, pointed
+/// at the request's tab; it returns to the pool when dropped.
 ///
-/// WebDriver cannot report the status or headers of a navigation, so
-/// responses are always `200 OK` with an HTML content type, and the request's
-/// headers and body are not sent. Only `GET` requests are supported.
+/// Navigation goes through WebDriver BiDi, so responses carry the page's
+/// real status and headers, and requests are sent with their method,
+/// headers and body.
 pub struct BrowserSession {
     driver: Object<Sessions>,
+    bidi: BiDi,
+    context: BrowsingContextId,
+    page_load_timeout: Duration,
+    status_policy: StatusPolicy,
 }
 
 impl BrowserSession {
-    pub(crate) const fn new(driver: Object<Sessions>) -> Self {
-        Self { driver }
+    pub(crate) const fn new(
+        driver: Object<Sessions>,
+        bidi: BiDi,
+        context: BrowsingContextId,
+        page_load_timeout: Duration,
+        status_policy: StatusPolicy,
+    ) -> Self {
+        Self {
+            driver,
+            bidi,
+            context,
+            page_load_timeout,
+            status_policy,
+        }
     }
 
     /// Returns a handle to the session's [`WebDriver`].
@@ -41,29 +64,57 @@ impl BrowserSession {
         (*self.driver).clone()
     }
 
+    /// Returns the session's WebDriver BiDi connection, e.g. to listen to
+    /// console logs or network events.
+    #[must_use]
+    pub const fn bidi(&self) -> &BiDi {
+        &self.bidi
+    }
+
+    /// Returns the browsing context, the tab, the request is handled in.
+    #[must_use]
+    pub const fn context(&self) -> &BrowsingContextId {
+        &self.context
+    }
+
     /// Navigates to the request URI without reading the page, returning the
-    /// URI the browser ended up on after redirects.
+    /// response the page ended on after redirects.
+    ///
+    /// The request is sent with its method, headers and body. Its status is
+    /// checked against the backend's [`StatusPolicy`].
     ///
     /// # Errors
     ///
-    /// Returns an [`Invalid`](spire_core::ErrorKind::Invalid) error for
-    /// requests other than `GET`, or an error if navigation fails.
-    pub async fn navigate(&self, request: &Request) -> Result<Uri> {
-        if request.method() != Method::GET {
-            let method = request.method();
-            return Err(Error::invalid(format!(
-                "browser sessions only navigate with GET, not {method}"
-            )));
-        }
+    /// Returns an error if the navigation fails or times out, or if the
+    /// status is an error under the [`StatusPolicy`].
+    pub async fn navigate(&self, request: Request) -> Result<Navigation> {
+        let (parts, body) = request.into_parts();
+        let body = body.collect().await.map_err(|error| {
+            Error::invalid("failed to read the request body")
+                .with_source(error)
+                .with_uri(parts.uri.clone())
+        })?;
+        let overrides = Overrides {
+            method: parts.method,
+            headers: parts.headers,
+            body: body.to_bytes().to_vec(),
+        };
 
-        let uri = request.uri();
-        let failed = |error| from_webdriver(error).with_uri(uri.clone());
-        self.goto(uri.to_string())
-            .await
-            .map_err(|error| failed(error).with_message(format!("failed to navigate to {uri}")))?;
+        let navigation = navigate(
+            &self.bidi,
+            &self.context,
+            &parts.uri,
+            &overrides,
+            self.page_load_timeout,
+        )
+        .await?;
 
-        let current = self.current_url().await.map_err(failed)?;
-        Ok(current.as_str().parse().unwrap_or_else(|_| uri.clone()))
+        let mut response = Response::new(());
+        *response.status_mut() = navigation.status();
+        *response.headers_mut() = navigation.headers().clone();
+        response.set_final_uri(navigation.uri().clone());
+        self.status_policy.check(response)?;
+        Ok(navigation)
     }
 
     /// Returns the source of the page as currently rendered, including
@@ -87,22 +138,36 @@ impl Deref for BrowserSession {
 
 impl fmt::Debug for BrowserSession {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BrowserSession").finish_non_exhaustive()
+        f.debug_struct("BrowserSession")
+            .field("context", &self.context)
+            .finish_non_exhaustive()
     }
 }
 
 impl Client for BrowserSession {
+    /// Navigates to the request URI and returns the rendered page.
+    ///
+    /// The response has the page's status and headers, but its body is the
+    /// rendered document serialized as HTML, so it is always
+    /// `text/html; charset=utf-8`, whatever the server sent.
     async fn fetch(self, request: Request) -> Result<Response> {
-        let final_uri = self.navigate(&request).await?;
+        let uri = request.uri().clone();
+        let navigation = self.navigate(request).await?;
         let source = self
             .page_source()
             .await
-            .map_err(|error| error.with_uri(request.uri().clone()))?;
+            .map_err(|error| error.with_uri(uri))?;
 
         let mut response = Response::new(Body::from(source));
+        *response.status_mut() = navigation.status();
+        let headers = response.headers_mut();
+        *headers = navigation.headers().clone();
+        for header in [CONTENT_LENGTH, CONTENT_ENCODING, TRANSFER_ENCODING] {
+            headers.remove(header);
+        }
         let content_type = HeaderValue::from_static("text/html; charset=utf-8");
-        response.headers_mut().insert(CONTENT_TYPE, content_type);
-        response.set_final_uri(final_uri);
+        headers.insert(CONTENT_TYPE, content_type);
+        response.set_final_uri(navigation.uri().clone());
         Ok(response)
     }
 }

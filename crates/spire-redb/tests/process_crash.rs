@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use spire_core::backend::Noop;
-use spire_core::frontier::{FrontierExt, Seed};
+use spire_core::frontier::FrontierExt;
+use spire_core::frontier::seed::Seed;
 use spire_core::worker::from_fn;
 use spire_core::{Context, Crawler, Error};
 use spire_redb::RedbStore;

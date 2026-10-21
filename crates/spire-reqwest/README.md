@@ -66,7 +66,7 @@ spire-reqwest = { version = "0.2.0", default-features = false, features = ["nati
 
 | Feature | Enables |
 |---|---|
-| `rustls` (default), `native-tls` | TLS implementation |
+| `rustls-tls` (default), `native-tls` | TLS implementation |
 | `http2` (default) | HTTP/2 negotiation |
 | `system-proxy` (default) | Proxies from the environment and system settings |
 | `gzip`, `brotli`, `zstd`, `deflate` | Transparent response decompression |
@@ -92,18 +92,6 @@ let reqwest_client = reqwest::Client::builder()
     .unwrap();
 
 let backend = HttpClient::from(reqwest_client);
-```
-
-### Composing with Tower
-
-`HttpClient` is a `tower::Service`, so middleware composes with it and
-`ServiceClient` turns the result back into a spire `Client`:
-
-```rust
-use spire_core::service::ServiceClient;
-use spire_reqwest::HttpClient;
-
-let client = ServiceClient(tower::ServiceBuilder::new().service(HttpClient::new()));
 ```
 
 ## Error Handling

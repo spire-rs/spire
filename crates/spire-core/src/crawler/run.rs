@@ -13,7 +13,9 @@ use crate::crawler::hosts::{self, Admit, Hosts};
 #[cfg(feature = "robots")]
 use crate::crawler::robots::{BackendSource, RobotsCache, RobotsSource, Verdict};
 use crate::crawler::{Crawler, Live, Stats};
-use crate::frontier::{Ack, Next, Queue, Report, Seed};
+use crate::frontier::queue::Queue;
+use crate::frontier::seed::Seed;
+use crate::frontier::{Ack, Next, Report};
 use crate::request::Tag;
 use crate::sync::lock;
 use crate::worker::{Outcome, Scope, Worker};

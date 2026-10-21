@@ -4,7 +4,8 @@ use futures::FutureExt;
 use futures::future::BoxFuture;
 
 use crate::Result;
-use crate::frontier::{Ack, Admission, Frontier, Next, Report, Seed};
+use crate::frontier::seed::Seed;
+use crate::frontier::{Ack, Admission, Frontier, Next, Report};
 
 /// An object-safe [`Frontier`].
 pub(crate) trait DynFrontier: Send + Sync + 'static {

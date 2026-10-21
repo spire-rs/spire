@@ -50,7 +50,9 @@ frontier or a dataset.
 
 ```rust
 use spire_core::backend::Noop;
-use spire_core::frontier::{FrontierExt, InMemFrontier, Seed};
+use spire_core::frontier::FrontierExt;
+use spire_core::frontier::memory::InMemFrontier;
+use spire_core::frontier::seed::Seed;
 use spire_core::worker::{Outcome, from_fn};
 use spire_core::{Context, Crawler, Result};
 

@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
-use crate::frontier::Seed;
+use crate::frontier::seed::Seed;
 
 /// How a crawl treats every host.
 #[derive(Debug, Clone, Copy, Default)]

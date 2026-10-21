@@ -2,7 +2,8 @@ use std::fmt;
 
 use redb::ReadableTable;
 use spire_core::Result;
-use spire_core::frontier::{Ack, Admission, Frontier, Next, Report, Seed};
+use spire_core::frontier::seed::Seed;
+use spire_core::frontier::{Ack, Admission, Frontier, Next, Report};
 
 use crate::codec;
 use crate::store::{IN_FLIGHT, META, NEXT_SEQUENCE, QUEUE, RedbStore};

@@ -4,11 +4,16 @@ use std::time::Duration;
 
 use deadpool::Runtime;
 use deadpool::managed::{Pool, PoolError};
-use spire_core::backend::Backend;
+use spire_core::backend::{Backend, StatusPolicy};
 use spire_core::http::Uri;
 use spire_core::{Error, ErrorKind, Result};
-use thirtyfour::{Capabilities, ChromiumLikeCapabilities, DesiredCapabilities};
+use thirtyfour::bidi::BrowsingContextId;
+use thirtyfour::bidi::modules::browsing_context::{Create, CreateType};
+use thirtyfour::{
+    Capabilities, CapabilitiesHelper, ChromiumLikeCapabilities, DesiredCapabilities, WindowHandle,
+};
 
+use crate::error::{from_bidi, from_webdriver};
 use crate::pool::{Endpoint, Sessions, quit};
 use crate::session::BrowserSession;
 
@@ -16,8 +21,15 @@ use crate::session::BrowserSession;
 ///
 /// Sessions are started on demand, up to
 /// [`max_sessions`](BrowserBuilder::max_sessions), and reused across
-/// requests. Between requests a session's storage and cookies are cleared,
-/// unless [`keep_session_state`](BrowserBuilder::keep_session_state) is set.
+/// requests. Every request gets a tab in a fresh browser profile, so no
+/// cookies or storage carry over, unless
+/// [`keep_session_state`](BrowserBuilder::keep_session_state) is set.
+///
+/// The backend speaks WebDriver BiDi, which current chromedriver and
+/// geckodriver support: responses carry the page's real status and headers,
+/// error statuses follow the [`StatusPolicy`], and requests are sent with
+/// their method, headers and body. Starting a session fails on a WebDriver
+/// server without BiDi.
 ///
 /// Call [`close`](Self::close) once the crawl is over: sessions that are
 /// dropped instead of quit block the runtime while they shut down.
@@ -84,15 +96,49 @@ impl Backend for BrowserBackend {
     type Client = BrowserSession;
 
     async fn connect(&self) -> Result<BrowserSession> {
-        let driver = self.pool.get().await.map_err(|error| match error {
-            PoolError::Backend(error) => error,
-            PoolError::Timeout(_) => Error::new(ErrorKind::Timeout)
-                .with_message("timed out waiting for a browser session"),
-            PoolError::Closed => Error::backend("browser backend is closed"),
-            error => Error::backend("failed to get a browser session").with_source(error),
-        })?;
+        // Boxed: the pool's future holds a whole session start.
+        let driver = Box::pin(self.pool.get())
+            .await
+            .map_err(|error| match error {
+                PoolError::Backend(error) => error,
+                PoolError::Timeout(_) => Error::new(ErrorKind::Timeout)
+                    .with_message("timed out waiting for a browser session"),
+                PoolError::Closed => Error::backend("browser backend is closed"),
+                error => Error::backend("failed to get a browser session").with_source(error),
+            })?;
+        let sessions = self.pool.manager();
+        let bidi = driver.bidi().await.map_err(from_webdriver)?;
 
-        Ok(BrowserSession::new(driver))
+        // A tab of its own, in a fresh profile unless state is kept; the pool
+        // removes the profile when the session comes back.
+        let context = if sessions.isolate {
+            let profile = bidi.browser().create_user_context().await;
+            let profile = profile.map_err(from_bidi)?.user_context;
+            let tab = bidi.send(Create {
+                r#type: CreateType::Tab,
+                reference_context: None,
+                background: None,
+                user_context: Some(profile),
+            });
+            let context = tab.await.map_err(from_bidi)?.context;
+            let handle = WindowHandle::from(context.as_str());
+            driver
+                .switch_to_window(handle)
+                .await
+                .map_err(from_webdriver)?;
+            context
+        } else {
+            let handle = driver.window().await.map_err(from_webdriver)?;
+            BrowsingContextId::from(handle.to_string())
+        };
+
+        Ok(BrowserSession::new(
+            driver,
+            bidi,
+            context,
+            sessions.page_load_timeout,
+            sessions.status_policy,
+        ))
     }
 }
 
@@ -111,7 +157,8 @@ pub struct BrowserBuilder {
     acquire_timeout: Option<Duration>,
     page_load_timeout: Duration,
     max_session_age: Option<Duration>,
-    reset: bool,
+    isolate: bool,
+    status_policy: StatusPolicy,
 }
 
 impl Default for BrowserBuilder {
@@ -125,7 +172,8 @@ impl Default for BrowserBuilder {
             acquire_timeout: None,
             page_load_timeout: Duration::from_secs(30),
             max_session_age: None,
-            reset: true,
+            isolate: true,
+            status_policy: StatusPolicy::default(),
         }
     }
 }
@@ -194,9 +242,17 @@ impl BrowserBuilder {
     }
 
     /// Keeps storage and cookies between the requests a session serves, e.g.
-    /// for a logged-in crawl.
+    /// for a logged-in crawl: requests share the browser's own profile and
+    /// tab instead of getting fresh ones.
     pub const fn keep_session_state(mut self) -> Self {
-        self.reset = false;
+        self.isolate = false;
+        self
+    }
+
+    /// Sets how error statuses are treated. By default, they become errors
+    /// the crawler retries or fails, as for HTTP backends.
+    pub const fn status_policy(mut self, policy: StatusPolicy) -> Self {
+        self.status_policy = policy;
         self
     }
 
@@ -228,17 +284,21 @@ impl BrowserBuilder {
             ));
         }
 
-        let capabilities = match self.capabilities {
+        let mut capabilities = match self.capabilities {
             Some(capabilities) => capabilities,
             None => headless_chrome()?,
         };
+        capabilities.enable_bidi().map_err(|error| {
+            Error::invalid("failed to enable WebDriver BiDi").with_source(error)
+        })?;
         let sessions = Sessions {
             endpoints,
             next: AtomicUsize::new(0),
             capabilities,
             page_load_timeout: self.page_load_timeout,
             max_age: self.max_session_age,
-            reset: self.reset,
+            isolate: self.isolate,
+            status_policy: self.status_policy,
         };
 
         let pool = Pool::builder(sessions)
@@ -259,7 +319,8 @@ impl fmt::Debug for BrowserBuilder {
             .field("remotes", &self.remotes)
             .field("max_sessions", &self.max_sessions)
             .field("page_load_timeout", &self.page_load_timeout)
-            .field("reset", &self.reset)
+            .field("isolate", &self.isolate)
+            .field("status_policy", &self.status_policy)
             .finish_non_exhaustive()
     }
 }

@@ -13,11 +13,15 @@
 //! ./chromedriver/<platform>/chromedriver-<platform>/chromedriver --port=4444
 //! ```
 
+use spire::backend::BrowserBackend;
 use spire::dataset::{Data, InMemDataset};
-use spire::extract::driver::View;
-use spire::frontier::{FrontierExt, InMemFrontier, Link, Queue, Seed};
+use spire::extract::View;
+use spire::frontier::FrontierExt;
+use spire::frontier::memory::InMemFrontier;
+use spire::frontier::queue::{Link, Queue};
+use spire::frontier::seed::Seed;
 use spire::request::Tags;
-use spire::{BrowserBackend, Crawler, Error, Result, Router};
+use spire::{Crawler, Error, Result, Router};
 use tracing_subscriber::EnvFilter;
 
 /// The kinds of page the crawl visits.

@@ -1,15 +1,15 @@
 use http::Uri;
 
-use crate::frontier::Seed;
+use crate::frontier::seed::Seed;
 use crate::request::Tag;
 
-/// A link to follow with [`Queue::follow`](crate::frontier::Queue::follow).
+/// A link to follow with [`Queue::follow`](crate::frontier::queue::Queue::follow).
 ///
 /// A link is either an `href`, absolute or relative to the page it was found
 /// on, or a complete [`Seed`]. Strings, URIs and seeds convert into links.
 ///
 /// ```
-/// use spire_core::frontier::Link;
+/// use spire_core::frontier::queue::Link;
 ///
 /// let next = Link::from("/page/2");
 /// let detail = Link::from("../items/42").with_tag("item");

@@ -2,7 +2,8 @@ use std::fmt;
 use std::future::Future;
 
 use crate::Result;
-use crate::frontier::{Ack, Admission, Frontier, Next, Report, Seed};
+use crate::frontier::seed::Seed;
+use crate::frontier::{Ack, Admission, Frontier, Next, Report};
 
 /// A facade that refuses seeds a predicate rejects, see
 /// [`FrontierExt::filter`](crate::frontier::FrontierExt::filter).
@@ -94,8 +95,10 @@ impl AllowedHosts {
 
 #[cfg(test)]
 mod tests {
+    use crate::frontier::memory::InMemFrontier;
+    use crate::frontier::seed::Seed;
     use crate::frontier::test_util::seed;
-    use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier, Seed};
+    use crate::frontier::{Admission, Frontier, FrontierExt};
 
     #[tokio::test]
     async fn filter_refuses_rejected_seeds() {

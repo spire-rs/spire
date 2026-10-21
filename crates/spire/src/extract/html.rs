@@ -24,7 +24,7 @@ static TITLE: LazyLock<Selector> =
 ///
 /// ```
 /// use spire::extract::Html;
-/// use spire::frontier::Queue;
+/// use spire::frontier::queue::Queue;
 ///
 /// async fn handler(queue: Queue, page: Html) -> spire::Result<()> {
 ///     println!("{:?}", page.title());
@@ -50,7 +50,7 @@ impl Html {
 
     /// Returns the `href` of every link, as written in the page.
     ///
-    /// Pass them to [`Queue::follow_all`](crate::frontier::Queue::follow_all),
+    /// Pass them to [`Queue::follow_all`](crate::frontier::queue::Queue::follow_all),
     /// which resolves relative links.
     #[must_use]
     pub fn links(&self) -> Vec<String> {
@@ -61,37 +61,16 @@ impl Html {
             .collect()
     }
 
-    /// Extracts the first `T`, see [`Select`].
+    /// Extracts a `T` from the document, see [`Select`]: the first match of
+    /// its root selector, an `Option<T>` if it may be missing, or a `Vec<T>`
+    /// for every match.
     ///
     /// # Errors
     ///
-    /// Returns an error if nothing matches `T`'s root selector, or a field of
-    /// `T` cannot be extracted.
-    pub fn select_one<T: Select>(&self) -> Result<T> {
-        match T::ROOT {
-            None => T::select(self.0.root_element()),
-            Some(css) => {
-                let element = self.0.select(&private::selector(css)?).next();
-                let element =
-                    element.ok_or_else(|| Error::worker(format!("no element matches `{css}`")))?;
-                T::select(element)
-            }
-        }
-    }
-
-    /// Extracts a `T` from every match of its root selector, see [`Select`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if a field of a match cannot be extracted.
-    pub fn select_all<T: Select>(&self) -> Result<Vec<T>> {
-        match T::ROOT {
-            None => Ok(vec![T::select(self.0.root_element())?]),
-            Some(css) => {
-                let selector = private::selector(css)?;
-                self.0.select(&selector).map(T::select).collect()
-            }
-        }
+    /// Returns an error if nothing matches a required `T`'s root selector, or
+    /// a field cannot be extracted.
+    pub fn select<T: Select>(&self) -> Result<T> {
+        select_in(self.0.root_element())
     }
 }
 
@@ -145,6 +124,10 @@ where
 ///
 /// The container's `#[select("...")]` sets [`ROOT`](Self::ROOT): each match
 /// becomes one value. Without it, the whole document is one value.
+///
+/// `Option<T>` and `Vec<T>` select too, taking the first match of `T` if any
+/// and every match of `T`, so [`Element<Vec<T>>`](Element) extracts them
+/// all.
 pub trait Select: Sized {
     /// The CSS selector of the elements each value is extracted from, or
     /// `None` for the document root.
@@ -159,7 +142,42 @@ pub trait Select: Sized {
     fn select(element: ElementRef<'_>) -> Result<Self>;
 }
 
-/// Extracts the first `T` from the response body, see [`Select`].
+/// Extracts a `T` from `element`: from the first match of its root selector
+/// below it, or from the element itself without one.
+fn select_in<T: Select>(element: ElementRef<'_>) -> Result<T> {
+    let Some(css) = T::ROOT else {
+        return T::select(element);
+    };
+    let found = element.select(&private::selector(css)?).next();
+    let found = found.ok_or_else(|| Error::worker(format!("no element matches `{css}`")))?;
+    T::select(found)
+}
+
+/// The first match of `T`, if any.
+impl<T: Select> Select for Option<T> {
+    fn select(element: ElementRef<'_>) -> Result<Self> {
+        let Some(css) = T::ROOT else {
+            return T::select(element).map(Some);
+        };
+        let found = element.select(&private::selector(css)?).next();
+        found.map(T::select).transpose()
+    }
+}
+
+/// Every match of `T`.
+impl<T: Select> Select for Vec<T> {
+    fn select(element: ElementRef<'_>) -> Result<Self> {
+        let Some(css) = T::ROOT else {
+            return Ok(vec![T::select(element)?]);
+        };
+        let selector = private::selector(css)?;
+        element.select(&selector).map(T::select).collect()
+    }
+}
+
+/// Extracts a `T` from the response body, see [`Select`] and
+/// [`Html::select`]: `Element<T>` for the first match, `Element<Option<T>>`
+/// if it may be missing, and `Element<Vec<T>>` for every match.
 #[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Element<T>(pub T);
 
@@ -173,26 +191,7 @@ where
 
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self> {
         let html = Html::from_context(cx, state).await?;
-        html.select_one().map(Self)
-    }
-}
-
-/// Extracts a `T` from every match of its root selector in the response
-/// body, see [`Select`].
-#[derive(Debug, Clone, Deref, DerefMut)]
-pub struct Elements<T>(pub Vec<T>);
-
-impl<C, S, T> FromContext<C, S> for Elements<T>
-where
-    C: Client,
-    S: Sync,
-    T: Select + Send,
-{
-    type Rejection = Error;
-
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self> {
-        let html = Html::from_context(cx, state).await?;
-        html.select_all().map(Self)
+        html.select().map(Self)
     }
 }
 
@@ -340,7 +339,7 @@ mod tests {
 
     #[test]
     fn selects_every_root_match() {
-        let products: Vec<Product> = Html::parse(PAGE).select_all().unwrap();
+        let products: Vec<Product> = Html::parse(PAGE).select::<Vec<_>>().unwrap();
         assert_eq!(
             products,
             [
@@ -359,27 +358,37 @@ mod tests {
             ]
         );
 
-        let first: Product = Html::parse(PAGE).select_one().unwrap();
+        let first: Product = Html::parse(PAGE).select().unwrap();
         assert_eq!(first.name, "Lamp");
     }
 
     #[test]
     fn reports_missing_and_unparsable_fields() {
         let missing = Html::parse(r#"<article class="product"><h2>x</h2></article>"#);
-        let error = missing.select_one::<Product>().unwrap_err();
+        let error = missing.select::<Product>().unwrap_err();
         assert_eq!(
             error.to_string(),
             "`Product.link`: no element matches `a.more`"
         );
 
         let bad_price = r#"<article class="product"><h2>x</h2><span class="price">free</span><a class="more" href="/">m</a></article>"#;
-        let error = Html::parse(bad_price).select_one::<Product>().unwrap_err();
+        let error = Html::parse(bad_price).select::<Product>().unwrap_err();
         assert!(
             error
                 .to_string()
                 .starts_with("`Product.price`: cannot parse `free`")
         );
 
-        assert!(Html::parse("<p></p>").select_one::<Product>().is_err());
+        assert!(Html::parse("<p></p>").select::<Product>().is_err());
+    }
+
+    #[test]
+    fn optional_and_repeated_selections() {
+        let empty = Html::parse("<p></p>");
+        assert_eq!(empty.select::<Option<Product>>().unwrap(), None);
+        assert_eq!(empty.select::<Vec<Product>>().unwrap(), []);
+
+        let first = Html::parse(PAGE).select::<Option<Product>>().unwrap();
+        assert_eq!(first.map(|product| product.name).as_deref(), Some("Lamp"));
     }
 }

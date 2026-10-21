@@ -9,7 +9,7 @@ use robotxt::Robots as Rules;
 use tokio::time::Instant;
 
 use crate::crawler::Robots;
-use crate::frontier::Seed;
+use crate::frontier::seed::Seed;
 use crate::{Error, TRACING_TARGET};
 
 /// Whether robots.txt lets a seed be crawled.

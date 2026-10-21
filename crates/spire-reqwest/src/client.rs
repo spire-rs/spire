@@ -1,24 +1,16 @@
 use std::future::{Future, ready};
-use std::task::{Context, Poll};
 
-use futures::FutureExt;
-use futures::future::BoxFuture;
-use spire_core::backend::{Backend, Client};
+use spire_core::backend::{Backend, Client, StatusPolicy};
 use spire_core::request::{Request, Response};
 use spire_core::{Error, ErrorKind, Result};
-use tower::Service;
 
 use crate::conversion::{request_to_reqwest, response_from_reqwest};
-use crate::status::StatusPolicy;
 
 /// An HTTP [`Backend`] and [`Client`] built on [`reqwest::Client`].
 ///
 /// Every request of a crawl shares the underlying connection pool, cookie
 /// store and configuration of the wrapped client. Error statuses are turned
 /// into errors according to the [`StatusPolicy`].
-///
-/// `HttpClient` also implements [`tower::Service`], so tower middleware
-/// composes with it through [`ServiceClient`] and [`ServiceBackend`].
 ///
 /// # Examples
 ///
@@ -35,9 +27,6 @@ use crate::status::StatusPolicy;
 ///
 /// let backend = HttpClient::from(client).with_status_policy(StatusPolicy::Accept);
 /// ```
-///
-/// [`ServiceClient`]: spire_core::service::ServiceClient
-/// [`ServiceBackend`]: spire_core::service::ServiceBackend
 #[derive(Debug, Clone, Default)]
 pub struct HttpClient {
     client: reqwest::Client,
@@ -78,7 +67,7 @@ impl HttpClient {
             .execute(request)
             .await
             .map_err(|error| classify(error).with_uri(uri.clone()))?;
-        self.status_policy.apply(response_from_reqwest(response))
+        self.status_policy.check(response_from_reqwest(response))
     }
 }
 
@@ -105,20 +94,6 @@ impl Client for HttpClient {
     }
 }
 
-impl Service<Request> for HttpClient {
-    type Error = Error;
-    type Future = BoxFuture<'static, Result<Response>>;
-    type Response = Response;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, request: Request) -> Self::Future {
-        self.clone().execute(request).boxed()
-    }
-}
-
 /// Classifies a failed transfer, so the crawler only retries what may
 /// succeed on another attempt.
 fn classify(error: reqwest::Error) -> Error {
@@ -139,7 +114,6 @@ fn classify(error: reqwest::Error) -> Error {
 #[cfg(test)]
 mod tests {
     use spire_core::request::Body;
-    use spire_core::service::ServiceClient;
 
     use super::*;
 
@@ -155,12 +129,5 @@ mod tests {
         let backend = HttpClient::new().with_status_policy(StatusPolicy::Accept);
         let client = backend.connect().await.unwrap();
         assert_eq!(client.status_policy(), StatusPolicy::Accept);
-    }
-
-    #[test]
-    fn composes_with_tower() {
-        fn assert_client<C: Client>(_: &C) {}
-
-        assert_client(&ServiceClient(HttpClient::new()));
     }
 }

@@ -32,7 +32,7 @@ Derives `spire::extract::Select`, turning CSS selectors on the fields of a
 struct into extraction from HTML:
 
 ```rust,ignore
-use spire::extract::{Elements, Select};
+use spire::extract::{Element, Select};
 
 #[derive(Debug, Select)]
 #[select("article.product")]
@@ -47,7 +47,7 @@ struct Product {
     link: String,
 }
 
-async fn handler(Elements(products): Elements<Product>) {
+async fn handler(Element(products): Element<Vec<Product>>) {
     for product in products {
         println!("{}: {:?}", product.name, product.price);
     }

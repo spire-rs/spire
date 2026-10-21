@@ -6,7 +6,8 @@ use std::sync::Arc;
 use crate::Result;
 use crate::backend::Client;
 use crate::dataset::{Data, Dataset, Datasets};
-use crate::frontier::{InMemFrontier, Queue};
+use crate::frontier::memory::InMemFrontier;
+use crate::frontier::queue::Queue;
 use crate::request::{Request, Response, ResponseExt};
 
 /// A request being crawled, with everything needed to handle it.
@@ -143,7 +144,7 @@ mod tests {
     use super::*;
     use crate::backend::Noop;
     use crate::dataset::InMemDataset;
-    use crate::frontier::Seed;
+    use crate::frontier::seed::Seed;
     use crate::request::{Depth, RequestExt};
 
     #[tokio::test]

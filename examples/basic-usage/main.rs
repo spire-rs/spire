@@ -6,12 +6,16 @@
 //! route for `/links/**` handles them, and the deduplicating frontier visits
 //! each page once.
 
+use spire::backend::HttpClient;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::{Element, Html, Select};
-use spire::frontier::{FrontierExt, InMemFrontier, Queue, Seed};
-use spire::http::Uri;
+use spire::frontier::FrontierExt;
+use spire::frontier::memory::InMemFrontier;
+use spire::frontier::queue::Queue;
+use spire::frontier::seed::Seed;
 use spire::request::Tags;
-use spire::{Crawler, HttpClient, Result, Router};
+use spire::request::http::Uri;
+use spire::{Crawler, Result, Router};
 use tracing_subscriber::EnvFilter;
 
 /// The kinds of page the crawl is seeded with.

@@ -1,11 +1,12 @@
 //! The frontier: requests waiting to be crawled.
 //!
 //! A [`Frontier`] stores [`Seed`]s and decides which one is crawled next.
-//! [`InMemFrontier`] provides the storage; facades wrap any frontier to add
+//! [`InMemFrontier`](memory::InMemFrontier) provides the storage; facades wrap any frontier to add
 //! behavior and are chained with [`FrontierExt`]:
 //!
 //! ```
-//! use spire_core::frontier::{FrontierExt, InMemFrontier};
+//! use spire_core::frontier::FrontierExt;
+//! use spire_core::frontier::memory::InMemFrontier;
 //!
 //! let frontier = InMemFrontier::fifo()
 //!     .dedup()
@@ -18,7 +19,7 @@
 //! too deep is refused before it is marked as seen.
 //!
 //! - [`Filter`] refuses seeds outside the crawl's scope, e.g. other hosts.
-//! - [`Dedup`] refuses seeds whose [`Fingerprint`] was seen before.
+//! - [`Dedup`] refuses seeds whose [`Fingerprint`](seed::Fingerprint) was seen before.
 //! - [`MaxDepth`] refuses seeds deeper than a limit.
 //! - [`Retry`] re-queues seeds after [`Report::Retry`], with a delay.
 //! - [`TagBackoff`] holds back a tag's seeds after [`Report::Backoff`].
@@ -27,24 +28,22 @@
 //! without a [`TagBackoff`] facade, backoffs only delay the retried request.
 
 pub(crate) mod dynamic;
-mod facade;
-mod memory;
-mod queue;
-mod seed;
-mod seen;
+pub mod facade;
+pub mod memory;
+pub mod queue;
+pub mod seed;
+pub mod seen;
 #[cfg(test)]
 pub(crate) mod test_util;
 
 use std::future::{Future, ready};
 use std::time::Duration;
 
-pub use facade::{AllowedHosts, Dedup, Filter, MaxDepth, Retry, RetryPolicy, TagBackoff};
-pub use memory::InMemFrontier;
-pub use queue::{Link, Queue};
-pub use seed::{Fingerprint, Seed};
-pub use seen::{BloomSeen, BloomSnapshot, InMemSeen, SeenSet};
 use tokio::time::Instant;
 
+use self::facade::{AllowedHosts, Dedup, Filter, MaxDepth, Retry, RetryPolicy, TagBackoff};
+use self::seed::Seed;
+use self::seen::{InMemSeen, SeenSet};
 use crate::Result;
 use crate::request::Tag;
 

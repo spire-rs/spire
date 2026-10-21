@@ -23,10 +23,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 # Default feature set: rustls, HTTP/2 and system proxies
-default = ["rustls", "http2", "system-proxy"]
+default = ["rustls-tls", "http2", "system-proxy"]
 
 # TLS through rustls, with no system dependencies
-rustls = ["reqwest/rustls"]
+rustls-tls = ["reqwest/rustls"]
 # TLS through the platform's native library (OpenSSL, Secure Transport, SChannel)
 native-tls = ["reqwest/native-tls"]
 
@@ -52,15 +52,8 @@ hickory-dns = ["reqwest/hickory-dns"]
 # Spire
 spire-core = { workspace = true, features = [] }
 
-# Async runtime
-futures = { workspace = true, features = [] }
-
-# Tower ecosystem
-tower = { workspace = true, features = [] }
-
 # HTTP client
 reqwest = { workspace = true, features = [] }
-httpdate = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing

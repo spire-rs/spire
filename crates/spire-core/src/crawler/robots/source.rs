@@ -9,7 +9,7 @@ use http_body_util::BodyExt;
 use robotxt::{AccessResult, Robots};
 
 use crate::backend::{Backend, Client};
-use crate::frontier::Seed;
+use crate::frontier::seed::Seed;
 use crate::{Error, ErrorKind, Result};
 
 /// Fetches robots.txt files; type-erased so the backend may differ from the

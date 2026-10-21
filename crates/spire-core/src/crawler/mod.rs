@@ -24,7 +24,11 @@ use crate::Result;
 use crate::crawler::hosts::HostPolicy;
 use crate::dataset::{Data, Dataset, Datasets};
 use crate::frontier::dynamic::DynFrontier;
-use crate::frontier::{Frontier, FrontierExt, InMemFrontier, Queue, RetryPolicy, Seed};
+use crate::frontier::facade::RetryPolicy;
+use crate::frontier::memory::InMemFrontier;
+use crate::frontier::queue::Queue;
+use crate::frontier::seed::Seed;
+use crate::frontier::{Frontier, FrontierExt};
 use crate::sync::lock;
 
 /// The default number of requests handled at once.
@@ -54,7 +58,9 @@ const DEFAULT_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 /// use std::time::Duration;
 ///
 /// use spire_core::backend::Noop;
-/// use spire_core::frontier::{FrontierExt, InMemFrontier, Seed};
+/// use spire_core::frontier::FrontierExt;
+/// use spire_core::frontier::memory::InMemFrontier;
+/// use spire_core::frontier::seed::Seed;
 /// use spire_core::worker::from_fn;
 /// use spire_core::{Context, Crawler, Result};
 ///

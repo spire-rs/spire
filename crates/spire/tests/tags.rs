@@ -3,7 +3,7 @@
 #![cfg(feature = "macros")]
 
 use spire::backend::Noop;
-use spire::frontier::Seed;
+use spire::frontier::seed::Seed;
 use spire::request::{Tag, Tags};
 use spire::worker::{Outcome, Worker};
 use spire::{Context, Router};

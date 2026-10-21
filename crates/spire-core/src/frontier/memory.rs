@@ -1,3 +1,5 @@
+//! In-memory storage: [`InMemFrontier`], a FIFO, LIFO or priority queue.
+
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 use std::fmt;
@@ -5,7 +7,8 @@ use std::future::{Future, ready};
 use std::sync::Mutex;
 
 use crate::Result;
-use crate::frontier::{Ack, Admission, Frontier, Next, Report, Seed};
+use crate::frontier::seed::Seed;
+use crate::frontier::{Ack, Admission, Frontier, Next, Report};
 use crate::sync::lock;
 
 /// An in-memory [`Frontier`] that crawls in insertion, reverse or priority

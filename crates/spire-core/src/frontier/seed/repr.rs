@@ -3,7 +3,7 @@
 use bytes::Bytes;
 use http::{HeaderValue, Method};
 
-use crate::frontier::Seed;
+use crate::frontier::seed::Seed;
 use crate::request::{Attempt, Depth, Tag};
 
 /// The serialized form of a [`Seed`]: `http` types are not serializable.

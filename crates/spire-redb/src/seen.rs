@@ -1,7 +1,8 @@
 use std::fmt;
 
 use spire_core::Result;
-use spire_core::frontier::{Fingerprint, SeenSet};
+use spire_core::frontier::seed::Fingerprint;
+use spire_core::frontier::seen::SeenSet;
 
 use crate::store::{RedbStore, SEEN};
 

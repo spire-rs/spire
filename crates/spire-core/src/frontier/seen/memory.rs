@@ -3,14 +3,15 @@ use std::future::{Future, ready};
 use std::sync::Mutex;
 
 use crate::Result;
-use crate::frontier::{Fingerprint, SeenSet};
+use crate::frontier::seed::Fingerprint;
+use crate::frontier::seen::SeenSet;
 use crate::sync::lock;
 
 /// A [`SeenSet`] kept in memory for the lifetime of the crawl.
 ///
 /// It holds every fingerprint pushed, about 16 bytes each: a million URLs
 /// take roughly 16 MB. Capping it would let duplicates through; for larger
-/// crawls use [`BloomSeen`](crate::frontier::BloomSeen), which takes fixed
+/// crawls use [`BloomSeen`](crate::frontier::seen::BloomSeen), which takes fixed
 /// memory at the cost of rarely skipping a new URL, or a persistent
 /// [`SeenSet`].
 #[derive(Debug, Default)]

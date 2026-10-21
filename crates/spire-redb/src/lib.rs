@@ -14,4 +14,4 @@ pub use crate::seen::RedbSeen;
 pub use crate::store::{RedbStore, RedbStoreBuilder};
 
 /// Tracing target for redb storage.
-pub const TRACING_TARGET: &str = "spire_redb";
+const TRACING_TARGET: &str = "spire_redb";

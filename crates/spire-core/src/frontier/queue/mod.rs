@@ -1,3 +1,5 @@
+//! Queues: [`Queue`], the handle handlers add links through, and [`Link`].
+
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -10,7 +12,8 @@ pub use link::Link;
 use link::Target;
 
 use crate::frontier::dynamic::DynFrontier;
-use crate::frontier::{Admission, Frontier, Seed};
+use crate::frontier::seed::Seed;
+use crate::frontier::{Admission, Frontier};
 use crate::request::{Depth, Request, RequestExt};
 use crate::sync::lock;
 use crate::{Error, Result};
@@ -91,7 +94,7 @@ impl Queue {
     /// not inherited: an untagged link goes to the router's path routes or
     /// fallback, so pagination tags its links explicitly.
     ///
-    /// The tag is not part of the [`Fingerprint`](crate::frontier::Fingerprint):
+    /// The tag is not part of the [`Fingerprint`](crate::frontier::seed::Fingerprint):
     /// with a deduplicating frontier, a URL already followed under one tag is
     /// a [`Duplicate`](Admission::Duplicate) under any other.
     ///
@@ -182,7 +185,8 @@ impl fmt::Debug for Queue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frontier::{FrontierExt, InMemFrontier, Next};
+    use crate::frontier::memory::InMemFrontier;
+    use crate::frontier::{FrontierExt, Next};
     use crate::request::Tag;
 
     async fn drain(frontier: &InMemFrontier) -> Vec<(String, Option<String>, u32)> {

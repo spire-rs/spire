@@ -36,11 +36,9 @@ tokio = { workspace = true, features = ["rt", "time", "macros"] }
 tokio-util = { workspace = true, features = [] }
 futures = { workspace = true, features = [] }
 
-# Tower ecosystem
-tower = { workspace = true, features = [] }
-
 # HTTP
 http = { workspace = true, features = [] }
+httpdate = { workspace = true, features = [] }
 http-body = { workspace = true, features = [] }
 http-body-util = { workspace = true, features = [] }
 

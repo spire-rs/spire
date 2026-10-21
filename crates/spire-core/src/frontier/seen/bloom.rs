@@ -3,7 +3,8 @@ use std::future::{Future, ready};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::frontier::{Fingerprint, SeenSet};
+use crate::frontier::seed::Fingerprint;
+use crate::frontier::seen::SeenSet;
 use crate::sync::lock;
 use crate::{Result, TRACING_TARGET};
 
@@ -14,12 +15,14 @@ use crate::{Result, TRACING_TARGET};
 /// never treats a seen URL as new, so no duplicate is crawled, but it may
 /// treat a new URL as seen, so that page is skipped. At 1% it takes about
 /// 1.2 bytes per expected URL, against about 16 for
-/// [`InMemSeen`](crate::frontier::InMemSeen); at 0.1%, about 1.8.
+/// [`InMemSeen`](crate::frontier::seen::InMemSeen); at 0.1%, about 1.8.
 ///
 /// Past `expected` URLs the rate climbs; the filter logs a warning once.
 ///
 /// ```
-/// use spire_core::frontier::{BloomSeen, FrontierExt, InMemFrontier};
+/// use spire_core::frontier::FrontierExt;
+/// use spire_core::frontier::memory::InMemFrontier;
+/// use spire_core::frontier::seen::BloomSeen;
 ///
 /// // Ten million URLs at a 1% false-positive rate: about 12 MB.
 /// let seen = BloomSeen::new(10_000_000, 0.01);
@@ -221,7 +224,7 @@ impl fmt::Debug for BloomSeen {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frontier::Seed;
+    use crate::frontier::seed::Seed;
 
     fn fingerprint(i: usize) -> Fingerprint {
         Seed::get(format!("https://example.com/{i}"))
@@ -288,7 +291,8 @@ mod tests {
 
     #[tokio::test]
     async fn dedups_a_frontier() {
-        use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
+        use crate::frontier::memory::InMemFrontier;
+        use crate::frontier::{Admission, Frontier, FrontierExt};
 
         let frontier = InMemFrontier::fifo().dedup_with(BloomSeen::new(100, 0.001));
         let seed = || Seed::get("https://example.com/page").unwrap();

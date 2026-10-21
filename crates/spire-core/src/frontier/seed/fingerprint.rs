@@ -1,7 +1,7 @@
 //! Stable request fingerprints.
 
 /// A stable 64-bit identifier of a request, see
-/// [`Seed::fingerprint`](crate::frontier::Seed::fingerprint).
+/// [`Seed::fingerprint`](crate::frontier::seed::Seed::fingerprint).
 ///
 /// The hash is stable across runs and platforms, so it can be persisted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

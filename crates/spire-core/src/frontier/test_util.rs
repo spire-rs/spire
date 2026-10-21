@@ -1,6 +1,7 @@
 //! Helpers shared by the frontier's tests.
 
-use crate::frontier::{Frontier, Next, Seed};
+use crate::frontier::seed::Seed;
+use crate::frontier::{Frontier, Next};
 
 pub(crate) fn seed(path: &str) -> Seed {
     Seed::get(format!("https://example.com/{path}")).unwrap()

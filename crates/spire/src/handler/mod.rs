@@ -1,10 +1,6 @@
 //! Handlers: async functions of extractors that handle a request.
 
-mod service;
-
 use std::future::Future;
-
-pub use service::HandlerService;
 
 use crate::Context;
 use crate::extract::{FromContext, FromContextRef};
@@ -31,11 +27,6 @@ use crate::worker::{IntoOutcome, Outcome};
 pub trait Handler<C, M, S>: Clone + Send + Sync + 'static {
     /// Handles the request in `cx`.
     fn call(self, cx: Context<C>, state: S) -> impl Future<Output = Outcome> + Send + 'static;
-
-    /// Binds the handler to `state`, producing a tower service.
-    fn with_state(self, state: S) -> HandlerService<Self, M, S> {
-        HandlerService::new(self, state)
-    }
 }
 
 impl<C, S, F, Fut> Handler<C, ((),), S> for F
