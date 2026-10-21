@@ -126,7 +126,7 @@ mod tests {
     fn honours_retry_after() {
         let error = classify(429, Some("120"));
         assert!(error.is_retryable());
-        assert_eq!(error.retry_after(), Some(Duration::from_secs(120)));
+        assert_eq!(error.retry_after(), Some(Duration::from_mins(2)));
 
         let past = classify(503, Some("Wed, 21 Oct 2015 07:28:00 GMT"));
         assert_eq!(past.retry_after(), Some(Duration::ZERO));

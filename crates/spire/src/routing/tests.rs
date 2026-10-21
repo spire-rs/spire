@@ -132,7 +132,7 @@ async fn layers_wrap_routes_and_fallback() {
 #[tokio::test(start_paused = true)]
 async fn layer_errors_fail_the_request() {
     async fn slow() {
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        tokio::time::sleep(Duration::from_mins(1)).await;
     }
 
     let timeout = tower::timeout::TimeoutLayer::new(Duration::from_secs(1));

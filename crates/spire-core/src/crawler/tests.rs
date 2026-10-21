@@ -380,7 +380,7 @@ mod limits {
     async fn request_timeout_fails_and_retries() {
         let worker = from_fn(|cx: Context<Noop>| async move {
             if cx.request().attempt().get() == 0 {
-                sleep(Duration::from_secs(60)).await;
+                sleep(Duration::from_mins(1)).await;
             }
         });
         let crawler = Crawler::new(Noop, worker)
@@ -394,7 +394,7 @@ mod limits {
     #[tokio::test(start_paused = true)]
     async fn shutdown_grace_cancels_in_flight_requests() {
         let worker = from_fn(|_: Context<Noop>| async {
-            sleep(Duration::from_secs(600)).await;
+            sleep(Duration::from_mins(10)).await;
         });
         let frontier = Arc::new(Recording::default());
         let crawler = Crawler::new(Noop, worker)
@@ -788,9 +788,9 @@ mod resume {
     async fn snapshot_keeps_cancelled_and_retrying_seeds() {
         let worker = from_fn(|cx: Context<Noop>| async move {
             if cx.request().uri().path() == "/flaky" {
-                return Outcome::retry_after(Duration::from_secs(60));
+                return Outcome::retry_after(Duration::from_mins(1));
             }
-            sleep(Duration::from_secs(600)).await;
+            sleep(Duration::from_mins(10)).await;
             Outcome::Continue
         });
         let crawler = Crawler::new(Noop, worker)
