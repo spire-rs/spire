@@ -16,6 +16,7 @@ use spire_core::backend::Backend;
 #[cfg(feature = "robots")]
 #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
 pub use spire_core::crawler::Robots;
+pub use spire_core::crawler::{AdaptiveDelay, HostDelay};
 #[cfg(any(test, feature = "testing"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 pub use spire_core::testing;
@@ -87,3 +88,33 @@ const TRACING_TARGET: &str = "spire";
 #[cfg(all(doctest, feature = "full", feature = "testing"))]
 #[doc = include_str!("../README.md")]
 pub struct ReadmeDoctests;
+
+/// The book's examples, one item per chapter, compiled as doctests with
+/// every feature enabled. The book is not published with the crate, so this
+/// only builds in the repository.
+#[cfg(all(doctest, feature = "full", feature = "testing"))]
+mod book {
+    macro_rules! chapters {
+        ($($name:ident: $file:literal),* $(,)?) => {
+            $(
+                #[doc = include_str!(concat!("../../../book/src/", $file))]
+                struct $name;
+            )*
+        };
+    }
+
+    chapters! {
+        Introduction: "introduction.md",
+        FirstCrawl: "first-crawl.md",
+        Concepts: "concepts.md",
+        Routing: "routing.md",
+        Extracting: "extracting.md",
+        Datasets: "datasets.md",
+        Frontier: "frontier.md",
+        Politeness: "politeness.md",
+        Sitemaps: "sitemaps.md",
+        Browsers: "browsers.md",
+        Middleware: "middleware.md",
+        Testing: "testing.md",
+    }
+}

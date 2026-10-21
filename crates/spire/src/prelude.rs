@@ -20,5 +20,5 @@ pub use crate::frontier::queue::{Link, Queue};
 pub use crate::frontier::seed::Seed;
 pub use crate::frontier::{Admission, Frontier, FrontierExt};
 pub use crate::request::{Attempt, Depth, RequestExt as _, ResponseExt as _, Tag, Tags};
-pub use crate::worker::{IntoOutcome, Outcome};
-pub use crate::{Context, Crawler, Error, ErrorKind, Result, Router};
+pub use crate::worker::{IntoOutcome, Outcome, WorkerExt};
+pub use crate::{Context, Crawler, Error, ErrorKind, HostDelay, Result, Router};

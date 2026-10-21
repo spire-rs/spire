@@ -10,12 +10,37 @@ and this project adheres to
 
 ### Added
 
+- `spire-core`: middleware, re-exported in `spire::worker`. A `Middleware`
+  runs around a worker for every request, with the `Next` worker to pass it
+  on to: it can change the request, check the response's head before any
+  handler, or change the outcome. `WorkerExt::layer` wraps a worker or
+  router in it, `middleware::from_fn` makes one from an async function, and
+  `SetHeader` sets or rotates a header, e.g. the user agent.
+- `spire-core`: adaptive host delays. `Crawler::with_host_delay` takes a
+  `HostDelay`: a fixed `Duration` as before, or `HostDelay::adaptive()`,
+  which adapts each host's delay to its response times, never lowering it
+  on a failure, and doubling it on `429`, `503` or a timeout.
+- `spire-core`: `MockPage::with_latency`, for pages that take time to
+  answer.
+- `spire-core`: `backend::Rotate` cycles through several backends, one per
+  request, e.g. HTTP clients behind different proxies.
+- [The Spire Book](https://spire-rs.github.io/spire), a guide to every part of
+  a crawl, published from `book/`. Its examples are doctested. The `spire`
+  README now links to it instead of holding the guide itself.
 - `spire-core`: the `testing` module, re-exported as `spire::testing` behind
   the `testing` feature, to test handlers without a network. `MockSite` is a
   backend serving fixed `MockPage`s by URL, with redirects and the real
   backends' status policy, and records what was fetched. `MockSite::visit`
   runs one request through a router or worker, so its outcome, the seeds it
   queued and the items it wrote can be checked without crawling further.
+
+### Changed
+
+- **Breaking:** `Crawler::new` requires its worker to handle the backend's
+  clients. A router's client type is then inferred from the backend where
+  the crawler is built, not only once it runs.
+- **Breaking:** `Crawler::with_host_delay` takes `impl Into<HostDelay>`, so it
+  is no longer `const`. A `Duration` still works as before.
 
 ## [0.3.0] - 2026-10-21
 

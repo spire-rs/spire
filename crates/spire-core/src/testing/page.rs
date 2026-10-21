@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bytes::Bytes;
 use http::header::{CONTENT_TYPE, IntoHeaderName};
 use http::{HeaderMap, HeaderValue, StatusCode, Uri};
@@ -10,6 +12,8 @@ pub struct MockPage {
     pub(super) body: Bytes,
     /// Where the page redirects to, if it does.
     pub(super) location: Option<Uri>,
+    /// How long the page takes to answer.
+    pub(super) latency: Duration,
 }
 
 impl MockPage {
@@ -21,6 +25,7 @@ impl MockPage {
             headers: HeaderMap::new(),
             body: Bytes::new(),
             location: None,
+            latency: Duration::ZERO,
         }
     }
 
@@ -79,6 +84,15 @@ impl MockPage {
     #[must_use]
     pub fn with_header(mut self, name: impl IntoHeaderName, value: HeaderValue) -> Self {
         self.headers.insert(name, value);
+        self
+    }
+
+    /// Takes `latency` to answer, e.g. to test timeouts or adaptive host
+    /// delays. Tests with paused time, `#[tokio::test(start_paused = true)]`,
+    /// skip the wait.
+    #[must_use]
+    pub const fn with_latency(mut self, latency: Duration) -> Self {
+        self.latency = latency;
         self
     }
 

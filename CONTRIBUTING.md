@@ -140,7 +140,20 @@ This project follows the standard Rust style guidelines:
 
 - Document all public APIs with doc comments
 - Include examples in doc comments where appropriate
-- Keep the README.md up to date with new features
+- Explain new features in [the book](book/src), and keep the READMEs short
+
+The book is built with [mdBook](https://rust-lang.github.io/mdBook/), and
+published to GitHub Pages from `main`. Preview it while writing:
+
+```bash
+cargo install mdbook
+mdbook serve book --open
+```
+
+Its examples are doctests of the `spire` crate, so `make test` compiles them,
+and runs those that need no network. Mark examples that crawl a real site
+`no_run`, and hide boilerplate with `# ` lines, which both rustdoc and mdBook
+hide.
 
 ## Submitting Changes
 

@@ -4,6 +4,7 @@
 [![Crate Docs][docs-badge]][docs-url]
 [![Crate Version][crates-badge]][crates-url]
 [![Crate Coverage][coverage-badge]][coverage-url]
+[![Book][book-badge]][book-url]
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
 
@@ -15,6 +16,8 @@
 [docs-url]: http://docs.rs/spire
 [coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
 [coverage-url]: https://app.codecov.io/gh/spire-rs/spire
+[book-badge]: https://img.shields.io/badge/book-guide-blue?logo=mdbook&style=flat-square
+[book-url]: https://spire-rs.github.io/spire
 
 The flexible crawler and scraper framework for Rust, built on
 [tokio][tokio-rs/tokio].
@@ -41,21 +44,7 @@ The flexible crawler and scraper framework for Rust, built on
 spire = { version = "0.3.0", features = ["reqwest", "macros"] }
 ```
 
-### Feature Flags
-
-| Feature | Enables |
-|---|---|
-| `html` (default) | The `Html` and `Element` extractors and the `Select` trait |
-| `macros` | `#[derive(Select)]` |
-| `robots` | Obeying robots.txt (RFC 9309) with `Crawler::with_robots`, optionally fetched through a separate backend |
-| `sitemap` | The `Sitemap` extractor and `FollowSitemap` handler, for XML and text sitemaps, gzipped or not |
-| `serde` | Serializable seeds for snapshots, and the `JsonlDataset` output |
-| `redb` | `RedbStore`: a crash-safe frontier and seen set on disk |
-| `reqwest` | The `HttpClient` backend |
-| `thirtyfour` | The `BrowserBackend` (WebDriver) backend |
-| `rustls-tls` (default), `native-tls` | TLS for the enabled backends |
-| `testing` | `MockSite` and `Visit`, to test handlers without a network |
-| `full` | Everything except `native-tls` and `testing` |
+See the book for [every feature flag](https://spire-rs.github.io/spire/installation.html).
 
 ## Quick Start
 
@@ -125,159 +114,25 @@ serving several variants takes `page: Page` as an argument. A URL is fetched
 once whatever its tag. Error statuses become failures: `5xx` and `429` are
 retried, honouring `Retry-After`.
 
-### Sitemaps
+## Guide
 
-With the `sitemap` feature, the `FollowSitemap` handler follows sitemaps:
-every page is queued with one tag, and every sitemap of an index with the tag
-of the sitemap itself. Seed sitemaps yourself, or let `Robots::with_sitemaps`
-queue the ones each site's robots.txt lists:
+[The Spire Book](https://spire-rs.github.io/spire) explains every part of a crawl:
 
-```rust,no_run
-use spire::backend::HttpClient;
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
-use spire::frontier::seed::Seed;
-use spire::request::Tags;
-use spire::{Crawler, FollowSitemap, Result, Robots, Router};
+- [How a crawl works](https://spire-rs.github.io/spire/concepts.html): seeds, the frontier, backends,
+  routers and datasets
+- [Routing](https://spire-rs.github.io/spire/routing.html) by tag and path, with typed tags and several
+  handlers per page
+- [Extracting data](https://spire-rs.github.io/spire/extracting.html) from HTML, JSON and text
+- [Storing results](https://spire-rs.github.io/spire/datasets.html) in memory or as JSON Lines
+- [The frontier](https://spire-rs.github.io/spire/frontier.html): deduplication, depth, retries,
+  backoff, and crawls that survive a crash
+- [Limits and politeness](https://spire-rs.github.io/spire/politeness.html): per-host limits,
+  robots.txt and budgets
+- [Sitemaps](https://spire-rs.github.io/spire/sitemaps.html), [browsers](https://spire-rs.github.io/spire/browsers.html),
+  [middleware and proxies](https://spire-rs.github.io/spire/middleware.html), and
+  [testing](https://spire-rs.github.io/spire/testing.html)
 
-#[derive(Debug, Clone, Copy, Tags)]
-enum Page {
-    Home,
-    Sitemap,
-    Product,
-}
-
-async fn product() {}
-
-async fn crawl() -> Result<()> {
-    let router = Router::new()
-        .route(Page::Home, || async {})
-        .route(Page::Sitemap, FollowSitemap::new(Page::Product))
-        .route(Page::Product, product);
-
-    let crawler = Crawler::new(HttpClient::default(), router)
-        .with_frontier(InMemFrontier::fifo().dedup().allow_hosts(["example.com"]))
-        .with_robots(Robots::new("MyBot").with_sitemaps(Page::Sitemap))
-        .with_seed(Seed::get("https://example.com/")?.with_tag(Page::Home));
-    crawler.run().await?;
-    Ok(())
-}
-```
-
-The `Sitemap` extractor parses a sitemap for a handler of your own. Sitemaps
-must be fetched over HTTP: a browser renders XML as a page.
-
-### Browser Automation
-
-`BrowserBackend` drives real browsers over WebDriver BiDi, with the page's
-real status and headers, any request method, and a fresh browser profile per
-request. The page is loaded once, by the first extractor that needs it, and
-body extractors such as `Html` read it as currently rendered. `View` hands
-over the driver to interact with the page; `view.snapshot()` then parses it again,
-including what the interaction changed:
-
-```rust,no_run
-use spire::backend::BrowserBackend;
-use spire::backend::thirtyfour::By;
-use spire::extract::View;
-use spire::frontier::queue::Queue;
-use spire::frontier::seed::Seed;
-use spire::{Crawler, Result, Router};
-
-async fn rendered(queue: Queue, view: View) -> Result<()> {
-    if let Ok(more) = view.find(By::Css("button.more")).await {
-        let _ = more.click().await;
-    }
-    let page = view.snapshot().await?;
-    println!("{:?} at {:?}", page.title(), view.current_url().await);
-    queue.follow_all(page.links()).await?;
-    Ok(())
-}
-
-async fn crawl() -> Result<()> {
-    let backend = BrowserBackend::builder()
-        .remote("http://localhost:4444")
-        .max_sessions(4)
-        .build()?;
-
-    let router = Router::new().route("page", rendered);
-    let crawler = Crawler::new(backend, router)
-        .with_seed(Seed::get("https://example.com/")?.with_tag("page"));
-    crawler.run().await?;
-
-    // Quit the browser sessions instead of dropping them.
-    crawler.backend().close().await;
-    Ok(())
-}
-```
-
-### Testing
-
-With the `testing` feature, `MockSite` serves fixed pages by URL, so
-handlers can be tested without a network. Enable it for tests only:
-
-```toml
-[dev-dependencies]
-spire = { version = "0.3.0", features = ["testing"] }
-```
-
-`MockSite` is a backend, so a whole crawl runs against it, and `visit` runs
-one request through a router without crawling what it queues, to check what
-the handlers did:
-
-```rust
-use spire::dataset::InMemDataset;
-use spire::extract::Select;
-use spire::frontier::seed::Seed;
-use spire::testing::{MockPage, MockSite};
-use spire::worker::Outcome;
-use spire::{Collect, FollowLinks, Result, Router};
-
-#[derive(Debug, Select)]
-#[select("article")]
-struct Product {
-    #[select("h2")]
-    name: String,
-}
-
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
-    let site = MockSite::new().page(
-        "https://shop.test/list",
-        MockPage::html(r#"<article><h2>Lamp</h2></article><a class="next" href="?page=2">next</a>"#),
-    );
-    let router = Router::new().route("listing", (
-        Collect::<Product>::new(),
-        FollowLinks::new("listing").select("a.next"),
-    ));
-
-    let visit = site
-        .visit(Seed::get("https://shop.test/list")?.with_tag("listing"))
-        .with_dataset(InMemDataset::<Product>::new());
-    assert!(matches!(visit.run(&router).await, Outcome::Continue));
-
-    let products = visit.dataset::<Product>()?.read_all().await?;
-    assert_eq!(products[0].name, "Lamp");
-    assert_eq!(visit.queued()[0].uri(), "https://shop.test/list?page=2");
-    Ok(())
-}
-```
-
-Pages are `html`, `text`, `json`, `xml`, a `status`, or a `redirect`, which
-is followed as an HTTP client would. URLs without a page get a `404`, and
-error statuses fail the fetch as they do over HTTP.
-
-## Architecture
-
-- **`Crawler`** pops seeds from the frontier, runs them concurrently through
-  the backend and the router, and reports each outcome back.
-- **`Frontier`** holds the seeds; facades add deduplication, depth limits,
-  retries and per-tag backoff.
-- **`Backend`** hands out a client per request: `HttpClient` or a pooled
-  `BrowserSession`.
-- **`Router`** picks the handler for a request by its tag; handlers return
-  anything that converts into an `Outcome`.
-- **Datasets** store what handlers scrape, one per item type.
+The API reference is on [docs.rs](https://docs.rs/spire).
 
 ## Contributing
 

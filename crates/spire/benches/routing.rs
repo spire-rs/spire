@@ -3,7 +3,10 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use spire::backend::Noop;
 use spire::frontier::seed::Seed;
-use spire::worker::{Worker, from_fn};
+use spire::request::http::HeaderValue;
+use spire::request::http::header::USER_AGENT;
+use spire::worker::middleware::SetHeader;
+use spire::worker::{Worker, WorkerExt, from_fn};
 use spire::{Context, Crawler, Router};
 
 /// A router with 20 tag routes and 20 path routes, all doing nothing.
@@ -64,7 +67,8 @@ fn seeds() -> Vec<Seed> {
         .collect()
 }
 
-/// A whole crawl with one handler: through a router, and as a bare worker.
+/// A whole crawl with one handler: through a router, a router in one
+/// middleware, and as a bare worker.
 fn crawl(c: &mut Criterion) {
     let runtime = runtime();
     let mut group = c.benchmark_group("crawl");
@@ -73,6 +77,19 @@ fn crawl(c: &mut Criterion) {
     group.bench_function("router", |b| {
         b.to_async(&runtime).iter_batched(
             || Crawler::new(Noop, Router::new().fallback(|| async {})).with_seeds(seeds()),
+            |crawler| async move { crawler.run().await.unwrap() },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+    group.bench_function("layered", |b| {
+        b.to_async(&runtime).iter_batched(
+            || {
+                let agent = HeaderValue::from_static("bench");
+                let router = Router::new()
+                    .fallback(|| async {})
+                    .layer(SetHeader::new(USER_AGENT, agent));
+                Crawler::new(Noop, router).with_seeds(seeds())
+            },
             |crawler| async move { crawler.run().await.unwrap() },
             criterion::BatchSize::SmallInput,
         );

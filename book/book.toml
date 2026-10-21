@@ -1,0 +1,23 @@
+[book]
+title = "The Spire Book"
+authors = ["Oleh Martsokha"]
+description = "A guide to crawling and scraping the web with Spire, the Rust crawler framework."
+language = "en"
+
+[rust]
+edition = "2024"
+
+[output.html]
+site-url = "/spire/"
+git-repository-url = "https://github.com/spire-rs/spire"
+edit-url-template = "https://github.com/spire-rs/spire/edit/main/book/{path}"
+default-theme = "light"
+preferred-dark-theme = "navy"
+# The chapters are short, so the sidebar lists chapters only, not the
+# current page's headings.
+sidebar-header-nav = false
+
+# The playground has no spire, so examples cannot run there. They are
+# compiled, and run where they need no network, by `cargo test` instead.
+[output.html.playground]
+runnable = false

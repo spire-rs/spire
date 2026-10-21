@@ -47,6 +47,9 @@ LLM.md
 .claude
 CLAUDE.md
 
+# The book, built by `mdbook build book`
+/book/book/
+
 # Output of the rust-blog example, run from the repository root
 /rust-blog.jsonl
 /rust-blog.redb

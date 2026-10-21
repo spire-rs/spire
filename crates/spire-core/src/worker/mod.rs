@@ -1,10 +1,13 @@
-//! Workers, which handle fetched requests, and their [`Outcome`]s.
+//! Workers, which handle fetched requests, their [`Outcome`]s, and the
+//! [`middleware`] around them.
 
+pub mod middleware;
 mod outcome;
 
 use std::fmt;
 use std::future::Future;
 
+pub use middleware::WorkerExt;
 pub use outcome::{IntoOutcome, Outcome, Scope};
 
 use crate::context::Context;
