@@ -36,7 +36,8 @@ fast it answers:
 use std::time::Duration;
 
 use spire::backend::HttpClient;
-use spire::{Crawler, HostDelay, Router};
+use spire::crawler::HostDelay;
+use spire::{Crawler, Router};
 # async fn page() {}
 
 let delay = HostDelay::adaptive()
@@ -69,7 +70,8 @@ for your user agent, and honours its `Crawl-delay`:
 use std::time::Duration;
 
 use spire::backend::HttpClient;
-use spire::{Crawler, Robots, Router};
+use spire::crawler::Robots;
+use spire::{Crawler, Router};
 # async fn page() {}
 
 let robots = Robots::new("MyBot")

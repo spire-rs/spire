@@ -6,29 +6,18 @@
 #![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
 
 pub mod extract;
-mod handler;
+pub mod handler;
 mod routing;
 
 #[doc(hidden)]
 pub mod prelude;
 
 use spire_core::backend::Backend;
-#[cfg(feature = "robots")]
-#[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
-pub use spire_core::crawler::Robots;
-pub use spire_core::crawler::{AdaptiveDelay, HostDelay};
 #[cfg(any(test, feature = "testing"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 pub use spire_core::testing;
 pub use spire_core::{Context, Error, ErrorKind, Result, dataset, worker};
 
-#[cfg(feature = "sitemap")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
-pub use crate::handler::FollowSitemap;
-pub use crate::handler::Handler;
-#[cfg(feature = "html")]
-#[cfg_attr(docsrs, doc(cfg(feature = "html")))]
-pub use crate::handler::{Collect, FollowLinks};
 pub use crate::routing::Router;
 
 /// Backends and the clients they hand out, plus the enabled HTTP and browser
@@ -41,6 +30,18 @@ pub mod backend {
     #[cfg(feature = "thirtyfour")]
     #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
     pub use spire_thirtyfour::{BrowserBackend, BrowserBuilder, BrowserSession, thirtyfour};
+}
+
+/// The crawler's settings and statistics; the [`Crawler`] itself is at the
+/// crate root.
+pub mod crawler {
+    #[cfg(feature = "robots")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
+    pub use spire_core::crawler::Robots;
+    pub use spire_core::crawler::{AdaptiveDelay, HostDelay, Stats};
+
+    #[cfg(doc)]
+    use crate::Crawler;
 }
 
 /// The frontier: requests waiting to be crawled.

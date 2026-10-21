@@ -11,7 +11,9 @@ use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
 use spire::request::Tags;
-use spire::{Crawler, FollowSitemap, Result, Robots, Router};
+use spire::crawler::Robots;
+use spire::handler::FollowSitemap;
+use spire::{Crawler, Result, Router};
 
 #[derive(Debug, Clone, Copy, Tags)]
 enum Page {

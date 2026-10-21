@@ -39,6 +39,13 @@ and this project adheres to
 - **Breaking:** `Crawler::new` requires its worker to handle the backend's
   clients. A router's client type is then inferred from the backend where
   the crawler is built, not only once it runs.
+- **Breaking:** `spire`'s root holds only `Crawler`, `Router`, `Context`
+  and the error types. The crawler's settings and statistics moved to a new
+  `spire::crawler` module (`Robots`, `HostDelay`, `AdaptiveDelay`, and
+  `Stats`, which was not re-exported before), and the handlers to a public
+  `spire::handler` module (`Handler`, `FollowLinks`, `Collect`,
+  `FollowSitemap`). The prelude includes `HostDelay`, `FollowLinks` and
+  `Collect`.
 - **Breaking:** `Crawler::with_host_delay` takes `impl Into<HostDelay>`, so it
   is no longer `const`. A `Duration` still works as before.
 

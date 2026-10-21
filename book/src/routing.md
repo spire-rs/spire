@@ -115,7 +115,8 @@ fetched once. They stop at the first one that does not return
 `Outcome::Continue`:
 
 ```rust
-# use spire::{Collect, FollowLinks, Router};
+# use spire::handler::{Collect, FollowLinks};
+# use spire::Router;
 # use spire::extract::Select;
 # use spire::backend::Noop;
 # #[derive(Debug, Select)]

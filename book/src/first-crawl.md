@@ -48,7 +48,8 @@ use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
 use spire::request::Tags;
-use spire::{Collect, Crawler, FollowLinks, Result, Router};
+use spire::handler::{Collect, FollowLinks};
+use spire::{Crawler, Result, Router};
 #
 # #[derive(Debug, Clone, Copy, Tags)]
 # enum Page {

@@ -58,7 +58,8 @@ use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
 use spire::request::Tags;
-use spire::{Collect, Crawler, FollowLinks, Result, Router};
+use spire::handler::{Collect, FollowLinks};
+use spire::{Crawler, Result, Router};
 
 /// The kinds of page the crawl visits, routed by tag.
 #[derive(Debug, Clone, Copy, Tags)]

@@ -7,8 +7,9 @@ use spire::extract::Select;
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
+use spire::handler::{Collect, FollowLinks};
 use spire::testing::{MockPage, MockSite};
-use spire::{Collect, Crawler, FollowLinks, Router};
+use spire::{Crawler, Router};
 
 #[derive(Debug, Select)]
 #[select("article")]

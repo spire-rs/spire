@@ -18,7 +18,8 @@ use spire::extract::Select;
 use spire::frontier::seed::Seed;
 use spire::testing::{MockPage, MockSite};
 use spire::worker::Outcome;
-use spire::{Collect, FollowLinks, Result, Router};
+use spire::handler::{Collect, FollowLinks};
+use spire::{Result, Router};
 
 #[derive(Debug, Select)]
 #[select("article")]
