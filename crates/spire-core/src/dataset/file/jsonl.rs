@@ -5,8 +5,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use super::FileSink;
 use crate::dataset::Dataset;
-use crate::dataset::file::FileSink;
 use crate::{Error, ErrorKind, Result};
 
 /// A write-only [`Dataset`] that appends every item to a file as one line of
@@ -101,15 +101,23 @@ where
     T: Serialize + Send + 'static,
 {
     async fn write(&self, item: T) -> Result<()> {
+        self.write_batch(vec![item]).await
+    }
+
+    /// Writes every item at once: all of them, or none.
+    async fn write_batch(&self, items: Vec<T>) -> Result<()> {
         self.sink
-            .write(move |()| {
-                let mut line = serde_json::to_vec(&item).map_err(|error| {
-                    Error::new(ErrorKind::Dataset)
-                        .with_message("failed to serialize an item")
-                        .with_source(error)
-                })?;
-                line.push(b'\n');
-                Ok((line, ()))
+            .write(items.len(), move |()| {
+                let mut lines = Vec::new();
+                for item in &items {
+                    serde_json::to_writer(&mut lines, item).map_err(|error| {
+                        Error::new(ErrorKind::Dataset)
+                            .with_message("failed to serialize an item")
+                            .with_source(error)
+                    })?;
+                    lines.push(b'\n');
+                }
+                Ok((lines, ()))
             })
             .await
     }
@@ -185,5 +193,25 @@ mod tests {
         let path = temp_path("missing-dir").join("nested/pages.jsonl");
         let error = JsonlDataset::<Page>::create(&path).await.unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Dataset);
+    }
+
+    #[tokio::test]
+    async fn batches_are_written_whole_or_not_at_all() {
+        use std::collections::HashMap;
+
+        let path = temp_path("jsonl-batch");
+        let maps = JsonlDataset::<HashMap<(u8, u8), u8>>::create(&path)
+            .await
+            .unwrap();
+        // A map with tuple keys is not JSON, so the batch is refused whole.
+        let bad = HashMap::from([((1, 2), 3)]);
+        assert!(maps.write_batch(vec![HashMap::new(), bad]).await.is_err());
+        maps.write_batch(vec![HashMap::new(), HashMap::new()])
+            .await
+            .unwrap();
+
+        let contents = tokio::fs::read_to_string(&path).await.unwrap();
+        tokio::fs::remove_file(&path).await.unwrap();
+        assert_eq!(contents, "{}\n{}\n");
     }
 }

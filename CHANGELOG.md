@@ -8,6 +8,28 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `spire-core`: `Dataset::write_batch` stores several items at once, by
+  default one by one. `InMemDataset`, the file datasets and `RedbDataset`
+  store a batch in one step, all of it or none, and `Data::write_all`, which
+  `Collect` stores a page's items with, writes one batch.
+- `spire`: the `Head` extractor, with the response's status, headers and
+  final URI, and `Query<T>`, the request URI's query string deserialized
+  with serde.
+- `spire`: with the `html` feature, the `Meta` extractor reads a page's
+  title, description, canonical URL, language, robots, Open Graph and
+  Twitter fields, and `JsonLd<T>` its JSON-LD structured data. `Html::meta`
+  and `Html::json_ld` read the same from a parsed page.
+
+### Changed
+
+- **Breaking:** the `View` extractor is renamed `Tab`: it is the request's
+  tab in the browser.
+- **Breaking:** `spire::extract::sitemapo`, the whole sitemap parser, is
+  replaced by `spire::extract::sitemap`, which re-exports only the records a
+  `Sitemap` holds: `Record`, `Entry`, `Sitemap` and their extensions.
+
 ## [0.4.0] - 2026-10-22
 
 Middleware, adaptive host delays, handler testing and persistent datasets,

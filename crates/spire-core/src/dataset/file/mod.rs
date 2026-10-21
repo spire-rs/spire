@@ -1,4 +1,9 @@
-//! The file handling shared by the datasets that append to a file.
+//! Datasets that append to a file, and the file handling they share.
+
+#[cfg(feature = "csv")]
+mod csv;
+#[cfg(feature = "json")]
+mod jsonl;
 
 use std::fmt;
 use std::fs::TryLockError;
@@ -12,6 +17,10 @@ use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
 use tokio::sync::Mutex;
 
+#[cfg(feature = "csv")]
+pub use self::csv::CsvDataset;
+#[cfg(feature = "json")]
+pub use self::jsonl::JsonlDataset;
 use crate::{Error, ErrorKind, Result};
 
 /// A file that items are appended to, with the encoder's state `S`.
@@ -136,10 +145,11 @@ impl<S, T: Target> FileSink<S, T> {
         self.inner.written.load(Ordering::Relaxed)
     }
 
-    /// Encodes an item with `encode`, which returns its bytes and the next
-    /// state, then appends the bytes.
+    /// Encodes `count` items with `encode`, which returns their bytes and
+    /// the next state, then appends the bytes: all of them, or none.
     pub(super) async fn write(
         &self,
+        count: usize,
         encode: impl FnOnce(&S) -> Result<(Vec<u8>, S)>,
     ) -> Result<()> {
         let mut open = self.inner.open.lock().await;
@@ -159,7 +169,7 @@ impl<S, T: Target> FileSink<S, T> {
 
         open.len += bytes.len() as u64;
         open.state = state;
-        self.inner.written.fetch_add(1, Ordering::Relaxed);
+        self.inner.written.fetch_add(count, Ordering::Relaxed);
         Ok(())
     }
 }
@@ -221,7 +231,7 @@ mod tests {
 
     /// Writes `line`, with a header the first time, as the CSV dataset does.
     async fn write(sink: &FileSink<bool, Flaky>, line: &str) -> Result<()> {
-        sink.write(|header| {
+        sink.write(1, |header| {
             let mut bytes = if *header {
                 Vec::new()
             } else {

@@ -3,24 +3,24 @@
 `BrowserBackend` drives real browsers over WebDriver BiDi, with the page's
 real status and headers, any request method, and a fresh browser profile per
 request. The page is loaded once, by the first extractor that needs it, and
-body extractors such as `Html` read it as currently rendered. `View` hands
-over the driver to interact with the page; `view.snapshot()` then parses it again,
-including what the interaction changed:
+body extractors such as `Html` read it as currently rendered. `Tab` is
+the request's tab, to interact with the page; `tab.snapshot()` then parses it
+again, including what the interaction changed:
 
 ```rust,no_run
 use spire::backend::BrowserBackend;
 use spire::backend::thirtyfour::By;
-use spire::extract::View;
+use spire::extract::Tab;
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
 use spire::{Crawler, Result, Router};
 
-async fn rendered(queue: Queue, view: View) -> Result<()> {
-    if let Ok(more) = view.find(By::Css("button.more")).await {
+async fn rendered(queue: Queue, tab: Tab) -> Result<()> {
+    if let Ok(more) = tab.find(By::Css("button.more")).await {
         let _ = more.click().await;
     }
-    let page = view.snapshot().await?;
-    println!("{:?} at {:?}", page.title(), view.current_url().await);
+    let page = tab.snapshot().await?;
+    println!("{:?} at {:?}", page.title(), tab.current_url().await);
     queue.follow_all(page.links()).await?;
     Ok(())
 }

@@ -5,11 +5,12 @@
 //! read the response: the request is fetched once, by the first that needs
 //! it, and body extractors read the page as it is when they run.
 //!
-//! - Request and crawl: [`Uri`](crate::request::http::Uri), [`Tag`], an enum
-//!   deriving [`Tags`],
-//!   [`Depth`], [`Attempt`], [`Queue`] and [`Data`].
-//! - Response body: [`Bytes`], [`Text`], [`Json`], and with the `html`
-//!   feature [`Html`] and [`Element`].
+//! - Request and crawl: [`Uri`](crate::request::http::Uri), [`Query`],
+//!   [`Tag`], an enum deriving [`Tags`], [`Depth`], [`Attempt`], [`Queue`]
+//!   and [`Data`].
+//! - Response: [`Head`] for the status and headers, and for the body
+//!   [`Bytes`], [`Text`], [`Json`], and with the `html` feature [`Html`],
+//!   [`Element`], [`Meta`] and [`JsonLd`].
 //! - Everything else: [`State`].
 //!
 //! Wrapping an extractor in `Option` or `Result` makes it infallible.
@@ -21,33 +22,34 @@
 //! [`Queue`]: crate::frontier::queue::Queue
 //! [`Data`]: crate::dataset::Data
 
-mod content;
-pub(crate) mod context;
+mod body;
 #[cfg(feature = "thirtyfour")]
-mod driver;
+mod browser;
+pub(crate) mod context;
+mod head;
 #[cfg(feature = "html")]
 pub(crate) mod html;
+mod query;
 #[cfg(feature = "sitemap")]
-mod sitemap;
+#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
+pub mod sitemap;
 mod state;
 
 use std::convert::Infallible;
 use std::future::Future;
 
-pub use content::{Bytes, Json, Text};
+pub use body::{Bytes, Json, Text};
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-pub use driver::View;
+pub use browser::Tab;
+pub use head::Head;
 #[cfg(feature = "html")]
 #[cfg_attr(docsrs, doc(cfg(feature = "html")))]
-pub use html::{Element, Html, Select};
+pub use html::{Element, Html, JsonLd, Meta, Select};
+pub use query::Query;
 #[cfg(feature = "sitemap")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
-pub use sitemap::Sitemap;
-/// The sitemap parser behind [`Sitemap`]: its records and their attributes.
-#[cfg(feature = "sitemap")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
-pub use sitemapo;
+pub use sitemap::parse::Sitemap;
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 pub use spire_macros::Select;

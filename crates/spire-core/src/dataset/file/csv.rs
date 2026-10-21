@@ -5,8 +5,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use super::FileSink;
 use crate::dataset::Dataset;
-use crate::dataset::file::FileSink;
 use crate::{Error, ErrorKind, Result};
 
 /// A write-only [`Dataset`] that appends every item to a CSV file as one
@@ -186,7 +186,24 @@ where
     T: Serialize + Send + 'static,
 {
     async fn write(&self, item: T) -> Result<()> {
-        self.sink.write(move |columns| encode(&item, columns)).await
+        self.write_batch(vec![item]).await
+    }
+
+    /// Writes every row at once: all of them, or none, so one row whose
+    /// columns do not match rejects the batch.
+    async fn write_batch(&self, items: Vec<T>) -> Result<()> {
+        self.sink
+            .write(items.len(), move |columns| {
+                let mut rows = Vec::new();
+                let mut columns = columns.clone();
+                for item in &items {
+                    let (row, next) = encode(item, &columns)?;
+                    rows.extend(row);
+                    columns = next;
+                }
+                Ok((rows, columns))
+            })
+            .await
     }
 
     /// Always returns `None`: the dataset is write-only.
@@ -336,5 +353,33 @@ mod tests {
         let contents = tokio::fs::read_to_string(&path).await.unwrap();
         tokio::fs::remove_file(&path).await.unwrap();
         assert_eq!(contents, "title,words\nHome,3\nAbout,5\n");
+    }
+
+    #[tokio::test]
+    async fn batches_are_written_whole_or_not_at_all() {
+        let path = temp_path("csv-batch");
+        let products = CsvDataset::<Product>::create(&path).await.unwrap();
+        let product = |name| Product {
+            name,
+            price: Some(1.0),
+        };
+        products
+            .write_batch(vec![product("Lamp"), product("Desk")])
+            .await
+            .unwrap();
+
+        // The second row has other columns, so neither row is written.
+        let mixed = CsvDataset::<(&str, u32)>::from_sink(products.sink.clone());
+        let error = mixed
+            .write_batch(vec![("Chair", 1), ("Shelf", 2)])
+            .await
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Dataset);
+        products.write_batch(vec![product("Rug")]).await.unwrap();
+
+        let contents = tokio::fs::read_to_string(&path).await.unwrap();
+        tokio::fs::remove_file(&path).await.unwrap();
+        assert_eq!(contents, "name,price\nLamp,1.0\nDesk,1.0\nRug,1.0\n");
+        assert_eq!(products.sink.written(), 3);
     }
 }

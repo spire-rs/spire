@@ -34,16 +34,17 @@ impl<T: Send + 'static> Data<T> {
         self.inner.write(item).await
     }
 
-    /// Stores every item of `items`, stopping at the first error.
+    /// Stores every item of `items` at once, see [`Dataset::write_batch`].
     ///
     /// # Errors
     ///
     /// Returns an error if the underlying dataset fails.
     pub async fn write_all(&self, items: impl IntoIterator<Item = T>) -> Result<()> {
-        for item in items {
-            self.inner.write(item).await?;
+        let items: Vec<T> = items.into_iter().collect();
+        if items.is_empty() {
+            return Ok(());
         }
-        Ok(())
+        self.inner.write_batch(items).await
     }
 
     /// Takes the next item, or `None` if the dataset is empty.
@@ -138,6 +139,10 @@ impl<T: Send + 'static> Dataset<T> for Data<T> {
         self.inner.write(item)
     }
 
+    fn write_batch(&self, items: Vec<T>) -> impl Future<Output = Result<()>> + Send {
+        self.inner.write_batch(items)
+    }
+
     fn read(&self) -> impl Future<Output = Result<Option<T>>> + Send {
         self.inner.read()
     }
@@ -154,6 +159,7 @@ impl<T: Send + 'static> Dataset<T> for Data<T> {
 /// An object-safe [`Dataset`].
 trait DynDataset<T>: Send + Sync + 'static {
     fn write(&self, item: T) -> BoxFuture<'_, Result<()>>;
+    fn write_batch(&self, items: Vec<T>) -> BoxFuture<'_, Result<()>>;
     fn read(&self) -> BoxFuture<'_, Result<Option<T>>>;
     fn read_batch(&self, max: usize) -> BoxFuture<'_, Result<Vec<T>>>;
     fn size_hint(&self) -> Option<usize>;
@@ -166,6 +172,10 @@ where
 {
     fn write(&self, item: T) -> BoxFuture<'_, Result<()>> {
         Dataset::write(self, item).boxed()
+    }
+
+    fn write_batch(&self, items: Vec<T>) -> BoxFuture<'_, Result<()>> {
+        Dataset::write_batch(self, items).boxed()
     }
 
     fn read(&self) -> BoxFuture<'_, Result<Option<T>>> {

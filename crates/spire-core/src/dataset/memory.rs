@@ -97,6 +97,12 @@ impl<T: Send + 'static> Dataset<T> for InMemDataset<T> {
         ready(Ok(item))
     }
 
+    /// Stores every item under one lock.
+    fn write_batch(&self, items: Vec<T>) -> impl Future<Output = Result<()>> + Send {
+        lock(&self.inner.items).extend(items);
+        ready(Ok(()))
+    }
+
     /// Takes up to `max` items under one lock.
     fn read_batch(&self, max: usize) -> impl Future<Output = Result<Vec<T>>> + Send {
         let mut items = lock(&self.inner.items);
@@ -160,5 +166,13 @@ mod tests {
         let data = crate::dataset::Data::new((0..count).collect::<InMemDataset<u32>>());
         let items = data.read_all().await.unwrap();
         assert_eq!(items, (0..count).collect::<Vec<_>>());
+    }
+
+    #[tokio::test]
+    async fn batches_are_written_in_order() {
+        let queue = InMemDataset::new();
+        queue.write(1).await.unwrap();
+        queue.write_batch(vec![2, 3]).await.unwrap();
+        assert_eq!(queue.read_batch(10).await.unwrap(), [1, 2, 3]);
     }
 }

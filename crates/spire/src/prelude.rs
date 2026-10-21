@@ -12,10 +12,10 @@ pub use crate::backend::{BrowserBackend, BrowserSession};
 pub use crate::crawler::HostDelay;
 pub use crate::dataset::{Data, Dataset, InMemDataset};
 #[cfg(feature = "thirtyfour")]
-pub use crate::extract::View;
+pub use crate::extract::Tab;
 #[cfg(feature = "html")]
-pub use crate::extract::{Element, Html, Select};
-pub use crate::extract::{FromRef, Json, State, Text};
+pub use crate::extract::{Element, Html, JsonLd, Meta, Select};
+pub use crate::extract::{FromRef, Head, Json, Query, State, Text};
 pub use crate::frontier::memory::InMemFrontier;
 pub use crate::frontier::queue::{Link, Queue};
 pub use crate::frontier::seed::Seed;

@@ -109,17 +109,29 @@ where
     T: Serialize + DeserializeOwned + Send + 'static,
 {
     async fn write(&self, item: T) -> Result<()> {
-        let bytes = serde_json::to_vec(&item).map_err(|error| {
-            Error::new(ErrorKind::Dataset)
-                .with_message("failed to encode an item")
-                .with_source(error)
-        })?;
+        self.write_batch(vec![item]).await
+    }
+
+    /// Writes every item in one transaction: all of them, or none.
+    async fn write_batch(&self, items: Vec<T>) -> Result<()> {
+        let encoded = items
+            .iter()
+            .map(|item| {
+                serde_json::to_vec(item).map_err(|error| {
+                    Error::new(ErrorKind::Dataset)
+                        .with_message("failed to encode an item")
+                        .with_source(error)
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
         let name = Arc::clone(&self.table);
         self.store
             .write(move |txn| {
                 let mut table = txn.open_table(definition(&name))?;
-                let next = table.last()?.map_or(0, |(key, _)| key.value() + 1);
-                table.insert(next, bytes.as_slice())?;
+                let first = table.last()?.map_or(0, |(key, _)| key.value() + 1);
+                for (key, bytes) in (first..).zip(&encoded) {
+                    table.insert(key, bytes.as_slice())?;
+                }
                 Ok(())
             })
             .await
@@ -321,5 +333,22 @@ mod tests {
         assert_eq!(numbers.read_batch(10).await.unwrap(), [1]);
         assert!(numbers.read_batch(10).await.is_err());
         assert_eq!(numbers.read_batch(10).await.unwrap(), [3]);
+    }
+
+    #[tokio::test]
+    async fn batches_are_written_whole_or_not_at_all() {
+        use std::collections::HashMap;
+
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+        let numbers = store.dataset::<u32>("numbers");
+        numbers.write(0).await.unwrap();
+        numbers.write_batch(vec![1, 2, 3]).await.unwrap();
+        assert_eq!(Data::new(numbers).read_all().await.unwrap(), [0, 1, 2, 3]);
+
+        let maps = store.dataset::<HashMap<(u8, u8), u8>>("maps");
+        let bad = HashMap::from([((1, 2), 3)]);
+        assert!(maps.write_batch(vec![HashMap::new(), bad]).await.is_err());
+        assert_eq!(maps.len().unwrap(), 0);
     }
 }

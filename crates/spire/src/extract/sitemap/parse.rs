@@ -24,7 +24,7 @@ const GZIP: [u8; 2] = [0x1f, 0x8b];
 ///
 /// ```
 /// use spire::extract::Sitemap;
-/// use spire::extract::sitemapo::Record;
+/// use spire::extract::sitemap::Record;
 /// use spire::frontier::queue::Queue;
 ///
 /// async fn sitemap(queue: Queue, Sitemap(records): Sitemap) -> spire::Result<()> {

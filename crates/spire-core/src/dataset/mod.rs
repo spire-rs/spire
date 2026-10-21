@@ -23,28 +23,24 @@
 //! # }
 //! ```
 
-#[cfg(feature = "csv")]
-mod csv;
 mod data;
 #[cfg(any(feature = "json", feature = "csv"))]
 mod file;
-#[cfg(feature = "json")]
-mod jsonl;
 mod memory;
 mod registry;
 
 use std::future::Future;
 
 pub use data::{Data, READ_BATCH};
+#[cfg(feature = "csv")]
+#[cfg_attr(docsrs, doc(cfg(feature = "csv")))]
+pub use file::CsvDataset;
 #[cfg(feature = "json")]
 #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
-pub use jsonl::JsonlDataset;
+pub use file::JsonlDataset;
 pub use memory::InMemDataset;
 pub(crate) use registry::Datasets;
 
-#[cfg(feature = "csv")]
-#[cfg_attr(docsrs, doc(cfg(feature = "csv")))]
-pub use self::csv::CsvDataset;
 use crate::Result;
 
 /// Stores items of type `T`.
@@ -55,6 +51,28 @@ pub trait Dataset<T>: Send + Sync + 'static {
     ///
     /// Returns an error if the underlying storage fails.
     fn write(&self, item: T) -> impl Future<Output = Result<()>> + Send;
+
+    /// Stores several items at once, in order.
+    ///
+    /// The default writes them one by one, stopping at the first error, so
+    /// the items before it stay stored. Storage that can store several items
+    /// at once, such as in a single transaction, overrides it, and stores
+    /// either all of them or none.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying storage fails.
+    fn write_batch(&self, items: Vec<T>) -> impl Future<Output = Result<()>> + Send
+    where
+        T: Send,
+    {
+        async move {
+            for item in items {
+                self.write(item).await?;
+            }
+            Ok(())
+        }
+    }
 
     /// Takes the next item, or `None` if the dataset is empty.
     ///
