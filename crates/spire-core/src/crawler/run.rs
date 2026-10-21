@@ -415,6 +415,7 @@ where
 
         let request = seed.clone().into_request();
         let task = async move {
+            let started = Instant::now();
             let handle = async {
                 let client = match backend.connect().await {
                     Ok(client) => client,
@@ -425,13 +426,21 @@ where
                 worker.handle(cx).await
             };
 
-            match deadline {
+            let outcome = match deadline {
                 Some(deadline) => timeout(deadline, handle).await.unwrap_or_else(|_| {
                     let error = Error::new(ErrorKind::Timeout).with_message("request timed out");
                     Outcome::Fail(error)
                 }),
                 None => handle.await,
-            }
+            };
+
+            tracing::debug!(
+                target: TRACING_TARGET,
+                outcome = %label(&outcome),
+                elapsed_ms = started.elapsed().as_millis(),
+                "request handled",
+            );
+            outcome
         };
 
         let id = run.tasks.spawn(task.instrument(span)).id();
@@ -554,5 +563,17 @@ where
                 None
             }
         }
+    }
+}
+
+/// Names an outcome for logs.
+const fn label(outcome: &Outcome) -> &'static str {
+    match outcome {
+        Outcome::Continue => "continue",
+        Outcome::Retry { .. } => "retry",
+        Outcome::Backoff { .. } => "backoff",
+        Outcome::Abort(_) => "abort",
+        Outcome::Stop => "stop",
+        Outcome::Fail(_) => "fail",
     }
 }

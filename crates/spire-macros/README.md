@@ -64,6 +64,40 @@ async fn handler(Elements(products): Elements<Product>) {
   element's text, trimmed with whitespace collapsed, or the attribute, parsed
   with `FromStr`.
 
+### `Tags`
+
+Derives `spire::request::Tags` for an enum of unit variants, so tags are
+checked by the compiler:
+
+```rust,ignore
+use spire::Router;
+use spire::request::Tags;
+
+#[derive(Debug, Clone, Copy, Tags)]
+enum Page {
+    List,
+    ItemReviews,
+    #[tag(rename = "item")]
+    Detail,
+}
+
+let router = Router::new()
+    .route(Page::List, list)
+    .route(Page::ItemReviews, reviews)
+    .route(Page::Detail, detail)
+    .require::<Page>();
+```
+
+- Variants are named in `snake_case` (`ItemReviews` is `item_reviews`);
+  `#[tag(rename_all = "...")]` on the enum picks another case, with serde's
+  names (`kebab-case`, `camelCase`, ...), and `#[tag(rename = "...")]` on a
+  variant names it outright.
+- Persistent frontiers store tags as strings, so rename a variant with
+  `#[tag(rename = "old_name")]` to keep its stored seeds routable.
+- The enum is also an extractor: a handler serving several variants takes
+  `page: Page` (or `Option<Page>`) as an argument.
+- The enum must be `Copy` and have only unit variants with distinct names.
+
 ## Usage
 
 This crate is typically not used directly. Instead, enable the `macros` feature
@@ -74,10 +108,10 @@ in the main `spire` crate:
 spire = { version = "0.2.0", features = ["macros"] }
 ```
 
-The derive is then available as `spire::extract::Select`, next to the trait
-of the same name.
+The derives are then available as `spire::extract::Select` and
+`spire::request::Tags`, next to the traits of the same names.
 
 ## License
 
-This project is licensed under the MIT License - see the
-[LICENSE](../../LICENSE.txt) file for details.
+This project is licensed under the MIT License; see the
+[LICENSE](../../LICENSE) file for details.

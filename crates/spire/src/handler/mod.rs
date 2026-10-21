@@ -52,7 +52,7 @@ where
 
 macro_rules! impl_handler {
     ([$($ty:ident),*], $last:ident) => {
-        #[allow(non_snake_case)]
+        #[expect(non_snake_case, reason = "extractors are bound to their type parameters' names")]
         impl<C, S, F, Fut, M, $($ty,)* $last> Handler<C, (M, $($ty,)* $last,), S> for F
         where
             C: Send + Sync + 'static,

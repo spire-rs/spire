@@ -5,7 +5,8 @@
 //! the last may implement [`FromContext`] and consume it, typically to fetch
 //! the response.
 //!
-//! - Request and crawl: [`http::Uri`](crate::http::Uri), [`Tag`],
+//! - Request and crawl: [`http::Uri`](crate::http::Uri), [`Tag`], an enum
+//!   deriving [`Tags`],
 //!   [`Depth`], [`Attempt`], [`Queue`] and [`Data`].
 //! - Response body: [`Bytes`], [`Text`], [`Json`], and with the `html`
 //!   feature [`Html`], [`Element`] and [`Elements`].
@@ -14,13 +15,14 @@
 //! Wrapping an extractor in `Option` or `Result` makes it infallible.
 //!
 //! [`Tag`]: crate::request::Tag
+//! [`Tags`]: crate::request::Tags
 //! [`Depth`]: crate::request::Depth
 //! [`Attempt`]: crate::request::Attempt
 //! [`Queue`]: crate::frontier::Queue
 //! [`Data`]: crate::dataset::Data
 
 mod content;
-mod context;
+pub(crate) mod context;
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
 pub mod driver;

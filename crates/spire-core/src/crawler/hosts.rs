@@ -118,7 +118,7 @@ impl Hosts {
 
     /// Raises the delay of `key` to at least `delay`, e.g. for a
     /// robots.txt `Crawl-delay`.
-    #[cfg_attr(not(feature = "robots"), allow(dead_code, reason = "used by `robots`"))]
+    #[cfg(feature = "robots")]
     pub(crate) fn raise_delay(&mut self, key: &str, delay: Duration) {
         let host = self.host(key);
         host.delay = host.delay.max(delay);
@@ -204,6 +204,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "robots")]
     fn raised_delay_applies_to_the_next_start() {
         let now = Instant::now();
         let mut hosts = Hosts::new(policy(0, 1));

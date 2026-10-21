@@ -44,7 +44,7 @@ allow = [
     "CC0-1.0",
     "Zlib",
     # Weak copyleft; pulled in transitively by scraper's CSS selector engine
-    # (cssparser, selectors). File-level copyleft only — using these crates
+    # (cssparser, selectors). File-level copyleft only: using these crates
     # as-is does not affect our source.
     "MPL-2.0",
 ]
@@ -66,7 +66,7 @@ highlight = "all"
 # List of crates that are allowed
 allow = []
 
-# List of crates to deny - focus on actual security/legal issues
+# List of crates to deny, focusing on actual security and legal issues
 deny = [
     # Prefer rustls over OpenSSL for security and licensing simplicity
     { name = "openssl-sys", version = "*" },

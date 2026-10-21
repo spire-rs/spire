@@ -8,14 +8,13 @@ use tower::layer::layer_fn;
 use tower::service_fn;
 
 use crate::backend::{Backend, Client, Noop};
-use crate::dataset::{Data, InMemDataset};
-use crate::extract::{FromRef, Html, State, Text};
-use crate::frontier::{Queue, Seed};
+use crate::extract::{FromRef, State, Text};
+use crate::frontier::Seed;
 use crate::http::Uri;
 use crate::http::header::{CONTENT_TYPE, HeaderValue};
-use crate::request::{Body, Depth, Request, Response, ResponseExt, Tag};
+use crate::request::{Body, Depth, Request, Response, ResponseExt, Tag, Tags};
 use crate::worker::{Outcome, Worker};
-use crate::{Context, Crawler, ErrorKind, Result, Router};
+use crate::{Context, ErrorKind, Result, Router};
 
 /// A backend serving fixed pages, as if every request was redirected to
 /// `https://example.com/moved/<path>`.
@@ -50,7 +49,11 @@ impl Client for Site {
 }
 
 fn context(tag: Option<&str>) -> Context<Noop> {
-    let mut seed = Seed::get("https://example.com/").unwrap();
+    context_at("https://example.com/", tag)
+}
+
+fn context_at(uri: &str, tag: Option<&str>) -> Context<Noop> {
+    let mut seed = Seed::get(uri).unwrap();
     if let Some(tag) = tag {
         seed = seed.with_tag(tag);
     }
@@ -99,10 +102,13 @@ async fn unrouted_requests_fail() {
     };
     assert_eq!(error.kind(), ErrorKind::Worker);
     assert_eq!(error.to_string(), "no route for tag `typo`");
-    assert!(matches!(
-        router.handle(context(None)).await,
-        Outcome::Fail(_)
-    ));
+    let Outcome::Fail(error) = router.handle(context(None)).await else {
+        panic!("expected a failure");
+    };
+    assert_eq!(
+        error.to_string(),
+        "no path or fallback route for untagged `/`"
+    );
 }
 
 #[test]
@@ -210,7 +216,13 @@ async fn rejected_extractors_fail_and_optional_ones_do_not() {
 }
 
 #[tokio::test]
+#[cfg(feature = "html")]
 async fn crawls_and_resolves_links_after_redirects() {
+    use crate::Crawler;
+    use crate::dataset::{Data, InMemDataset};
+    use crate::extract::Html;
+    use crate::frontier::Queue;
+
     async fn page(uri: Uri, queue: Queue, data: Data<String>, page: Html) -> Result<()> {
         let title = page.title().unwrap_or_default();
         data.write(format!("{} {title}", uri.path())).await?;
@@ -218,15 +230,16 @@ async fn crawls_and_resolves_links_after_redirects() {
         Ok(())
     }
 
-    let crawler = Crawler::new(Site, Router::new().route("page", page))
+    let router = Router::new().route("home", page).fallback(page);
+    let crawler = Crawler::new(Site, router)
         .with_dataset(InMemDataset::<String>::new())
-        .with_seed(Seed::get("https://example.com/").unwrap().with_tag("page"));
+        .with_seed(Seed::get("https://example.com/").unwrap().with_tag("home"));
 
     let stats = crawler.run().await.unwrap();
     assert_eq!((stats.requests, stats.failed), (3, 0));
 
     // `a` resolves against the redirected `/moved/`, `/b#top` loses its
-    // fragment, `mailto:` is skipped, and followed links keep the tag.
+    // fragment, `mailto:` is skipped, and untagged links reach the fallback.
     let mut seen = crawler
         .dataset::<String>()
         .unwrap()
@@ -255,4 +268,101 @@ async fn text_extractor_reads_the_body() {
         router.handle(Context::new(request, Site)).await,
         Outcome::Stop
     ));
+}
+
+/// A hand-written [`Tags`] set, as `#[derive(Tags)]` generates it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Page {
+    List,
+    Item,
+}
+
+impl From<Page> for Tag {
+    fn from(page: Page) -> Self {
+        Self::from_static(match page {
+            Page::List => "list",
+            Page::Item => "item",
+        })
+    }
+}
+
+impl Tags for Page {
+    const ALL: &'static [Self] = &[Self::List, Self::Item];
+}
+
+#[tokio::test]
+async fn untagged_requests_route_by_path() {
+    let outcome = |outcome: fn() -> Outcome| move || ready(outcome());
+    let router = Router::new()
+        .route("item", outcome(|| Outcome::Continue))
+        .route_path("/items/*", outcome(|| Outcome::Stop))
+        .route_path("/items/**", outcome(Outcome::retry))
+        .fallback(outcome(|| Outcome::Fail(crate::Error::worker("fallback"))));
+    let handle = |uri: &str, tag: Option<&str>| router.handle(context_at(uri, tag));
+
+    // The first matching pattern wins, the query is ignored, and a tag
+    // always wins over the path.
+    let outcome = handle("https://example.com/items/1?page=2", None).await;
+    assert!(matches!(outcome, Outcome::Stop));
+    let outcome = handle("https://example.com/items/1/reviews", None).await;
+    assert!(matches!(outcome, Outcome::Retry { .. }));
+    let outcome = handle("https://example.com/items/1", Some("item")).await;
+    assert!(matches!(outcome, Outcome::Continue));
+    let outcome = handle("https://example.com/other", None).await;
+    assert!(matches!(outcome, Outcome::Fail(_)));
+
+    // Unknown tags skip the path routes, so typos still reach the fallback.
+    let outcome = handle("https://example.com/items/1", Some("typo")).await;
+    assert!(matches!(outcome, Outcome::Fail(_)));
+}
+
+#[test]
+#[should_panic(expected = "path `/items/*` already has a route")]
+fn duplicate_path_routes_panic() {
+    let a = Router::<Noop>::new().route_path("/items/*", named);
+    let b = Router::new().route_path("/items/*", named);
+    let _ = a.merge(b);
+}
+
+#[tokio::test]
+async fn layers_wrap_path_routes() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    let counting = layer_fn(move |route: super::Route<Noop>| {
+        let counter = counter.clone();
+        service_fn(move |cx| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            tower::ServiceExt::oneshot(route.clone(), cx)
+        })
+    });
+    let router = Router::new()
+        .route_path("/**", || async { Outcome::Stop })
+        .layer(counting);
+
+    assert!(matches!(router.handle(context(None)).await, Outcome::Stop));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn enum_tags_route() {
+    let router = Router::new()
+        .route(Page::List, || async { Outcome::Continue })
+        .route(Page::Item, || async { Outcome::Stop })
+        .require::<Page>();
+    assert!(matches!(
+        router.handle(context(Some("list"))).await,
+        Outcome::Continue
+    ));
+    assert!(matches!(
+        router.handle(context(Some("item"))).await,
+        Outcome::Stop
+    ));
+}
+
+#[test]
+#[should_panic(expected = "no route for tag `item`")]
+fn require_names_missing_tags() {
+    let _ = Router::<Noop>::new()
+        .route(Page::List, named)
+        .require::<Page>();
 }

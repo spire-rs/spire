@@ -65,10 +65,18 @@ Crawl a listing, follow its pagination and extract every product:
 ```rust,no_run
 # #[cfg(all(feature = "reqwest", feature = "macros"))]
 # mod example {
-use spire::dataset::InMemDataset;
+use spire::dataset::{Data, InMemDataset};
 use spire::extract::{Elements, Html, Select};
 use spire::frontier::{FrontierExt, InMemFrontier, Link, Queue, Seed};
+use spire::request::Tags;
 use spire::{Crawler, HttpClient, Result, Router};
+
+/// The kinds of page the crawl visits, routed by tag.
+#[derive(Debug, Clone, Copy, Tags)]
+enum Page {
+    Listing,
+    Product,
+}
 
 #[derive(Debug, Select)]
 #[select("article.product")]
@@ -84,28 +92,29 @@ struct Product {
 /// Queues the next page and every product page of a listing.
 async fn listing(queue: Queue, page: Html) -> Result<()> {
     let pages = page.links().into_iter().filter(|href| href.contains("?page="));
-    queue.follow_all(pages).await?;
+    queue.follow_all(pages.map(|href| Link::from(href).with_tag(Page::Listing))).await?;
     for product in page.select_all::<Product>()? {
-        queue.follow(Link::from(product.link).with_tag("product")).await?;
+        queue.follow(Link::from(product.link).with_tag(Page::Product)).await?;
     }
     Ok(())
 }
 
 /// Stores the product on its own page.
-async fn product(data: spire::dataset::Data<Product>, Elements(found): Elements<Product>) -> Result<()> {
+async fn product(data: Data<Product>, Elements(found): Elements<Product>) -> Result<()> {
     data.write_all(found).await
 }
 
 async fn crawl() -> Result<()> {
     let router = Router::new()
-        .route("listing", listing)
-        .route("product", product);
+        .route(Page::Listing, listing)
+        .route(Page::Product, product)
+        .require::<Page>();
 
     let crawler = Crawler::new(HttpClient::default(), router)
         .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3).tag_backoff())
         .with_dataset(InMemDataset::<Product>::new())
         .with_concurrency(16)
-        .with_seed(Seed::get("https://example.com/products")?.with_tag("listing"));
+        .with_seed(Seed::get("https://example.com/products")?.with_tag(Page::Listing));
 
     let stats = crawler.run().await?;
     let products = crawler.dataset::<Product>()?.read_all().await?;
@@ -115,25 +124,36 @@ async fn crawl() -> Result<()> {
 # }
 ```
 
-Relative links resolve against the page they were found on, after redirects;
-followed links inherit the tag of their page unless given one. Error statuses
-become failures: `5xx` and `429` are retried, honouring `Retry-After`.
+Relative links resolve against the page they were found on, after redirects.
+Tags are not inherited: a followed link without one goes to the first
+`route_path` pattern matching its path, such as `/products/*`, or else the
+fallback. `require` fails at startup if a variant has no route, and a handler
+serving several variants takes `page: Page` as an argument. A URL is fetched
+once whatever its tag. Error statuses become failures: `5xx` and `429` are
+retried, honouring `Retry-After`.
 
 ### Browser Automation
 
-`BrowserBackend` drives real browsers over WebDriver. Body extractors load
-the page; `View` exposes the driver to interact with it:
+`BrowserBackend` drives real browsers over WebDriver. Body extractors such as
+`Html` load the page and read it. `View` loads the page without reading it and
+hands over the driver, to interact with the page first; `view.html()` then
+reads the page as rendered:
 
 ```rust,no_run
-# #[cfg(feature = "thirtyfour")]
+# #[cfg(all(feature = "thirtyfour", feature = "html"))]
 # mod example {
-use spire::extract::Html;
 use spire::extract::driver::View;
-use spire::frontier::Seed;
+use spire::frontier::{Queue, Seed};
+use spire::thirtyfour::By;
 use spire::{BrowserBackend, Crawler, Result, Router};
 
-async fn rendered(View(driver): View, page: Html) -> Result<()> {
-    println!("{:?} at {:?}", page.title(), driver.current_url().await);
+async fn rendered(queue: Queue, view: View) -> Result<()> {
+    if let Ok(more) = view.find(By::Css("button.more")).await {
+        let _ = more.click().await;
+    }
+    let page = view.html().await?;
+    println!("{:?} at {:?}", page.title(), view.current_url().await);
+    queue.follow_all(page.links()).await?;
     Ok(())
 }
 
@@ -176,12 +196,14 @@ Routes are tower services, so tower middleware wraps them with
 use std::time::Duration;
 
 use spire::Router;
+use spire::backend::Noop;
+use tower::timeout::TimeoutLayer;
 
 async fn handler() {}
 
-let router: Router<spire::backend::Noop> = Router::new()
+let router: Router<Noop> = Router::new()
     .route("page", handler)
-    .layer(tower::timeout::TimeoutLayer::new(Duration::from_secs(30)));
+    .layer(TimeoutLayer::new(Duration::from_secs(30)));
 ```
 
 ## Contributing
@@ -191,8 +213,8 @@ guidelines.
 
 ## License
 
-This project is licensed under the MIT License - see the
-[LICENSE](../../LICENSE.txt) file for details.
+This project is licensed under the MIT License; see the
+[LICENSE](../../LICENSE) file for details.
 
 ## Acknowledgments
 

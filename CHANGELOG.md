@@ -10,7 +10,10 @@ and this project adheres to
 
 ### Added
 
-- `View` extractor now wraps the browser `WebDriver` (`spire::extract::driver::View`).
+- `View` extractor (`spire::extract::driver::View`) navigates the browser
+  without reading the page and holds the session for the handler, exposing the
+  `WebDriver`; `View::html` parses the page as currently rendered.
+  `BrowserSession::navigate` and `page_source` back it.
 - `spire-core` frontier: `Seed`, `InMemFrontier` and the `Dedup`, `MaxDepth`,
   `Retry` and `TagBackoff` facades, chained with `FrontierExt`.
 - `Crawler::run` returns `Stats`; `Outcome::Backoff` pauses a tag (e.g. on 429)
@@ -60,9 +63,18 @@ and this project adheres to
   exact on-disk `RedbSeen`, so a crawl survives a crash; seeds in flight are
   queued again on reopening. Commits sync once a second by default (a crash
   repeats work, never loses it), or on every commit with `sync_always`.
+- Typed tags: `#[derive(Tags)]` (`macros` feature) turns an enum of unit
+  variants into tags (`snake_case` by default, `rename_all` and `rename`
+  attributes); `Router::require` checks every variant has a route, and the
+  enum is an extractor, so a handler can take its variant as an argument.
+- Every handled request is logged at `debug` with its outcome and duration.
+- `Router::route_path` and `route_path_service` route untagged requests by
+  path pattern (`*` within a segment, `**` across segments).
 
 ### Changed
 
+- **Breaking:** followed links no longer inherit the tag of their page; an
+  untagged link goes to the path routes or the fallback.
 - **Breaking:** TLS feature `rustls-tls` renamed to `rustls` on `spire`, `spire-reqwest` and
   `spire-thirtyfour`, matching upstream `reqwest` 0.13 and `thirtyfour` 0.38.
 - Updated `reqwest` to 0.13, `thirtyfour` to 0.38, `deadpool` to 0.13 and `syn` to 3.0.
@@ -89,10 +101,6 @@ and this project adheres to
   `extract::Body` is now `Bytes`; requests without a route fail instead of
   being silently dropped.
 
-### Deprecated
-
-- N/A
-
 ### Removed
 
 - `TagQuery`, `Task`, `TaskBuilder`, `RequestSource`, `FutureDataset`,
@@ -116,10 +124,6 @@ and this project adheres to
 - `spire-thirtyfour` ignored managed endpoints, behavior settings and several
   pool options, always used one endpoint, and spoofed the user agent after
   navigating.
-
-### Security
-
-- N/A
 
 ## [0.2.0] - 2025-12-01
 

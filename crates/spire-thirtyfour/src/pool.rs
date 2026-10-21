@@ -3,6 +3,8 @@
 //! [`BrowserBackend`]: crate::BrowserBackend
 
 use std::fmt;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -28,13 +30,23 @@ pub(crate) enum Endpoint {
     Managed(Arc<thirtyfour::manager::WebDriverManager>),
 }
 
+/// A boxed future that starts a session.
+type Launch<'a> = Pin<Box<dyn Future<Output = WebDriverResult<WebDriver>> + Send + 'a>>;
+
 impl Endpoint {
-    async fn launch(&self, capabilities: Capabilities) -> WebDriverResult<WebDriver> {
-        match self {
-            Self::Remote(url) => WebDriver::new(url.as_ref(), capabilities).await,
-            #[cfg(feature = "manager")]
-            Self::Managed(manager) => manager.launch(capabilities).await,
-        }
+    /// Starts a session.
+    ///
+    /// The future is boxed: thirtyfour's session start nests deeply enough
+    /// that proving the pool's futures `Send` otherwise exceeds the
+    /// compiler's recursion limit.
+    fn launch(&self, capabilities: Capabilities) -> Launch<'_> {
+        Box::pin(async move {
+            match self {
+                Self::Remote(url) => WebDriver::new(url.as_ref(), capabilities).await,
+                #[cfg(feature = "manager")]
+                Self::Managed(manager) => manager.launch(capabilities).await,
+            }
+        })
     }
 }
 

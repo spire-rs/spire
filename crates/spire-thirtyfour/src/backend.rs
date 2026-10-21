@@ -46,7 +46,6 @@ pub struct BrowserBackend {
 
 impl BrowserBackend {
     /// Returns a builder for a backend.
-    #[must_use]
     pub fn builder() -> BrowserBuilder {
         BrowserBuilder::default()
     }

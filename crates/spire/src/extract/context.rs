@@ -1,3 +1,4 @@
+use std::any::type_name;
 use std::convert::Infallible;
 use std::future::{Future, ready};
 
@@ -7,7 +8,7 @@ use crate::dataset::Data;
 use crate::extract::{FromContext, FromContextRef};
 use crate::frontier::Queue;
 use crate::http::Uri;
-use crate::request::{Attempt, Depth, RequestExt, Tag};
+use crate::request::{Attempt, Depth, RequestExt, Tag, Tags};
 use crate::{Context, Error, Result};
 
 /// Extracts a clone of the backend client handling the request.
@@ -86,6 +87,20 @@ where
             tag.ok_or_else(|| Error::worker("request has no tag"))
         })
     }
+}
+
+/// Reads the request's tag as a member of `T`; called by the extractor
+/// `#[derive(Tags)]` generates.
+///
+/// # Errors
+///
+/// Returns an error if the request is untagged or its tag names no member.
+pub fn tag_of<T: Tags, C>(cx: &Context<C>) -> Result<T> {
+    let Some(tag) = cx.request().tag() else {
+        return Err(Error::worker("request has no tag"));
+    };
+    let name = type_name::<T>().rsplit("::").next().unwrap_or_default();
+    T::from_tag(tag).ok_or_else(|| Error::worker(format!("tag `{tag}` is not a `{name}`")))
 }
 
 impl<C, S> FromContextRef<C, S> for Depth

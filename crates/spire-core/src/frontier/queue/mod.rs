@@ -11,15 +11,15 @@ use link::Target;
 
 use crate::frontier::dynamic::DynFrontier;
 use crate::frontier::{Admission, Frontier, Seed};
-use crate::request::{Depth, Request, RequestExt, Tag};
+use crate::request::{Depth, Request, RequestExt};
 use crate::sync::lock;
 use crate::{Error, Result};
 
 /// A cloneable handle for adding seeds to a crawl's [`Frontier`].
 ///
 /// Handlers get a queue bound to the request they handle, so
-/// [`Queue::follow`] can resolve relative links and derive the depth and tag
-/// of the requests it queues.
+/// [`Queue::follow`] can resolve relative links and derive the depth of the
+/// requests it queues.
 #[derive(Clone)]
 pub struct Queue {
     frontier: Arc<dyn DynFrontier>,
@@ -27,7 +27,6 @@ pub struct Queue {
 }
 
 struct Parent {
-    tag: Option<Tag>,
     depth: Depth,
     /// The URI relative links resolve against: the request URI, replaced by
     /// the final URI once the response is fetched.
@@ -53,7 +52,6 @@ impl Queue {
     #[must_use]
     pub fn child_of<B>(&self, request: &Request<B>) -> Self {
         let parent = Parent {
-            tag: request.tag().cloned(),
             depth: request.depth(),
             base: Mutex::new(request.uri().clone()),
         };
@@ -87,8 +85,15 @@ impl Queue {
         self.frontier.push(seed).await
     }
 
-    /// Adds a link found on the current request: one level deeper, and with
-    /// the link's tag, the seed's tag or else the current tag.
+    /// Adds a link found on the current request, one level deeper.
+    ///
+    /// The followed request has the link's tag, or else the seed's. Tags are
+    /// not inherited: an untagged link goes to the router's path routes or
+    /// fallback, so pagination tags its links explicitly.
+    ///
+    /// The tag is not part of the [`Fingerprint`](crate::frontier::Fingerprint):
+    /// with a deduplicating frontier, a URL already followed under one tag is
+    /// a [`Duplicate`](Admission::Duplicate) under any other.
     ///
     /// Relative `href`s resolve against the page; fragments are dropped.
     /// Links that are not `http(s)` URLs, such as `mailto:` or malformed
@@ -113,9 +118,6 @@ impl Queue {
         }
         if let Some(parent) = &self.parent {
             seed = seed.with_depth(parent.depth.child());
-            if let (None, Some(tag)) = (seed.tag(), &parent.tag) {
-                seed = seed.with_tag(tag.clone());
-            }
         }
         self.frontier.push(seed).await
     }
@@ -181,6 +183,7 @@ impl fmt::Debug for Queue {
 mod tests {
     use super::*;
     use crate::frontier::{FrontierExt, InMemFrontier, Next};
+    use crate::request::Tag;
 
     async fn drain(frontier: &InMemFrontier) -> Vec<(String, Option<String>, u32)> {
         let mut popped = Vec::new();
@@ -200,12 +203,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn follow_derives_depth_and_tag() {
+    async fn follow_derives_depth_not_tag() {
         let frontier = Arc::new(InMemFrontier::fifo());
         let queue = Queue::from_dyn(frontier.clone());
         let child = queue.child_of(&page("https://example.com/"));
 
-        child.follow("https://example.com/inherit").await.unwrap();
+        child.follow("https://example.com/untagged").await.unwrap();
         child
             .follow(Link::from("/own").with_tag("detail"))
             .await
@@ -220,7 +223,7 @@ mod tests {
         assert_eq!(
             drain(&frontier).await,
             [
-                ("https://example.com/inherit".to_owned(), tag("list"), 3),
+                ("https://example.com/untagged".to_owned(), None, 3),
                 ("https://example.com/own".to_owned(), tag("detail"), 3),
                 ("https://example.com/seed".to_owned(), tag("seed"), 3),
                 ("https://example.com/root".to_owned(), None, 0),

@@ -36,8 +36,7 @@ impl Link {
         }
     }
 
-    /// Routes the followed request to the handler for `tag` instead of
-    /// inheriting the current tag.
+    /// Routes the followed request to the handler for `tag`.
     #[must_use]
     pub fn with_tag(mut self, tag: impl Into<Tag>) -> Self {
         self.tag = Some(tag.into());

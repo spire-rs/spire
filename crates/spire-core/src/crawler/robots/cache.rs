@@ -234,9 +234,8 @@ mod tests {
         Seed::get(uri).unwrap()
     }
 
-    #[expect(clippy::unnecessary_wraps, reason = "`fetched` takes a result")]
-    fn rules(txt: &str) -> Result<Rules, Error> {
-        Ok(Rules::parse(txt.as_bytes(), "bot"))
+    fn rules(txt: &str) -> Rules {
+        Rules::parse(txt.as_bytes(), "bot")
     }
 
     fn unreachable() -> Result<Rules, Error> {
@@ -285,7 +284,7 @@ mod tests {
 
         let (released, delay) = cache.fetched(
             "https://a.com",
-            rules("User-agent: *\nDisallow: /private\nCrawl-delay: 2"),
+            Ok(rules("User-agent: *\nDisallow: /private\nCrawl-delay: 2")),
             now,
         );
         assert_eq!((released.len(), delay), (2, Some(Duration::from_secs(2))));
@@ -334,7 +333,11 @@ mod tests {
         let mut cache = RobotsCache::new(Robots::new("bot").with_max_age(hour));
         cache.admit(seed("https://a.com/"), now);
         cache.take_fetches();
-        cache.fetched("https://a.com", rules("User-agent: *\nDisallow: /old"), now);
+        cache.fetched(
+            "https://a.com",
+            Ok(rules("User-agent: *\nDisallow: /old")),
+            now,
+        );
 
         let later = now + hour;
         assert!(matches!(
@@ -356,7 +359,7 @@ mod tests {
         ));
 
         cache.admit(seed("https://a.com/old"), later + hour);
-        cache.fetched("https://a.com", rules(""), later + hour);
+        cache.fetched("https://a.com", Ok(rules("")), later + hour);
         assert!(matches!(
             cache.admit(seed("https://a.com/old"), later + hour),
             Verdict::Allow(_)

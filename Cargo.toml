@@ -30,16 +30,15 @@ publish = true
 
 authors = ["Oleh Martsokha <o.martsokha@gmail.com>"]
 repository = "https://github.com/spire-rs/spire"
-homepage = "https://github.com/spire-rs/spire"
 documentation = "https://docs.rs/spire"
 
 # Shared lints for every crate (opt in with `[lints] workspace = true`).
 # The whole of `clippy::pedantic` is denied.
 [workspace.lints.clippy]
 pedantic = { level = "deny", priority = -1 }
-# `async_trait` expands to `#[must_use]` functions returning an already
-# `#[must_use]` boxed future.
-double_must_use = "allow"
+# Lint exceptions are `#[expect]`s with a reason, so stale ones are reported.
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
 
 [workspace.dependencies]
 # Default features are disabled for certain dependencies to allow
@@ -86,7 +85,6 @@ thiserror = { version = "2.0", features = [] }
 derive_more = { version = "2.1", features = [] }
 
 # Primitive datatypes
-jiff = { version = "0.2", features = [] }
 url = { version = "2.5", features = [] }
 
 # Storage

@@ -1,7 +1,7 @@
 # https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [package]
-name = "basic_usage"
+name = "basic-usage"
 version = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -10,23 +10,17 @@ publish = false
 description = "Basic usage example for Spire web scraping framework"
 
 [[bin]]
-name = "basic_usage"
+name = "basic-usage"
 path = "main.rs"
 
 [dependencies]
 # Async runtime and Spire framework
 spire = { workspace = true, features = ["reqwest", "macros"] }
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
-
-# Serialization
-serde = { workspace = true, features = ["derive"] }
-
-# Data types
-jiff = { workspace = true, features = ["serde"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 # Observability
 tracing = { workspace = true, features = [] }
-tracing-subscriber = { workspace = true, features = [] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [lints]
 workspace = true

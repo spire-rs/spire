@@ -15,9 +15,10 @@ use crate::pool::Sessions;
 /// A pooled WebDriver session, handed out for one request.
 ///
 /// [`fetch`](Client::fetch) navigates to the request URI and returns the
-/// rendered page source. Through [`Deref`], the session also exposes the full
-/// [`WebDriver`] API for interacting with the page; it returns to the pool
-/// when dropped.
+/// rendered page source; [`navigate`](Self::navigate) only navigates, for
+/// handlers that drive the page themselves. Through [`Deref`], the session
+/// also exposes the full [`WebDriver`] API for interacting with the page; it
+/// returns to the pool when dropped.
 ///
 /// WebDriver cannot report the status or headers of a navigation, so
 /// responses are always `200 OK` with an HTML content type, and the request's
@@ -39,6 +40,41 @@ impl BrowserSession {
     pub fn driver(&self) -> WebDriver {
         (*self.driver).clone()
     }
+
+    /// Navigates to the request URI without reading the page, returning the
+    /// URI the browser ended up on after redirects.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Invalid`](spire_core::ErrorKind::Invalid) error for
+    /// requests other than `GET`, or an error if navigation fails.
+    pub async fn navigate(&self, request: &Request) -> Result<Uri> {
+        if request.method() != Method::GET {
+            let method = request.method();
+            return Err(Error::invalid(format!(
+                "browser sessions only navigate with GET, not {method}"
+            )));
+        }
+
+        let uri = request.uri();
+        let failed = |error| from_webdriver(error).with_uri(uri.clone());
+        self.goto(uri.to_string())
+            .await
+            .map_err(|error| failed(error).with_message(format!("failed to navigate to {uri}")))?;
+
+        let current = self.current_url().await.map_err(failed)?;
+        Ok(current.as_str().parse().unwrap_or_else(|_| uri.clone()))
+    }
+
+    /// Returns the source of the page as currently rendered, including
+    /// changes made by scripts and interaction since it loaded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the browser cannot be reached.
+    pub async fn page_source(&self) -> Result<String> {
+        self.source().await.map_err(from_webdriver)
+    }
 }
 
 impl Deref for BrowserSession {
@@ -57,28 +93,16 @@ impl fmt::Debug for BrowserSession {
 
 impl Client for BrowserSession {
     async fn fetch(self, request: Request) -> Result<Response> {
-        if request.method() != Method::GET {
-            let method = request.method();
-            return Err(Error::invalid(format!(
-                "browser sessions only navigate with GET, not {method}"
-            )));
-        }
-
-        let uri = request.uri().clone();
-        let failed = |error| from_webdriver(error).with_uri(uri.clone());
-        self.goto(uri.to_string())
+        let final_uri = self.navigate(&request).await?;
+        let source = self
+            .page_source()
             .await
-            .map_err(|error| failed(error).with_message(format!("failed to navigate to {uri}")))?;
-
-        let source = self.source().await.map_err(failed)?;
-        let current = self.current_url().await.map_err(failed)?;
+            .map_err(|error| error.with_uri(request.uri().clone()))?;
 
         let mut response = Response::new(Body::from(source));
         let content_type = HeaderValue::from_static("text/html; charset=utf-8");
         response.headers_mut().insert(CONTENT_TYPE, content_type);
-        if let Ok(final_uri) = current.as_str().parse::<Uri>() {
-            response.set_final_uri(final_uri);
-        }
+        response.set_final_uri(final_uri);
         Ok(response)
     }
 }
