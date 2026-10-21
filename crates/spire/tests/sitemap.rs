@@ -1,6 +1,11 @@
 //! A crawl seeded only through robots.txt and sitemaps.
 
-#![cfg(all(feature = "sitemap", feature = "robots", feature = "macros"))]
+#![cfg(all(
+    feature = "sitemap",
+    feature = "robots",
+    feature = "macros",
+    feature = "testing"
+))]
 
 use std::io::Write;
 

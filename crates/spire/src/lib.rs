@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 // The README is the crate's documentation. Its examples need several
-// features, so they are doctested only with `full`, through `ReadmeDoctests`.
+// features, so they are doctested only with `full` and `testing`, through
+// `ReadmeDoctests`.
 #![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
 
 pub mod extract;
@@ -15,7 +16,10 @@ use spire_core::backend::Backend;
 #[cfg(feature = "robots")]
 #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
 pub use spire_core::crawler::Robots;
-pub use spire_core::{Context, Error, ErrorKind, Result, dataset, testing, worker};
+#[cfg(any(test, feature = "testing"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
+pub use spire_core::testing;
+pub use spire_core::{Context, Error, ErrorKind, Result, dataset, worker};
 
 #[cfg(feature = "sitemap")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
@@ -80,6 +84,6 @@ pub mod __private {
 const TRACING_TARGET: &str = "spire";
 
 /// The README's examples, compiled as doctests with every feature enabled.
-#[cfg(all(doctest, feature = "full"))]
+#[cfg(all(doctest, feature = "full", feature = "testing"))]
 #[doc = include_str!("../README.md")]
 pub struct ReadmeDoctests;

@@ -1,6 +1,6 @@
 //! The built-in handlers, alone and combined in tuples.
 
-#![cfg(all(feature = "html", feature = "macros"))]
+#![cfg(all(feature = "html", feature = "macros", feature = "testing"))]
 
 use spire::dataset::InMemDataset;
 use spire::extract::Select;

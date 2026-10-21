@@ -54,7 +54,8 @@ spire = { version = "0.3.0", features = ["reqwest", "macros"] }
 | `reqwest` | The `HttpClient` backend |
 | `thirtyfour` | The `BrowserBackend` (WebDriver) backend |
 | `rustls-tls` (default), `native-tls` | TLS for the enabled backends |
-| `full` | Everything except `native-tls` |
+| `testing` | `MockSite` and `Visit`, to test handlers without a network |
+| `full` | Everything except `native-tls` and `testing` |
 
 ## Quick Start
 
@@ -212,8 +213,15 @@ async fn crawl() -> Result<()> {
 
 ### Testing
 
-`MockSite` serves fixed pages by URL, so handlers can be tested without a
-network. It is a backend, so a whole crawl runs against it, and `visit` runs
+With the `testing` feature, `MockSite` serves fixed pages by URL, so
+handlers can be tested without a network. Enable it for tests only:
+
+```toml
+[dev-dependencies]
+spire = { version = "0.3.0", features = ["testing"] }
+```
+
+`MockSite` is a backend, so a whole crawl runs against it, and `visit` runs
 one request through a router without crawling what it queues, to check what
 the handlers did:
 

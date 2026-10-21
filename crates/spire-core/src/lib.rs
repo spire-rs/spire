@@ -10,6 +10,8 @@ mod error;
 pub mod frontier;
 pub mod request;
 mod sync;
+#[cfg(any(test, feature = "testing"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 pub mod testing;
 pub mod worker;
 
