@@ -4,7 +4,7 @@ use std::future::{Future, ready};
 use derive_more::{Deref, DerefMut};
 
 use crate::Context;
-use crate::extract::FromContextRef;
+use crate::extract::FromContext;
 
 /// Converts a reference to the router state into a part of it.
 ///
@@ -58,7 +58,7 @@ impl<T: Clone> FromRef<T> for T {
 #[derive(Debug, Default, Clone, Copy, Deref, DerefMut)]
 pub struct State<T>(pub T);
 
-impl<C, S, T> FromContextRef<C, S> for State<T>
+impl<C, S, T> FromContext<C, S> for State<T>
 where
     C: Sync,
     S: Sync,
@@ -66,7 +66,7 @@ where
 {
     type Rejection = Infallible;
 
-    fn from_context_ref(
+    fn from_context(
         _cx: &Context<C>,
         state: &S,
     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {

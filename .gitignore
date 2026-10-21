@@ -46,3 +46,7 @@ temp/
 LLM.md
 .claude
 CLAUDE.md
+
+# Output of the rust-blog example, run from the repository root
+/rust-blog.jsonl
+/rust-blog.redb

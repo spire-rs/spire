@@ -19,6 +19,9 @@ pub use spire_core::{Context, Error, ErrorKind, Result, dataset, worker};
 #[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
 pub use crate::handler::FollowSitemap;
 pub use crate::handler::Handler;
+#[cfg(feature = "html")]
+#[cfg_attr(docsrs, doc(cfg(feature = "html")))]
+pub use crate::handler::{Collect, FollowLinks};
 pub use crate::routing::Router;
 
 /// Backends and the clients they hand out, plus the enabled HTTP and browser
@@ -30,9 +33,7 @@ pub mod backend {
     pub use spire_reqwest::{HttpClient, reqwest};
     #[cfg(feature = "thirtyfour")]
     #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-    pub use spire_thirtyfour::{
-        BrowserBackend, BrowserBuilder, BrowserSession, Navigation, thirtyfour,
-    };
+    pub use spire_thirtyfour::{BrowserBackend, BrowserBuilder, BrowserSession, thirtyfour};
 }
 
 /// The frontier: requests waiting to be crawled.

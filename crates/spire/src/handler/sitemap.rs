@@ -50,7 +50,7 @@ impl FollowSitemap {
         }
     }
 
-    async fn follow<C: Client, S: Sync>(self, cx: Context<C>, state: &S) -> Result<()> {
+    async fn follow<C: Client, S: Sync>(&self, cx: &Context<C>, state: &S) -> Result<()> {
         let queue = cx.queue().clone();
         let tag = cx.request().tag().cloned();
         let Sitemap(records) = Sitemap::from_context(cx, state).await?;
@@ -97,8 +97,8 @@ where
     C: Client,
     S: Send + Sync + 'static,
 {
-    async fn call(self, cx: Context<C>, state: S) -> Outcome {
-        self.follow(cx, &state).await.into_outcome()
+    async fn call(&self, cx: &Context<C>, state: &S) -> Outcome {
+        self.follow(cx, state).await.into_outcome()
     }
 }
 

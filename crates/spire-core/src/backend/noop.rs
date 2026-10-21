@@ -1,5 +1,7 @@
 use std::future::{Future, ready};
 
+use bytes::Bytes;
+
 use crate::Result;
 use crate::backend::{Backend, Client};
 use crate::request::{Request, Response};
@@ -20,7 +22,11 @@ impl Backend for Noop {
 }
 
 impl Client for Noop {
-    fn fetch(self, _request: Request) -> impl Future<Output = Result<Response>> + Send {
+    fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
         ready(Ok(Response::default()))
+    }
+
+    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
+        ready(Ok(Bytes::new()))
     }
 }

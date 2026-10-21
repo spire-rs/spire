@@ -54,12 +54,11 @@ spire-core = { workspace = true, features = [] }
 
 # HTTP client
 reqwest = { workspace = true, features = [] }
+bytes = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
 tokio = { workspace = true, features = ["rt", "macros"] }
-bytes = { workspace = true, features = [] }
-http-body-util = { workspace = true, features = [] }
 
 [lints]
 workspace = true

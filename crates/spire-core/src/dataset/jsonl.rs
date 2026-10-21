@@ -16,8 +16,15 @@ use crate::{Error, ErrorKind, Result};
 /// A write-only [`Dataset`] that appends every item to a file as one line of
 /// JSON ([JSON Lines](https://jsonlines.org)).
 ///
-/// Each write is flushed, so items survive a crash of the crawl. Reading
-/// returns nothing; read the file instead. Clones share the file.
+/// Each item is written and flushed as it is stored, under a lock, so lines
+/// never interleave. A flush hands the line to the operating system without
+/// syncing it to disk: items survive a crash of the crawl, not of the
+/// machine. Reading returns nothing; read the file instead. Clones share
+/// the file.
+///
+/// Writes are not part of the frontier's state, so after a crash a request
+/// whose items were written may be crawled again, writing them twice: dedupe
+/// by a key such as the URL when reading the file.
 ///
 /// ```no_run
 /// use spire_core::dataset::JsonlDataset;

@@ -1,16 +1,16 @@
 //! Extractors: typed handler arguments taken from the [`Context`].
 //!
-//! A handler is an async function whose arguments are extractors. Every
-//! argument but the last implements [`FromContextRef`] and reads the context;
-//! the last may implement [`FromContext`] and consume it, typically to fetch
-//! the response.
+//! A handler is an async function whose arguments are extractors, which
+//! implement [`FromContext`]. They borrow the context, so any of them may
+//! read the response: the request is fetched once, by the first that needs
+//! it, and body extractors read the page as it is when they run.
 //!
 //! - Request and crawl: [`Uri`](crate::request::http::Uri), [`Tag`], an enum
 //!   deriving [`Tags`],
 //!   [`Depth`], [`Attempt`], [`Queue`] and [`Data`].
 //! - Response body: [`Bytes`], [`Text`], [`Json`], and with the `html`
 //!   feature [`Html`] and [`Element`].
-//! - Everything else: [`State`], [`Client`] and the [`Context`] itself.
+//! - Everything else: [`State`].
 //!
 //! Wrapping an extractor in `Option` or `Result` makes it infallible.
 //!
@@ -35,7 +35,6 @@ use std::convert::Infallible;
 use std::future::Future;
 
 pub use content::{Bytes, Json, Text};
-pub use context::Client;
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
 pub use driver::View;
@@ -57,104 +56,41 @@ pub use state::{FromRef, State};
 use crate::Context;
 use crate::worker::IntoOutcome;
 
-/// Marker types that tell [`FromContext`] implementations apart.
-mod private {
-    /// The extractor reads the context through [`FromContextRef`](super::FromContextRef).
-    #[derive(Debug, Clone, Copy)]
-    pub enum ViaRef {}
-
-    /// The extractor consumes the context.
-    #[derive(Debug, Clone, Copy)]
-    pub enum ViaContext {}
-}
-
-/// An extractor that reads the [`Context`] without consuming it.
-pub trait FromContextRef<C, S>: Sized {
-    /// What the handler returns when extraction fails.
-    type Rejection: IntoOutcome;
-
-    /// Extracts `Self` from the context and handler state.
-    fn from_context_ref(
-        cx: &Context<C>,
-        state: &S,
-    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send;
-}
-
-/// An extractor that consumes the [`Context`], e.g. to fetch the response.
-///
-/// Only the last argument of a handler can consume the context.
-pub trait FromContext<C, S, M = private::ViaContext>: Sized {
+/// An extractor: a handler argument taken from the [`Context`] and the
+/// router's state.
+pub trait FromContext<C, S>: Sized {
     /// What the handler returns when extraction fails.
     type Rejection: IntoOutcome;
 
     /// Extracts `Self` from the context and handler state.
     fn from_context(
-        cx: Context<C>,
+        cx: &Context<C>,
         state: &S,
     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send;
 }
 
-impl<C, S, T> FromContext<C, S, private::ViaRef> for T
-where
-    C: Send + Sync,
-    S: Sync,
-    T: FromContextRef<C, S>,
-{
-    type Rejection = T::Rejection;
-
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        T::from_context_ref(&cx, state).await
-    }
-}
-
-impl<C, S, T> FromContextRef<C, S> for Option<T>
-where
-    C: Sync,
-    S: Sync,
-    T: FromContextRef<C, S>,
-{
-    type Rejection = Infallible;
-
-    async fn from_context_ref(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        Ok(T::from_context_ref(cx, state).await.ok())
-    }
-}
-
 impl<C, S, T> FromContext<C, S> for Option<T>
 where
-    C: Send,
+    C: Sync,
     S: Sync,
     T: FromContext<C, S>,
 {
     type Rejection = Infallible;
 
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         Ok(T::from_context(cx, state).await.ok())
-    }
-}
-
-impl<C, S, T> FromContextRef<C, S> for Result<T, T::Rejection>
-where
-    C: Sync,
-    S: Sync,
-    T: FromContextRef<C, S, Rejection: Send>,
-{
-    type Rejection = Infallible;
-
-    async fn from_context_ref(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        Ok(T::from_context_ref(cx, state).await)
     }
 }
 
 impl<C, S, T> FromContext<C, S> for Result<T, T::Rejection>
 where
-    C: Send,
+    C: Sync,
     S: Sync,
     T: FromContext<C, S, Rejection: Send>,
 {
     type Rejection = Infallible;
 
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_context(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
         Ok(T::from_context(cx, state).await)
     }
 }

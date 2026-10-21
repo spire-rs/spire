@@ -5,7 +5,6 @@ use std::sync::Arc;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use http::{StatusCode, Uri};
-use http_body_util::BodyExt;
 use robotxt::{AccessResult, Robots};
 
 use crate::backend::{Backend, Client};
@@ -63,11 +62,11 @@ async fn download<B: Backend>(backend: &B, url: Uri) -> Download {
         Err(error) => return Download::Unreachable(error),
     };
 
-    let response = async {
-        let client = backend.connect().await?;
-        client.fetch(request).await
+    let client = match backend.connect().await {
+        Ok(client) => client,
+        Err(error) => return classify_error(error),
     };
-    let response = match response.await {
+    let response = match client.fetch(&request).await {
         Ok(response) => response,
         Err(error) => return classify_error(error),
     };
@@ -83,9 +82,9 @@ async fn download<B: Backend>(backend: &B, url: Uri) -> Download {
         );
     }
 
-    match response.into_body().collect().await {
-        Ok(body) => Download::Body(body.to_bytes()),
-        Err(error) => Download::Unreachable(Error::new(ErrorKind::Http).with_source(error)),
+    match client.body().await {
+        Ok(body) => Download::Body(body),
+        Err(error) => Download::Unreachable(error),
     }
 }
 

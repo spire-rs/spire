@@ -15,7 +15,6 @@ pub use spire_core::backend::StatusPolicy;
 pub use thirtyfour;
 
 pub use crate::backend::{BrowserBackend, BrowserBuilder};
-pub use crate::navigate::Navigation;
 pub use crate::session::BrowserSession;
 
 /// Tracing target for browser backend operations.

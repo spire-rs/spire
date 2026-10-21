@@ -64,8 +64,6 @@ futures = { version = "0.3", features = [] }
 
 # HTTP
 http = { version = "1.5", features = [] }
-http-body = { version = "1.1", features = [] }
-http-body-util = { version = "0.1", features = [] }
 
 # HTTP client
 reqwest = { version = "0.13", default-features = false, features = [] }

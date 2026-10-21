@@ -1,13 +1,13 @@
 //! Requests, responses and their crawl metadata.
 
-mod body;
 mod meta;
 
-pub use body::Body;
+use bytes::Bytes;
 pub use meta::{Attempt, Depth, RequestExt, ResponseExt, Tag, Tags};
 
-/// An HTTP request with a [`Body`].
-pub type Request<B = Body> = http::Request<B>;
+/// An HTTP request, with its body in memory.
+pub type Request<B = Bytes> = http::Request<B>;
 
-/// An HTTP response with a [`Body`].
-pub type Response<B = Body> = http::Response<B>;
+/// An HTTP response, with its body in memory, or without one: a client
+/// returns the head, `Response<()>`, and its body separately.
+pub type Response<B = Bytes> = http::Response<B>;

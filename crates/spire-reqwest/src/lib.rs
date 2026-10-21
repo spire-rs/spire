@@ -11,4 +11,4 @@ mod conversion;
 pub use reqwest;
 pub use spire_core::backend::StatusPolicy;
 
-pub use crate::client::HttpClient;
+pub use crate::client::{HttpClient, HttpSession};

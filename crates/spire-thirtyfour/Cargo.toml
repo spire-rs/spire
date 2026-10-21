@@ -45,8 +45,8 @@ deadpool = { workspace = true, features = [] }
 tokio = { workspace = true, features = ["time", "macros"] }
 futures = { workspace = true, features = [] }
 
-# HTTP
-http-body-util = { workspace = true, features = [] }
+# Response bodies
+bytes = { workspace = true, features = [] }
 
 # Encoding of BiDi request bodies and headers
 serde_json = { workspace = true, features = [] }
@@ -58,7 +58,6 @@ tracing = { workspace = true, features = [] }
 [dev-dependencies]
 # Testing
 tokio = { workspace = true, features = ["rt", "macros"] }
-http-body-util = { workspace = true, features = [] }
 
 [lints]
 workspace = true

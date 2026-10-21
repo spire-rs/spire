@@ -1,23 +1,17 @@
 use derive_more::{Deref, DerefMut};
 use encoding_rs::{Encoding, UTF_8};
-use http_body_util::BodyExt;
 use serde::de::DeserializeOwned;
 
 use crate::backend::Client;
 use crate::extract::FromContext;
 use crate::request::http::HeaderMap;
 use crate::request::http::header::CONTENT_TYPE;
-use crate::{Context, Error, ErrorKind, Result};
+use crate::{Context, Error, Result};
 
-/// Fetches the response and collects its body.
-async fn fetch_body<C: Client>(cx: Context<C>) -> Result<(HeaderMap, bytes::Bytes)> {
-    let (parts, body) = cx.fetch().await?.into_parts();
-    let collected = body.collect().await.map_err(|error| {
-        Error::new(ErrorKind::Http)
-            .with_message("failed to read the response body")
-            .with_source(error)
-    })?;
-    Ok((parts.headers, collected.to_bytes()))
+/// Returns the response's headers and body, fetching the request if needed.
+async fn fetch_body<C: Client>(cx: &Context<C>) -> Result<(HeaderMap, bytes::Bytes)> {
+    let headers = cx.response().await?.headers().clone();
+    Ok((headers, cx.body().await?))
 }
 
 /// Decodes `bytes` by the charset in the `Content-Type` header or a byte
@@ -55,7 +49,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, _: &S) -> Result<Self> {
+    async fn from_context(cx: &Context<C>, _: &S) -> Result<Self> {
         let (_, bytes) = fetch_body(cx).await?;
         Ok(Self(bytes))
     }
@@ -73,7 +67,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, _: &S) -> Result<Self> {
+    async fn from_context(cx: &Context<C>, _: &S) -> Result<Self> {
         let (headers, bytes) = fetch_body(cx).await?;
         Ok(Self(decode(&headers, &bytes)))
     }
@@ -91,7 +85,7 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, _: &S) -> Result<Self> {
+    async fn from_context(cx: &Context<C>, _: &S) -> Result<Self> {
         let (_, bytes) = fetch_body(cx).await?;
         serde_json::from_slice(&bytes)
             .map(Self)

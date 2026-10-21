@@ -5,8 +5,6 @@ use std::fmt;
 
 use http::Uri;
 
-use crate::request::{Request, Response};
-
 /// A label that routes a request to its handler.
 ///
 /// Requests without a tag go to the fallback handler.
@@ -184,7 +182,7 @@ impl fmt::Display for Attempt {
     }
 }
 
-/// Reads crawl metadata from a [`Request`].
+/// Reads crawl metadata from a [`Request`](crate::request::Request).
 ///
 /// The crawler stores the [`Tag`], [`Depth`] and [`Attempt`] of every request
 /// in its extensions.
@@ -199,7 +197,7 @@ pub trait RequestExt {
     fn attempt(&self) -> Attempt;
 }
 
-impl<B> RequestExt for Request<B> {
+impl<B> RequestExt for http::Request<B> {
     fn tag(&self) -> Option<&Tag> {
         self.extensions().get()
     }
@@ -217,7 +215,7 @@ impl<B> RequestExt for Request<B> {
 #[derive(Debug, Clone)]
 struct FinalUri(Uri);
 
-/// Reads and writes crawl metadata on a [`Response`].
+/// Reads and writes crawl metadata on a [`Response`](crate::request::Response).
 pub trait ResponseExt {
     /// Returns the URI the response was served from after redirects, if the
     /// backend recorded it.
@@ -229,7 +227,7 @@ pub trait ResponseExt {
     fn set_final_uri(&mut self, uri: Uri);
 }
 
-impl<B> ResponseExt for Response<B> {
+impl<B> ResponseExt for http::Response<B> {
     fn final_uri(&self) -> Option<&Uri> {
         self.extensions().get::<FinalUri>().map(|FinalUri(uri)| uri)
     }
@@ -242,6 +240,7 @@ impl<B> ResponseExt for Response<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::request::{Request, Response};
 
     #[test]
     fn request_metadata_defaults() {
