@@ -1,56 +1,71 @@
-use std::convert::Infallible;
-
-use bytes::Bytes;
 use derive_more::{Deref, DerefMut};
+use encoding_rs::{Encoding, UTF_8};
 use http_body_util::BodyExt;
 use serde::de::DeserializeOwned;
 
 use crate::backend::Client;
-use crate::context::{Context, Depth, TaskExt};
-use crate::extract::{FromContext, FromContextRef};
-use crate::{Error, ErrorKind};
+use crate::extract::FromContext;
+use crate::request::http::HeaderMap;
+use crate::request::http::header::CONTENT_TYPE;
+use crate::{Context, Error, ErrorKind, Result};
 
-/// Bytes [`Response`] body extractor.
-///
-/// ⚠️ Since parsing bytes requires consuming the response body,
-/// the Body extractor must be last if there are multiple extractors
-/// in a handler.
-///
-/// [`Response`]: crate::context::Response
+/// Fetches the response and collects its body.
+async fn fetch_body<C: Client>(cx: Context<C>) -> Result<(HeaderMap, bytes::Bytes)> {
+    let (parts, body) = cx.fetch().await?.into_parts();
+    let collected = body.collect().await.map_err(|error| {
+        Error::new(ErrorKind::Http)
+            .with_message("failed to read the response body")
+            .with_source(error)
+    })?;
+    Ok((parts.headers, collected.to_bytes()))
+}
+
+/// Decodes `bytes` by the charset in the `Content-Type` header or a byte
+/// order mark, defaulting to UTF-8. Malformed sequences become U+FFFD.
+pub(crate) fn decode(headers: &HeaderMap, bytes: &[u8]) -> String {
+    let encoding = headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(charset)
+        .and_then(|label| Encoding::for_label(label.as_bytes()))
+        .unwrap_or(UTF_8);
+
+    let (text, _, _) = encoding.decode(bytes);
+    text.into_owned()
+}
+
+/// Returns the `charset` parameter of a `Content-Type` value.
+fn charset(content_type: &str) -> Option<&str> {
+    content_type.split(';').skip(1).find_map(|parameter| {
+        let (name, value) = parameter.split_once('=')?;
+        let name = name.trim();
+        name.eq_ignore_ascii_case("charset")
+            .then(|| value.trim().trim_matches('"'))
+    })
+}
+
+/// Extracts the raw response body.
 #[derive(Debug, Clone, Deref, DerefMut)]
-pub struct Body(pub Bytes);
+pub struct Bytes(pub bytes::Bytes);
 
-#[spire_core::async_trait]
-impl<C, S> FromContext<C, S> for Body
+impl<C, S> FromContext<C, S> for Bytes
 where
     C: Client,
     S: Sync,
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
-        let response = cx.resolve().await?;
-        let body = response.into_body();
-        let bytes = body
-            .collect()
-            .await
-            .map_err(|e| Error::with_source(ErrorKind::Context, "failed to read response body", e))?
-            .to_bytes();
+    async fn from_context(cx: Context<C>, _: &S) -> Result<Self> {
+        let (_, bytes) = fetch_body(cx).await?;
         Ok(Self(bytes))
     }
 }
 
-/// Text [`Response`] body extractor.
-///
-/// ⚠️ Since parsing text requires consuming the response body,
-/// the Text extractor must be last if there are multiple extractors
-/// in a handler.
-///
-/// [`Response`]: crate::context::Response
+/// Extracts the response body as text, decoded by the charset in the
+/// `Content-Type` header.
 #[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Text(pub String);
 
-#[spire_core::async_trait]
 impl<C, S> FromContext<C, S> for Text
 where
     C: Client,
@@ -58,75 +73,16 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        let Body(bytes) = Body::from_context(cx, state).await?;
-        String::from_utf8(bytes.to_vec()).map(Self).map_err(|e| {
-            Error::with_source(ErrorKind::Context, "failed to parse UTF-8", Box::new(e))
-        })
+    async fn from_context(cx: Context<C>, _: &S) -> Result<Self> {
+        let (headers, bytes) = fetch_body(cx).await?;
+        Ok(Self(decode(&headers, &bytes)))
     }
 }
 
-/// Parsed HTML document extractor.
-///
-/// Extracts the response body as HTML text. This is a dummy implementation that
-/// only stores the raw HTML string without parsing capabilities.
-///
-/// ⚠️ Since parsing HTML requires consuming the response body,
-/// the Html extractor must be last if there are multiple extractors
-/// in a handler.
-///
-/// # Examples
-///
-/// ```ignore
-/// use spire::extract::Html;
-///
-/// async fn handler(Html(html): Html) {
-///     println!("HTML content: {}", html.as_str());
-/// }
-/// ```
-///
-#[derive(Debug, Clone, Deref, DerefMut)]
-pub struct Html(pub String);
-
-impl Html {
-    /// Get a reference to the raw HTML string.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// Convert into the raw HTML string.
-    pub fn into_string(self) -> String {
-        self.0
-    }
-}
-
-#[spire_core::async_trait]
-impl<C, S> FromContext<C, S> for Html
-where
-    C: Client,
-    S: Sync,
-{
-    type Rejection = Error;
-
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        let Text(text) = Text::from_context(cx, state).await?;
-        Ok(Self(text))
-    }
-}
-
-/// JSON [`Response`] body extractor.
-///
-/// Useful for the API scraping.
-///
-/// ⚠️ Since parsing JSON requires consuming the response body,
-/// the Json extractor must be last if there are multiple extractors
-/// in a handler.
-///
-/// [`Response`]: crate::context::Response
+/// Extracts the response body as JSON.
 #[derive(Debug, Default, Clone, Copy, Deref, DerefMut)]
 pub struct Json<T>(pub T);
 
-#[spire_core::async_trait]
 impl<C, S, T> FromContext<C, S> for Json<T>
 where
     C: Client,
@@ -135,24 +91,43 @@ where
 {
     type Rejection = Error;
 
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        let Body(bytes) = Body::from_context(cx, state).await?;
-        serde_json::from_slice::<T>(&bytes).map(Self).map_err(|e| {
-            Error::with_source(ErrorKind::Context, "failed to parse JSON", Box::new(e))
-        })
+    async fn from_context(cx: Context<C>, _: &S) -> Result<Self> {
+        let (_, bytes) = fetch_body(cx).await?;
+        serde_json::from_slice(&bytes)
+            .map(Self)
+            .map_err(|error| Error::worker("failed to parse JSON").with_source(error))
     }
 }
 
-/// Depth extractor for tracking request recursion depth.
-#[spire_core::async_trait]
-impl<C, S> FromContextRef<C, S> for Depth
-where
-    C: Sync,
-    S: Sync,
-{
-    type Rejection = Infallible;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::request::http::HeaderValue;
 
-    async fn from_context_ref(cx: &Context<C>, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Depth::new(cx.get_ref().depth()))
+    fn headers(content_type: &'static str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static(content_type));
+        headers
+    }
+
+    #[test]
+    fn parses_charset_parameter() {
+        assert_eq!(charset("text/html; charset=ISO-8859-1"), Some("ISO-8859-1"));
+        assert_eq!(charset("text/html;Charset=\"utf-8\""), Some("utf-8"));
+        assert_eq!(charset("text/html"), None);
+    }
+
+    #[test]
+    fn decodes_by_charset() {
+        let latin1 = [b'c', 0xE9];
+        assert_eq!(
+            decode(&headers("text/plain; charset=latin1"), &latin1),
+            "c\u{e9}"
+        );
+        assert_eq!(
+            decode(&HeaderMap::new(), "caf\u{e9}".as_bytes()),
+            "caf\u{e9}"
+        );
+        assert_eq!(decode(&HeaderMap::new(), &[0xFF]), "\u{fffd}");
     }
 }

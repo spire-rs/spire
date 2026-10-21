@@ -1,66 +1,64 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [package]
 name = "spire-thirtyfour"
-version = { workspace = true }
-edition = { workspace = true }
-rust-version = { workspace = true }
-license = { workspace = true }
+description = "Thirtyfour-based browser automation backend for Spire web scraping framework"
 readme = "./README.md"
+keywords = ["crawler", "scraper", "browser", "webdriver"]
+categories = ["asynchronous", "web-programming"]
+
+version = { workspace = true }
+rust-version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
 
 authors = { workspace = true }
 repository = { workspace = true }
-homepage = { workspace = true }
 documentation = { workspace = true }
-
-description = "Thirtyfour-based browser automation backend for Spire web scraping framework"
-keywords = ["crawler", "scraper", "browser", "webdriver"]
-categories = ["asynchronous", "web-programming"]
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
+# Default feature set (rustls for TLS)
 default = ["rustls-tls"]
-rustls-tls = ["thirtyfour/rustls-tls"]
+
+# TLS to the WebDriver server through rustls, with no system dependencies
+rustls-tls = ["thirtyfour/rustls"]
+# TLS to the WebDriver server through the platform's native library
 native-tls = ["thirtyfour/native-tls"]
+
+# Managed endpoints: drivers are downloaded, cached and spawned automatically
+manager = ["thirtyfour/manager"]
 
 [dependencies]
 # Spire
 spire-core = { workspace = true, features = [] }
 
-# Tower ecosystem
-tower = { workspace = true, features = [] }
-
-# Async
-futures = { workspace = true, features = [] }
-async-trait = { workspace = true, features = [] }
-
-# Browser automation
-thirtyfour = { workspace = true }
+# Browser automation, over WebDriver BiDi
+thirtyfour = { workspace = true, features = ["bidi"] }
 deadpool = { workspace = true, features = [] }
 
+# Async runtime
+tokio = { workspace = true, features = ["time", "macros"] }
+futures = { workspace = true, features = [] }
+
 # HTTP
-http = { workspace = true, features = [] }
 http-body-util = { workspace = true, features = [] }
 
-# Async runtime
-tokio = { workspace = true, features = ["time", "fs"] }
-
-# Serialization
-serde = { workspace = true, features = [] }
+# Encoding of BiDi request bodies and headers
 serde_json = { workspace = true, features = [] }
+base64 = { workspace = true, features = [] }
 
-# Time handling
-jiff = { workspace = true, features = ["serde"] }
-
-# Derive macros
-thiserror = { workspace = true, features = [] }
-derive_builder = { workspace = true, features = [] }
-derive_more = { workspace = true, features = [] }
-
-# Utilities
-bytes = { workspace = true, features = [] }
+# Observability
+tracing = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
-tokio = { workspace = true, features = [] }
+tokio = { workspace = true, features = ["rt", "macros"] }
+http-body-util = { workspace = true, features = [] }
+
+[lints]
+workspace = true

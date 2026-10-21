@@ -1,0 +1,45 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "spire-redb"
+description = "Crash-safe frontier and seen set for the Spire web scraping framework, stored in redb"
+readme = "./README.md"
+keywords = ["crawler", "scraper", "frontier", "redb", "persistence"]
+categories = ["asynchronous", "web-programming", "database"]
+
+version = { workspace = true }
+rust-version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+
+authors = { workspace = true }
+repository = { workspace = true }
+documentation = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+# Internal crates
+spire-core = { workspace = true, features = ["serde"] }
+
+# Async runtime
+tokio = { workspace = true, features = ["rt"] }
+
+# Storage
+redb = { workspace = true, features = [] }
+
+# (De)serialization
+serde_json = { workspace = true, features = [] }
+
+# Observability
+tracing = { workspace = true, features = [] }
+
+[dev-dependencies]
+# Testing
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync"] }
+
+[lints]
+workspace = true

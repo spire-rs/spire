@@ -1,81 +1,108 @@
 # https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
-resolver = "2"
+resolver = "3"
 members = [
     "./crates/spire",
-    "./crates/spire-*",
+    "./crates/spire-core",
+    "./crates/spire-macros",
+    "./crates/spire-redb",
+    "./crates/spire-reqwest",
+    "./crates/spire-thirtyfour",
     "./examples/*",
 ]
 
 default-members = [
     "./crates/spire",
-    "./crates/spire-*",
+    "./crates/spire-core",
+    "./crates/spire-macros",
+    "./crates/spire-redb",
+    "./crates/spire-reqwest",
+    "./crates/spire-thirtyfour",
 ]
 
 [workspace.package]
 version = "0.2.0"
+rust-version = "1.95"
 edition = "2024"
-rust-version = "1.89"
-readme = "./README.md"
 license = "MIT"
+publish = true
 
 authors = ["Oleh Martsokha <o.martsokha@gmail.com>"]
 repository = "https://github.com/spire-rs/spire"
-homepage = "https://github.com/spire-rs/spire"
 documentation = "https://docs.rs/spire"
 
+# Shared lints for every crate (opt in with `[lints] workspace = true`).
+# The whole of `clippy::pedantic` is denied.
+[workspace.lints.rust]
+missing_docs = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+# Lint exceptions are `#[expect]`s with a reason, so stale ones are reported.
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+
 [workspace.dependencies]
-# Workspace crates
+# Default features are disabled for certain dependencies to allow
+# downstream workspaces/crates to selectively enable them as needed.
+#
+# See for more details: https://github.com/rust-lang/cargo/issues/11329
+
+# Internal crates
 spire = { path = "./crates/spire", version = "0.2.0" }
 spire-core = { path = "./crates/spire-core", version = "0.2.0" }
 spire-macros = { path = "./crates/spire-macros", version = "0.2.0" }
+spire-redb = { path = "./crates/spire-redb", version = "0.2.0" }
 spire-reqwest = { path = "./crates/spire-reqwest", version = "0.2.0" }
 spire-thirtyfour = { path = "./crates/spire-thirtyfour", version = "0.2.0" }
 
 # Async runtime
-tokio = { version = "1.39", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.54", features = [] }
 tokio-util = { version = "0.7", features = [] }
 futures = { version = "0.3", features = [] }
-async-trait = { version = "0.1", features = [] }
-
-# Tower ecosystem
-tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = [] }
 
 # HTTP
-http = { version = "1.1", features = [] }
-http-body = { version = "1.0", features = [] }
+http = { version = "1.5", features = [] }
+http-body = { version = "1.1", features = [] }
 http-body-util = { version = "0.1", features = [] }
 
-# Utilities
-bytes = { version = "1.7", features = [] }
-pin-project-lite = { version = "0.2", features = [] }
-thiserror = { version = "2.0", features = [] }
-derive_more = { version = "2.0", features = [] }
-derive_builder = { version = "0.20", features = [] }
-url = { version = "2.5", features = [] }
-
-# Serialization
-serde = { version = "1.0", features = [] }
-serde_json = { version = "1.0", features = [] }
-
-# HTTP clients & HTML parsing
-reqwest = { version = "0.12", features = [] }
+# HTTP client
+reqwest = { version = "0.13", default-features = false, features = [] }
+httpdate = { version = "1.0", features = [] }
 
 # Browser automation
-thirtyfour = { version = "0.36", features = [] }
-deadpool = { version = "0.12", features = [] }
+thirtyfour = { version = "0.38", default-features = false, features = ["reqwest"] }
+deadpool = { version = "0.13", features = ["rt_tokio_1"] }
+
+# (De)serialization
+serde = { version = "1.0", features = [] }
+serde_json = { version = "1.0", features = [] }
+base64 = { version = "0.23", features = [] }
+
+# Derive macros & utilities
+bytes = { version = "1.12", features = [] }
+thiserror = { version = "2.0", features = [] }
+derive_more = { version = "2.1", features = [] }
+
+# Primitive datatypes
+url = { version = "2.5", features = [] }
+
+# Storage
+redb = { version = "4.4", features = [] }
+
+# Politeness
+robotxt = { version = "0.7", default-features = false, features = ["parser"] }
+
+# Markup
+scraper = { version = "0.27", default-features = false, features = ["atomic"] }
+encoding_rs = { version = "0.8", features = [] }
 
 # Observability
 tracing = { version = "0.1", features = [] }
 tracing-subscriber = { version = "0.3", features = [] }
-tracing-test = { version = "0.2", features = [] }
-
-# Time handling
-jiff = { version = "0.2", features = [] }
 
 # Proc macros
 proc-macro2 = { version = "1.0", features = [] }
 quote = { version = "1.0", features = [] }
-syn = { version = "2.0", features = [] }
+syn = { version = "3.0", features = [] }

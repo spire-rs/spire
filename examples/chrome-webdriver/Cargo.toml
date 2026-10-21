@@ -1,0 +1,26 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "chrome-webdriver"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+publish = false
+description = "Chrome WebDriver automation example for Spire web scraping framework"
+
+[[bin]]
+name = "chrome-webdriver"
+path = "main.rs"
+
+[dependencies]
+# Async runtime and Spire framework
+spire = { workspace = true, features = ["thirtyfour", "macros"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
+# Observability
+tracing = { workspace = true, features = [] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+[lints]
+workspace = true

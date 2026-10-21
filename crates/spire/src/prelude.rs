@@ -1,41 +1,24 @@
 //! A convenience module that re-exports commonly used items.
 //!
-//! This module is intended to be glob-imported for convenience:
-//!
 //! ```
 //! use spire::prelude::*;
 //! ```
 
-// HTTP types
-pub use spire_core::http;
-// Macros (with feature gate)
-#[cfg(feature = "macros")]
-#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-pub use spire_macros::Select as DeriveSelect;
-
 #[cfg(feature = "reqwest")]
-#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-pub use crate::HttpClient;
-#[doc(hidden)]
-pub use crate::async_trait;
-pub use crate::backend::{Backend, Worker};
-pub use crate::context::{
-    Body, Context, Depth, FlowControl, IntoFlowControl, Request, RequestQueue, Response, Tag,
-    TagQuery, Task, TaskBuilder,
-};
-pub use crate::dataset::future::{Data, DataSink, DataStream};
-pub use crate::dataset::{Dataset, DatasetExt, InMemDataset};
-#[cfg(feature = "reqwest")]
-#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-pub use crate::extract::client::HttpBackend;
-pub use crate::extract::{
-    AttrData, AttrTag, Body as ExtractBody, Client as ExtractClient, Elements, FromContext,
-    FromContextRef, Html, Json, Select, State, Text,
-};
+pub use crate::backend::HttpClient;
+pub use crate::backend::{Backend, Client as _, StatusPolicy};
 #[cfg(feature = "thirtyfour")]
-#[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-pub use crate::{
-    BrowserBackend, BrowserBehaviorConfig, BrowserBuilder, BrowserConfig, BrowserConfigBuilder,
-    BrowserConnection, BrowserError, BrowserResult, NavigationErrorType, thirtyfour,
-};
-pub use crate::{Client, Error, ErrorKind, Result, Router};
+pub use crate::backend::{BrowserBackend, BrowserSession};
+pub use crate::dataset::{Data, Dataset, InMemDataset};
+#[cfg(feature = "thirtyfour")]
+pub use crate::extract::View;
+#[cfg(feature = "html")]
+pub use crate::extract::{Element, Html, Select};
+pub use crate::extract::{FromRef, Json, State, Text};
+pub use crate::frontier::memory::InMemFrontier;
+pub use crate::frontier::queue::{Link, Queue};
+pub use crate::frontier::seed::Seed;
+pub use crate::frontier::{Admission, Frontier, FrontierExt};
+pub use crate::request::{Attempt, Depth, RequestExt as _, ResponseExt as _, Tag, Tags};
+pub use crate::worker::{IntoOutcome, Outcome};
+pub use crate::{Context, Crawler, Error, ErrorKind, Result, Router};

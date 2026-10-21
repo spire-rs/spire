@@ -1,104 +1,114 @@
+<div align="center">
+
+<img src=".github/assets/logo.png" alt="Spire" width="104" height="104" />
+
 # Spire
 
-[![Build Status][action-badge]][action-url]
-[![Crate Docs][docs-badge]][docs-url]
-[![Crate Version][crates-badge]][crates-url]
-[![Crate Coverage][coverage-badge]][coverage-url]
+**The flexible crawler and scraper framework for Rust.**
 
-**Check out other `spire` projects [here](https://github.com/spire-rs).**
+Crawl websites over HTTP or in real browsers, route every page to a typed
+handler, and extract structured data, built on tokio.
 
-[action-badge]: https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yml?branch=main&label=build&logo=github&style=flat-square
-[action-url]: https://github.com/spire-rs/spire/actions/workflows/build.yml
-[crates-badge]: https://img.shields.io/crates/v/spire.svg?logo=rust&style=flat-square
-[crates-url]: https://crates.io/crates/spire
-[docs-badge]: https://img.shields.io/docsrs/spire?logo=Docs.rs&style=flat-square
-[docs-url]: http://docs.rs/spire
-[coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
-[coverage-url]: https://app.codecov.io/gh/spire-rs/spire
+[![Build](https://img.shields.io/github/actions/workflow/status/spire-rs/spire/build.yml?branch=main&label=build&style=flat-square)](https://github.com/spire-rs/spire/actions/workflows/build.yml)
+[![Security](https://img.shields.io/github/actions/workflow/status/spire-rs/spire/security.yml?branch=main&label=security&style=flat-square)](https://github.com/spire-rs/spire/actions/workflows/security.yml)
+[![Crates.io](https://img.shields.io/crates/v/spire.svg?style=flat-square)](https://crates.io/crates/spire)
+[![Docs](https://img.shields.io/docsrs/spire?style=flat-square)](https://docs.rs/spire)
 
-The flexible crawler & scraper framework powered by [tokio][tokio-rs/tokio] and
-[tower][tower-rs/tower].
+[**docs.rs/spire**](https://docs.rs/spire) · [**crates.io/crates/spire**](https://crates.io/crates/spire) · [**github.com/spire-rs**](https://github.com/spire-rs)
 
-[tokio-rs/tokio]: https://github.com/tokio-rs/tokio/
-[tower-rs/tower]: https://github.com/tower-rs/tower/
+</div>
 
-## Overview
+A crawl flows through three parts: the **frontier** queues the requests to make
+and decides what is new, the **crawler** fetches them concurrently through a
+**backend** (HTTP or a browser) while keeping to per-host limits and
+robots.txt, and the **router** hands each response to a handler. Handlers are
+async functions whose arguments are extractors: parsed HTML, typed JSON, the
+queue for links to follow, or a dataset to store results in.
 
-Spire is a modular web scraping and crawling framework for Rust that combines
-the power of async/await with the composability of tower's middleware ecosystem.
-It supports both HTTP-based scraping and browser automation through pluggable
-backends.
+> [!WARNING]
+> **Active development. API not stable.** Public APIs and on-disk formats may
+> change without notice between releases. Pin a specific version if you depend
+> on this in production.
 
 ## Features
 
-- **Multiple Backends**: HTTP (reqwest) and browser automation (thirtyfour)
-  support
-- **Tower Integration**: Composable middleware using the tower ecosystem
-- **Type-Safe Routing**: Tag-based routing with compile-time guarantees
-- **Ergonomic Extractors**: Clean, type-safe data extraction from requests
-- **Async/Await**: Built on tokio for high-performance concurrent scraping
-- **Observability**: Optional tracing and metrics support
-- **Graceful Shutdown**: Proper resource cleanup and cancellation support
+- **HTTP and browser backends**: reqwest for plain HTTP, thirtyfour to drive real browsers over WebDriver.
+- **Typed routing**: route by tags, checked by the compiler with `#[derive(Tags)]`, or by URL path patterns.
+- **Extractors**: parse HTML into structs with `#[derive(Select)]`, deserialize JSON, or drive the browser with `View`.
+- **Polite crawling**: per-host concurrency and delays, robots.txt per RFC 9309, retries with `Retry-After` and backoff.
+- **Frontiers**: deduplication with URL normalization, depth limits, host filters, priorities, and a Bloom filter for huge crawls.
+- **Crash safety**: a redb-backed frontier and seen set that resume a crawl after a crash.
 
-## Quick Start
+## Requirements
 
-Add spire to your `Cargo.toml`:
+- **Rust + Cargo**: 1.95+, Edition 2024
+- **A WebDriver server**, such as chromedriver, for the browser backend only.
+
+## Quick start
+
+Add spire with the HTTP backend, and tokio:
 
 ```toml
 [dependencies]
-spire = { version = "0.2.0", features = ["reqwest", "tracing"] }
-tracing = { version = "0.1", features = [] }
-tracing-subscriber = { version = "0.3", features = [] }
-tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+spire = { version = "0.2", features = ["reqwest"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 
-Basic HTTP scraping example:
+Crawl a site two links deep and print every title:
 
 ```rust
-use spire::prelude::*;
+use spire::backend::HttpClient;
+use spire::extract::Html;
+use spire::frontier::FrontierExt;
+use spire::frontier::memory::InMemFrontier;
+use spire::frontier::queue::Queue;
+use spire::frontier::seed::Seed;
+use spire::{Crawler, Result, Router};
 
-async fn scrape_page(
-    uri: http::Uri,
-    data_store: Data<String>,
-    Text(html): Text,
-) -> Result<()> {
-    let url = uri.to_string();
-    tracing::info!("Scraped {}: {} bytes", url, html.len());
-
-    // Store the scraped data
-    data_store.write(format!("Content from {}", url)).await?;
+/// Prints the title of every page and follows its links.
+async fn page(queue: Queue, page: Html) -> Result<()> {
+    println!("{:?}", page.title());
+    queue.follow_all(page.links()).await?;
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize structured logging
-    tracing_subscriber::fmt::init();
+    let router = Router::new().route_path("/**", page);
+    let frontier = InMemFrontier::fifo()
+        .dedup()
+        .max_depth(2)
+        .allow_hosts(["example.com"]);
 
-    let router = Router::new()
-        .route("page", scrape_page);
-
-    let client = Client::new(HttpClient::default(), router)
-        .with_request_queue(InMemDataset::stack())
-        .with_dataset(InMemDataset::<String>::new());
-
-    client.request_queue()
-        .append_with_tag("page", "https://example.com")
-        .await?;
-
-    client.run().await
+    let crawler = Crawler::new(HttpClient::default(), router)
+        .with_frontier(frontier)
+        .with_seed(Seed::get("https://example.com/")?);
+    crawler.run().await?;
+    Ok(())
 }
 ```
 
-See the [examples directory](./examples/) for comprehensive guides and the
-[main crate documentation](./spire/) for detailed API reference. usage.
+The [`spire` crate](crates/spire/README.md) covers feature flags, typed
+extraction, browser automation and middleware.
+
+## Examples
+
+Each example in [`examples/`](examples/) is a small crawl against
+[httpbin.org](https://httpbin.org), documented at the top of its `main.rs`:
+
+| Command | What it shows |
+| --- | --- |
+| `cargo run -p basic-usage` | Tags, path routes, link following and `#[derive(Select)]` |
+| `cargo run -p api-endpoints` | Typed JSON responses and following API pagination |
+| `cargo run -p chrome-webdriver` | Browser automation with `View`; needs `chromedriver --port=4444` |
+
+`RUST_LOG=spire_core=debug` logs every request with its outcome and duration.
 
 ## Contributing
 
-We welcome contributions! Please read our
-[Contributing Guide](./CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines, and
+[CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE)
-file for details.
+MIT License, see [LICENSE](LICENSE).

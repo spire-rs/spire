@@ -1,56 +1,75 @@
 use std::convert::Infallible;
+use std::future::{Future, ready};
 
 use derive_more::{Deref, DerefMut};
 
-use crate::context::Context;
+use crate::Context;
 use crate::extract::FromContextRef;
 
-/// Used to do reference-to-value conversion.
+/// Converts a reference to the router state into a part of it.
+///
+/// Implement it to extract a field of the state with [`State`]:
+///
+/// ```
+/// use spire::extract::FromRef;
+///
+/// #[derive(Clone)]
+/// struct AppState {
+///     api_key: String,
+/// }
+///
+/// struct ApiKey(String);
+///
+/// impl FromRef<AppState> for ApiKey {
+///     fn from_ref(state: &AppState) -> Self {
+///         Self(state.api_key.clone())
+///     }
+/// }
+/// ```
 pub trait FromRef<T> {
-    /// Converts to the `self` from an input reference.
+    /// Converts `input` into `Self`.
     fn from_ref(input: &T) -> Self;
 }
 
-impl<T> FromRef<T> for T
-where
-    T: Clone,
-{
-    #[inline]
+impl<T: Clone> FromRef<T> for T {
     fn from_ref(input: &T) -> Self {
         input.clone()
     }
 }
 
-/// State extractor.
+/// Extracts the router state, or a part of it through [`FromRef`].
 ///
-/// ```rust
-/// use spire::extract::{FromRef, State};
+/// ```
+/// use spire::Router;
+/// use spire::extract::State;
 ///
-/// #[derive(Debug, Clone)]
+/// #[derive(Clone)]
 /// struct AppState {
-///     port: u16,
+///     api_key: String,
 /// }
 ///
-/// impl FromRef<AppState> for u16 {
-///     fn from_ref(input: &AppState) -> Self {
-///         input.port
-///     }
+/// async fn handler(State(state): State<AppState>) {
+///     println!("{}", state.api_key);
 /// }
 ///
-/// async fn handler(State(port): State<u16>) {}
+/// let state = AppState { api_key: "secret".to_owned() };
+/// let router: Router<(), AppState> = Router::with_state(state).route("page", handler);
 /// ```
 #[derive(Debug, Default, Clone, Copy, Deref, DerefMut)]
 pub struct State<T>(pub T);
 
-#[spire_core::async_trait]
 impl<C, S, T> FromContextRef<C, S> for State<T>
 where
-    S: Send + Sync + 'static,
-    T: FromRef<S>,
+    C: Sync,
+    S: Sync,
+    T: FromRef<S> + Send,
 {
     type Rejection = Infallible;
 
-    async fn from_context_ref(_cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(T::from_ref(state)))
+    fn from_context_ref(
+        _cx: &Context<C>,
+        state: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        ready(Ok(Self(T::from_ref(state))))
     }
 }

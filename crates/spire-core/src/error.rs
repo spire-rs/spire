@@ -1,58 +1,70 @@
+//! Error and result types.
+//!
+//! An [`Error`] carries a classified [`ErrorKind`], a message and an optional
+//! source. The kind drives retry decisions: the crawler retries a failed
+//! request when [`Error::is_retryable`] holds.
+
 use std::convert::Infallible;
+use std::fmt;
 use std::time::Duration;
-use std::{fmt, io};
 
-use crate::context::{FlowControl, IntoFlowControl, TagQuery};
+use http::{StatusCode, Uri};
 
-/// Type alias for a type-erased [`Error`] type.
-///
-/// [`Error`]: std::error::Error
+/// A result whose error defaults to [`Error`].
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// A boxed, thread-safe source error.
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-/// Error kind representing the category of error that occurred.
-///
-/// This enum categorizes errors by their source and nature, making it easier
-/// to handle different error scenarios programmatically.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Classification of a failure, so callers can branch without matching on
+/// messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ErrorKind {
-    /// HTTP-related errors (invalid requests, connection failures, etc.)
+    /// The input was invalid: a malformed URL, request or configuration.
+    Invalid,
+    /// The transfer failed, or the remote answered with a status worth
+    /// retrying, such as `429` or `503`.
     Http,
-
-    /// Dataset operation errors (read/write failures, serialization errors)
-    Dataset,
-
-    /// Worker processing errors (business logic failures)
-    Worker,
-
-    /// Backend initialization or client creation errors
-    Backend,
-
-    /// Context or request processing errors
-    Context,
-
-    /// I/O errors (file system, network)
-    Io,
-
-    /// Timeout errors
+    /// The remote refused the request in a way retrying won't fix, such as
+    /// `404` or `403`.
+    Rejected,
+    /// The operation timed out.
     Timeout,
-
-    /// Other unclassified errors
-    Other,
+    /// A backend failed, e.g. while connecting or driving a browser.
+    Backend,
+    /// A worker or handler failed.
+    Worker,
+    /// Reading from or writing to a dataset failed.
+    Dataset,
+    /// Reading from or writing to the frontier failed.
+    Frontier,
+    /// The operation was cancelled.
+    Cancelled,
 }
 
 impl ErrorKind {
-    /// Returns a string representation of the error kind.
+    /// Returns the kind as a lowercase string.
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::Invalid => "invalid",
             Self::Http => "http",
-            Self::Dataset => "dataset",
-            Self::Worker => "worker",
-            Self::Backend => "backend",
-            Self::Context => "context",
-            Self::Io => "io",
+            Self::Rejected => "rejected",
             Self::Timeout => "timeout",
-            Self::Other => "other",
+            Self::Backend => "backend",
+            Self::Worker => "worker",
+            Self::Dataset => "dataset",
+            Self::Frontier => "frontier",
+            Self::Cancelled => "cancelled",
         }
+    }
+
+    /// Whether an operation failing with this kind is worth retrying. Only
+    /// transient failures are retryable.
+    #[must_use]
+    pub const fn is_retryable(self) -> bool {
+        matches!(self, Self::Http | Self::Timeout | Self::Backend)
     }
 }
 
@@ -62,249 +74,188 @@ impl fmt::Display for ErrorKind {
     }
 }
 
-/// Unrecoverable failure during [`Request`] processing.
-///
-/// `Error` provides structured error information including:
-/// - Error kind for categorization
-/// - Optional source error for error chains
-/// - Optional tag query for selective task termination
-///
-/// # Examples
-///
-/// ## Creating Errors
-///
-/// ```no_run
-/// use spire_core::{Error, ErrorKind};
-///
-/// // From a message
-/// let err = Error::new(ErrorKind::Worker, "failed to parse response");
-///
-/// // With a source error
-/// let err = Error::with_source(
-///     ErrorKind::Http,
-///     "request failed",
-///     Box::new(std::io::Error::from(std::io::ErrorKind::ConnectionReset))
-/// );
-/// ```
-///
-/// ## Error Handling
-///
-/// ```no_run
-/// use spire_core::{Error, ErrorKind};
-///
-/// # let result: Result<(), Error> = Err(Error::new(ErrorKind::Timeout, "timeout"));
-/// match result {
-///     Err(e) if e.kind() == ErrorKind::Timeout => {
-///         // Retry on timeout
-///     }
-///     Err(e) => {
-///         // Log error with source chain
-///         eprintln!("Error: {}", e);
-///         if let Some(source) = e.source() {
-///             eprintln!("Caused by: {}", source);
-///         }
-///     }
-///     Ok(v) => { /* ... */ }
-/// }
-/// ```
-///
-/// [`Request`]: crate::context::Request
-#[must_use]
-#[derive(thiserror::Error)]
+/// An error carrying a classified [`ErrorKind`], a message, and an optional
+/// source.
+#[derive(Debug, thiserror::Error)]
 pub struct Error {
     kind: ErrorKind,
     message: String,
+    status: Option<StatusCode>,
+    retry_after: Option<Duration>,
+    uri: Option<Box<Uri>>,
     #[source]
     source: Option<BoxError>,
-    query: Option<TagQuery>,
 }
 
 impl Error {
-    /// Creates a new [`Error`] with the given kind and message.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use spire_core::{Error, ErrorKind};
-    ///
-    /// let err = Error::new(ErrorKind::Dataset, "failed to write data");
-    /// ```
-    pub fn new(kind: ErrorKind, message: impl Into<String>) -> Self {
+    /// Creates an error of the given [`ErrorKind`] with an empty message.
+    #[must_use]
+    pub fn new(kind: ErrorKind) -> Self {
         Self {
             kind,
-            message: message.into(),
+            message: String::new(),
+            status: None,
+            retry_after: None,
+            uri: None,
             source: None,
-            query: None,
         }
     }
 
-    /// Creates a new [`Error`] with the given kind, message, and source error.
+    /// Wraps an arbitrary error under the given [`ErrorKind`].
     ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use spire_core::{Error, ErrorKind};
-    ///
-    /// let io_err = std::io::Error::from(std::io::ErrorKind::NotFound);
-    /// let err = Error::with_source(
-    ///     ErrorKind::Dataset,
-    ///     "failed to read file",
-    ///     Box::new(io_err)
-    /// );
-    /// ```
-    pub fn with_source(kind: ErrorKind, message: impl Into<String>, source: BoxError) -> Self {
-        Self {
-            kind,
-            message: message.into(),
-            source: Some(source),
-            query: None,
+    /// If the error already is an [`Error`], it is returned unchanged and
+    /// keeps its own kind.
+    pub fn from_boxed(kind: ErrorKind, error: impl Into<BoxError>) -> Self {
+        match error.into().downcast::<Self>() {
+            Ok(error) => *error,
+            Err(error) => Self::new(kind).with_source(error),
         }
     }
 
-    /// Creates a new [`Error`] from a boxable error with automatic kind detection.
-    ///
-    /// Attempts to determine the error kind based on the error type.
-    pub fn from_boxed(error: impl Into<BoxError>) -> Self {
-        let boxed = error.into();
-        let message = boxed.to_string();
-
-        // Try to infer kind from error type name
-        let kind = if message.contains("http") || message.contains("request") {
-            ErrorKind::Http
-        } else if message.contains("io") || message.contains("file") {
-            ErrorKind::Io
-        } else if message.contains("timeout") {
-            ErrorKind::Timeout
-        } else {
-            ErrorKind::Other
-        };
-
-        Self {
-            kind,
-            message,
-            source: Some(boxed),
-            query: None,
-        }
+    /// Creates an [`Invalid`](ErrorKind::Invalid) error with a message.
+    pub fn invalid(message: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Invalid).with_message(message)
     }
 
-    /// Returns the error kind.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use spire_core::{Error, ErrorKind};
-    ///
-    /// let err = Error::new(ErrorKind::Http, "request failed");
-    /// assert_eq!(err.kind(), ErrorKind::Http);
-    /// ```
-    #[inline]
+    /// Creates a [`Backend`](ErrorKind::Backend) error with a message.
+    pub fn backend(message: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Backend).with_message(message)
+    }
+
+    /// Creates a [`Worker`](ErrorKind::Worker) error with a message.
+    pub fn worker(message: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Worker).with_message(message)
+    }
+
+    /// Replaces the message.
+    #[must_use]
+    pub fn with_message(mut self, message: impl Into<String>) -> Self {
+        self.message = message.into();
+        self
+    }
+
+    /// Attaches a source error.
+    #[must_use]
+    pub fn with_source(mut self, source: impl Into<BoxError>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    /// Attaches the response status that caused the error.
+    #[must_use]
+    pub const fn with_status(mut self, status: StatusCode) -> Self {
+        self.status = Some(status);
+        self
+    }
+
+    /// Attaches the URI of the request that failed.
+    #[must_use]
+    pub fn with_uri(mut self, uri: Uri) -> Self {
+        self.uri = Some(Box::new(uri));
+        self
+    }
+
+    /// Asks for the failed request's tag to be paused for `delay` before it
+    /// is retried, e.g. from a `Retry-After` header.
+    #[must_use]
+    pub const fn with_retry_after(mut self, delay: Duration) -> Self {
+        self.retry_after = Some(delay);
+        self
+    }
+
+    /// Returns the [`ErrorKind`].
     #[must_use]
     pub const fn kind(&self) -> ErrorKind {
         self.kind
     }
 
-    /// Returns the error message.
-    #[inline]
+    /// Returns the message, which may be empty.
     #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
 
-    /// Overrides the current [`TagQuery`].
-    ///
-    /// Terminates all collector tasks with matching [`Tag`]s.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use spire_core::{Error, ErrorKind};
-    /// use spire_core::context::TagQuery;
-    ///
-    /// let err = Error::new(ErrorKind::Worker, "failed")
-    ///     .with_query(TagQuery::Owner);
-    /// ```
-    ///
-    /// [`Tag`]: crate::context::Tag
-    #[inline]
-    pub fn with_query(mut self, query: TagQuery) -> Self {
-        self.query = Some(query);
-        self
-    }
-
-    /// Returns the tag query if set.
-    #[inline]
+    /// Returns the response status that caused the error, if any.
     #[must_use]
-    pub const fn query(&self) -> Option<&TagQuery> {
-        self.query.as_ref()
+    pub const fn status(&self) -> Option<StatusCode> {
+        self.status
     }
-}
 
-impl fmt::Debug for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut debug = f.debug_struct("Error");
-        debug
-            .field("kind", &self.kind)
-            .field("message", &self.message);
+    /// Returns the URI of the request that failed, if known.
+    #[must_use]
+    pub fn uri(&self) -> Option<&Uri> {
+        self.uri.as_deref()
+    }
 
-        if let Some(ref source) = self.source {
-            debug.field("source", source);
-        }
+    /// Returns how long to wait before retrying, if the remote said so.
+    #[must_use]
+    pub const fn retry_after(&self) -> Option<Duration> {
+        self.retry_after
+    }
 
-        if let Some(ref query) = self.query {
-            debug.field("query", query);
-        }
-
-        debug.finish()
+    /// Whether the failed operation is worth retrying.
+    #[must_use]
+    pub const fn is_retryable(&self) -> bool {
+        self.kind.is_retryable()
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}] {}", self.kind, self.message)
-    }
-}
-
-impl From<BoxError> for Error {
-    #[inline]
-    fn from(value: BoxError) -> Self {
-        Self::from_boxed(value)
+        match (self.message.is_empty(), &self.source) {
+            (false, _) => f.write_str(&self.message),
+            (true, Some(source)) => write!(f, "{}: {source}", self.kind),
+            (true, None) => write!(f, "{} error", self.kind),
+        }
     }
 }
 
 impl From<Infallible> for Error {
-    #[inline]
-    fn from(_: Infallible) -> Self {
-        unreachable!()
+    fn from(never: Infallible) -> Self {
+        match never {}
     }
 }
 
 impl From<http::Error> for Error {
-    #[inline]
     fn from(error: http::Error) -> Self {
-        Self::with_source(ErrorKind::Http, "HTTP error", Box::new(error))
+        Self::invalid("invalid request").with_source(error)
     }
 }
 
-impl From<io::Error> for Error {
-    #[inline]
-    fn from(error: io::Error) -> Self {
-        Self::with_source(ErrorKind::Io, "I/O error", Box::new(error))
+impl From<http::uri::InvalidUri> for Error {
+    fn from(error: http::uri::InvalidUri) -> Self {
+        Self::invalid("invalid uri").with_source(error)
     }
 }
 
-impl IntoFlowControl for Error {
-    fn into_flow_control(self) -> FlowControl {
-        match self.query {
-            Some(query) => {
-                let message = if let Some(source) = self.source {
-                    source
-                } else {
-                    // Convert string message to io::Error which implements std::error::Error
-                    Box::new(io::Error::other(self.message)) as BoxError
-                };
-                FlowControl::Fail(query, message)
-            }
-            None => FlowControl::Hold(TagQuery::Owner, Duration::default()),
-        }
+#[cfg(test)]
+mod tests {
+    use std::error::Error as _;
+
+    use super::*;
+
+    #[test]
+    fn display_prefers_message() {
+        let error = Error::backend("pool exhausted");
+        assert_eq!(error.to_string(), "pool exhausted");
+        assert_eq!(Error::new(ErrorKind::Timeout).to_string(), "timeout error");
+    }
+
+    #[test]
+    fn from_boxed_keeps_existing_kind() {
+        let inner = Error::new(ErrorKind::Timeout);
+        let error = Error::from_boxed(ErrorKind::Backend, inner);
+        assert_eq!(error.kind(), ErrorKind::Timeout);
+
+        let error = Error::from_boxed(ErrorKind::Backend, std::io::Error::other("io"));
+        assert_eq!(error.kind(), ErrorKind::Backend);
+        assert!(error.source().is_some());
+    }
+
+    #[test]
+    fn retryable_kinds() {
+        assert!(Error::new(ErrorKind::Http).is_retryable());
+        assert!(!Error::new(ErrorKind::Rejected).is_retryable());
+        assert!(!Error::invalid("bad").is_retryable());
     }
 }

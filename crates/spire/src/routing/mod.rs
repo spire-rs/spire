@@ -1,599 +1,354 @@
-//! Routing between [`Handler`]s and `tower::`[`Service`]s.
-//!
-//! This module provides the core routing functionality for Spire, allowing you to
-//! map different tags to specific handlers or services. The router uses an efficient
-//! tag-based routing system that can handle both static and dynamic routing patterns.
-//!
-//! # Basic Usage
-//!
-//! ```ignore
-//! use spire::routing::Router;
-//! use spire::context::{Tag, FlowControl};
-//!
-//! async fn home_handler() -> &'static str {
-//!     "Welcome to the home page"
-//! }
-//!
-//! async fn about_handler() -> &'static str {
-//!     "About us"
-//! }
-//!
-//! let router = Router::new()
-//!     .route(Tag::from("home"), home_handler)
-//!     .route(Tag::from("about"), about_handler)
-//!     .fallback(|| async { "Page not found" });
-//! ```
-//!
-//! # State Management
-//!
-//! ```ignore
-//! use spire::routing::Router;
-//! use spire::extract::State;
-//!
-//! #[derive(Clone)]
-//! struct AppState {
-//!     db_pool: DatabasePool,
-//! }
-//!
-//! async fn handler(State(state): State<AppState>) -> &'static str {
-//!     // Use state.db_pool
-//!     "Data processed"
-//! }
-//!
-//! let app_state = AppState { db_pool: create_pool() };
-//! let router = Router::new()
-//!     .route("process", handler)
-//!     .with_state(app_state);
-//! ```
-//!
-//! # Service Integration
-//!
-//! ```ignore
-//! use tower::ServiceBuilder;
-//! use spire::routing::Router;
-//!
-//! let router = Router::new()
-//!     .route("api", my_handler)
-//!     .layer(ServiceBuilder::new()
-//!         .timeout(Duration::from_secs(30))
-//!         .layer(my_middleware)
-//!     );
-//! ```
+//! Routing requests to handlers by their [`Tag`], or else their path.
 
-use std::convert::Infallible;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fmt;
+use std::future::Future;
+use std::marker::PhantomData;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 
-use endpoint::Endpoint;
-pub use future::RouteFuture;
-pub use route::Route;
-use tag_router::TagRouter;
-use tower::{Layer, Service};
+use futures::future::BoxFuture;
 
-use crate::context::{Context as Cx, FlowControl, IntoFlowControl, Tag};
-pub use crate::handler::{Handler, HandlerService};
+mod path;
 
-mod endpoint;
-mod future;
-mod make_route;
-mod route;
-mod tag_router;
+use self::path::PathPattern;
+use crate::handler::Handler;
+use crate::request::{RequestExt, Tag, Tags};
+use crate::worker::{Outcome, Worker};
+use crate::{Context, Error, TRACING_TARGET};
 
-/// Composes and routes [`Handler`]s and `tower::`[`Service`]s.
+/// A handler bound to its state, with its type erased.
+type Route<C> = Arc<dyn ErasedHandler<C>>;
+
+/// An object-safe [`Handler`] bound to its state.
+trait ErasedHandler<C>: Send + Sync + 'static {
+    fn call(&self, cx: Context<C>) -> BoxFuture<'static, Outcome>;
+}
+
+/// A handler and the state it is called with.
+struct Bound<H, M, S> {
+    handler: H,
+    state: S,
+    marker: PhantomData<fn() -> M>,
+}
+
+impl<C, H, M, S> ErasedHandler<C> for Bound<H, M, S>
+where
+    H: Handler<C, M, S>,
+    S: Clone + Send + Sync + 'static,
+    M: 'static,
+{
+    fn call(&self, cx: Context<C>) -> BoxFuture<'static, Outcome> {
+        Box::pin(self.handler.clone().call(cx, self.state.clone()))
+    }
+}
+
+/// Routes requests to handlers by their [`Tag`], or else their path.
 ///
-/// The `Router` is the central component for request routing in Spire. It maps
-/// [`Tag`]s to handlers or services, allowing different types of requests to be
-/// processed by appropriate logic.
+/// Tagged requests go to the handler registered for their tag. Untagged
+/// requests go to the first [path route](Self::route_path) matching their
+/// path. Everything else, including tags without a route, goes to the
+/// fallback; without a fallback it fails, so a misspelled tag shows up in the
+/// crawl's stats.
 ///
-/// # Features
+/// Tags can be strings or an enum deriving [`Tags`], which
+/// [`require`](Self::require) checks for a route per variant.
 ///
-/// - **Tag-based routing**: Route requests based on their tags
-/// - **Fallback handling**: Define fallback behavior for unmatched requests
-/// - **State management**: Attach state to handlers for shared data access
-/// - **Middleware support**: Apply tower middleware layers to all routes
-/// - **Service compatibility**: Full integration with the tower ecosystem
-/// - **Efficient cloning**: Uses `Arc` internally for cheap clones
+/// State is given up front with [`with_state`](Self::with_state) and shared
+/// by every handler through [`State`](crate::extract::State).
 ///
-/// # Examples
-///
-/// ## Basic Routing
-///
-/// ```ignore
-/// use spire::routing::Router;
-/// use spire::context::Tag;
-///
-/// async fn api_handler() -> &'static str { "API response" }
-/// async fn web_handler() -> &'static str { "Web response" }
-///
-/// let router = Router::new()
-///     .route(Tag::from("api"), api_handler)
-///     .route(Tag::from("web"), web_handler);
 /// ```
+/// use spire::Router;
+/// use spire::extract::Text;
+/// use spire::frontier::queue::Queue;
 ///
-/// ## With State and Middleware
-///
-/// ```ignore
-/// use spire::routing::Router;
-/// use spire::extract::State;
-/// use tower::ServiceBuilder;
-///
-/// #[derive(Clone)]
-/// struct AppState { /* ... */ }
-///
-/// async fn handler(State(state): State<AppState>) -> &'static str {
-///     "Processed"
+/// async fn list(queue: Queue) -> spire::Result<()> {
+///     queue.follow("/items/1").await?;
+///     Ok(())
 /// }
 ///
-/// let router = Router::new()
-///     .route("process", handler)
-///     .layer(ServiceBuilder::new().timeout(Duration::from_secs(10)))
-///     .with_state(AppState { /* ... */ });
+/// async fn item(Text(body): Text) {
+///     println!("{} bytes", body.len());
+/// }
+///
+/// let router: Router<spire::backend::Noop> = Router::new()
+///     .route("list", list)
+///     .route("item", item);
 /// ```
-#[must_use = "services do nothing unless you `.poll_ready` or `.call` them"]
-pub struct Router<C = (), S = ()> {
-    inner: Arc<TagRouter<C, S>>,
+#[must_use]
+pub struct Router<C, S = ()> {
+    routes: HashMap<Tag, Route<C>>,
+    paths: Vec<(PathPattern, Route<C>)>,
+    fallback: Option<Route<C>>,
+    state: S,
+}
+
+impl<C> Router<C> {
+    /// Creates a router without state.
+    pub fn new() -> Self {
+        Self::with_state(())
+    }
 }
 
 impl<C, S> Router<C, S> {
-    /// Creates a new empty [`Router`].
-    ///
-    /// This creates a router with no routes and a default fallback handler
-    /// that returns [`FlowControl::Continue`] for all unmatched requests.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use spire::routing::Router;
-    ///
-    /// let router: Router = Router::new();
-    /// ```
-    ///
-    /// # Type Parameters
-    ///
-    /// - `C`: The client type (usually inferred from usage)
-    /// - `S`: The state type (defaults to `()` for stateless routers)
-    pub fn new() -> Self
-    where
-        C: 'static,
-    {
-        let inner = Arc::new(TagRouter::<C, S>::new());
-        Self { inner }
-    }
-
-    /// Inserts a route that maps a tag to a handler.
-    ///
-    /// When a request with the specified tag is processed, it will be routed
-    /// to the provided handler. The handler can be any async function that
-    /// implements the [`Handler`] trait.
-    ///
-    /// # Arguments
-    ///
-    /// * `tag` - The tag to match against incoming requests
-    /// * `handler` - The handler function to process matching requests
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use spire::routing::Router;
-    /// use spire::context::Tag;
-    ///
-    /// async fn my_handler() -> &'static str {
-    ///     "Hello, World!"
-    /// }
-    ///
-    /// let router = Router::new()
-    ///     .route(Tag::from("greeting"), my_handler)
-    ///     .route("simple", my_handler); // Tag::from is called automatically
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if a route for this tag has already been inserted. Each tag
-    /// can only be associated with one handler.
-    pub fn route<H, V>(mut self, tag: impl Into<Tag>, handler: H) -> Self
-    where
-        C: 'static,
-        S: Send + Clone + 'static,
-        H: Handler<C, V, S>,
-        H::Future: Send + 'static,
-        V: Send + 'static,
-    {
-        let endpoint = Endpoint::from_handler(handler);
-        Arc::make_mut(&mut self.inner).route(tag.into(), endpoint);
-        self
-    }
-
-    /// Inserts a route that maps a tag to a tower [`Service`].
-    ///
-    /// This method allows you to route to any tower [`Service`] instead of
-    /// a handler function, providing maximum flexibility for integration
-    /// with existing tower-based services.
-    ///
-    /// # Arguments
-    ///
-    /// * `tag` - The tag to match against incoming requests
-    /// * `service` - The tower service to process matching requests
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use spire::routing::Router;
-    /// use tower::service_fn;
-    ///
-    /// let my_service = service_fn(|_req| async {
-    ///     Ok("Service response")
-    /// });
-    ///
-    /// let router = Router::new()
-    ///     .route_service("api", my_service);
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if a route for this tag has already been inserted.
-    pub fn route_service<H>(mut self, tag: impl Into<Tag>, service: H) -> Self
-    where
-        C: 'static,
-        S: Send + Clone + 'static,
-        H: Service<Cx<C>, Error = Infallible> + Clone + Send + 'static,
-        H::Response: IntoFlowControl + 'static,
-        H::Future: Send + 'static,
-    {
-        let endpoint = Endpoint::<C, S>::from_service(service);
-        Arc::make_mut(&mut self.inner).route(tag.into(), endpoint);
-        self
-    }
-
-    /// Sets the fallback [`Handler`] for unmatched requests.
-    ///
-    /// The fallback handler processes all requests that don't match any
-    /// configured routes. This is useful for implementing default behavior,
-    /// error handling, or catch-all logic.
-    ///
-    /// # Default Behavior
-    ///
-    /// By default, unmatched requests are processed by a handler that returns
-    /// [`FlowControl::Continue`], effectively ignoring them.
-    ///
-    /// # Arguments
-    ///
-    /// * `handler` - The handler to process unmatched requests
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use spire::routing::Router;
-    /// use spire::context::FlowControl;
-    ///
-    /// async fn not_found_handler() -> FlowControl {
-    ///     println!("Request not matched by any route");
-    ///     FlowControl::Continue
-    /// }
-    ///
-    /// let router = Router::new()
-    ///     .route("home", home_handler)
-    ///     .fallback(not_found_handler);
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if a fallback handler has already been set. You can only
-    /// set one fallback handler per router.
-    pub fn fallback<H, V>(mut self, handler: H) -> Self
-    where
-        C: 'static,
-        S: Send + Clone + 'static,
-        H: Handler<C, V, S>,
-        H::Future: Send + 'static,
-        V: Send + 'static,
-    {
-        let endpoint = Endpoint::from_handler(handler);
-        Arc::make_mut(&mut self.inner).fallback(endpoint);
-        self
-    }
-
-    /// Sets the fallback [`Service`] for unmatched requests.
-    ///
-    /// Similar to [`fallback`], but allows you to use any tower [`Service`]
-    /// instead of a handler function.
-    ///
-    /// # Arguments
-    ///
-    /// * `service` - The tower service to process unmatched requests
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use spire::routing::Router;
-    /// use tower::service_fn;
-    ///
-    /// let fallback_service = service_fn(|_req| async {
-    ///     Ok("Default response")
-    /// });
-    ///
-    /// let router = Router::new()
-    ///     .route("api", api_handler)
-    ///     .fallback_service(fallback_service);
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if a fallback handler has already been set.
-    ///
-    /// [`fallback`]: Self::fallback
-    pub fn fallback_service<H>(mut self, service: H) -> Self
-    where
-        C: 'static,
-        S: Send + Clone + 'static,
-        H: Service<Cx<C>, Error = Infallible> + Clone + Send + 'static,
-        H::Response: IntoFlowControl + 'static,
-        H::Future: Send + 'static,
-    {
-        let endpoint = Endpoint::<C, S>::from_service(service);
-        Arc::make_mut(&mut self.inner).fallback(endpoint);
-        self
-    }
-
-    /// Merges with another [`Router`] by combining their routes.
-    ///
-    /// This combines the routes from both routers. If both routers have
-    /// routes for the same tag, the behavior is undefined and may panic.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - The router to merge with this one
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use spire::routing::Router;
-    ///
-    /// let api_router = Router::new()
-    ///     .route("users", users_handler)
-    ///     .route("posts", posts_handler);
-    ///
-    /// let web_router = Router::new()
-    ///     .route("home", home_handler)
-    ///     .route("about", about_handler);
-    ///
-    /// let combined_router = api_router.merge(web_router);
-    /// ```
-    ///
-    /// # Performance
-    ///
-    /// This operation may require cloning internal data structures if the
-    /// router is shared (behind an `Arc`). Consider building your complete
-    /// router structure before cloning when possible.
-    pub fn merge(mut self, other: Self) -> Self {
-        let other_inner = Arc::try_unwrap(other.inner).unwrap_or_else(|arc| (*arc).clone());
-        Arc::make_mut(&mut self.inner).merge(other_inner);
-        self
-    }
-
-    /// Applies a `tower::`[`Layer`] to all routes in the router.
-    ///
-    /// This allows you to add middleware to all handlers, such as logging,
-    /// rate limiting, or request transformation.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use tower::ServiceBuilder;
-    ///
-    /// let router = Router::new()
-    ///     .route(tag, handler)
-    ///     .layer(ServiceBuilder::new().layer(my_middleware));
-    /// ```
-    pub fn layer<L>(self, layer: L) -> Self
-    where
-        C: 'static,
-        S: Clone + Send + 'static,
-        L: Layer<Route<C, Infallible>> + Clone + Send + 'static,
-        L::Service: Service<Cx<C>> + Clone + Send + 'static,
-        <L::Service as Service<Cx<C>>>::Response: IntoFlowControl + 'static,
-        <L::Service as Service<Cx<C>>>::Error: Into<Infallible> + 'static,
-        <L::Service as Service<Cx<C>>>::Future: Send + 'static,
-    {
-        let inner = Arc::try_unwrap(self.inner).unwrap_or_else(|arc| (*arc).clone());
-        let remap =
-            |k: Tag, v: Endpoint<C, S>| -> (Tag, Endpoint<C, S>) { (k, v.layer(layer.clone())) };
+    /// Creates a router whose handlers share `state`.
+    pub fn with_state(state: S) -> Self {
         Self {
-            inner: Arc::new(inner.map(remap)),
+            routes: HashMap::new(),
+            paths: Vec::new(),
+            fallback: None,
+            state,
         }
     }
 
-    /// Attaches state to all handlers in the router.
+    /// Routes requests tagged `tag` to `handler`.
     ///
-    /// This converts a stateless router into a stateful one by providing
-    /// state that can be extracted in handlers via the [`State`] extractor.
+    /// # Panics
     ///
-    /// # Examples
+    /// Panics if `tag` already has a route.
+    pub fn route<H, M>(self, tag: impl Into<Tag>, handler: H) -> Self
+    where
+        C: Send + 'static,
+        S: Clone + Send + Sync + 'static,
+        H: Handler<C, M, S>,
+        M: 'static,
+    {
+        let route = self.bind(handler);
+        self.insert(tag.into(), route)
+    }
+
+    /// Routes untagged requests whose path matches `pattern` to `handler`.
     ///
-    /// ```ignore
-    /// #[derive(Clone)]
-    /// struct AppState {
-    ///     db: Database,
-    /// }
+    /// In `pattern`, `*` matches within one path segment and `**` across
+    /// segments; the query is ignored. Path routes are tried in the order
+    /// they were added, and only for requests without a tag, so a tag always
+    /// wins over the path.
     ///
-    /// async fn handler(State(state): State<AppState>) {
-    ///     // Use state.db
-    /// }
+    /// ```
+    /// use spire::Router;
     ///
-    /// let router = Router::new()
-    ///     .route(tag, handler)
-    ///     .with_state(AppState { db });
+    /// async fn product() {}
+    /// async fn review() {}
+    ///
+    /// let router: Router<spire::backend::Noop> = Router::new()
+    ///     .route_path("/products/*", product)
+    ///     .route_path("/products/*/reviews/**", review);
     /// ```
     ///
-    /// [`State`]: crate::extract::State
-    pub fn with_state<S2>(self, state: S) -> Router<C, S2>
+    /// # Panics
+    ///
+    /// Panics if `pattern` does not start with `/` or already has a route.
+    pub fn route_path<H, M>(self, pattern: &str, handler: H) -> Self
     where
-        S: Clone,
+        C: Send + 'static,
+        S: Clone + Send + Sync + 'static,
+        H: Handler<C, M, S>,
+        M: 'static,
     {
-        let inner = Arc::try_unwrap(self.inner).unwrap_or_else(|arc| (*arc).clone());
-        Router::<C, S2> {
-            inner: Arc::new(inner.with_state::<S2>(state)),
+        let route = self.bind(handler);
+        self.insert_path(PathPattern::new(pattern), route)
+    }
+
+    /// Routes requests no tag or path route takes to `handler`.
+    pub fn fallback<H, M>(mut self, handler: H) -> Self
+    where
+        C: Send + 'static,
+        S: Clone + Send + Sync + 'static,
+        H: Handler<C, M, S>,
+        M: 'static,
+    {
+        self.fallback = Some(self.bind(handler));
+        self
+    }
+
+    /// Checks that every tag of `T` has a route.
+    ///
+    /// Call it after the routes are added: a forgotten handler then fails
+    /// when the router is built rather than as failed requests mid-crawl.
+    ///
+    /// ```
+    /// use spire::Router;
+    /// # use spire::request::{Tag, Tags};
+    /// # #[derive(Clone, Copy)]
+    /// # enum Page { List, Item }
+    /// # impl From<Page> for Tag {
+    /// #     fn from(page: Page) -> Self {
+    /// #         Tag::from_static(match page { Page::List => "list", Page::Item => "item" })
+    /// #     }
+    /// # }
+    /// # impl Tags for Page {
+    /// #     const ALL: &'static [Self] = &[Self::List, Self::Item];
+    /// # }
+    ///
+    /// async fn list() {}
+    /// async fn item() {}
+    ///
+    /// // `Page` is `#[derive(Tags)] enum Page { List, Item }`.
+    /// let router: Router<spire::backend::Noop> = Router::new()
+    ///     .route(Page::List, list)
+    ///     .route(Page::Item, item)
+    ///     .require::<Page>();
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if a tag of `T` has no route, naming every such tag.
+    pub fn require<T: Tags>(self) -> Self {
+        let missing: Vec<String> = T::ALL
+            .iter()
+            .map(|&tag| tag.into())
+            .filter(|tag| !self.routes.contains_key(tag))
+            .map(|tag| format!("`{tag}`"))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "no route for {} {}",
+            if missing.len() == 1 { "tag" } else { "tags" },
+            missing.join(", ")
+        );
+        self
+    }
+
+    /// Adds the routes of `other`, keeping this router's state.
+    ///
+    /// Path routes of `other` are tried after this router's.
+    ///
+    /// # Panics
+    ///
+    /// Panics if both routers route the same tag or path pattern, or both
+    /// have a fallback.
+    pub fn merge(mut self, other: Self) -> Self {
+        for (tag, route) in other.routes {
+            self = self.insert(tag, route);
+        }
+        for (pattern, route) in other.paths {
+            self = self.insert_path(pattern, route);
+        }
+        if let Some(fallback) = other.fallback {
+            assert!(
+                self.fallback.replace(fallback).is_none(),
+                "both routers have a fallback"
+            );
+        }
+        self
+    }
+
+    /// Binds `handler` to the router's state.
+    fn bind<H, M>(&self, handler: H) -> Route<C>
+    where
+        C: Send + 'static,
+        S: Clone + Send + Sync + 'static,
+        H: Handler<C, M, S>,
+        M: 'static,
+    {
+        Arc::new(Bound {
+            handler,
+            state: self.state.clone(),
+            marker: PhantomData,
+        })
+    }
+
+    fn insert(mut self, tag: Tag, route: Route<C>) -> Self {
+        match self.routes.entry(tag) {
+            Entry::Occupied(entry) => panic!("tag `{}` already has a route", entry.key()),
+            Entry::Vacant(entry) => entry.insert(route),
+        };
+        self
+    }
+
+    fn insert_path(mut self, pattern: PathPattern, route: Route<C>) -> Self {
+        assert!(
+            self.paths.iter().all(|(other, _)| *other != pattern),
+            "path `{}` already has a route",
+            pattern.as_str()
+        );
+        self.paths.push((pattern, route));
+        self
+    }
+
+    /// Returns the first path route matching `path`.
+    fn path_route(&self, path: &str) -> Option<&Route<C>> {
+        let mut paths = self.paths.iter();
+        let (_, route) = paths.find(|(pattern, _)| pattern.matches(path))?;
+        Some(route)
+    }
+
+    /// Calls the route for the request: its tag's, else the first matching
+    /// path route's for an untagged request, else the fallback.
+    fn dispatch(&self, cx: Context<C>) -> BoxFuture<'static, Outcome>
+    where
+        C: 'static,
+    {
+        let tag = cx.request().tag();
+        tracing::trace!(
+            target: TRACING_TARGET,
+            tag = tag.map(tracing::field::display),
+            "routing request",
+        );
+
+        let route = match tag {
+            Some(tag) => self.routes.get(tag),
+            None => self.path_route(cx.request().uri().path()),
+        };
+        match route.or(self.fallback.as_ref()) {
+            Some(route) => route.call(cx),
+            None => Box::pin(std::future::ready(unrouted(&cx))),
         }
     }
 }
 
-impl<C, S> Clone for Router<C, S> {
-    fn clone(&self) -> Self {
-        let inner = self.inner.clone();
-        Self { inner }
-    }
+/// Fails a request nothing routes.
+fn unrouted<C>(cx: &Context<C>) -> Outcome {
+    let request = cx.request();
+    let message = match request.tag() {
+        Some(tag) => format!("no route for tag `{tag}`"),
+        None => format!(
+            "no path or fallback route for untagged `{}`",
+            request.uri().path()
+        ),
+    };
+    Outcome::Fail(Error::worker(message))
 }
 
-impl<C, S> fmt::Display for Router<C, S> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Router").finish_non_exhaustive()
-    }
-}
-
-impl<C, S> Default for Router<C, S>
-where
-    C: 'static,
-{
+impl<C> Default for Router<C> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<C> Service<Cx<C>> for Router<C, ()>
-where
-    C: 'static,
-{
-    type Error = Infallible;
-    type Future = RouteFuture<C, Infallible>;
-    type Response = FlowControl;
-
-    #[inline]
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+impl<C, S: Clone> Clone for Router<C, S> {
+    fn clone(&self) -> Self {
+        Self {
+            routes: self.routes.clone(),
+            paths: self.paths.clone(),
+            fallback: self.fallback.clone(),
+            state: self.state.clone(),
+        }
     }
+}
 
-    #[inline]
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip_all, level = "trace"))]
-    fn call(&mut self, cx: Cx<C>) -> Self::Future {
-        #[cfg(feature = "tracing")]
-        tracing::trace!("router calling inner tag router");
+impl<C, S> fmt::Debug for Router<C, S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut tags: Vec<_> = self.routes.keys().map(Tag::as_str).collect();
+        tags.sort_unstable();
+        let paths: Vec<_> = self.paths.iter().map(|(pattern, _)| pattern).collect();
+        f.debug_struct("Router")
+            .field("routes", &tags)
+            .field("paths", &paths)
+            .field("fallback", &self.fallback.is_some())
+            .finish_non_exhaustive()
+    }
+}
 
-        // Clone the Arc to get access to the inner TagRouter
-        let mut inner = (*self.inner).clone();
-        inner.call(cx)
+impl<C, S> Worker<C> for Router<C, S>
+where
+    C: Send + 'static,
+    S: Send + Sync + 'static,
+{
+    fn handle(&self, cx: Context<C>) -> impl Future<Output = Outcome> + Send {
+        self.dispatch(cx)
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-    use std::sync::atomic::AtomicU32;
-
-    use crate::extract::FromRef;
-    use crate::routing::Router;
-
-    #[derive(Debug, Default, Clone)]
-    struct AppState {
-        counter: Arc<AtomicU32>,
-        sub_value: u32,
-    }
-
-    impl FromRef<AppState> for u32 {
-        fn from_ref(input: &AppState) -> Self {
-            input.sub_value
-        }
-    }
-
-    impl FromRef<AppState> for Arc<AtomicU32> {
-        fn from_ref(input: &AppState) -> Self {
-            input.counter.clone()
-        }
-    }
-
-    #[test]
-    fn router_creation() {
-        let _router: Router = Router::new();
-        let _router: Router<(), AppState> = Router::new();
-    }
-
-    #[test]
-    fn basic_routing() {
-        // Test that Router can be created
-        let _router: Router = Router::new();
-    }
-
-    #[test]
-    fn state_routing() {
-        let state = AppState::default();
-        let _router: Router<(), AppState> = Router::new().with_state(state);
-    }
-
-    #[test]
-    fn router_service_creation() {
-        let state = AppState {
-            counter: Arc::new(AtomicU32::new(0)),
-            sub_value: 42,
-        };
-
-        let _router: Router<(), AppState> = Router::new().with_state(state);
-    }
-
-    #[test]
-    fn router_fallback() {
-        // Test that Router supports fallback configuration
-        let _router: Router<(), ()> = Router::new().with_state(());
-    }
-
-    #[test]
-    fn router_service_integration() {
-        // Test that Router can be created with service integration
-        let _router: Router<(), ()> = Router::new().with_state(());
-    }
-
-    #[test]
-    fn router_merge() {
-        let router1 = Router::new();
-        let router2 = Router::new();
-
-        let merged_router = router1.merge(router2);
-
-        // The merged router should contain all routes
-        // Note: We can't directly test the internal structure,
-        // but we can verify it compiles and the types work
-        let _: Router = merged_router;
-    }
-
-    #[test]
-    fn router_clone() {
-        let router: Router<(), ()> = Router::new();
-        let cloned_router = router.clone();
-
-        // Both routers should be usable
-        let _: Router<(), ()> = router;
-        let _: Router<(), ()> = cloned_router;
-    }
-
-    #[test]
-    fn router_multiple_extractors() {
-        let state = AppState {
-            counter: Arc::new(AtomicU32::new(0)),
-            sub_value: 42,
-        };
-
-        let _router: Router<(), AppState> = Router::new().with_state(state);
-    }
-
-    #[test]
-    fn router_with_layer() {
-        // Test that Router supports layers (without using actual timeout layer to avoid trait bound issues)
-        let _router: Router<(), ()> = Router::new().with_state(());
-    }
-
-    #[test]
-    fn router_poll_ready() {
-        let _router: Router<(), ()> = Router::new().with_state(());
-
-        // Router creation should work
-        // Note: Actual polling would require proper service implementation
-    }
-}
+mod tests;

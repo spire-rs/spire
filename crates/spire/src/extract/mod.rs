@@ -1,118 +1,107 @@
-//! Types and traits for extracting data from [`Context`].
+//! Extractors: typed handler arguments taken from the [`Context`].
 //!
-//! ### Intro
+//! A handler is an async function whose arguments are extractors. Every
+//! argument but the last implements [`FromContextRef`] and reads the context;
+//! the last may implement [`FromContext`] and consume it, typically to fetch
+//! the response.
 //!
-//! A [`Handler`] function is an async function that takes any number of extractors as arguments.
+//! - Request and crawl: [`Uri`](crate::request::http::Uri), [`Tag`], an enum
+//!   deriving [`Tags`],
+//!   [`Depth`], [`Attempt`], [`Queue`] and [`Data`].
+//! - Response body: [`Bytes`], [`Text`], [`Json`], and with the `html`
+//!   feature [`Html`] and [`Element`].
+//! - Everything else: [`State`], [`Client`] and the [`Context`] itself.
 //!
-//! An extractor is a type that implements [`FromContextRef`] or [`FromContext`].
+//! Wrapping an extractor in `Option` or `Result` makes it infallible.
 //!
-//! [`Handler`]: crate::handler::Handler
-//!
-//! ### [`Context`] extractors
-//!
-//! - [`RequestQueue`] for enqueuing new requests.
-//! - [`Data`], `DataStream` and `DataSink` for reading and writing response data.
-//! - [`Client`] to access [`Backend`]-specific `HttpClient` or `BrowserClient`.
-//! - [`State`] and [`FromRef`] trait for state extraction.
-//!
-//! [`Backend`]: crate::backend::Backend
-
-//!
+//! [`Tag`]: crate::request::Tag
+//! [`Tags`]: crate::request::Tags
+//! [`Depth`]: crate::request::Depth
+//! [`Attempt`]: crate::request::Attempt
+//! [`Queue`]: crate::frontier::queue::Queue
 //! [`Data`]: crate::dataset::Data
 
-//! [`RequestQueue`]: crate::context::RequestQueue
-//!
-//! ### [`Request`] and [`Response`] extractors
-//!
-//! - [`Body`], [`Text`], and [`Json`] for response body extraction.
-//! - [`Html`] (for `HttpClient`) or [`View`] (for `BrowserClient`) for direct markup access.
-//! - [`Elements`] and [`Select`] trait for declarative markup extraction.
-//!
-//! [`Request`]: crate::context::Request
-//! [`Response`]: crate::context::Response
-
-//! [`View`]: driver::View
+mod content;
+pub(crate) mod context;
+#[cfg(feature = "thirtyfour")]
+mod driver;
+#[cfg(feature = "html")]
+pub(crate) mod html;
+mod state;
 
 use std::convert::Infallible;
+use std::future::Future;
 
+pub use content::{Bytes, Json, Text};
+pub use context::Client;
+#[cfg(feature = "thirtyfour")]
+#[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
+pub use driver::View;
+#[cfg(feature = "html")]
+#[cfg_attr(docsrs, doc(cfg(feature = "html")))]
+pub use html::{Element, Html, Select};
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 pub use spire_macros::Select;
+pub use state::{FromRef, State};
 
-use crate::context::{Context, IntoFlowControl};
-pub use crate::extract::content::{Body, Html, Json, Text};
-pub use crate::extract::context::Client;
-pub use crate::extract::select::{AttrData, AttrTag, Elements, Select};
-pub use crate::extract::state::{FromRef, State};
+use crate::Context;
+use crate::worker::IntoOutcome;
 
-mod content;
-mod context;
-mod state;
-
-pub mod select;
-
-#[cfg(feature = "reqwest")]
-#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-pub mod client;
-#[cfg(feature = "thirtyfour")]
-#[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-pub mod driver;
-
-mod sealed {
+/// Marker types that tell [`FromContext`] implementations apart.
+mod private {
+    /// The extractor reads the context through [`FromContextRef`](super::FromContextRef).
     #[derive(Debug, Clone, Copy)]
-    pub enum ViaParts {}
+    pub enum ViaRef {}
 
+    /// The extractor consumes the context.
     #[derive(Debug, Clone, Copy)]
-    pub enum ViaRequest {}
+    pub enum ViaContext {}
 }
 
-/// Core trait for a non-consuming extractor.
-#[spire_core::async_trait]
+/// An extractor that reads the [`Context`] without consuming it.
 pub trait FromContextRef<C, S>: Sized {
-    /// Extraction failure type.
-    ///
-    /// Should be convertable into the [`FlowControl`].
-    ///
-    /// [`FlowControl`]: crate::context::FlowControl
-    type Rejection: IntoFlowControl;
+    /// What the handler returns when extraction fails.
+    type Rejection: IntoOutcome;
 
-    /// Extracts the value from the reference to the context.
-    async fn from_context_ref(cx: &Context<C>, state: &S) -> Result<Self, Self::Rejection>;
+    /// Extracts `Self` from the context and handler state.
+    fn from_context_ref(
+        cx: &Context<C>,
+        state: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send;
 }
 
-/// Core trait for a consuming extractor.
-#[spire_core::async_trait]
-pub trait FromContext<C, S, V = sealed::ViaRequest>: Sized {
-    /// Extraction failure type.
-    ///
-    /// Should be convertable into the [`FlowControl`].
-    ///
-    /// [`FlowControl`]: crate::context::FlowControl
-    type Rejection: IntoFlowControl;
+/// An extractor that consumes the [`Context`], e.g. to fetch the response.
+///
+/// Only the last argument of a handler can consume the context.
+pub trait FromContext<C, S, M = private::ViaContext>: Sized {
+    /// What the handler returns when extraction fails.
+    type Rejection: IntoOutcome;
 
-    /// Extracts the value from the context.
-    async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection>;
+    /// Extracts `Self` from the context and handler state.
+    fn from_context(
+        cx: Context<C>,
+        state: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send;
 }
 
-#[spire_core::async_trait]
-impl<C, S, T> FromContext<C, S, sealed::ViaParts> for T
+impl<C, S, T> FromContext<C, S, private::ViaRef> for T
 where
-    C: Send + Sync + 'static,
-    S: Send + Sync + 'static,
+    C: Send + Sync,
+    S: Sync,
     T: FromContextRef<C, S>,
 {
-    type Rejection = <Self as FromContextRef<C, S>>::Rejection;
+    type Rejection = T::Rejection;
 
     async fn from_context(cx: Context<C>, state: &S) -> Result<Self, Self::Rejection> {
-        Self::from_context_ref(&cx, state).await
+        T::from_context_ref(&cx, state).await
     }
 }
 
-#[spire_core::async_trait]
 impl<C, S, T> FromContextRef<C, S> for Option<T>
 where
-    C: Send + Sync + 'static,
-    S: Send + Sync + 'static,
+    C: Sync,
+    S: Sync,
     T: FromContextRef<C, S>,
 {
     type Rejection = Infallible;
@@ -122,11 +111,10 @@ where
     }
 }
 
-#[spire_core::async_trait]
 impl<C, S, T> FromContext<C, S> for Option<T>
 where
-    C: Send + Sync + 'static,
-    S: Send + Sync + 'static,
+    C: Send,
+    S: Sync,
     T: FromContext<C, S>,
 {
     type Rejection = Infallible;
@@ -136,12 +124,11 @@ where
     }
 }
 
-#[spire_core::async_trait]
 impl<C, S, T> FromContextRef<C, S> for Result<T, T::Rejection>
 where
-    C: Send + Sync + 'static,
-    S: Send + Sync + 'static,
-    T: FromContextRef<C, S>,
+    C: Sync,
+    S: Sync,
+    T: FromContextRef<C, S, Rejection: Send>,
 {
     type Rejection = Infallible;
 
@@ -150,12 +137,11 @@ where
     }
 }
 
-#[spire_core::async_trait]
 impl<C, S, T> FromContext<C, S> for Result<T, T::Rejection>
 where
-    C: Send + Sync + 'static,
-    S: Send + Sync + 'static,
-    T: FromContext<C, S>,
+    C: Send,
+    S: Sync,
+    T: FromContext<C, S, Rejection: Send>,
 {
     type Rejection = Infallible;
 
