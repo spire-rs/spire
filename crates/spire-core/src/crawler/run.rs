@@ -1,6 +1,7 @@
 //! The run loop of a [`Crawler`].
 
 use std::collections::{HashMap, HashSet};
+use std::pin::pin;
 use std::time::Duration;
 
 use tokio::task::{Id, JoinError, JoinSet};
@@ -9,7 +10,7 @@ use tracing::Instrument;
 
 use crate::backend::Backend;
 use crate::context::Context;
-use crate::crawler::hosts::{self, Admit, Hosts};
+use crate::crawler::hosts::{Admit, Hosts};
 #[cfg(feature = "robots")]
 use crate::crawler::robots::{BackendSource, RobotsCache, RobotsSource, Verdict};
 use crate::crawler::{Crawler, Live, Stats};
@@ -73,7 +74,9 @@ enum Access {
 /// The state of a single run.
 struct Run {
     tasks: JoinSet<Outcome>,
-    in_flight: HashMap<Id, Seed>,
+    /// The seeds of the running requests, with their host keys if hosts
+    /// are tracked.
+    in_flight: HashMap<Id, (Seed, Option<String>)>,
     robots: Option<RobotsRun>,
     hosts: Hosts,
     aborted: HashSet<Option<Tag>>,
@@ -211,11 +214,15 @@ where
 
         let settings = &self.settings;
         let deadline = settings.time_limit.map(|limit| started + limit);
+        // A robots.txt `Crawl-delay` may slow a host down, so hosts are
+        // tracked whenever robots.txt is obeyed.
+        let robots = self.robots_run();
+        let hosts = Hosts::new(settings.hosts, robots.is_some());
         let mut run = Run {
             tasks: JoinSet::new(),
             in_flight: HashMap::new(),
-            robots: self.robots_run(),
-            hosts: Hosts::new(settings.hosts),
+            robots,
+            hosts,
             aborted: HashSet::new(),
             started: 0,
             stopping: false,
@@ -223,6 +230,16 @@ where
             error: None,
         };
         tracing::info!(target: TRACING_TARGET, concurrency = settings.concurrency.get(), "crawl started");
+
+        // Timers and the shutdown signal are created once and re-armed as
+        // needed: `select!` would otherwise build them again for every
+        // finished request.
+        let mut wait_timer = pin!(sleep_until(started));
+        let mut armed_wait = None;
+        let mut deadline_timer = pin!(sleep_until(deadline.unwrap_or(started)));
+        let mut grace_timer = pin!(sleep_until(started));
+        let mut armed_grace = None;
+        let mut shutdown = pin!(self.shutdown.cancelled());
 
         loop {
             let wait = if run.stopping {
@@ -234,21 +251,38 @@ where
             if run.tasks.is_empty() && !run.robots_busy() && (run.stopping || wait.is_none()) {
                 break;
             }
+            if let Some(at) = wait
+                && armed_wait != wait
+            {
+                wait_timer.as_mut().reset(at);
+                armed_wait = wait;
+            }
+            if let Some(at) = run.grace
+                && armed_grace != run.grace
+            {
+                grace_timer.as_mut().reset(at);
+                armed_grace = run.grace;
+            }
 
+            // Biased: the rare control branches are checked first, so a steady
+            // stream of finished requests cannot delay a shutdown.
             tokio::select! {
-                Some(joined) = run.tasks.join_next_with_id() => self.complete(&mut run, joined).await,
-                Some(fetched) = next_robots(&mut run.robots) => self.robots_fetched(&mut run, fetched).await,
-                () = sleep_until(wait.unwrap_or(started)), if wait.is_some() => {}
-                () = self.shutdown.cancelled(), if !run.stopping => {
+                biased;
+                () = &mut shutdown, if !run.stopping => {
                     run.stop("shutdown requested", settings.shutdown_grace);
                 }
-                () = sleep_until(deadline.unwrap_or(started)), if deadline.is_some() && !run.stopping => {
+                () = &mut deadline_timer, if deadline.is_some() && !run.stopping => {
                     run.stop("time limit reached", settings.shutdown_grace);
                 }
-                () = sleep_until(run.grace.unwrap_or(started)), if run.grace.is_some() => {
+                () = &mut grace_timer, if run.grace.is_some() => {
                     tracing::warn!(target: TRACING_TARGET, in_flight = run.tasks.len(), "shutdown grace period over, cancelling requests");
                     run.grace = None;
                     run.tasks.abort_all();
+                }
+                Some(joined) = run.tasks.join_next_with_id() => self.complete(&mut run, joined).await,
+                Some(fetched) = next_robots(&mut run.robots) => self.robots_fetched(&mut run, fetched).await,
+                () = &mut wait_timer, if wait.is_some() => {
+                    armed_wait = None;
                 }
             }
         }
@@ -404,7 +438,7 @@ where
         }
 
         run.started += 1;
-        run.hosts.started(&hosts::key(&seed), Instant::now());
+        let host = run.hosts.start(&seed, Instant::now());
 
         let backend = self.backend.clone();
         let worker = self.worker.clone();
@@ -451,8 +485,9 @@ where
             outcome
         };
 
-        let id = run.tasks.spawn(task.instrument(span)).id();
-        run.in_flight.insert(id, seed);
+        // Boxed so spawning moves a pointer, not the whole request future.
+        let id = run.tasks.spawn(Box::pin(task.instrument(span))).id();
+        run.in_flight.insert(id, (seed, host));
     }
 
     /// Records a finished request and reports its outcome to the frontier.
@@ -460,10 +495,12 @@ where
         let (id, outcome) = match joined {
             Ok(joined) => joined,
             Err(error) if error.is_cancelled() => {
-                let Some(seed) = run.in_flight.remove(&error.id()) else {
+                let Some((seed, host)) = run.in_flight.remove(&error.id()) else {
                     return;
                 };
-                run.hosts.finished(&hosts::key(&seed));
+                if let Some(host) = host {
+                    run.hosts.finished(&host);
+                }
                 self.tally(|stats| stats.cancelled += 1);
                 self.report(run, Report::Cancelled(seed)).await;
                 return;
@@ -473,10 +510,12 @@ where
                 (error.id(), Outcome::Fail(failure))
             }
         };
-        let Some(seed) = run.in_flight.remove(&id) else {
+        let Some((seed, host)) = run.in_flight.remove(&id) else {
             return;
         };
-        run.hosts.finished(&hosts::key(&seed));
+        if let Some(host) = host {
+            run.hosts.finished(&host);
+        }
         self.tally(|stats| stats.requests += 1);
 
         let uri = seed.uri().clone();

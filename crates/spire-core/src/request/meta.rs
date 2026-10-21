@@ -182,10 +182,19 @@ impl fmt::Display for Attempt {
     }
 }
 
+/// The crawl metadata of a request, stored as one extension: one allocation
+/// per request instead of one per value.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Meta {
+    pub(crate) tag: Option<Tag>,
+    pub(crate) depth: Depth,
+    pub(crate) attempt: Attempt,
+}
+
 /// Reads crawl metadata from a [`Request`](crate::request::Request).
 ///
 /// The crawler stores the [`Tag`], [`Depth`] and [`Attempt`] of every request
-/// in its extensions.
+/// in its extensions, when it turns a seed into the request.
 pub trait RequestExt {
     /// Returns the tag, if the request has one.
     fn tag(&self) -> Option<&Tag>;
@@ -199,15 +208,21 @@ pub trait RequestExt {
 
 impl<B> RequestExt for http::Request<B> {
     fn tag(&self) -> Option<&Tag> {
-        self.extensions().get()
+        self.extensions().get::<Meta>()?.tag.as_ref()
     }
 
     fn depth(&self) -> Depth {
-        self.extensions().get().copied().unwrap_or_default()
+        self.extensions()
+            .get::<Meta>()
+            .map(|meta| meta.depth)
+            .unwrap_or_default()
     }
 
     fn attempt(&self) -> Attempt {
-        self.extensions().get().copied().unwrap_or_default()
+        self.extensions()
+            .get::<Meta>()
+            .map(|meta| meta.attempt)
+            .unwrap_or_default()
     }
 }
 
@@ -261,8 +276,11 @@ mod tests {
     #[test]
     fn request_metadata_from_extensions() {
         let mut request = Request::new(());
-        request.extensions_mut().insert(Tag::from_static("page"));
-        request.extensions_mut().insert(Depth::new(2));
+        request.extensions_mut().insert(Meta {
+            tag: Some(Tag::from_static("page")),
+            depth: Depth::new(2),
+            attempt: Attempt::FIRST,
+        });
         assert_eq!(request.tag(), Some(&Tag::from("page")));
         assert_eq!(request.depth().child(), Depth::new(3));
     }

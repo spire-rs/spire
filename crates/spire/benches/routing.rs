@@ -3,8 +3,8 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use spire::backend::Noop;
 use spire::frontier::seed::Seed;
-use spire::worker::Worker;
-use spire::{Context, Router};
+use spire::worker::{Worker, from_fn};
+use spire::{Context, Crawler, Router};
 
 /// A router with 20 tag routes and 20 path routes, all doing nothing.
 fn router() -> Router<Noop> {
@@ -55,5 +55,37 @@ fn runtime() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-criterion_group!(benches, routing);
+/// Requests per crawl.
+const REQUESTS: usize = 1_000;
+
+fn seeds() -> Vec<Seed> {
+    (0..REQUESTS)
+        .map(|i| Seed::get(format!("https://example.test/{i}")).unwrap())
+        .collect()
+}
+
+/// A whole crawl with one handler: through a router, and as a bare worker.
+fn crawl(c: &mut Criterion) {
+    let runtime = runtime();
+    let mut group = c.benchmark_group("crawl");
+    group.throughput(criterion::Throughput::Elements(REQUESTS as u64));
+
+    group.bench_function("router", |b| {
+        b.to_async(&runtime).iter_batched(
+            || Crawler::new(Noop, Router::new().fallback(|| async {})).with_seeds(seeds()),
+            |crawler| async move { crawler.run().await.unwrap() },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+    group.bench_function("worker", |b| {
+        b.to_async(&runtime).iter_batched(
+            || Crawler::new(Noop, from_fn(|_: Context<Noop>| async {})).with_seeds(seeds()),
+            |crawler| async move { crawler.run().await.unwrap() },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+    group.finish();
+}
+
+criterion_group!(benches, routing, crawl);
 criterion_main!(benches);

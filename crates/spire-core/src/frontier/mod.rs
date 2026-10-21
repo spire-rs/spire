@@ -141,10 +141,6 @@ impl Admission {
 }
 
 /// The result of [`Frontier::pop`].
-#[expect(
-    clippy::large_enum_variant,
-    reason = "moved once per pop, never stored"
-)]
 #[derive(Debug)]
 pub enum Next {
     /// A seed is ready to be crawled.

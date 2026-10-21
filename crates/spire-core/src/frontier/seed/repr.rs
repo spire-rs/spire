@@ -29,7 +29,7 @@ struct SeedRepr {
 impl serde::Serialize for Seed {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let headers = self
-            .headers
+            .headers()
             .iter()
             .map(|(name, value)| (name.as_str().to_owned(), value.as_bytes().to_vec()))
             .collect();
@@ -38,7 +38,7 @@ impl serde::Serialize for Seed {
             method: self.method.as_str().to_owned(),
             uri: self.uri.to_string(),
             headers,
-            body: self.body.to_vec(),
+            body: self.body().to_vec(),
             tag: self.tag.as_ref().map(|tag| tag.as_str().to_owned()),
             depth: self.depth.get(),
             priority: self.priority,
@@ -60,9 +60,11 @@ impl<'de> serde::Deserialize<'de> for Seed {
         for (name, value) in repr.headers {
             let name = http::HeaderName::from_bytes(name.as_bytes()).map_err(D::Error::custom)?;
             let value = HeaderValue::from_bytes(&value).map_err(D::Error::custom)?;
-            seed.headers.append(name, value);
+            seed.extras_mut().headers.append(name, value);
         }
-        seed.body = Bytes::from(repr.body);
+        if !repr.body.is_empty() {
+            seed.extras_mut().body = Bytes::from(repr.body);
+        }
         seed.tag = repr.tag.map(Tag::from);
         seed.depth = Depth::new(repr.depth);
         seed.priority = repr.priority;

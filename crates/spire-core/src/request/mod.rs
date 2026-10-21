@@ -3,6 +3,7 @@
 mod meta;
 
 use bytes::Bytes;
+pub(crate) use meta::Meta;
 pub use meta::{Attempt, Depth, RequestExt, ResponseExt, Tag, Tags};
 
 /// An HTTP request, with its body in memory.

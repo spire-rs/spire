@@ -41,7 +41,43 @@ fn crawler(c: &mut Criterion) {
             },
         );
     }
+
+    // Baselines: a plain loop awaiting a no-op handler per seed, and the
+    // same with a task spawned per seed.
+    group.bench_function("loop", |b| {
+        b.to_async(&runtime).iter_batched(
+            seeds,
+            |seeds| async move {
+                for seed in seeds {
+                    handle(std::hint::black_box(seed)).await;
+                }
+            },
+            BatchSize::SmallInput,
+        );
+    });
+    group.bench_function("spawn", |b| {
+        b.to_async(&runtime).iter_batched(
+            seeds,
+            |seeds| async move {
+                let mut tasks = tokio::task::JoinSet::new();
+                for seed in seeds {
+                    tasks.spawn(handle(seed));
+                }
+                while tasks.join_next().await.is_some() {}
+            },
+            BatchSize::SmallInput,
+        );
+    });
     group.finish();
+}
+
+/// A handler that does nothing, for the baselines.
+#[expect(
+    clippy::unused_async,
+    reason = "the baselines await a handler, as the crawler does"
+)]
+async fn handle(seed: Seed) {
+    drop(seed);
 }
 
 /// A current-thread runtime: steadier timings than a thread pool.

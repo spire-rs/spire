@@ -43,6 +43,12 @@ and this project adheres to
 - **Breaking:** `HttpClient` hands out an `HttpSession` per request.
   `BrowserSession::navigate` and `Navigation` are removed: fetching
   navigates, and `View` reads the status and headers from the head.
+- The crawler's per-request overhead is about a third lower: hosts are
+  only tracked when a limit, delay or robots.txt needs them, the timers of
+  the crawl loop are created once, request futures are boxed before they
+  are spawned, crawl metadata is one request extension, and a seed's
+  headers and body are boxed, as most seeds have neither.
+- **Breaking:** `Seed::headers` and `Seed::body` are no longer `const`.
 - Path routes match about 25 times faster: a pattern's literal prefix and
   suffix rule out most paths at once, and matching no longer allocates per
   character.

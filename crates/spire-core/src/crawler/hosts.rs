@@ -18,7 +18,6 @@ pub(crate) struct HostPolicy {
 }
 
 /// What to do with a seed that is allowed to be crawled.
-#[expect(clippy::large_enum_variant, reason = "moved once per admitted seed")]
 pub(crate) enum Admit {
     /// Start it now.
     Start(Seed),
@@ -40,12 +39,15 @@ struct Host {
 /// host share limits: they reach the same server.
 pub(crate) struct Hosts {
     policy: HostPolicy,
+    /// Whether hosts are tracked at all: without limits or delays, every
+    /// host is always free and the bookkeeping is skipped.
+    tracked: bool,
     by_key: HashMap<String, Host>,
     parked: usize,
 }
 
 /// The key a seed's host is tracked under: its lowercase authority.
-pub(crate) fn key(seed: &Seed) -> String {
+fn key(seed: &Seed) -> String {
     seed.uri()
         .authority()
         .map(|authority| authority.as_str().to_ascii_lowercase())
@@ -53,20 +55,30 @@ pub(crate) fn key(seed: &Seed) -> String {
 }
 
 impl Hosts {
-    pub(crate) fn new(policy: HostPolicy) -> Self {
+    /// Tracks hosts if `policy` limits them, or if `delays` may be raised
+    /// later, e.g. by a robots.txt `Crawl-delay`.
+    pub(crate) fn new(policy: HostPolicy, delays: bool) -> Self {
+        let tracked = policy.max_concurrency.is_some() || !policy.delay.is_zero() || delays;
         Self {
             policy,
+            tracked,
             by_key: HashMap::new(),
             parked: 0,
         }
     }
 
     fn host(&mut self, key: &str) -> &mut Host {
-        let delay = self.policy.delay;
-        self.by_key.entry(key.to_owned()).or_insert_with(|| Host {
-            delay,
-            ..Host::default()
-        })
+        // Looked up first, so the key is only copied for a new host.
+        if !self.by_key.contains_key(key) {
+            let host = Host {
+                delay: self.policy.delay,
+                ..Host::default()
+            };
+            self.by_key.insert(key.to_owned(), host);
+        }
+        self.by_key
+            .get_mut(key)
+            .unwrap_or_else(|| unreachable!("the host was just inserted"))
     }
 
     fn is_free(policy: HostPolicy, host: &Host, now: Instant) -> bool {
@@ -79,6 +91,9 @@ impl Hosts {
 
     /// Decides whether `seed` starts now or waits for its host.
     pub(crate) fn admit(&mut self, seed: Seed, now: Instant) -> Admit {
+        if !self.tracked {
+            return Admit::Start(seed);
+        }
         let policy = self.policy;
         let host = self.host(&key(&seed));
         if host.parked.is_empty() && Self::is_free(policy, host, now) {
@@ -99,6 +114,17 @@ impl Hosts {
             .find(|host| !host.parked.is_empty() && Self::is_free(policy, host, now))?;
         self.parked -= 1;
         host.parked.pop_front()
+    }
+
+    /// Records that a request for `seed` started, returning the key to pass
+    /// to [`finished`](Self::finished), or `None` if hosts are not tracked.
+    pub(crate) fn start(&mut self, seed: &Seed, now: Instant) -> Option<String> {
+        if !self.tracked {
+            return None;
+        }
+        let key = key(seed);
+        self.started(&key, now);
+        Some(key)
     }
 
     /// Records that a request to `key` started.
@@ -166,7 +192,7 @@ mod tests {
     #[test]
     fn limits_concurrency_per_host() {
         let now = Instant::now();
-        let mut hosts = Hosts::new(policy(1, 0));
+        let mut hosts = Hosts::new(policy(1, 0), false);
 
         assert!(matches!(
             hosts.admit(seed("https://a.com/1"), now),
@@ -191,7 +217,7 @@ mod tests {
     #[test]
     fn spaces_out_requests_per_host() {
         let now = Instant::now();
-        let mut hosts = Hosts::new(policy(0, 2));
+        let mut hosts = Hosts::new(policy(0, 2), false);
         hosts.started("a.com", now);
 
         assert!(matches!(
@@ -207,7 +233,7 @@ mod tests {
     #[cfg(feature = "robots")]
     fn raised_delay_applies_to_the_next_start() {
         let now = Instant::now();
-        let mut hosts = Hosts::new(policy(0, 1));
+        let mut hosts = Hosts::new(policy(0, 1), false);
         hosts.raise_delay("a.com", Duration::from_secs(5));
         hosts.started("a.com", now);
 
@@ -216,5 +242,24 @@ mod tests {
             Admit::Parked
         ));
         assert_eq!(hosts.earliest(), Some(now + Duration::from_secs(5)));
+    }
+
+    #[test]
+    fn untracked_hosts_start_everything_at_once() {
+        let now = Instant::now();
+        let mut hosts = Hosts::new(policy(0, 0), false);
+        for _ in 0..3 {
+            let seed = seed("https://a.com/");
+            assert!(hosts.start(&seed, now).is_none());
+            assert!(matches!(hosts.admit(seed, now), Admit::Start(_)));
+        }
+        assert_eq!((hosts.parked(), hosts.earliest()), (0, None));
+
+        // A delay that may be raised later keeps hosts tracked.
+        let mut hosts = Hosts::new(policy(0, 0), true);
+        assert_eq!(
+            hosts.start(&seed("https://a.com/"), now).as_deref(),
+            Some("a.com")
+        );
     }
 }

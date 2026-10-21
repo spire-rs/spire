@@ -1,6 +1,8 @@
 //! Seeds: [`Seed`], a request waiting in the frontier, and its
 //! [`Fingerprint`].
 
+use std::sync::LazyLock;
+
 use bytes::Bytes;
 use http::header::IntoHeaderName;
 use http::{HeaderMap, HeaderValue, Method, Uri};
@@ -12,7 +14,7 @@ mod repr;
 
 pub use fingerprint::Fingerprint;
 
-use crate::request::{Attempt, Depth, Request, Tag};
+use crate::request::{Attempt, Depth, Meta, Request, Tag};
 use crate::{Error, Result};
 
 /// A request waiting in the frontier.
@@ -24,8 +26,9 @@ use crate::{Error, Result};
 pub struct Seed {
     method: Method,
     uri: Uri,
-    headers: HeaderMap,
-    body: Bytes,
+    /// Headers and body, which most seeds do not have: boxed, so a seed
+    /// stays small as it moves through the frontier.
+    extras: Option<Box<Extras>>,
     tag: Option<Tag>,
     depth: Depth,
     priority: i32,
@@ -47,8 +50,7 @@ impl Seed {
         Ok(Self {
             method,
             uri,
-            headers: HeaderMap::new(),
-            body: Bytes::new(),
+            extras: None,
             tag: None,
             depth: Depth::ROOT,
             priority: 0,
@@ -96,15 +98,20 @@ impl Seed {
     /// Inserts a header, replacing any previous value.
     #[must_use]
     pub fn with_header(mut self, name: impl IntoHeaderName, value: HeaderValue) -> Self {
-        self.headers.insert(name, value);
+        self.extras_mut().headers.insert(name, value);
         self
     }
 
     /// Sets the body.
     #[must_use]
     pub fn with_body(mut self, body: impl Into<Bytes>) -> Self {
-        self.body = body.into();
+        self.extras_mut().body = body.into();
         self
+    }
+
+    /// Returns the headers and body, creating them on first use.
+    fn extras_mut(&mut self) -> &mut Extras {
+        self.extras.get_or_insert_with(Box::default)
     }
 
     /// Returns a copy of this seed for its next attempt.
@@ -128,14 +135,18 @@ impl Seed {
 
     /// Returns the headers.
     #[must_use]
-    pub const fn headers(&self) -> &HeaderMap {
-        &self.headers
+    pub fn headers(&self) -> &HeaderMap {
+        static EMPTY: LazyLock<HeaderMap> = LazyLock::new(HeaderMap::new);
+        self.extras
+            .as_ref()
+            .map_or(&EMPTY, |extras| &extras.headers)
     }
 
     /// Returns the body.
     #[must_use]
-    pub const fn body(&self) -> &Bytes {
-        &self.body
+    pub fn body(&self) -> &Bytes {
+        static EMPTY: Bytes = Bytes::new();
+        self.extras.as_ref().map_or(&EMPTY, |extras| &extras.body)
     }
 
     /// Returns the tag, if any.
@@ -181,7 +192,7 @@ impl Seed {
         Fingerprint::of(&[
             self.method.as_str().as_bytes(),
             self.canonical_uri().as_bytes(),
-            &self.body,
+            self.body(),
         ])
     }
 
@@ -189,19 +200,26 @@ impl Seed {
     /// attempt as extensions.
     #[must_use]
     pub fn into_request(self) -> Request {
-        let mut request = Request::new(self.body);
+        let Extras { headers, body } = self.extras.map(|extras| *extras).unwrap_or_default();
+        let mut request = Request::new(body);
         *request.method_mut() = self.method;
         *request.uri_mut() = self.uri;
-        *request.headers_mut() = self.headers;
+        *request.headers_mut() = headers;
 
-        let extensions = request.extensions_mut();
-        if let Some(tag) = self.tag {
-            extensions.insert(tag);
-        }
-        extensions.insert(self.depth);
-        extensions.insert(self.attempt);
+        request.extensions_mut().insert(Meta {
+            tag: self.tag,
+            depth: self.depth,
+            attempt: self.attempt,
+        });
         request
     }
+}
+
+/// The rarely set parts of a [`Seed`].
+#[derive(Debug, Clone, Default)]
+struct Extras {
+    headers: HeaderMap,
+    body: Bytes,
 }
 
 impl TryFrom<&str> for Seed {
