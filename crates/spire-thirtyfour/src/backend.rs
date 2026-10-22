@@ -31,8 +31,10 @@ use crate::session::BrowserSession;
 /// their method, headers and body. Starting a session fails on a WebDriver
 /// server without BiDi.
 ///
-/// Call [`close`](Self::close) once the crawl is over: sessions that are
-/// dropped instead of quit block the runtime while they shut down.
+/// Call [`close`](Self::close) once the crawl is over, to quit every session
+/// before going on. A backend dropped without it quits its sessions on
+/// background tasks instead, which may not finish if the program exits
+/// right after.
 ///
 /// # Examples
 ///
@@ -74,8 +76,10 @@ impl BrowserBackend {
     /// further requests fail with a [`Backend`](ErrorKind::Backend) error.
     pub async fn close(&self) {
         let idle = self.pool.retain(|_, _| false).removed;
-        for driver in idle {
-            quit(driver).await;
+        for mut pooled in idle {
+            if let Some(driver) = pooled.take() {
+                quit(driver).await;
+            }
         }
         self.pool.close();
     }

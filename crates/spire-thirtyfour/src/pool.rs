@@ -4,6 +4,7 @@
 
 use std::fmt;
 use std::future::Future;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -84,10 +85,62 @@ impl Sessions {
 /// Ends a session that is being discarded.
 ///
 /// Dropping a session without quitting it blocks the runtime while thirtyfour
-/// tears it down synchronously.
+/// tears it down synchronously; [`Pooled`] quits it on the runtime instead.
 pub(crate) async fn quit(driver: WebDriver) {
     if let Err(error) = driver.quit().await {
         tracing::debug!(target: crate::TRACING_TARGET, %error, "failed to quit session");
+    }
+}
+
+/// Something that must be quit asynchronously before it is dropped.
+pub(crate) trait Quit: Send + 'static {
+    /// Quits it.
+    fn quit(self) -> impl Future<Output = ()> + Send;
+}
+
+impl Quit for WebDriver {
+    fn quit(self) -> impl Future<Output = ()> + Send {
+        quit(self)
+    }
+}
+
+/// A session in the pool, quit when dropped without blocking the runtime.
+///
+/// The pool drops sessions it no longer wants, e.g. when the backend is
+/// dropped without [`close`](crate::BrowserBackend::close), or a session
+/// returns to a closed pool. A dropped session that was not quit yet is
+/// quit on a task of the current runtime; only without one does it fall back
+/// to thirtyfour's blocking teardown.
+pub(crate) struct Pooled<T: Quit = WebDriver>(Option<T>);
+
+impl<T: Quit> Pooled<T> {
+    pub(crate) const fn new(value: T) -> Self {
+        Self(Some(value))
+    }
+
+    /// Takes the session out, to quit it now: it is not quit again on drop.
+    pub(crate) const fn take(&mut self) -> Option<T> {
+        self.0.take()
+    }
+}
+
+impl<T: Quit> Deref for Pooled<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.0
+            .as_ref()
+            .unwrap_or_else(|| unreachable!("a taken session is never used again"))
+    }
+}
+
+impl<T: Quit> Drop for Pooled<T> {
+    fn drop(&mut self) {
+        if let Some(value) = self.0.take()
+            && let Ok(runtime) = tokio::runtime::Handle::try_current()
+        {
+            runtime.spawn(value.quit());
+        }
     }
 }
 
@@ -110,9 +163,9 @@ async fn remove_profiles(driver: &WebDriver) -> Result<()> {
 
 impl Manager for Sessions {
     type Error = Error;
-    type Type = WebDriver;
+    type Type = Pooled;
 
-    async fn create(&self) -> Result<WebDriver> {
+    async fn create(&self) -> Result<Pooled> {
         let endpoint = self.endpoint();
         let driver = endpoint
             .launch(self.capabilities.clone())
@@ -133,23 +186,28 @@ impl Manager for Sessions {
         }
 
         tracing::debug!(target: crate::TRACING_TARGET, %endpoint, "session started");
-        Ok(driver)
+        Ok(Pooled::new(driver))
     }
 
-    async fn recycle(&self, driver: &mut WebDriver, metrics: &Metrics) -> RecycleResult<Error> {
-        if self.max_age.is_some_and(|max_age| metrics.age() >= max_age) {
-            quit(driver.clone()).await;
-            return Err(RecycleError::message("session reached its maximum age"));
+    async fn recycle(&self, pooled: &mut Pooled, metrics: &Metrics) -> RecycleResult<Error> {
+        let expired = self.max_age.is_some_and(|max_age| metrics.age() >= max_age);
+        // Listing the profiles also checks the session is alive.
+        let failed = if expired {
+            None
+        } else {
+            remove_profiles(pooled).await.err()
+        };
+        if !expired && failed.is_none() {
+            return Ok(());
         }
 
-        // Listing the profiles also checks the session is alive.
-        if let Err(error) = remove_profiles(driver).await {
-            quit(driver.clone()).await;
-            return Err(RecycleError::Backend(
-                error.with_message("session failed to recycle"),
-            ));
+        if let Some(driver) = pooled.take() {
+            quit(driver).await;
         }
-        Ok(())
+        Err(match failed {
+            Some(error) => RecycleError::Backend(error.with_message("session failed to recycle")),
+            None => RecycleError::message("session reached its maximum age"),
+        })
     }
 }
 
@@ -163,5 +221,49 @@ impl fmt::Debug for Sessions {
             .field("isolate", &self.isolate)
             .field("status_policy", &self.status_policy)
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
+
+    use super::*;
+
+    /// A session that records being quit.
+    struct Fake(Arc<AtomicBool>);
+
+    impl Quit for Fake {
+        fn quit(self) -> impl Future<Output = ()> + Send {
+            self.0.store(true, Ordering::SeqCst);
+            std::future::ready(())
+        }
+    }
+
+    #[tokio::test]
+    async fn dropped_sessions_are_quit_on_the_runtime() {
+        let quit = Arc::new(AtomicBool::new(false));
+        drop(Pooled::new(Fake(Arc::clone(&quit))));
+        // Quit on a task, not during the drop.
+        tokio::task::yield_now().await;
+        assert!(quit.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn taken_sessions_are_not_quit_again() {
+        let quit = Arc::new(AtomicBool::new(false));
+        let mut pooled = Pooled::new(Fake(Arc::clone(&quit)));
+        assert!(pooled.take().is_some());
+        drop(pooled);
+        tokio::task::yield_now().await;
+        assert!(!quit.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn without_a_runtime_dropping_does_not_panic() {
+        let quit = Arc::new(AtomicBool::new(false));
+        drop(Pooled::new(Fake(Arc::clone(&quit))));
+        assert!(!quit.load(Ordering::SeqCst));
     }
 }

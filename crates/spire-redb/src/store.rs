@@ -13,11 +13,20 @@ use crate::codec;
 use crate::dataset::RedbDataset;
 use crate::frontier::RedbFrontier;
 use crate::seen::RedbSeen;
+use crate::validators::RedbValidators;
 
 /// Queued seeds, by negated priority then insertion order.
 pub(crate) const QUEUE: TableDefinition<(i64, u64), &[u8]> = TableDefinition::new("queue");
 /// Popped seeds not yet reported, by fingerprint.
 pub(crate) const IN_FLIGHT: TableDefinition<u64, &[u8]> = TableDefinition::new("in_flight");
+/// Seeds to crawl again, one per fingerprint: when they are due, in
+/// milliseconds since the Unix epoch, then the encoded seed.
+pub(crate) const SCHEDULED: TableDefinition<u64, &[u8]> = TableDefinition::new("scheduled");
+/// The seeds of [`SCHEDULED`] by when they are due, then fingerprint.
+pub(crate) const SCHEDULE: TableDefinition<(u64, u64), ()> = TableDefinition::new("schedule");
+/// Validators of crawled pages, by their request's fingerprint, see
+/// [`RedbValidators`].
+pub(crate) const VALIDATORS: TableDefinition<u64, &[u8]> = TableDefinition::new("validators");
 /// Fingerprints seen by [`RedbSeen`].
 pub(crate) const SEEN: TableDefinition<u64, ()> = TableDefinition::new("seen");
 /// Counters, such as the next insertion sequence.
@@ -191,6 +200,13 @@ impl RedbStore {
     #[must_use]
     pub fn seen(&self) -> RedbSeen {
         RedbSeen::new(self.clone())
+    }
+
+    /// Returns the validators stored in this database, for conditional
+    /// requests with `Revalidate`.
+    #[must_use]
+    pub fn validators(&self) -> RedbValidators {
+        RedbValidators::new(self.clone())
     }
 
     /// Returns the dataset stored in this database under `name`, created on

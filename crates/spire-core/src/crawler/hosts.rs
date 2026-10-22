@@ -185,13 +185,6 @@ impl Hosts {
         }
     }
 
-    /// Whether limits adapt to responses, which then need [`Feedback`].
-    pub(crate) fn adaptive(&self) -> bool {
-        self.policy
-            .concurrency
-            .is_some_and(HostConcurrency::is_adaptive)
-    }
-
     /// Records that a request to `key` finished at `now`, and slows the
     /// host down if `feedback` says it is throttled, or lets it recover.
     ///
@@ -210,6 +203,7 @@ impl Hosts {
         let adaptive = concurrency.filter(|concurrency| concurrency.is_adaptive());
         let slow = adaptive.is_some()
             && feedback.signal == Signal::Ok
+            && !feedback.unchanged
             && host.limit.observe(feedback.latency);
         if feedback.signal == Signal::Throttled || slow {
             // Requests started before the host was last slowed down were
@@ -365,7 +359,6 @@ mod tests {
             delay: Duration::ZERO.into(),
         };
         let mut hosts = Hosts::new(policy, false);
-        assert!(hosts.adaptive());
 
         // A host starts at one request at a time.
         let first = seed("https://a.com/1");
@@ -385,6 +378,7 @@ mod tests {
         let fast = Feedback {
             started: now,
             latency: Some(Duration::from_millis(100)),
+            unchanged: false,
             signal: Signal::Ok,
         };
         hosts.finished("a.com", Some(fast), now);
@@ -407,6 +401,7 @@ mod tests {
         let feedback = Feedback {
             started,
             latency: Some(Duration::from_millis(100)),
+            unchanged: false,
             signal,
         };
         hosts.finished("a.com", Some(feedback), now);
@@ -492,5 +487,35 @@ mod tests {
             steps.push((hosts.by_key["a.com"].limit.get(), gap(&hosts).as_secs()));
         }
         assert_eq!(steps, [(1, 1), (1, 0), (2, 0), (2, 0)]);
+    }
+
+    #[test]
+    fn unchanged_responses_do_not_set_the_best_time() {
+        use crate::crawler::concurrency::Signal;
+
+        let mut hosts = Hosts::new(
+            HostPolicy {
+                concurrency: Some(HostConcurrency::adaptive(4)),
+                delay: HostDelay::default(),
+            },
+            false,
+        );
+        let now = Instant::now();
+        let response = |latency_ms, unchanged| Feedback {
+            started: now,
+            latency: Some(Duration::from_millis(latency_ms)),
+            unchanged,
+            signal: Signal::Ok,
+        };
+        hosts.finished("a.com", Some(response(100, false)), now);
+        for _ in 0..5 {
+            hosts.finished("a.com", Some(response(10, true)), now);
+        }
+        let limit = hosts.by_key["a.com"].limit.get();
+
+        // 150 ms is within twice the 100 ms best: a quick 304 did not lower
+        // it, so the full response is not slow.
+        hosts.finished("a.com", Some(response(150, false)), now);
+        assert!(hosts.by_key["a.com"].limit.get() >= limit);
     }
 }

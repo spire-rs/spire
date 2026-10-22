@@ -114,6 +114,26 @@ impl MockSite {
     }
 }
 
+/// Whether `request` is conditional and still matches a page with
+/// `headers`, as a server answering `304 Not Modified` decides: an
+/// `If-None-Match` naming the page's `ETag`, or an `If-Modified-Since` equal
+/// to its `Last-Modified`.
+fn not_modified(request: &Request, headers: &http::HeaderMap) -> bool {
+    use http::header::{ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED};
+
+    let asked = request.headers();
+    if let (Some(etag), Some(none_match)) = (headers.get(ETAG), asked.get(IF_NONE_MATCH)) {
+        let none_match = none_match.to_str().unwrap_or_default();
+        return none_match
+            .split(',')
+            .any(|tag| tag.trim() == "*" || tag.trim().as_bytes() == etag.as_bytes());
+    }
+    matches!(
+        (headers.get(LAST_MODIFIED), asked.get(IF_MODIFIED_SINCE)),
+        (Some(modified), Some(since)) if modified == since
+    )
+}
+
 /// Parses an absolute URI given to a [`MockSite`] or [`MockPage`].
 pub(super) fn parse(uri: &str) -> Uri {
     match uri.parse::<Uri>() {
@@ -153,12 +173,16 @@ impl MockClient {
 
         let mut head = Response::new(());
         *head.status_mut() = page.status;
+        let unchanged = page.status.is_success() && not_modified(request, &page.headers);
+        if unchanged {
+            *head.status_mut() = StatusCode::NOT_MODIFIED;
+        }
         *head.headers_mut() = page.headers;
         head.set_final_uri(served_from);
 
         // As the real backends, an error status is rejected with no body.
         let head = self.site.status_policy.check(head)?;
-        *lock(&self.body) = Some(page.body);
+        *lock(&self.body) = Some(if unchanged { Bytes::new() } else { page.body });
         Ok(head)
     }
 }

@@ -121,6 +121,13 @@ impl Seed {
         self
     }
 
+    /// Returns this seed as on its first attempt, e.g. to crawl it again.
+    #[must_use]
+    pub(crate) const fn first_attempt(mut self) -> Self {
+        self.attempt = Attempt::FIRST;
+        self
+    }
+
     /// Returns the method.
     #[must_use]
     pub const fn method(&self) -> &Method {
@@ -189,11 +196,7 @@ impl Seed {
     /// part of it.
     #[must_use]
     pub fn fingerprint(&self) -> Fingerprint {
-        Fingerprint::of(&[
-            self.method.as_str().as_bytes(),
-            self.canonical_uri().as_bytes(),
-            self.body(),
-        ])
+        fingerprint(&self.method, &self.uri, self.body())
     }
 
     /// Converts the seed into a [`Request`] carrying its tag, depth and
@@ -213,6 +216,16 @@ impl Seed {
         });
         request
     }
+}
+
+/// The fingerprint of a request with `method`, `uri` and `body`, as
+/// [`Seed::fingerprint`] computes it, e.g. for a request built from a seed.
+pub(crate) fn fingerprint(method: &Method, uri: &Uri, body: &[u8]) -> Fingerprint {
+    Fingerprint::of(&[
+        method.as_str().as_bytes(),
+        normalize::canonical(uri).as_bytes(),
+        body,
+    ])
 }
 
 /// The rarely set parts of a [`Seed`].

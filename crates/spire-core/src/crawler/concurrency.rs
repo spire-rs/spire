@@ -83,6 +83,9 @@ pub(crate) struct Feedback {
     pub(crate) started: Instant,
     /// How long its fetch took, if it completed.
     pub(crate) latency: Option<Duration>,
+    /// Whether the server answered `304 Not Modified`: quick, with no
+    /// body, so not a measure of how fast the host serves pages.
+    pub(crate) unchanged: bool,
     pub(crate) signal: Signal,
 }
 

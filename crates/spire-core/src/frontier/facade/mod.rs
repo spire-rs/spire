@@ -6,9 +6,11 @@ mod dedup;
 mod depth;
 mod filter;
 mod retry;
+mod revisit;
 
 pub use backoff::TagBackoff;
 pub use dedup::Dedup;
 pub use depth::MaxDepth;
 pub use filter::{AllowedHosts, Filter};
 pub use retry::{Retry, RetryPolicy};
+pub use revisit::Revisits;

@@ -65,7 +65,7 @@ async fn example() -> spire_core::Result<()> {
         .build()?;
 
     // Crawl with `spire::Crawler::new(backend.clone(), router)`, then quit the
-    // sessions; sessions that are dropped instead block the runtime.
+    // sessions before going on.
     backend.close().await;
     Ok(())
 }

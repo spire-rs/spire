@@ -1,10 +1,12 @@
 //! The [`Context`] a worker handles.
 
+use std::cell::Cell;
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
+use http::StatusCode;
 use tokio::sync::OnceCell;
 use tokio::time::Instant;
 
@@ -14,7 +16,6 @@ use crate::dataset::{Data, Dataset, Datasets};
 use crate::frontier::memory::InMemFrontier;
 use crate::frontier::queue::Queue;
 use crate::request::{Request, Response, ResponseExt};
-use crate::sync::lock;
 
 /// A request being crawled, with everything needed to handle it.
 ///
@@ -24,18 +25,34 @@ use crate::sync::lock;
 /// the first [`response`](Self::response) or [`body`](Self::body), and the
 /// response's head is kept. The body is always read from the client, so a
 /// browser page reads as currently rendered.
+///
+/// The crawler learns how the fetch went, its time and status, from the task
+/// the request runs on. Fetching after moving the context to another task,
+/// e.g. with `tokio::spawn`, works, but adaptive host limits and
+/// [`Stats::unchanged`](crate::crawler::Stats::unchanged) do not see it.
 pub struct Context<C> {
     request: Request,
     client: C,
     queue: Queue,
     datasets: Arc<Datasets>,
     response: OnceCell<Response<()>>,
-    /// Where to record how long the fetch took, for adaptive host limits.
-    fetch_time: Option<FetchTime>,
 }
 
-/// How long a request's fetch took, shared with the crawler.
-pub(crate) type FetchTime = Arc<Mutex<Option<Duration>>>;
+/// How a request's fetch went: how long it took, and the response's status.
+///
+/// The crawler runs each request on a task of its own, with a [`FETCH`]
+/// scope the context records the fetch into, so the crawler reads it back
+/// without allocating or locking per request.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct Fetch {
+    pub(crate) latency: Option<Duration>,
+    pub(crate) status: Option<StatusCode>,
+}
+
+tokio::task_local! {
+    /// How the current task's request was fetched, see [`Fetch`].
+    pub(crate) static FETCH: Cell<Fetch>;
+}
 
 impl<C> Context<C> {
     /// Creates a standalone context, e.g. to test a handler.
@@ -61,14 +78,7 @@ impl<C> Context<C> {
             queue,
             datasets,
             response: OnceCell::new(),
-            fetch_time: None,
         }
-    }
-
-    /// Records how long the fetch takes in `fetch_time`.
-    pub(crate) fn with_fetch_time(mut self, fetch_time: FetchTime) -> Self {
-        self.fetch_time = Some(fetch_time);
-        self
     }
 
     /// Replaces the queue, binding it to the request.
@@ -140,9 +150,13 @@ impl<C> Context<C> {
             .get_or_try_init(|| async {
                 let started = Instant::now();
                 let response = self.client.fetch(&self.request).await;
-                if let Some(fetch_time) = &self.fetch_time {
-                    *lock(fetch_time) = Some(started.elapsed());
-                }
+                // Outside a crawl, e.g. in a test, there is no scope to
+                // record into.
+                let fetch = Fetch {
+                    latency: Some(started.elapsed()),
+                    status: response.as_ref().ok().map(http::Response::status),
+                };
+                let _ = FETCH.try_with(|cell| cell.set(fetch));
                 let response = response?;
                 if let Some(uri) = response.final_uri() {
                     self.queue.rebase(uri.clone());

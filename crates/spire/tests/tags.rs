@@ -110,3 +110,23 @@ async fn extracts_the_variant() {
     let router: Router<Noop> = Router::new().fallback(maybe);
     assert!(matches!(router.handle(context(None)).await, Outcome::Stop));
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Tags, spire::request::Revisit)]
+enum Fresh {
+    #[revisit("1h30m")]
+    Listing,
+    #[revisit("1d")]
+    Product,
+    About,
+}
+
+#[test]
+fn revisit_intervals_come_from_the_attributes() {
+    use std::time::Duration;
+
+    use spire::request::Revisit;
+
+    assert_eq!(Fresh::Listing.interval(), Some(Duration::from_mins(90)));
+    assert_eq!(Fresh::Product.interval(), Some(Duration::from_hours(24)));
+    assert_eq!(Fresh::About.interval(), None);
+}

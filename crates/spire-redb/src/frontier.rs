@@ -1,12 +1,15 @@
 use std::fmt;
+use std::future::{Future, ready};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use redb::ReadableTable;
 use spire_core::Result;
 use spire_core::frontier::seed::Seed;
-use spire_core::frontier::{Ack, Admission, Frontier, Pop, Report};
+use spire_core::frontier::{Ack, Admission, Frontier, Pop, Report, Schedule};
+use tokio::time::Instant;
 
 use crate::codec;
-use crate::store::{IN_FLIGHT, META, NEXT_SEQUENCE, QUEUE, RedbStore};
+use crate::store::{IN_FLIGHT, META, NEXT_SEQUENCE, QUEUE, RedbStore, SCHEDULE, SCHEDULED};
 
 /// A [`Frontier`] stored in a [`RedbStore`], crawling by priority, then in
 /// insertion order.
@@ -67,20 +70,42 @@ impl Frontier for RedbFrontier {
         Ok(Admission::Queued)
     }
 
+    /// Hands out a due scheduled seed first, then the queue. It does not
+    /// wait for scheduled seeds that are not due yet; see
+    /// [`Schedule::next_due`].
     async fn pop(&self) -> Result<Pop> {
+        let now = unix_millis(SystemTime::now());
         let popped = self
             .store
-            .write(|txn| {
+            .write(move |txn| {
+                let mut schedule = txn.open_table(SCHEDULE)?;
+                let mut scheduled = txn.open_table(SCHEDULED)?;
                 let mut queue = txn.open_table(QUEUE)?;
                 let mut in_flight = txn.open_table(IN_FLIGHT)?;
-                while let Some((_, bytes)) = queue.pop_first()? {
-                    let bytes = bytes.value().to_vec();
+
+                let mut next = None;
+                let due = schedule
+                    .first()?
+                    .map(|(key, _)| key.value())
+                    .filter(|&(due, _)| due <= now);
+                if let Some((due, fingerprint)) = due {
+                    schedule.remove((due, fingerprint))?;
+                    next = scheduled
+                        .remove(fingerprint)?
+                        .and_then(|entry| entry.value().get(8..).map(<[u8]>::to_vec));
+                }
+                loop {
+                    if next.is_none() {
+                        next = queue.pop_first()?.map(|(_, bytes)| bytes.value().to_vec());
+                    }
+                    let Some(bytes) = next.take() else {
+                        return Ok(None);
+                    };
                     if let Some(seed) = codec::decode(&bytes) {
                         in_flight.insert(seed.fingerprint().get(), bytes.as_slice())?;
                         return Ok(Some(seed));
                     }
                 }
-                Ok(None)
             })
             .await?;
 
@@ -119,6 +144,57 @@ impl Frontier for RedbFrontier {
     fn size_hint(&self) -> Option<usize> {
         self.store.count(QUEUE).ok()
     }
+}
+
+/// Keeps scheduled seeds in the store, so revisits survive a restart.
+impl Schedule for RedbFrontier {
+    async fn schedule(&self, seed: Seed, due: Instant) -> Result<()> {
+        let due = SystemTime::now() + due.saturating_duration_since(Instant::now());
+        let due = unix_millis(due);
+        let fingerprint = seed.fingerprint().get();
+        let mut entry = due.to_le_bytes().to_vec();
+        entry.extend(codec::encode(&seed)?);
+        self.store
+            .write(move |txn| {
+                let mut scheduled = txn.open_table(SCHEDULED)?;
+                let mut schedule = txn.open_table(SCHEDULE)?;
+                // One revisit per page: the new one replaces any other.
+                let earlier = scheduled
+                    .insert(fingerprint, entry.as_slice())?
+                    .and_then(|old| scheduled_due(old.value()));
+                if let Some(earlier) = earlier {
+                    schedule.remove((earlier, fingerprint))?;
+                }
+                schedule.insert((due, fingerprint), ())?;
+                Ok(())
+            })
+            .await
+    }
+
+    fn next_due(&self) -> impl Future<Output = Result<Option<Instant>>> + Send {
+        let first = self.store.read(|txn| match txn.open_table(SCHEDULE) {
+            Ok(schedule) => Ok(schedule.first()?.map(|(key, _)| key.value().0)),
+            Err(redb::TableError::TableDoesNotExist(_)) => Ok(None),
+            Err(error) => Err(error.into()),
+        });
+        ready(first.map(|due| {
+            due.map(|due| {
+                let wait = due.saturating_sub(unix_millis(SystemTime::now()));
+                Instant::now() + Duration::from_millis(wait)
+            })
+        }))
+    }
+}
+
+/// When a scheduled entry is due: its first 8 bytes.
+fn scheduled_due(entry: &[u8]) -> Option<u64> {
+    entry.first_chunk::<8>().map(|due| u64::from_le_bytes(*due))
+}
+
+/// Milliseconds since the Unix epoch, zero before it.
+fn unix_millis(time: SystemTime) -> u64 {
+    let since = time.duration_since(UNIX_EPOCH).unwrap_or_default();
+    u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]
@@ -224,5 +300,40 @@ pub(crate) mod tests {
         };
         assert_eq!(frontier.report(retry).await.unwrap(), Ack::RetryRefused);
         assert_eq!(frontier.in_flight().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn scheduled_seeds_come_back_when_due_and_survive_reopening() {
+        use std::time::Duration;
+
+        use spire_core::frontier::Schedule;
+        use tokio::time::Instant;
+
+        let path = TempPath::new();
+        {
+            let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
+            let later = Instant::now() + Duration::from_hours(1);
+            frontier.schedule(seed("later"), later).await.unwrap();
+            frontier
+                .schedule(seed("due"), Instant::now())
+                .await
+                .unwrap();
+            frontier.push(seed("queued")).await.unwrap();
+            // A page has one revisit: scheduling it again replaces it.
+            let later = Instant::now() + Duration::from_hours(2);
+            frontier.schedule(seed("later"), later).await.unwrap();
+        }
+
+        let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
+        // The due revisit first, then the queue; the other is not waited
+        // for, but reported as due in two hours.
+        let mut popped = Vec::new();
+        while let Pop::Ready(seed) = frontier.pop().await.unwrap() {
+            popped.push(seed.uri().path().to_owned());
+        }
+        assert_eq!(popped, ["/due", "/queued"]);
+        let next = frontier.next_due().await.unwrap().unwrap() - Instant::now();
+        let range = Duration::from_mins(119)..=Duration::from_hours(2);
+        assert!(range.contains(&next), "{next:?}");
     }
 }
