@@ -102,7 +102,7 @@ redirect loops are not.
 
 Error statuses follow the client's `StatusPolicy`. By default, `408`, `429`
 and `5xx` become retryable errors, with `429` and `503` pausing the request's
-tag for as long as `Retry-After` asks, and other `4xx` become errors that are
+host for as long as `Retry-After` asks, and other `4xx` become errors that are
 not retried. `StatusPolicy::Accept` returns every response to the handler
 instead:
 

@@ -46,7 +46,9 @@ impl HostConcurrency {
     /// down, with `429 Too Many Requests` or `503 Service Unavailable`, when
     /// a request times out, or when responses take more than twice the
     /// host's best time, at most once per round. Other failures leave it
-    /// alone.
+    /// alone. At one, a throttled host's gap widens instead, see
+    /// [`HostDelay`](crate::crawler::HostDelay); recovering, its gap closes
+    /// before its limit grows again.
     ///
     /// Response times are how long the fetch took, not the handlers.
     #[must_use]
@@ -110,8 +112,6 @@ pub(crate) struct Limit {
     successes: usize,
     /// The host's best recent response time.
     best: Option<Duration>,
-    /// When the limit last halved.
-    halved: Option<Instant>,
 }
 
 impl Limit {
@@ -120,7 +120,6 @@ impl Limit {
             current: 1,
             successes: 0,
             best: None,
-            halved: None,
         }
     }
 
@@ -129,35 +128,38 @@ impl Limit {
         self.current
     }
 
-    /// Adapts the limit, at most `max`, to how a request went at `now`.
-    pub(crate) fn update(&mut self, max: usize, feedback: Feedback, now: Instant) {
-        let slow = match (feedback.signal, feedback.latency, self.best) {
-            (Signal::Ok, Some(latency), Some(best)) => latency > best * SLOW,
-            _ => false,
+    /// Takes a successful response's time into account, returning whether
+    /// it was slow: more than twice the host's best.
+    pub(crate) fn observe(&mut self, latency: Option<Duration>) -> bool {
+        let Some(latency) = latency else {
+            return false;
         };
-        if let (Signal::Ok, Some(latency)) = (feedback.signal, feedback.latency) {
-            self.best = Some(match self.best {
-                Some(best) if latency > best => best + latency.saturating_sub(best) / DRIFT,
-                _ => latency,
-            });
-        }
+        let slow = self.best.is_some_and(|best| latency > best * SLOW);
+        self.best = Some(match self.best {
+            Some(best) if latency > best => best + latency.saturating_sub(best) / DRIFT,
+            _ => latency,
+        });
+        slow
+    }
 
-        if feedback.signal == Signal::Throttled || slow {
-            // Requests started before the last halving were sent at the old
-            // limit: they halve it once, not once each.
-            if self.halved.is_some_and(|at| feedback.started < at) {
-                return;
-            }
-            self.current = (self.current / 2).max(1);
+    /// Counts a fast success, growing the limit by one, at most `max`, once
+    /// a round of them is in.
+    pub(crate) fn grow(&mut self, max: usize) {
+        self.successes += 1;
+        if self.successes >= self.current {
+            self.current = (self.current + 1).min(max);
             self.successes = 0;
-            self.halved = Some(now);
-        } else if feedback.signal == Signal::Ok {
-            self.successes += 1;
-            if self.successes >= self.current {
-                self.current = (self.current + 1).min(max);
-                self.successes = 0;
-            }
         }
+    }
+
+    /// Halves the limit, returning `false` if it is already one.
+    pub(crate) fn halve(&mut self) -> bool {
+        if self.current == 1 {
+            return false;
+        }
+        self.current /= 2;
+        self.successes = 0;
+        true
     }
 }
 
@@ -165,21 +167,16 @@ impl Limit {
 mod tests {
     use super::*;
 
-    fn feedback(signal: Signal, started: Instant, latency_ms: u64) -> Feedback {
-        Feedback {
-            started,
-            latency: Some(Duration::from_millis(latency_ms)),
-            signal,
-        }
+    const fn ms(ms: u64) -> Duration {
+        Duration::from_millis(ms)
     }
 
     #[test]
     fn grows_by_one_per_round_up_to_the_max() {
-        let now = Instant::now();
         let mut limit = Limit::new();
         let mut limits = Vec::new();
         for _ in 0..12 {
-            limit.update(4, feedback(Signal::Ok, now, 100), now);
+            limit.grow(4);
             limits.push(limit.get());
         }
         // One success at 1, two at 2, three at 3, then capped at 4.
@@ -187,47 +184,33 @@ mod tests {
     }
 
     #[test]
-    fn halves_once_per_round_when_throttled_or_slow() {
-        let start = Instant::now();
+    fn halves_down_to_one() {
         let mut limit = Limit::new();
         for _ in 0..20 {
-            limit.update(8, feedback(Signal::Ok, start, 100), start);
+            limit.grow(8);
         }
         assert_eq!(limit.get(), 6);
-
-        // A 429 halves it; the other requests of the same round do not.
-        let later = start + Duration::from_secs(1);
-        limit.update(8, feedback(Signal::Throttled, start, 100), later);
-        limit.update(8, feedback(Signal::Throttled, start, 100), later);
+        assert!(limit.halve());
         assert_eq!(limit.get(), 3);
-
-        // A request started after it, coming back three times slower than
-        // the host's best, halves it again.
-        let after = later + Duration::from_millis(1);
-        limit.update(8, feedback(Signal::Ok, after, 300), after);
+        assert!(limit.halve());
+        assert!(!limit.halve(), "already one");
         assert_eq!(limit.get(), 1);
     }
 
     #[test]
-    fn other_failures_leave_it_alone() {
-        let now = Instant::now();
+    fn responses_twice_as_slow_as_the_best_are_slow() {
         let mut limit = Limit::new();
-        limit.update(4, feedback(Signal::Ok, now, 100), now);
-        limit.update(4, feedback(Signal::Failed, now, 1), now);
-        limit.update(4, feedback(Signal::Failed, now, 10_000), now);
-        assert_eq!(limit.get(), 2);
-        assert_eq!(limit.best, Some(Duration::from_millis(100)));
-    }
-
-    #[test]
-    fn the_best_time_follows_slower_hosts_slowly() {
-        let now = Instant::now();
-        let mut limit = Limit::new();
-        limit.update(4, feedback(Signal::Ok, now, 100), now);
-        limit.update(4, feedback(Signal::Ok, now, 180), now);
-        assert_eq!(limit.best, Some(Duration::from_millis(105)));
-        limit.update(4, feedback(Signal::Ok, now, 50), now);
-        assert_eq!(limit.best, Some(Duration::from_millis(50)));
+        assert!(!limit.observe(Some(ms(100))));
+        assert!(!limit.observe(Some(ms(180))));
+        assert_eq!(
+            limit.best,
+            Some(ms(105)),
+            "the best follows slower times slowly"
+        );
+        assert!(limit.observe(Some(ms(300))));
+        assert!(!limit.observe(Some(ms(50))));
+        assert_eq!(limit.best, Some(ms(50)));
+        assert!(!limit.observe(None));
     }
 
     #[test]

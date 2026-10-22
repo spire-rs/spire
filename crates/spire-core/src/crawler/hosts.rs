@@ -1,11 +1,14 @@
-//! Per-host politeness: concurrency and delays.
+//! Per-host politeness: concurrency, gaps, and slowing down throttled
+//! hosts.
 
 use std::collections::{HashMap, VecDeque};
 use std::time::Duration;
 
 use tokio::time::Instant;
 
-use crate::crawler::concurrency::{Feedback, HostConcurrency, Limit};
+use crate::TRACING_TARGET;
+use crate::crawler::concurrency::{Feedback, HostConcurrency, Limit, Signal};
+use crate::crawler::delay::HostDelay;
 use crate::frontier::seed::Seed;
 
 /// How a crawl treats every host.
@@ -13,8 +16,8 @@ use crate::frontier::seed::Seed;
 pub(crate) struct HostPolicy {
     /// Requests in flight per host at most; unlimited if `None`.
     pub(crate) concurrency: Option<HostConcurrency>,
-    /// Time between the starts of two requests to the same host.
-    pub(crate) delay: Duration,
+    /// The gap between the starts of two requests to the same host.
+    pub(crate) delay: HostDelay,
 }
 
 /// What to do with a seed that is allowed to be crawled.
@@ -28,10 +31,16 @@ pub(crate) enum Admit {
 struct Host {
     in_flight: usize,
     next_start: Option<Instant>,
-    /// The policy's delay, raised by a robots.txt `Crawl-delay`.
-    delay: Duration,
+    /// The policy's delay, its minimum raised by a robots.txt `Crawl-delay`.
+    delay: HostDelay,
+    /// The current gap between starts, from the delay's minimum up to its
+    /// maximum while the host is throttled.
+    gap: Duration,
     /// The host's own limit, if limits adapt.
     limit: Limit,
+    /// When the host was last slowed down, so the requests already in
+    /// flight then slow it down once, not once each.
+    slowed: Option<Instant>,
     parked: VecDeque<Seed>,
 }
 
@@ -41,8 +50,8 @@ struct Host {
 /// host share limits: they reach the same server.
 pub(crate) struct Hosts {
     policy: HostPolicy,
-    /// Whether hosts are tracked at all: without limits or delays, every
-    /// host is always free and the bookkeeping is skipped.
+    /// Whether hosts are tracked: without limits, gaps or throttled hosts,
+    /// every host is always free and the bookkeeping is skipped.
     tracked: bool,
     by_key: HashMap<String, Host>,
     parked: usize,
@@ -60,7 +69,7 @@ impl Hosts {
     /// Tracks hosts if `policy` limits them, or if `delays` may be raised
     /// later, e.g. by a robots.txt `Crawl-delay`.
     pub(crate) fn new(policy: HostPolicy, delays: bool) -> Self {
-        let tracked = policy.concurrency.is_some() || !policy.delay.is_zero() || delays;
+        let tracked = policy.concurrency.is_some() || !policy.delay.min().is_zero() || delays;
         Self {
             policy,
             tracked,
@@ -76,7 +85,9 @@ impl Hosts {
                 in_flight: 0,
                 next_start: None,
                 delay: self.policy.delay,
+                gap: self.policy.delay.min(),
                 limit: Limit::new(),
+                slowed: None,
                 parked: VecDeque::new(),
             };
             self.by_key.insert(key.to_owned(), host);
@@ -137,12 +148,29 @@ impl Hosts {
         Some(key)
     }
 
+    /// Tracks hosts from now on, e.g. once one is throttled, returning the
+    /// key of `seed`'s host.
+    pub(crate) fn track(&mut self, seed: &Seed) -> String {
+        self.tracked = true;
+        key(seed)
+    }
+
     /// Records that a request to `key` started.
     pub(crate) fn started(&mut self, key: &str, now: Instant) {
         let host = self.host(key);
         host.in_flight += 1;
-        if !host.delay.is_zero() {
-            host.next_start = Some(now + host.delay);
+        if !host.gap.is_zero() {
+            let next = now + host.gap;
+            host.next_start = Some(host.next_start.map_or(next, |at| at.max(next)));
+        }
+    }
+
+    /// Starts no request to `key` before `until`, e.g. for a `Retry-After`.
+    pub(crate) fn pause(&mut self, key: &str, until: Instant) {
+        let host = self.host(key);
+        if host.next_start.is_none_or(|at| at < until) {
+            tracing::info!(target: TRACING_TARGET, host = key, "pausing host, as it asked");
+            host.next_start = Some(until);
         }
     }
 
@@ -153,16 +181,44 @@ impl Hosts {
             .is_some_and(HostConcurrency::is_adaptive)
     }
 
-    /// Records that a request to `key` finished at `now`, adapting the
-    /// host's limit to `feedback` if limits adapt.
+    /// Records that a request to `key` finished at `now`, and slows the
+    /// host down if `feedback` says it is throttled, or lets it recover.
+    ///
+    /// A throttled host first loses concurrency, if its limit adapts and is
+    /// above one; then its gap grows, up to the delay's maximum. A host
+    /// recovers in the other order: its gap shrinks back to the minimum,
+    /// then an adaptive limit grows again.
     pub(crate) fn finished(&mut self, key: &str, feedback: Option<Feedback>, now: Instant) {
         let concurrency = self.policy.concurrency;
         let host = self.host(key);
         host.in_flight = host.in_flight.saturating_sub(1);
-        if let (Some(concurrency), Some(feedback)) = (concurrency, feedback)
-            && concurrency.is_adaptive()
-        {
-            host.limit.update(concurrency.max(), feedback, now);
+        let Some(feedback) = feedback else {
+            return;
+        };
+
+        let adaptive = concurrency.filter(|concurrency| concurrency.is_adaptive());
+        let slow = adaptive.is_some()
+            && feedback.signal == Signal::Ok
+            && host.limit.observe(feedback.latency);
+        if feedback.signal == Signal::Throttled || slow {
+            // Requests started before the host was last slowed down were
+            // sent at the old pace: they slow it down once, not once each.
+            if host.slowed.is_some_and(|at| feedback.started < at) {
+                return;
+            }
+            host.slowed = Some(now);
+            if adaptive.is_some() && host.limit.halve() {
+                tracing::debug!(target: TRACING_TARGET, host = key, limit = host.limit.get(), "host throttled, lowering its concurrency");
+            } else {
+                host.gap = host.delay.grow(host.gap);
+                tracing::debug!(target: TRACING_TARGET, host = key, gap_ms = host.gap.as_millis(), "host throttled, widening its gap");
+            }
+        } else if feedback.signal == Signal::Ok {
+            if host.gap > host.delay.min() {
+                host.gap = host.delay.shrink(host.gap);
+            } else if let Some(adaptive) = adaptive {
+                host.limit.grow(adaptive.max());
+            }
         }
     }
 
@@ -171,7 +227,8 @@ impl Hosts {
     #[cfg(feature = "robots")]
     pub(crate) fn raise_delay(&mut self, key: &str, delay: Duration) {
         let host = self.host(key);
-        host.delay = host.delay.max(delay);
+        host.delay.raise(delay);
+        host.gap = host.gap.max(delay);
     }
 
     /// The earliest instant a parked seed's host becomes free by time alone.
@@ -209,7 +266,7 @@ mod tests {
     fn policy(max: usize, delay: u64) -> HostPolicy {
         HostPolicy {
             concurrency: (max > 0).then(|| HostConcurrency::fixed(max)),
-            delay: Duration::from_secs(delay),
+            delay: Duration::from_secs(delay).into(),
         }
     }
 
@@ -294,7 +351,7 @@ mod tests {
         let now = Instant::now();
         let policy = HostPolicy {
             concurrency: Some(HostConcurrency::adaptive(4)),
-            delay: Duration::ZERO,
+            delay: Duration::ZERO.into(),
         };
         let mut hosts = Hosts::new(policy, false);
         assert!(hosts.adaptive());
@@ -332,5 +389,97 @@ mod tests {
             hosts.admit(seed("https://a.com/4"), now),
             Admit::Parked
         ));
+    }
+
+    /// Finishes a request to `a.com` started at `started`, at `now`.
+    fn finish(hosts: &mut Hosts, signal: Signal, started: Instant, now: Instant) {
+        let feedback = Feedback {
+            started,
+            latency: Some(Duration::from_millis(100)),
+            signal,
+        };
+        hosts.finished("a.com", Some(feedback), now);
+    }
+
+    fn gap(hosts: &Hosts) -> Duration {
+        hosts.by_key["a.com"].gap
+    }
+
+    #[test]
+    fn throttled_hosts_widen_their_gap_and_recover() {
+        use crate::crawler::concurrency::Signal;
+
+        let ms = Duration::from_millis;
+        let mut hosts = Hosts::new(
+            HostPolicy {
+                concurrency: Some(HostConcurrency::fixed(1)),
+                delay: (ms(200)..=ms(1000)).into(),
+            },
+            false,
+        );
+        let mut now = Instant::now();
+        hosts.started("a.com", now);
+
+        // Each round of throttling doubles the gap, up to the maximum...
+        let mut gaps = Vec::new();
+        for _ in 0..4 {
+            let started = now;
+            now += Duration::from_secs(1);
+            finish(&mut hosts, Signal::Throttled, started, now);
+            gaps.push(gap(&hosts));
+        }
+        assert_eq!(gaps, [ms(400), ms(800), ms(1000), ms(1000)]);
+
+        // ...but requests from the same round count once.
+        finish(&mut hosts, Signal::Throttled, now - ms(1), now);
+        assert_eq!(gap(&hosts), ms(1000));
+
+        // Successes halve it back to the minimum, and other failures leave
+        // it alone.
+        finish(&mut hosts, Signal::Failed, now, now);
+        assert_eq!(gap(&hosts), ms(1000));
+        gaps.clear();
+        for _ in 0..3 {
+            finish(&mut hosts, Signal::Ok, now, now);
+            gaps.push(gap(&hosts));
+        }
+        assert_eq!(gaps, [ms(500), ms(250), ms(200)]);
+    }
+
+    #[test]
+    fn adaptive_hosts_lose_concurrency_before_their_gap_widens() {
+        use crate::crawler::concurrency::Signal;
+
+        let mut hosts = Hosts::new(
+            HostPolicy {
+                concurrency: Some(HostConcurrency::adaptive(4)),
+                delay: HostDelay::default(),
+            },
+            false,
+        );
+        let mut now = Instant::now();
+        hosts.started("a.com", now);
+        for _ in 0..6 {
+            finish(&mut hosts, Signal::Ok, now, now);
+        }
+        assert_eq!(hosts.by_key["a.com"].limit.get(), 4);
+
+        // 4, 2, 1 at once, then a gap of 1 s, then 2 s.
+        let mut steps = Vec::new();
+        for _ in 0..4 {
+            let started = now;
+            now += Duration::from_secs(1);
+            finish(&mut hosts, Signal::Throttled, started, now);
+            steps.push((hosts.by_key["a.com"].limit.get(), gap(&hosts).as_secs()));
+        }
+        assert_eq!(steps, [(2, 0), (1, 0), (1, 1), (1, 2)]);
+
+        // Recovering, the gap closes before the limit grows.
+        steps.clear();
+        for _ in 0..4 {
+            finish(&mut hosts, Signal::Ok, now, now);
+            steps.push((hosts.by_key["a.com"].limit.get(), gap(&hosts).as_secs()));
+        }
+        assert_eq!(steps, [(1, 1), (1, 0), (2, 0), (2, 0)]);
     }
 }

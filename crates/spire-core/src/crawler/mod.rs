@@ -1,6 +1,7 @@
 //! The [`Crawler`], which drives a crawl to completion.
 
 mod concurrency;
+mod delay;
 mod hosts;
 #[cfg(feature = "robots")]
 mod robots;
@@ -15,6 +16,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub use concurrency::HostConcurrency;
+pub use delay::HostDelay;
 #[cfg(feature = "robots")]
 #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
 pub use robots::Robots;
@@ -229,10 +231,13 @@ impl<B, W> Crawler<B, W> {
         self
     }
 
-    /// Waits at least `delay` between starting two requests to the same host.
+    /// Sets the gap between starting two requests to the same host: at
+    /// least a minimum, a [`Duration`], growing while the host is throttled
+    /// up to a maximum, one minute unless a range sets it; see
+    /// [`HostDelay`]. No minimum by default.
     #[must_use]
-    pub const fn with_host_delay(mut self, delay: Duration) -> Self {
-        self.settings.hosts.delay = delay;
+    pub fn with_host_delay(mut self, delay: impl Into<HostDelay>) -> Self {
+        self.settings.hosts.delay = delay.into();
         self
     }
 

@@ -30,8 +30,10 @@ The flexible crawler and scraper framework for Rust, built on
   handlers written as async functions of typed extractors.
 - **Declarative extraction**: parse pages with `Html`, or derive `Select` to
   turn CSS selectors into structs.
-- **A real frontier**: deduplication, depth limits, retries with backoff and
-  per-tag pauses that honour `Retry-After`.
+- **A real frontier**: deduplication, depth limits, and retries with
+  backoff.
+- **Polite by default**: hosts that ask to slow down get wider gaps, and a
+  `Retry-After` pauses the host for as long as it asks.
 - **Concurrent by default**: requests run concurrently up to a limit, and the
   crawl ends once nothing is queued or in flight.
 - **Two backends**: plain HTTP through reqwest, and real browsers through
