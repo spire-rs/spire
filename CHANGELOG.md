@@ -8,6 +8,12 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-22
+
+New extractors and one module per format, batched dataset writes, adaptive
+host concurrency, and hosts that slow down when they are throttled.
+Breaking changes are marked.
+
 ### Added
 
 - `spire-core`: throttled hosts slow down below one request at a time. Once
@@ -236,7 +242,8 @@ Rust 1.95.
 
 - Initial placeholder release for name reservation
 
-[Unreleased]: https://github.com/spire-rs/spire/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/spire-rs/spire/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/spire-rs/spire/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/spire-rs/spire/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/spire-rs/spire/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/spire-rs/spire/releases/tag/v0.2.0
