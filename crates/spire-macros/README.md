@@ -105,7 +105,7 @@ in the main `spire` crate:
 
 ```toml
 [dependencies]
-spire = { version = "0.4.0", features = ["macros"] }
+spire = { version = "0.5.0", features = ["macros"] }
 ```
 
 The derives are then available as `spire::extract::html::Select` and

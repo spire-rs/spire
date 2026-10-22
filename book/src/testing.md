@@ -5,7 +5,7 @@ handlers can be tested without a network. Enable it for tests only:
 
 ```toml
 [dev-dependencies]
-spire = { version = "0.4.0", features = ["testing"] }
+spire = { version = "0.5.0", features = ["testing"] }
 ```
 
 `MockSite` is a backend, so a whole crawl runs against it, and `visit` runs

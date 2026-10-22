@@ -5,7 +5,7 @@ tokio to run it:
 
 ```toml
 [dependencies]
-spire = { version = "0.4", features = ["reqwest", "macros"] }
+spire = { version = "0.5", features = ["reqwest", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -36,7 +36,7 @@ Depend on it next to `spire` to turn them on:
 
 ```toml
 [dependencies]
-spire-reqwest = { version = "0.4", features = ["gzip", "brotli", "cookies"] }
+spire-reqwest = { version = "0.5", features = ["gzip", "brotli", "cookies"] }
 ```
 
 | Feature | Enables |
