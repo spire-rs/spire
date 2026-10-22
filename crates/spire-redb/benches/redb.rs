@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use spire_core::frontier::seed::Seed;
 use spire_core::frontier::seen::SeenSet;
-use spire_core::frontier::{Frontier, Next};
+use spire_core::frontier::{Frontier, Pop};
 use spire_redb::RedbStore;
 
 /// Seeds per round: per-commit syncs take milliseconds each.
@@ -84,7 +84,7 @@ fn redb(c: &mut Criterion) {
                     for seed in seeds() {
                         frontier.push(seed).await.unwrap();
                     }
-                    while let Next::Ready(_) = frontier.pop().await.unwrap() {}
+                    while let Pop::Ready(_) = frontier.pop().await.unwrap() {}
                 })
             });
         });

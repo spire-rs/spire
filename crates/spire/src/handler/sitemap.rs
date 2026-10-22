@@ -2,7 +2,8 @@ use sitemapo::Record;
 use sitemapo::record::Entry;
 
 use crate::backend::Client;
-use crate::extract::{FromContext, Sitemap};
+use crate::extract::FromContext;
+use crate::extract::sitemap::Sitemap;
 use crate::frontier::seed::Seed;
 use crate::handler::Handler;
 use crate::request::{RequestExt, Tag};

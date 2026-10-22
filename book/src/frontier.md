@@ -116,7 +116,7 @@ stopped:
 ```rust,no_run
 use spire::backend::HttpClient;
 use spire::frontier::FrontierExt;
-use spire::frontier::redb::RedbStore;
+use spire::redb::RedbStore;
 use spire::frontier::seed::Seed;
 use spire::{Crawler, Result, Router};
 

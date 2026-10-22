@@ -3,7 +3,7 @@ use std::fmt;
 use redb::ReadableTable;
 use spire_core::Result;
 use spire_core::frontier::seed::Seed;
-use spire_core::frontier::{Ack, Admission, Frontier, Next, Report};
+use spire_core::frontier::{Ack, Admission, Frontier, Pop, Report};
 
 use crate::codec;
 use crate::store::{IN_FLIGHT, META, NEXT_SEQUENCE, QUEUE, RedbStore};
@@ -67,7 +67,7 @@ impl Frontier for RedbFrontier {
         Ok(Admission::Queued)
     }
 
-    async fn pop(&self) -> Result<Next> {
+    async fn pop(&self) -> Result<Pop> {
         let popped = self
             .store
             .write(|txn| {
@@ -84,7 +84,7 @@ impl Frontier for RedbFrontier {
             })
             .await?;
 
-        Ok(popped.map_or(Next::Empty, Next::Ready))
+        Ok(popped.map_or(Pop::Empty, Pop::Ready))
     }
 
     async fn report(&self, report: Report) -> Result<Ack> {
@@ -152,8 +152,8 @@ pub(crate) mod tests {
 
     async fn pop_path(frontier: &RedbFrontier) -> Option<String> {
         match frontier.pop().await.unwrap() {
-            Next::Ready(seed) => Some(seed.uri().path().trim_start_matches('/').to_owned()),
-            Next::Wait(_) | Next::Empty => None,
+            Pop::Ready(seed) => Some(seed.uri().path().trim_start_matches('/').to_owned()),
+            Pop::Wait(_) | Pop::Empty => None,
         }
     }
 
@@ -185,7 +185,7 @@ pub(crate) mod tests {
             for name in ["done", "in-flight", "queued", "cancelled"] {
                 frontier.push(seed(name).with_tag(name)).await.unwrap();
             }
-            let Next::Ready(done) = frontier.pop().await.unwrap() else {
+            let Pop::Ready(done) = frontier.pop().await.unwrap() else {
                 panic!()
             };
             frontier.report(Report::Done(done)).await.unwrap();
@@ -193,7 +193,7 @@ pub(crate) mod tests {
             // the crawl crashed mid-request.
             assert_eq!(pop_path(&frontier).await.as_deref(), Some("in-flight"));
             assert_eq!(pop_path(&frontier).await.as_deref(), Some("queued"));
-            let Next::Ready(cancelled) = frontier.pop().await.unwrap() else {
+            let Pop::Ready(cancelled) = frontier.pop().await.unwrap() else {
                 panic!()
             };
             frontier.report(Report::Cancelled(cancelled)).await.unwrap();
@@ -202,7 +202,7 @@ pub(crate) mod tests {
         let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
         assert_eq!(frontier.in_flight().unwrap(), 0);
         let mut left = Vec::new();
-        while let Next::Ready(seed) = frontier.pop().await.unwrap() {
+        while let Pop::Ready(seed) = frontier.pop().await.unwrap() {
             left.push(seed.tag().map(ToString::to_string).unwrap());
         }
         left.sort();
@@ -214,7 +214,7 @@ pub(crate) mod tests {
         let path = TempPath::new();
         let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
         frontier.push(seed("a")).await.unwrap();
-        let Next::Ready(popped) = frontier.pop().await.unwrap() else {
+        let Pop::Ready(popped) = frontier.pop().await.unwrap() else {
             panic!()
         };
 

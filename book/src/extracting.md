@@ -7,18 +7,22 @@ the others share it.
 | Extractor | Gives |
 |---|---|
 | `Uri` | The request's URI |
+| `Query<T>` | The request URI's query string, deserialized |
 | `Tag`, or an enum deriving `Tags` | The request's tag |
 | `Depth`, `Attempt` | How many links from a seed it is, and which try this is |
 | `Queue` | The queue to follow links through |
 | `Data<T>` | The dataset for items of type `T` |
 | `State<T>` | The router's state, or a part of it |
+| `Head` | The response's status, headers, and final URI after redirects |
 | `Bytes` | The response body |
 | `Text` | The body as text |
 | `Json<T>` | The body deserialized as JSON |
 | `Html` | The body parsed as HTML (`html` feature) |
 | `Element<T>` | A `T: Select` extracted from the HTML (`html` feature) |
+| `Meta` | The page's title, description, canonical URL, language, robots, Open Graph and Twitter fields (`html` feature) |
+| `JsonLd<T>` | The page's JSON-LD structured data (`html` feature) |
 | `Sitemap` | The body parsed as a sitemap (`sitemap` feature) |
-| `View` | The browser, to interact with the page (`thirtyfour` feature) |
+| `Tab` | The browser, to interact with the page (`thirtyfour` feature) |
 
 Wrapping an extractor in `Option` or `Result` makes it infallible: the
 handler runs with `None` or the error instead of failing the request.
@@ -30,7 +34,7 @@ anything implementing `Select`:
 
 ```rust
 use spire::Result;
-use spire::extract::Html;
+use spire::extract::html::Html;
 
 async fn page(html: Html) -> Result<()> {
     println!("{:?}", html.title());
@@ -41,13 +45,21 @@ async fn page(html: Html) -> Result<()> {
 }
 ```
 
+`visible_text()` is the text a reader sees: the body without scripts and
+styles, one line per paragraph or list item. `main_text()` keeps only the
+main content, the first `<main>`, `<article>` or `role="main"` element,
+without navigation and asides, for indexing or summarizing pages. To walk
+the tree yourself, `Html` wraps a `spire::extract::html::Document`, scraper's
+document, and `spire::extract::html` re-exports the rest of scraper at the
+version spire uses.
+
 ## Selecting with a derive
 
 `#[derive(Select)]`, with the `macros` feature, extracts a struct with CSS
 selectors:
 
 ```rust
-use spire::extract::{Element, Select};
+use spire::extract::html::{Element, Select};
 
 #[derive(Debug, Select)]
 #[select("article.product")]
@@ -81,6 +93,79 @@ async fn listing(Element(products): Element<Vec<Product>>) {
 
 `Element<T>` takes one value, `Element<Option<T>>` the first if any, and
 `Element<Vec<T>>` all of them.
+
+## Metadata and structured data
+
+`Meta` reads a page's `<head>` without selectors: its title, description,
+canonical URL, language, `<meta name="robots">`, and Open Graph and Twitter
+fields. `JsonLd<T>` reads its [schema.org](https://schema.org) data, which
+many product, article and event pages publish in
+`<script type="application/ld+json">` blocks, often the most reliable data
+on the page:
+
+```rust
+use serde::Deserialize;
+use spire::Result;
+use spire::extract::html::{JsonLd, Meta};
+use spire::frontier::queue::Queue;
+
+/// The nodes to keep, by their `@type`.
+#[derive(Deserialize)]
+#[serde(tag = "@type")]
+enum Node {
+    Product { name: String, sku: Option<String> },
+    #[serde(other)]
+    Other,
+}
+
+async fn product(meta: Meta, JsonLd(nodes): JsonLd<Node>, queue: Queue) -> Result<()> {
+    // Respect pages asking not to be followed.
+    if meta.robots.as_deref().is_some_and(|robots| robots.contains("nofollow")) {
+        return Ok(());
+    }
+    for node in nodes {
+        if let Node::Product { name, sku } = node {
+            println!("{name} ({sku:?})");
+        }
+    }
+    if let Some(canonical) = meta.canonical {
+        queue.follow(canonical).await?;
+    }
+    Ok(())
+}
+```
+
+Both parse the page; a handler that also takes `Html` can call
+`html.meta()` and `html.json_ld()` instead, to parse it once.
+
+## The response head and query
+
+`Head` gives the response's status, headers and the URI it was served from,
+for example to read `Last-Modified`, or a status the backend's
+`StatusPolicy::Accept` let through. `Query<T>` deserializes the request
+URI's query string, for example the current page of a paginated API:
+
+```rust
+use serde::Deserialize;
+use spire::Result;
+use spire::extract::{Head, Query};
+use spire::frontier::queue::Queue;
+
+#[derive(Deserialize)]
+struct Page {
+    #[serde(default)]
+    page: u32,
+}
+
+async fn listing(head: Head, Query(Page { page }): Query<Page>, queue: Queue) -> Result<()> {
+    println!("page {page}: {} from {}", head.status, head.uri);
+    queue.follow(format!("?page={}", page + 1)).await?;
+    Ok(())
+}
+```
+
+A URI without a query deserializes from an empty one, so a struct of
+optional or defaulted fields always extracts.
 
 ## JSON and text
 

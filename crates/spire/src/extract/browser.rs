@@ -8,14 +8,14 @@ use spire_thirtyfour::thirtyfour::WebDriver;
 
 use crate::extract::FromContext;
 #[cfg(feature = "html")]
-use crate::extract::Html;
+use crate::extract::html::Html;
 use crate::request::http::{HeaderMap, StatusCode};
 use crate::{Context, Error, Result};
 
 /// Navigates the browser to the request URI, if no extractor did yet, and
 /// hands over the browser, to interact with the page.
 ///
-/// Through [`Deref`], `View` exposes the full [`WebDriver`] API, pointed at
+/// Through [`Deref`], `Tab` exposes the full [`WebDriver`] API, pointed at
 /// the request's tab, to query and interact with the live page.
 /// [`snapshot`](Self::snapshot) parses a copy of the page as currently
 /// rendered, including what scripts and interaction changed since it
@@ -31,26 +31,26 @@ use crate::{Context, Error, Result};
 /// # #[cfg(feature = "html")]
 /// # mod example {
 /// use spire::backend::thirtyfour::By;
-/// use spire::extract::View;
+/// use spire::extract::Tab;
 /// use spire::frontier::queue::Queue;
 ///
-/// async fn handler(queue: Queue, view: View) -> spire::Result<()> {
-///     if let Ok(more) = view.find(By::Css("button.more")).await {
+/// async fn handler(queue: Queue, tab: Tab) -> spire::Result<()> {
+///     if let Ok(more) = tab.find(By::Css("button.more")).await {
 ///         let _ = more.click().await;
 ///     }
-///     let page = view.snapshot().await?;
+///     let page = tab.snapshot().await?;
 ///     queue.follow_all(page.links()).await?;
 ///     Ok(())
 /// }
 /// # }
 /// ```
-pub struct View {
+pub struct Tab {
     driver: WebDriver,
     status: StatusCode,
     headers: HeaderMap,
 }
 
-impl View {
+impl Tab {
     /// Returns the status of the page's response.
     #[must_use]
     pub const fn status(&self) -> StatusCode {
@@ -88,7 +88,7 @@ impl View {
     }
 }
 
-impl Deref for View {
+impl Deref for Tab {
     type Target = WebDriver;
 
     fn deref(&self) -> &Self::Target {
@@ -96,15 +96,15 @@ impl Deref for View {
     }
 }
 
-impl fmt::Debug for View {
+impl fmt::Debug for Tab {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("View")
+        f.debug_struct("Tab")
             .field("status", &self.status)
             .finish_non_exhaustive()
     }
 }
 
-impl<S: Sync> FromContext<BrowserSession, S> for View {
+impl<S: Sync> FromContext<BrowserSession, S> for Tab {
     type Rejection = Error;
 
     async fn from_context(cx: &Context<BrowserSession>, _: &S) -> Result<Self> {

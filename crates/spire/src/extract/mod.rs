@@ -5,15 +5,24 @@
 //! read the response: the request is fetched once, by the first that needs
 //! it, and body extractors read the page as it is when they run.
 //!
-//! - Request and crawl: [`Uri`](crate::request::http::Uri), [`Tag`], an enum
-//!   deriving [`Tags`],
-//!   [`Depth`], [`Attempt`], [`Queue`] and [`Data`].
-//! - Response body: [`Bytes`], [`Text`], [`Json`], and with the `html`
-//!   feature [`Html`] and [`Element`].
+//! - Request and crawl: [`Uri`](crate::request::http::Uri), [`Query`],
+//!   [`Tag`], an enum deriving [`Tags`], [`Depth`], [`Attempt`], [`Queue`]
+//!   and [`Data`].
+//! - Response: [`Head`] for the status and headers, and for the body
+//!   [`Body`], [`Text`] and [`Json`].
+//! - HTML, with the `html` feature, in [`html`]: the parsed [`Html`],
+//!   [`Element`]s extracted with [`Select`], [`Meta`] and [`JsonLd`].
+//! - Sitemaps, with the `sitemap` feature, in [`sitemap`]; and a browser
+//!   [`Tab`] with the `thirtyfour` feature.
 //! - Everything else: [`State`].
 //!
 //! Wrapping an extractor in `Option` or `Result` makes it infallible.
 //!
+//! [`Html`]: html::Html
+//! [`Element`]: html::Element
+//! [`Select`]: html::Select
+//! [`Meta`]: html::Meta
+//! [`JsonLd`]: html::JsonLd
 //! [`Tag`]: crate::request::Tag
 //! [`Tags`]: crate::request::Tags
 //! [`Depth`]: crate::request::Depth
@@ -21,36 +30,29 @@
 //! [`Queue`]: crate::frontier::queue::Queue
 //! [`Data`]: crate::dataset::Data
 
-mod content;
-pub(crate) mod context;
+mod body;
 #[cfg(feature = "thirtyfour")]
-mod driver;
+mod browser;
+pub(crate) mod context;
+mod head;
 #[cfg(feature = "html")]
-pub(crate) mod html;
+#[cfg_attr(docsrs, doc(cfg(feature = "html")))]
+pub mod html;
+mod query;
 #[cfg(feature = "sitemap")]
-mod sitemap;
+#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
+pub mod sitemap;
 mod state;
 
 use std::convert::Infallible;
 use std::future::Future;
 
-pub use content::{Bytes, Json, Text};
+pub use body::{Body, Json, Text};
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-pub use driver::View;
-#[cfg(feature = "html")]
-#[cfg_attr(docsrs, doc(cfg(feature = "html")))]
-pub use html::{Element, Html, Select};
-#[cfg(feature = "sitemap")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
-pub use sitemap::Sitemap;
-/// The sitemap parser behind [`Sitemap`]: its records and their attributes.
-#[cfg(feature = "sitemap")]
-#[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
-pub use sitemapo;
-#[cfg(feature = "macros")]
-#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-pub use spire_macros::Select;
+pub use browser::Tab;
+pub use head::Head;
+pub use query::Query;
 pub use state::{FromRef, State};
 
 use crate::Context;

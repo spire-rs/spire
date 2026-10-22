@@ -53,22 +53,20 @@ pub mod dataset {
     #[cfg(feature = "json")]
     #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     pub use spire_core::dataset::JsonlDataset;
-    pub use spire_core::dataset::{Data, Dataset, InMemDataset};
-    #[cfg(feature = "redb")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
-    pub use spire_redb::RedbDataset;
+    pub use spire_core::dataset::{Data, Dataset, InMemDataset, READ_BATCH};
 }
 
 /// The frontier: requests waiting to be crawled.
 pub mod frontier {
     pub use spire_core::frontier::*;
+}
 
-    /// A crash-safe frontier and seen set, stored in redb.
-    #[cfg(feature = "redb")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
-    pub mod redb {
-        pub use spire_redb::{RedbFrontier, RedbSeen, RedbStore, RedbStoreBuilder};
-    }
+/// A crawl stored in redb: a crash-safe frontier, seen set and datasets in
+/// one file, see [`RedbStore`](crate::redb::RedbStore).
+#[cfg(feature = "redb")]
+#[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
+pub mod redb {
+    pub use spire_redb::{RedbDataset, RedbFrontier, RedbSeen, RedbStore, RedbStoreBuilder, redb};
 }
 
 /// Requests, responses and their crawl metadata.
@@ -94,7 +92,7 @@ pub mod __private {
 
     pub use crate::extract::context::tag_of;
     #[cfg(feature = "html")]
-    pub use crate::extract::html::private::*;
+    pub use crate::extract::html::select::private::*;
 }
 
 /// Tracing target for routing and extraction.

@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use derive_more::{Deref, DerefMut};
 use encoding_rs::{Encoding, UTF_8};
 use serde::de::DeserializeOwned;
@@ -9,7 +10,7 @@ use crate::request::http::header::CONTENT_TYPE;
 use crate::{Context, Error, Result};
 
 /// Returns the response's headers and body, fetching the request if needed.
-async fn fetch_body<C: Client>(cx: &Context<C>) -> Result<(HeaderMap, bytes::Bytes)> {
+async fn fetch_body<C: Client>(cx: &Context<C>) -> Result<(HeaderMap, Bytes)> {
     let headers = cx.response().await?.headers().clone();
     Ok((headers, cx.body().await?))
 }
@@ -40,9 +41,9 @@ fn charset(content_type: &str) -> Option<&str> {
 
 /// Extracts the raw response body.
 #[derive(Debug, Clone, Deref, DerefMut)]
-pub struct Bytes(pub bytes::Bytes);
+pub struct Body(pub Bytes);
 
-impl<C, S> FromContext<C, S> for Bytes
+impl<C, S> FromContext<C, S> for Body
 where
     C: Client,
     S: Sync,

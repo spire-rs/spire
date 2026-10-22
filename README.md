@@ -34,7 +34,7 @@ queue for links to follow, or a dataset to store results in.
 
 - **HTTP and browser backends**: reqwest for plain HTTP, thirtyfour to drive real browsers over WebDriver.
 - **Typed routing**: route by tags, checked by the compiler with `#[derive(Tags)]`, or by URL path patterns.
-- **Extractors**: parse HTML into structs with `#[derive(Select)]`, deserialize JSON, or drive the browser with `View`.
+- **Extractors**: parse HTML into structs with `#[derive(Select)]`, deserialize JSON, or drive the browser with `Tab`.
 - **Polite crawling**: per-host concurrency and delays, robots.txt per RFC 9309, retries with `Retry-After` and backoff.
 - **Sitemaps**: follow XML and text sitemaps and indexes, gzipped or not, found through robots.txt or seeded directly.
 - **Frontiers**: deduplication with URL normalization, depth limits, host filters, priorities, and a Bloom filter for huge crawls.
@@ -59,7 +59,7 @@ Crawl a site two links deep and print every title:
 
 ```rust
 use spire::backend::HttpClient;
-use spire::extract::Html;
+use spire::extract::html::Html;
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::queue::Queue;
@@ -101,7 +101,7 @@ top of its `main.rs`; most run against [httpbin.org](https://httpbin.org):
 | --- | --- |
 | `cargo run -p basic-usage` | Tags, path routes, link following and `#[derive(Select)]` |
 | `cargo run -p api-endpoints` | Typed JSON responses and following API pagination |
-| `cargo run -p chrome-webdriver` | Browser automation with `View`; needs `chromedriver --port=4444` |
+| `cargo run -p chrome-webdriver` | Browser automation with `Tab`; needs `chromedriver --port=4444` |
 | `cargo run -p rust-blog` | A tour of every feature: crawls the Rust blog through robots.txt, its sitemap and links into JSON Lines, resumable with redb |
 
 `RUST_LOG=spire_core=debug` logs every request with its outcome and duration.

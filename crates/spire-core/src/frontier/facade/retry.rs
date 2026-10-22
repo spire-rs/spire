@@ -9,7 +9,7 @@ use tokio::time::Instant;
 
 use crate::Result;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, Next, Report};
+use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
 use crate::request::Attempt;
 use crate::sync::lock;
 
@@ -183,17 +183,17 @@ impl<F: Frontier> Frontier for Retry<F> {
         self.inner.push(seed)
     }
 
-    async fn pop(&self) -> Result<Next> {
+    async fn pop(&self) -> Result<Pop> {
         let now = Instant::now();
         if let Some(seed) = lock(&self.delayed).pop_due(now) {
-            return Ok(Next::Ready(seed));
+            return Ok(Pop::Ready(seed));
         }
 
         let next = self.inner.pop().await?;
         let earliest = lock(&self.delayed).earliest();
         Ok(match (next, earliest) {
-            (Next::Wait(at), Some(earliest)) => Next::Wait(at.min(earliest)),
-            (Next::Empty, Some(earliest)) => Next::Wait(earliest),
+            (Pop::Wait(at), Some(earliest)) => Pop::Wait(at.min(earliest)),
+            (Pop::Empty, Some(earliest)) => Pop::Wait(earliest),
             (next, _) => next,
         })
     }
@@ -288,12 +288,12 @@ mod tests {
         assert_eq!(frontier.size_hint(), Some(1));
 
         match frontier.pop().await.unwrap() {
-            Next::Wait(at) => assert_eq!(at - Instant::now(), Duration::from_secs(2)),
+            Pop::Wait(at) => assert_eq!(at - Instant::now(), Duration::from_secs(2)),
             next => panic!("expected wait, got {next:?}"),
         }
 
         advance(Duration::from_secs(2)).await;
-        let Next::Ready(retried) = frontier.pop().await.unwrap() else {
+        let Pop::Ready(retried) = frontier.pop().await.unwrap() else {
             panic!("expected the retried seed");
         };
         assert_eq!(retried.attempt(), Attempt::new(1));
@@ -307,7 +307,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(pop_path(&frontier).await, None);
-        assert!(matches!(frontier.pop().await.unwrap(), Next::Empty));
+        assert!(matches!(frontier.pop().await.unwrap(), Pop::Empty));
     }
 
     #[tokio::test(start_paused = true)]
@@ -321,7 +321,7 @@ mod tests {
         frontier.report(retry).await.unwrap();
 
         assert_eq!(pop_path(&frontier).await.as_deref(), Some("fresh"));
-        assert!(matches!(frontier.pop().await.unwrap(), Next::Wait(_)));
+        assert!(matches!(frontier.pop().await.unwrap(), Pop::Wait(_)));
         advance(Duration::from_secs(1)).await;
         assert_eq!(pop_path(&frontier).await.as_deref(), Some("retried"));
     }

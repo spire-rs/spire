@@ -28,11 +28,11 @@ using the `macros` feature flag in the main `spire` crate.
 
 ### `Select`
 
-Derives `spire::extract::Select`, turning CSS selectors on the fields of a
+Derives `spire::extract::html::Select`, turning CSS selectors on the fields of a
 struct into extraction from HTML:
 
 ```rust,ignore
-use spire::extract::{Element, Select};
+use spire::extract::html::{Element, Select};
 
 #[derive(Debug, Select)]
 #[select("article.product")]
@@ -108,7 +108,7 @@ in the main `spire` crate:
 spire = { version = "0.4.0", features = ["macros"] }
 ```
 
-The derives are then available as `spire::extract::Select` and
+The derives are then available as `spire::extract::html::Select` and
 `spire::request::Tags`, next to the traits of the same names.
 
 ## License

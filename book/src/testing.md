@@ -14,7 +14,7 @@ the handlers did:
 
 ```rust
 use spire::dataset::InMemDataset;
-use spire::extract::Select;
+use spire::extract::html::Select;
 use spire::frontier::seed::Seed;
 use spire::testing::{MockPage, MockSite};
 use spire::worker::Outcome;

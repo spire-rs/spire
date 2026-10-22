@@ -5,7 +5,8 @@ use std::sync::Arc;
 use scraper::Selector;
 
 use crate::backend::Client;
-use crate::extract::{Element, FromContext, Html, Select};
+use crate::extract::FromContext;
+use crate::extract::html::{Element, Html, Select};
 use crate::frontier::queue::Link;
 use crate::handler::Handler;
 use crate::request::Tag;
@@ -105,7 +106,7 @@ where
 ///
 /// ```
 /// # #[cfg(feature = "macros")] {
-/// use spire::extract::Select;
+/// use spire::extract::html::Select;
 /// use spire::handler::{Collect, FollowLinks};
 /// use spire::Router;
 ///

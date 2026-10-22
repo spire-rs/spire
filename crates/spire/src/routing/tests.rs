@@ -150,7 +150,7 @@ async fn rejected_extractors_fail_and_optional_ones_do_not() {
 #[cfg(feature = "html")]
 async fn crawls_and_resolves_links_after_redirects() {
     use crate::dataset::{Data, InMemDataset};
-    use crate::extract::Html;
+    use crate::extract::html::Html;
     use crate::frontier::queue::Queue;
     use crate::request::http::Uri;
     use crate::{Crawler, Result};

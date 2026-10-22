@@ -7,7 +7,7 @@ extractor:
 ```rust,no_run
 use spire::backend::HttpClient;
 use spire::dataset::{Data, InMemDataset};
-use spire::extract::Html;
+use spire::extract::html::Html;
 use spire::frontier::seed::Seed;
 use spire::request::http::Uri;
 use spire::{Crawler, Result, Router};
@@ -113,7 +113,7 @@ back in the order they were written:
 use serde::{Deserialize, Serialize};
 use spire::backend::HttpClient;
 use spire::frontier::FrontierExt;
-use spire::frontier::redb::RedbStore;
+use spire::redb::RedbStore;
 use spire::frontier::seed::Seed;
 use spire::{Crawler, Result, Router};
 

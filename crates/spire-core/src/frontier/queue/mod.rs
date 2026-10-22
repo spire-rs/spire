@@ -186,12 +186,12 @@ impl fmt::Debug for Queue {
 mod tests {
     use super::*;
     use crate::frontier::memory::InMemFrontier;
-    use crate::frontier::{FrontierExt, Next};
+    use crate::frontier::{FrontierExt, Pop};
     use crate::request::Tag;
 
     async fn drain(frontier: &InMemFrontier) -> Vec<(String, Option<String>, u32)> {
         let mut popped = Vec::new();
-        while let Next::Ready(seed) = Frontier::pop(frontier).await.unwrap() {
+        while let Pop::Ready(seed) = Frontier::pop(frontier).await.unwrap() {
             let tag = seed.tag().map(Tag::to_string);
             popped.push((seed.uri().to_string(), tag, seed.depth().get()));
         }

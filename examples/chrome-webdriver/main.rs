@@ -1,8 +1,8 @@
 //! Browser automation: rendering pages in Chrome over WebDriver.
 //!
-//! `View` navigates the browser and hands the handler its session; the page
-//! is parsed with `view.snapshot()` once the handler is done interacting, so it
-//! includes whatever scripts rendered. Links are followed as with any other
+//! `Tab` navigates the browser and hands the handler the request's tab;
+//! the page is parsed with `tab.snapshot()` once the handler is done
+//! interacting, so it includes whatever scripts rendered. Links are followed as with any other
 //! backend.
 //!
 //! Needs a WebDriver server on port 4444 matching the installed Chrome, e.g.
@@ -15,7 +15,7 @@
 
 use spire::backend::BrowserBackend;
 use spire::dataset::{Data, InMemDataset};
-use spire::extract::View;
+use spire::extract::Tab;
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::queue::{Link, Queue};
@@ -39,17 +39,17 @@ struct Rendered {
 }
 
 /// Reads the rendered page and follows its links.
-async fn rendered(queue: Queue, data: Data<Rendered>, view: View) -> Result<()> {
-    let title = view
+async fn rendered(queue: Queue, data: Data<Rendered>, tab: Tab) -> Result<()> {
+    let title = tab
         .title()
         .await
         .map_err(|error| Error::backend("failed to read the title").with_source(error))?;
-    let url = view
+    let url = tab
         .current_url()
         .await
         .map_err(|error| Error::backend("failed to read the url").with_source(error))?;
 
-    let page = view.snapshot().await?;
+    let page = tab.snapshot().await?;
     let links = page.links();
     data.write(Rendered {
         url: url.to_string(),

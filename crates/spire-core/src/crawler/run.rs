@@ -17,7 +17,7 @@ use crate::crawler::robots::{BackendSource, RobotsCache, RobotsSource, Verdict};
 use crate::crawler::{Crawler, Live, Stats};
 use crate::frontier::queue::Queue;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Next, Report};
+use crate::frontier::{Ack, Pop, Report};
 use crate::request::Tag;
 use crate::sync::lock;
 use crate::worker::{Outcome, Scope, Worker};
@@ -364,12 +364,12 @@ where
             }
 
             match self.frontier.pop().await {
-                Ok(Next::Ready(seed)) => self.admit(run, seed).await,
-                Ok(Next::Wait(at)) => {
+                Ok(Pop::Ready(seed)) => self.admit(run, seed).await,
+                Ok(Pop::Wait(at)) => {
                     wait = wait.min(Some(at)).or(Some(at));
                     break;
                 }
-                Ok(Next::Empty) => break,
+                Ok(Pop::Empty) => break,
                 Err(error) => {
                     run.fail(error, settings.shutdown_grace);
                     return None;
@@ -579,7 +579,7 @@ where
             }
             Outcome::Abort(scope) => {
                 let tag = match scope {
-                    Scope::Owner => seed.tag().cloned(),
+                    Scope::SameTag => seed.tag().cloned(),
                     Scope::Tag(tag) => Some(tag),
                 };
                 tracing::info!(target: TRACING_TARGET, tag = tag.as_ref().map(tracing::field::display), "aborting tag");
@@ -597,7 +597,7 @@ where
                 if error.is_retryable() {
                     tracing::debug!(target: TRACING_TARGET, %uri, %error, "request failed, retrying");
                     let report = match error.retry_after() {
-                        Some(duration) => self.backoff(run, seed, Scope::Owner, duration).await,
+                        Some(duration) => self.backoff(run, seed, Scope::SameTag, duration).await,
                         None => Report::Retry { seed, after: None },
                     };
                     failure = Some(error);
@@ -630,7 +630,7 @@ where
     /// `seed` once the pause ends.
     async fn backoff(&self, run: &mut Run, seed: Seed, scope: Scope, duration: Duration) -> Report {
         let tag = match scope {
-            Scope::Owner => seed.tag().cloned(),
+            Scope::SameTag => seed.tag().cloned(),
             Scope::Tag(tag) => Some(tag),
         };
         tracing::debug!(

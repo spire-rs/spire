@@ -53,7 +53,7 @@ Crawl a listing, follow its pagination and extract every product:
 ```rust,no_run
 use spire::backend::HttpClient;
 use spire::dataset::InMemDataset;
-use spire::extract::Select;
+use spire::extract::html::Select;
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;

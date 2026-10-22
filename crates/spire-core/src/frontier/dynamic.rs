@@ -5,12 +5,12 @@ use futures::future::BoxFuture;
 
 use crate::Result;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, Next, Report};
+use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
 
 /// An object-safe [`Frontier`].
 pub(crate) trait DynFrontier: Send + Sync + 'static {
     fn push(&self, seed: Seed) -> BoxFuture<'_, Result<Admission>>;
-    fn pop(&self) -> BoxFuture<'_, Result<Next>>;
+    fn pop(&self) -> BoxFuture<'_, Result<Pop>>;
     fn report(&self, report: Report) -> BoxFuture<'_, Result<Ack>>;
     fn size_hint(&self) -> Option<usize>;
     fn snapshot(&self) -> Option<Vec<Seed>>;
@@ -21,7 +21,7 @@ impl<F: Frontier> DynFrontier for F {
         Frontier::push(self, seed).boxed()
     }
 
-    fn pop(&self) -> BoxFuture<'_, Result<Next>> {
+    fn pop(&self) -> BoxFuture<'_, Result<Pop>> {
         Frontier::pop(self).boxed()
     }
 

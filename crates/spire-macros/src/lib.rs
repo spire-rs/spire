@@ -8,9 +8,9 @@ mod tags;
 use proc_macro::TokenStream;
 use syn::{DeriveInput, Error, parse_macro_input};
 
-/// Derives `spire::extract::Select` from CSS selectors.
+/// Derives `spire::extract::html::Select` from CSS selectors.
 ///
-/// See the documentation of `spire::extract::Select` for the attributes.
+/// See the documentation of `spire::extract::html::Select` for the attributes.
 #[proc_macro_derive(Select, attributes(select))]
 pub fn derive_select(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
