@@ -895,3 +895,119 @@ async fn host_concurrency_is_fixed_or_adapts() {
     let busy = peak_fetches(busy, HostConcurrency::adaptive(4)).await;
     assert_eq!(busy, 1);
 }
+
+/// Crawls `seeds` on `site` one at a time and without retries, returning
+/// the time each fetch started, by path, after the crawl's start.
+async fn fetch_times(
+    site: crate::testing::MockSite,
+    seeds: impl IntoIterator<Item = Seed>,
+) -> Vec<(String, Duration)> {
+    use std::sync::Mutex;
+
+    use crate::testing::MockClient;
+
+    let start = Instant::now();
+    let times = Arc::new(Mutex::new(Vec::new()));
+    let worker = {
+        let times = Arc::clone(&times);
+        from_fn(move |cx: Context<MockClient>| {
+            let path = cx.request().uri().path().to_owned();
+            times.lock().unwrap().push((path, start.elapsed()));
+            async move { cx.response().await.map(drop) }
+        })
+    };
+    Crawler::new(site, worker)
+        .with_frontier(InMemFrontier::fifo())
+        .with_host_concurrency(1)
+        .with_seeds(seeds)
+        .run()
+        .await
+        .unwrap();
+    Arc::try_unwrap(times).unwrap().into_inner().unwrap()
+}
+
+#[tokio::test(start_paused = true)]
+async fn throttled_hosts_get_wider_gaps() {
+    use http::StatusCode;
+
+    use crate::testing::{MockPage, MockSite};
+
+    let busy =
+        MockPage::status(StatusCode::SERVICE_UNAVAILABLE).with_latency(Duration::from_millis(100));
+    let site = (0..5).fold(MockSite::new(), |site, i| {
+        site.page(&format!("https://example.com/{i}"), busy.clone())
+    });
+    let times = fetch_times(site, (0..5).map(|i| seed(&i.to_string()))).await;
+
+    // The first failure widens the gap to 1 s, and each after it doubles
+    // it, counted from the last start.
+    let starts: Vec<_> = times.iter().map(|(_, at)| at.as_millis()).collect();
+    assert_eq!(starts, [0, 1000, 3000, 7000, 15000]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn retry_after_pauses_the_whole_host() {
+    use http::header::RETRY_AFTER;
+    use http::{HeaderValue, StatusCode};
+
+    use crate::testing::{MockPage, MockSite};
+
+    let limited = MockPage::status(StatusCode::TOO_MANY_REQUESTS)
+        .with_header(RETRY_AFTER, HeaderValue::from_static("5"));
+    let site = MockSite::new()
+        .page("https://example.com/limited", limited)
+        .page("https://example.com/other", MockPage::text(""));
+    let seeds = [
+        seed("limited").with_tag("search"),
+        seed("other").with_tag("page"),
+    ];
+    let times = fetch_times(site, seeds).await;
+
+    // The host asked for 5 s, so the other tag's request waits too.
+    let other = times.iter().find(|(path, _)| path == "/other").unwrap();
+    assert_eq!(other.1, Duration::from_secs(5));
+}
+
+#[tokio::test(start_paused = true)]
+async fn retry_after_pauses_without_widening_the_gap() {
+    use http::header::RETRY_AFTER;
+    use http::{HeaderValue, StatusCode};
+
+    use crate::testing::{MockPage, MockSite};
+
+    let limited = MockPage::status(StatusCode::TOO_MANY_REQUESTS)
+        .with_header(RETRY_AFTER, HeaderValue::from_static("1"));
+    let site = MockSite::new()
+        .page("https://example.com/limited", limited)
+        .page("https://example.com/a", MockPage::text(""))
+        .page("https://example.com/b", MockPage::text(""));
+    let times = fetch_times(site, [seed("limited"), seed("a"), seed("b")]).await;
+
+    // Paused for the second the host asked for, then back at full pace: a
+    // widened gap would hold `/b` for another second.
+    let starts: Vec<_> = times
+        .iter()
+        .map(|(path, at)| (path.as_str(), at.as_millis()))
+        .collect();
+    assert_eq!(starts, [("/limited", 0), ("/a", 1000), ("/b", 1000)]);
+}
+
+#[test]
+fn only_the_host_throttles_it() {
+    use super::run::signal;
+    use crate::crawler::concurrency::Signal;
+
+    let unavailable =
+        Error::new(ErrorKind::Http).with_status(http::StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(signal(&Outcome::Fail(unavailable)), Signal::Throttled);
+    assert_eq!(
+        signal(&Outcome::Fail(Error::new(ErrorKind::Timeout))),
+        Signal::Throttled
+    );
+    // A handler's backoff pauses its tag, not the host.
+    assert_eq!(
+        signal(&Outcome::backoff(Duration::from_secs(5))),
+        Signal::Failed
+    );
+    assert_eq!(signal(&Outcome::Continue), Signal::Ok);
+}

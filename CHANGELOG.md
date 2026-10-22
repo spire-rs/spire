@@ -10,6 +10,11 @@ and this project adheres to
 
 ### Added
 
+- `spire-core`: throttled hosts slow down below one request at a time. Once
+  a host's concurrency cannot go lower, each round of `429`, `503` or
+  timeouts doubles the gap between its requests, up to
+  the maximum of `with_host_delay`, which now takes a `HostDelay`: a
+  `Duration` as its minimum, with a one-minute maximum, or a range.
 - `spire-core`: adaptive host concurrency. `with_host_concurrency` takes a
   `HostConcurrency`: a fixed number as before, or
   `HostConcurrency::adaptive(max)`, a limit per host that grows with each
@@ -35,6 +40,10 @@ and this project adheres to
 
 ### Changed
 
+- `Retry-After` on a `429` or `503` pauses the request's host, not its
+  tag, for exactly as long: the host is the one asking. `tag_backoff`
+  still applies handler backoffs to tags, and they no longer count as the
+  host throttling the crawl.
 - **Breaking:** adaptive host delays are replaced by adaptive host
   concurrency, which adapts the one setting a crawl has to choose, how many
   requests a host gets at once, instead of a delay aiming at a separate

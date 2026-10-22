@@ -26,6 +26,34 @@ Hosts are told apart by their authority, so `http://` and `https://` of the
 same host share their limits. A request whose host is busy waits without
 holding up requests to other hosts.
 
+## Slowing down
+
+A host is *throttled* when it answers `429 Too Many Requests` or `503
+Service Unavailable`, or when a request to it times out. Every crawl slows
+a throttled host down, without being asked:
+
+- A `Retry-After` header pauses the host for exactly as long as it asks: no
+  request starts to it until then, whatever its tag, and it resumes at the
+  same pace after.
+- Once its concurrency cannot go lower, each round of throttling doubles the
+  gap between its requests: from the delay's minimum, or one second without
+  one, up to a maximum of one minute. Each success halves it back.
+
+`with_host_delay` takes the gap's range. A `Duration` is its minimum, with
+the one-minute maximum; a range sets both ends, and the same value at both
+keeps the gap fixed:
+
+```rust,no_run
+use std::time::Duration;
+
+use spire::backend::HttpClient;
+use spire::{Crawler, Router};
+# async fn page() {}
+let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+    // At least 200 ms between requests, up to 5 minutes for a struggling host.
+    .with_host_delay(Duration::from_millis(200)..=Duration::from_secs(300));
+```
+
 ## Adaptive concurrency
 
 A fixed limit is either too timid for a fast site or too much for a slow
@@ -52,9 +80,10 @@ let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page))
   at most once per round, never below one. Other failures leave it alone.
 - Response times are how long the fetch took, not the handlers, so slow
   parsing does not slow the crawl down.
-- `with_host_delay` still spaces the requests to a host, and a robots.txt
-  `Crawl-delay` still raises it: a delay is a minimum gap, whatever the
-  limit allows.
+- At a limit of one, a throttled host's gap widens instead, as above.
+  Recovering, its gap closes first, then its limit grows again.
+- A robots.txt `Crawl-delay` raises a host's minimum gap, whatever the limit
+  allows.
 
 ## robots.txt
 

@@ -97,11 +97,12 @@ struct InFlight {
     fetch_time: Option<FetchTime>,
 }
 
-/// How a request went, as far as its host's limit is concerned: a host
-/// asking to slow down, or timing out, is throttling the crawl.
-fn signal(outcome: &Outcome) -> Signal {
+/// How a request went, as far as its host is concerned: a host answering
+/// `429` or `503`, or timing out, is throttling the crawl. A handler's
+/// backoff pauses its tag, not the host, so it is neither a success nor
+/// throttling.
+pub(super) fn signal(outcome: &Outcome) -> Signal {
     match outcome {
-        Outcome::Backoff { .. } => Signal::Throttled,
         Outcome::Fail(error)
             if error.kind() == ErrorKind::Timeout
                 || matches!(
@@ -111,12 +112,52 @@ fn signal(outcome: &Outcome) -> Signal {
         {
             Signal::Throttled
         }
-        Outcome::Fail(_) | Outcome::Retry { .. } => Signal::Failed,
+        Outcome::Fail(_) | Outcome::Retry { .. } | Outcome::Backoff { .. } => Signal::Failed,
         Outcome::Continue | Outcome::Abort(_) | Outcome::Stop => Signal::Ok,
     }
 }
 
 impl Run {
+    /// Records that a request for `seed` to `host` finished with `outcome`:
+    /// a throttled host is slowed down, and one with `Retry-After` paused.
+    fn finish_host(
+        &mut self,
+        host: Option<String>,
+        seed: &Seed,
+        started: Instant,
+        fetch_time: Option<FetchTime>,
+        outcome: &Outcome,
+    ) {
+        let now = Instant::now();
+        // A retryable error with `Retry-After` pauses the host it came from
+        // for exactly as long, without slowing it down further: the host
+        // said how long to wait, so there is nothing to guess.
+        let pause = match outcome {
+            Outcome::Fail(error) if error.is_retryable() => error.retry_after(),
+            _ => None,
+        };
+        let signal = if pause.is_some() {
+            Signal::Failed
+        } else {
+            signal(outcome)
+        };
+        // Hosts are tracked as soon as one is throttled, so it slows down
+        // even in a crawl without limits or gaps.
+        let throttled = signal == Signal::Throttled || pause.is_some();
+        let Some(host) = host.or_else(|| throttled.then(|| self.hosts.track(seed))) else {
+            return;
+        };
+        let feedback = Feedback {
+            started,
+            latency: fetch_time.and_then(|fetch_time| *lock(&fetch_time)),
+            signal,
+        };
+        self.hosts.finished(&host, Some(feedback), now);
+        if let Some(pause) = pause {
+            self.hosts.pause(&host, now + pause);
+        }
+    }
+
     fn stop(&mut self, reason: &'static str, grace: Option<Duration>) {
         if self.stopping {
             return;
@@ -561,14 +602,7 @@ where
         else {
             return;
         };
-        if let Some(host) = host {
-            let feedback = fetch_time.map(|fetch_time| Feedback {
-                started,
-                latency: *lock(&fetch_time),
-                signal: signal(&outcome),
-            });
-            run.hosts.finished(&host, feedback, Instant::now());
-        }
+        run.finish_host(host, &seed, started, fetch_time, &outcome);
         self.tally(|stats| stats.requests += 1);
 
         let uri = seed.uri().clone();
@@ -602,12 +636,11 @@ where
                 };
                 if error.is_retryable() {
                     tracing::debug!(target: TRACING_TARGET, %uri, %error, "request failed, retrying");
-                    let report = match error.retry_after() {
-                        Some(duration) => self.backoff(run, seed, Scope::SameTag, duration).await,
-                        None => Report::Retry { seed, after: None },
-                    };
+                    // A `Retry-After` paused the host above; the request
+                    // itself waits as long.
+                    let after = error.retry_after();
                     failure = Some(error);
-                    report
+                    Report::Retry { seed, after }
                 } else {
                     tracing::warn!(target: TRACING_TARGET, %uri, %error, "request failed");
                     self.tally(|stats| stats.failed += 1);

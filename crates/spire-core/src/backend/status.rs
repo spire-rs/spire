@@ -15,7 +15,7 @@ pub enum StatusPolicy {
     /// fails them without a handler having to check:
     ///
     /// - `408`, `429` and `5xx` are retryable [`Http`] errors; `429` and
-    ///   `503` honour `Retry-After` by pausing the request's tag.
+    ///   `503` honour `Retry-After` by pausing the request's host.
     /// - Other `4xx` are [`Rejected`] errors, which are not retried.
     ///
     /// [`Http`]: ErrorKind::Http

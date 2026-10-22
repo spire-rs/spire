@@ -68,7 +68,7 @@ let frontier = InMemFrontier::fifo()
 | `max_depth(depth)` | Refuses seeds further than `depth` links from a seed |
 | `retry(times)` | Retries failed requests, with exponential backoff |
 | `retry_with(policy)` | The same, with a `RetryPolicy` |
-| `tag_backoff()` | Pauses a tag when a request asks for it, e.g. on `429` |
+| `tag_backoff()` | Pauses a tag when a handler backs off |
 
 A crawler without `with_frontier` uses `InMemFrontier::fifo()` with the
 default retries, and no deduplication. Add `dedup` to any crawl that follows
@@ -102,10 +102,12 @@ with `Outcome::retry()`.
 ## Backoff
 
 When a site answers `429 Too Many Requests` or `503 Service Unavailable`
-with a `Retry-After` header, `tag_backoff` pauses every request with the
-same tag for that long, then tries the request again. A handler pauses a tag
-itself with `Outcome::backoff(duration)`, and `Outcome::abort()` skips every
-further request of its tag.
+with a `Retry-After` header, the crawler pauses every request to that host
+for as long as it asks, then tries the request again; see
+[Limits and politeness](politeness.md). A handler pauses a tag itself with
+`Outcome::backoff(duration)`, which `tag_backoff` applies to every request
+with that tag, and `Outcome::abort()` skips every further request of its
+tag.
 
 ## Surviving a crash
 
