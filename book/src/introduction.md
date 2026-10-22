@@ -8,7 +8,7 @@ once there is nothing left to do.
 
 ```rust,no_run
 use spire::backend::HttpClient;
-use spire::extract::Html;
+use spire::extract::html::Html;
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
 use spire::{Crawler, Result, Router};

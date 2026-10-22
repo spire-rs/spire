@@ -3,7 +3,7 @@
 #![cfg(all(feature = "html", feature = "macros", feature = "testing"))]
 
 use spire::dataset::InMemDataset;
-use spire::extract::Select;
+use spire::extract::html::Select;
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;

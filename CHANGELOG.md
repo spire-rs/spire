@@ -10,6 +10,12 @@ and this project adheres to
 
 ### Added
 
+- `spire`: `Html::visible_text`, the text a reader sees, one line per
+  block, and `Html::main_text`, the text of the page's main content without
+  navigation.
+- `spire`: `spire::extract::html` re-exports scraper, the HTML parser
+  `Html` wraps, with its document as `Document`, and `spire::redb::redb`
+  the database, so neither needs a matching dependency of its own.
 - `spire-core`: `Dataset::write_batch` stores several items at once, by
   default one by one. `InMemDataset`, the file datasets and `RedbDataset`
   store a batch in one step, all of it or none, and `Data::write_all`, which
@@ -24,11 +30,23 @@ and this project adheres to
 
 ### Changed
 
+- **Breaking:** the redb types moved from `spire::frontier::redb` and
+  `spire::dataset` to one `spire::redb` module: `RedbStore`, `RedbFrontier`,
+  `RedbSeen`, `RedbDataset` and the `redb` crate.
+- **Breaking:** the `Bytes` extractor is renamed `Body`, so it no longer
+  clashes with `bytes::Bytes`, which it wraps.
+- **Breaking:** everything for HTML is in `spire::extract::html`: `Html`,
+  `Element`, `Select` and its derive, `Meta`, `JsonLd`, and scraper's API.
+  Everything for sitemaps is in `spire::extract::sitemap`: the `Sitemap`
+  extractor and its records, with sitemapo's `Sitemap` record as
+  `IndexEntry`. Neither is re-exported at `spire::extract`'s root.
+- **Breaking:** `frontier::Next` is renamed `Pop`, the result of
+  `Frontier::pop`, apart from the middleware's `Next`.
+- **Breaking:** `Scope::Owner` is renamed `Scope::SameTag`.
 - **Breaking:** the `View` extractor is renamed `Tab`: it is the request's
   tab in the browser.
 - **Breaking:** `spire::extract::sitemapo`, the whole sitemap parser, is
-  replaced by `spire::extract::sitemap`, which re-exports only the records a
-  `Sitemap` holds: `Record`, `Entry`, `Sitemap` and their extensions.
+  replaced by the records in `spire::extract::sitemap`.
 
 ## [0.4.0] - 2026-10-22
 

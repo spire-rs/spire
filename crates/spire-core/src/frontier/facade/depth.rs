@@ -2,7 +2,7 @@ use std::future::Future;
 
 use crate::Result;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, Next, Report};
+use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
 use crate::request::Depth;
 
 /// A facade that refuses seeds deeper than a limit.
@@ -30,7 +30,7 @@ impl<F: Frontier> Frontier for MaxDepth<F> {
         self.inner.push(seed).await
     }
 
-    fn pop(&self) -> impl Future<Output = Result<Next>> + Send {
+    fn pop(&self) -> impl Future<Output = Result<Pop>> + Send {
         self.inner.pop()
     }
 

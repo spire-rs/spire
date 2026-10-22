@@ -1,7 +1,7 @@
 //! Helpers shared by the frontier's tests.
 
 use crate::frontier::seed::Seed;
-use crate::frontier::{Frontier, Next};
+use crate::frontier::{Frontier, Pop};
 
 pub(crate) fn seed(path: &str) -> Seed {
     Seed::get(format!("https://example.com/{path}")).unwrap()
@@ -9,7 +9,7 @@ pub(crate) fn seed(path: &str) -> Seed {
 
 pub(crate) async fn pop_path<F: Frontier>(frontier: &F) -> Option<String> {
     match frontier.pop().await.unwrap() {
-        Next::Ready(seed) => Some(seed.uri().path().trim_start_matches('/').to_owned()),
-        Next::Wait(_) | Next::Empty => None,
+        Pop::Ready(seed) => Some(seed.uri().path().trim_start_matches('/').to_owned()),
+        Pop::Wait(_) | Pop::Empty => None,
     }
 }

@@ -2,7 +2,8 @@ use derive_more::{Deref, DerefMut};
 use scraper::ElementRef;
 
 use crate::backend::Client;
-use crate::extract::{FromContext, Html};
+use crate::extract::FromContext;
+use crate::extract::html::Html;
 use crate::{Context, Error, Result};
 
 /// Extraction of a value from an HTML element, usually derived.
@@ -15,7 +16,7 @@ use crate::{Context, Error, Result};
 ///
 /// ```
 /// # #[cfg(feature = "macros")] {
-/// use spire::extract::Select;
+/// use spire::extract::html::Select;
 ///
 /// #[derive(Debug, Select)]
 /// #[select("article.product")]

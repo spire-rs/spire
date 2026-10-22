@@ -4,7 +4,7 @@ use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_mai
 use spire_core::frontier::memory::InMemFrontier;
 use spire_core::frontier::seed::{Fingerprint, Seed};
 use spire_core::frontier::seen::{BloomSeen, InMemSeen, SeenSet};
-use spire_core::frontier::{Frontier, FrontierExt, Next};
+use spire_core::frontier::{Frontier, FrontierExt, Pop};
 
 /// Seeds per push/pop round.
 const SEEDS: usize = 1_000;
@@ -23,7 +23,7 @@ async fn round<F: Frontier>(frontier: F, seeds: Vec<Seed>) {
     for seed in seeds {
         frontier.push(seed).await.unwrap();
     }
-    while let Next::Ready(_) = frontier.pop().await.unwrap() {}
+    while let Pop::Ready(_) = frontier.pop().await.unwrap() {}
 }
 
 fn frontiers(c: &mut Criterion) {

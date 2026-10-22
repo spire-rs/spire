@@ -59,7 +59,7 @@ Crawl a site two links deep and print every title:
 
 ```rust
 use spire::backend::HttpClient;
-use spire::extract::Html;
+use spire::extract::html::Html;
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::queue::Queue;

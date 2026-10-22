@@ -40,6 +40,11 @@ pub(crate) const NEXT_SEQUENCE: &str = "next_sequence";
 /// [`RedbStoreBuilder::sync_always`] to sync every commit instead, at a
 /// large cost in throughput.
 ///
+/// The database is the crawl's own. Keep an application's own tables, such
+/// as a search index, in a database of their own: redb locks its file and
+/// lets one transaction write at a time, so tables in the same file would
+/// wait on the frontier's every commit, and it on theirs.
+///
 /// ```no_run
 /// use spire_core::frontier::FrontierExt;
 /// use spire_redb::RedbStore;

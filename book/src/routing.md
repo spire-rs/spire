@@ -18,7 +18,7 @@ them, returning anything that converts into an `Outcome`: nothing, a
 
 ```rust
 use spire::Result;
-use spire::extract::Html;
+use spire::extract::html::Html;
 use spire::frontier::queue::Queue;
 use spire::request::Depth;
 use spire::request::http::Uri;
@@ -117,7 +117,7 @@ fetched once. They stop at the first one that does not return
 ```rust
 # use spire::handler::{Collect, FollowLinks};
 # use spire::Router;
-# use spire::extract::Select;
+# use spire::extract::html::Select;
 # use spire::backend::Noop;
 # #[derive(Debug, Select)]
 # #[select("article")]

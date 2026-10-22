@@ -2,7 +2,7 @@
 
 #![cfg(feature = "macros")]
 
-use spire::extract::{Html, Select};
+use spire::extract::html::{Html, Select};
 
 const PAGE: &str = r#"
     <html><body>

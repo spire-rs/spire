@@ -14,8 +14,8 @@ pub use crate::dataset::{Data, Dataset, InMemDataset};
 #[cfg(feature = "thirtyfour")]
 pub use crate::extract::Tab;
 #[cfg(feature = "html")]
-pub use crate::extract::{Element, Html, JsonLd, Meta, Select};
-pub use crate::extract::{FromRef, Head, Json, Query, State, Text};
+pub use crate::extract::html::{Element, Html, JsonLd, Meta, Select};
+pub use crate::extract::{Body, FromRef, Head, Json, Query, State, Text};
 pub use crate::frontier::memory::InMemFrontier;
 pub use crate::frontier::queue::{Link, Queue};
 pub use crate::frontier::seed::Seed;

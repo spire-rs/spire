@@ -34,7 +34,7 @@ anything implementing `Select`:
 
 ```rust
 use spire::Result;
-use spire::extract::Html;
+use spire::extract::html::Html;
 
 async fn page(html: Html) -> Result<()> {
     println!("{:?}", html.title());
@@ -45,13 +45,21 @@ async fn page(html: Html) -> Result<()> {
 }
 ```
 
+`visible_text()` is the text a reader sees: the body without scripts and
+styles, one line per paragraph or list item. `main_text()` keeps only the
+main content, the first `<main>`, `<article>` or `role="main"` element,
+without navigation and asides, for indexing or summarizing pages. To walk
+the tree yourself, `Html` wraps a `spire::extract::html::Document`, scraper's
+document, and `spire::extract::html` re-exports the rest of scraper at the
+version spire uses.
+
 ## Selecting with a derive
 
 `#[derive(Select)]`, with the `macros` feature, extracts a struct with CSS
 selectors:
 
 ```rust
-use spire::extract::{Element, Select};
+use spire::extract::html::{Element, Select};
 
 #[derive(Debug, Select)]
 #[select("article.product")]
@@ -98,7 +106,7 @@ on the page:
 ```rust
 use serde::Deserialize;
 use spire::Result;
-use spire::extract::{JsonLd, Meta};
+use spire::extract::html::{JsonLd, Meta};
 use spire::frontier::queue::Queue;
 
 /// The nodes to keep, by their `@type`.

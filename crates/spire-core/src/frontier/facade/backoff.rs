@@ -7,7 +7,7 @@ use tokio::time::Instant;
 
 use crate::Result;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, Next, Report};
+use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
 use crate::request::Tag;
 use crate::sync::lock;
 
@@ -109,10 +109,10 @@ impl<F: Frontier> Frontier for TagBackoff<F> {
         self.inner.push(seed)
     }
 
-    async fn pop(&self) -> Result<Next> {
+    async fn pop(&self) -> Result<Pop> {
         let now = Instant::now();
         if let Some(seed) = lock(&self.state).release(now) {
-            return Ok(Next::Ready(seed));
+            return Ok(Pop::Ready(seed));
         }
 
         loop {
@@ -121,22 +121,22 @@ impl<F: Frontier> Frontier for TagBackoff<F> {
                 if state.parked_len() >= self.max_parked
                     && let Some(earliest) = state.earliest()
                 {
-                    return Ok(Next::Wait(earliest));
+                    return Ok(Pop::Wait(earliest));
                 }
             }
 
             let next = self.inner.pop().await?;
             let mut state = lock(&self.state);
             return Ok(match next {
-                Next::Ready(seed) if state.is_paused(seed.tag(), now) => {
+                Pop::Ready(seed) if state.is_paused(seed.tag(), now) => {
                     state.park(seed);
                     continue;
                 }
-                Next::Ready(seed) => Next::Ready(seed),
-                Next::Wait(at) => {
-                    Next::Wait(state.earliest().map_or(at, |earliest| at.min(earliest)))
+                Pop::Ready(seed) => Pop::Ready(seed),
+                Pop::Wait(at) => {
+                    Pop::Wait(state.earliest().map_or(at, |earliest| at.min(earliest)))
                 }
-                Next::Empty => state.earliest().map_or(Next::Empty, Next::Wait),
+                Pop::Empty => state.earliest().map_or(Pop::Empty, Pop::Wait),
             });
         }
     }
@@ -200,14 +200,14 @@ mod tests {
         assert_eq!(pop_path(&frontier).await.as_deref(), Some("fast"));
         assert_eq!(frontier.size_hint(), Some(2));
         match frontier.pop().await.unwrap() {
-            Next::Wait(at) => assert_eq!(at - Instant::now(), Duration::from_secs(5)),
+            Pop::Wait(at) => assert_eq!(at - Instant::now(), Duration::from_secs(5)),
             next => panic!("expected wait, got {next:?}"),
         }
 
         advance(Duration::from_secs(5)).await;
         assert_eq!(pop_path(&frontier).await.as_deref(), Some("slow-1"));
         assert_eq!(pop_path(&frontier).await.as_deref(), Some("slow-2"));
-        assert!(matches!(frontier.pop().await.unwrap(), Next::Empty));
+        assert!(matches!(frontier.pop().await.unwrap(), Pop::Empty));
     }
 
     #[tokio::test(start_paused = true)]
@@ -222,7 +222,7 @@ mod tests {
         frontier.report(backoff(Some("slow"), 5)).await.unwrap();
 
         // One parked seed fills the facade, so the free seed waits too.
-        assert!(matches!(frontier.pop().await.unwrap(), Next::Wait(_)));
+        assert!(matches!(frontier.pop().await.unwrap(), Pop::Wait(_)));
         assert_eq!(frontier.size_hint(), Some(3));
         advance(Duration::from_secs(5)).await;
         assert_eq!(pop_path(&frontier).await.as_deref(), Some("a"));
@@ -248,7 +248,7 @@ mod tests {
         frontier.report(backoff(Some("a"), 1)).await.unwrap();
 
         advance(Duration::from_secs(1)).await;
-        assert!(matches!(frontier.pop().await.unwrap(), Next::Wait(_)));
+        assert!(matches!(frontier.pop().await.unwrap(), Pop::Wait(_)));
         advance(Duration::from_secs(9)).await;
         assert_eq!(pop_path(&frontier).await.as_deref(), Some("a"));
     }

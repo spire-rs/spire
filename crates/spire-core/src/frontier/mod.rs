@@ -61,7 +61,7 @@ pub trait Frontier: Send + Sync + 'static {
     /// # Errors
     ///
     /// Returns an error if the underlying storage fails.
-    fn pop(&self) -> impl Future<Output = Result<Next>> + Send;
+    fn pop(&self) -> impl Future<Output = Result<Pop>> + Send;
 
     /// Tells the frontier how a popped seed ended.
     ///
@@ -99,7 +99,7 @@ impl<F: Frontier> Frontier for std::sync::Arc<F> {
         F::push(self, seed)
     }
 
-    fn pop(&self) -> impl Future<Output = Result<Next>> + Send {
+    fn pop(&self) -> impl Future<Output = Result<Pop>> + Send {
         F::pop(self)
     }
 
@@ -142,7 +142,7 @@ impl Admission {
 
 /// The result of [`Frontier::pop`].
 #[derive(Debug)]
-pub enum Next {
+pub enum Pop {
     /// A seed is ready to be crawled.
     Ready(Seed),
     /// No seed is ready now, but one will be at the given instant.

@@ -8,7 +8,7 @@
 
 use spire::backend::HttpClient;
 use spire::dataset::{Data, InMemDataset};
-use spire::extract::{Element, Html, Select};
+use spire::extract::html::{Element, Html, Select};
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::queue::Queue;

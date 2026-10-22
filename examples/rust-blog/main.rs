@@ -27,9 +27,9 @@ use spire::backend::HttpClient;
 use spire::crawler::Robots;
 use spire::dataset::{InMemDataset, JsonlDataset};
 use spire::frontier::FrontierExt;
-use spire::frontier::redb::RedbStore;
 use spire::frontier::seed::Seed;
 use spire::handler::{Collect, FollowLinks, FollowSitemap};
+use spire::redb::RedbStore;
 use spire::{Crawler, Result, Router};
 use tracing_subscriber::EnvFilter;
 

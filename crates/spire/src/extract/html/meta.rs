@@ -7,7 +7,8 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::backend::Client;
-use crate::extract::{FromContext, Html};
+use crate::extract::FromContext;
+use crate::extract::html::Html;
 use crate::{Context, Error, Result};
 
 fn selector(css: &str) -> Selector {
@@ -105,7 +106,7 @@ fn flatten(value: Value, nodes: &mut Vec<Value>) {
 /// at hand, [`Html::meta`] reads the same without parsing the page again.
 ///
 /// ```
-/// use spire::extract::Meta;
+/// use spire::extract::html::Meta;
 ///
 /// async fn article(meta: Meta) {
 ///     let title = meta.properties.get("og:title").or(meta.title.as_ref());
@@ -160,7 +161,7 @@ where
 ///
 /// ```
 /// use serde::Deserialize;
-/// use spire::extract::JsonLd;
+/// use spire::extract::html::JsonLd;
 ///
 /// #[derive(Deserialize)]
 /// #[serde(tag = "@type")]

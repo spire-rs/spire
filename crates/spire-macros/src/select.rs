@@ -195,7 +195,7 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
     let ident = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     Ok(quote! {
-        impl #impl_generics ::spire::extract::Select for #ident #ty_generics #where_clause {
+        impl #impl_generics ::spire::extract::html::Select for #ident #ty_generics #where_clause {
             const ROOT: ::core::option::Option<&'static str> = #root;
 
             fn select(element: ::spire::__private::ElementRef<'_>) -> ::spire::Result<Self> {

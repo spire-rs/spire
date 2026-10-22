@@ -1,9 +1,13 @@
-//! The records a [`Sitemap`](crate::extract::Sitemap) holds, from the
-//! [sitemapo](https://docs.rs/sitemapo) parser: [`Entry`] for a page, and
-//! [`Sitemap`] for a sitemap an index lists, with their image, video, news
-//! and alternate-language extensions.
+//! Sitemaps: the [`Sitemap`] extractor, and the records it holds from the
+//! [sitemapo](https://docs.rs/sitemapo) parser.
+//!
+//! A [`Record`] is an [`Entry`] for a page, with its image, video, news and
+//! alternate-language extensions, or an [`IndexEntry`] for a sitemap an
+//! index lists, which sitemapo names `Sitemap`.
 
-pub(super) mod parse;
+mod parse;
 
 pub use sitemapo::Record;
-pub use sitemapo::record::*;
+pub use sitemapo::record::{Sitemap as IndexEntry, *};
+
+pub use self::parse::Sitemap;

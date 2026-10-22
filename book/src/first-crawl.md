@@ -26,7 +26,7 @@ enum Page {
 the `main.product` element of its page, with a name and an optional price:
 
 ```rust
-use spire::extract::Select;
+use spire::extract::html::Select;
 
 #[derive(Debug, Select)]
 #[select("main.product")]
@@ -43,7 +43,7 @@ struct Product {
 ```rust,no_run
 use spire::backend::HttpClient;
 use spire::dataset::InMemDataset;
-use spire::extract::Select;
+use spire::extract::html::Select;
 use spire::frontier::FrontierExt;
 use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;

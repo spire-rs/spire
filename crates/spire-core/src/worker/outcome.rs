@@ -49,14 +49,14 @@ impl Outcome {
     /// Pauses requests with the same tag as this one for `duration`.
     pub const fn backoff(duration: Duration) -> Self {
         Self::Backoff {
-            scope: Scope::Owner,
+            scope: Scope::SameTag,
             duration,
         }
     }
 
     /// Skips every further request with the same tag as this one.
     pub const fn abort() -> Self {
-        Self::Abort(Scope::Owner)
+        Self::Abort(Scope::SameTag)
     }
 
     /// Skips every further request with `tag`.
@@ -79,7 +79,7 @@ pub enum Scope {
     /// Requests sharing the tag of the request that was handled, including
     /// untagged requests when it had none.
     #[default]
-    Owner,
+    SameTag,
     /// Requests with the given tag.
     Tag(Tag),
 }

@@ -3,7 +3,7 @@
 use std::fmt::Write;
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use spire::extract::{Html, Select};
+use spire::extract::html::{Html, Select};
 
 #[derive(Debug, Select)]
 #[select("article.product")]

@@ -8,7 +8,7 @@ use spire_thirtyfour::thirtyfour::WebDriver;
 
 use crate::extract::FromContext;
 #[cfg(feature = "html")]
-use crate::extract::Html;
+use crate::extract::html::Html;
 use crate::request::http::{HeaderMap, StatusCode};
 use crate::{Context, Error, Result};
 

@@ -5,7 +5,7 @@ use flate2::bufread::GzDecoder;
 use sitemapo::{Parser, Record};
 
 use crate::backend::Client;
-use crate::extract::{Bytes, FromContext};
+use crate::extract::{Body, FromContext};
 use crate::{Context, Error, ErrorKind, Result};
 
 /// The magic bytes every gzip stream starts with.
@@ -23,7 +23,7 @@ const GZIP: [u8; 2] = [0x1f, 0x8b];
 /// limits of 50 000 URLs and 50 MiB: the records before a limit are kept.
 ///
 /// ```
-/// use spire::extract::Sitemap;
+/// use spire::extract::sitemap::Sitemap;
 /// use spire::extract::sitemap::Record;
 /// use spire::frontier::queue::Queue;
 ///
@@ -48,7 +48,7 @@ where
 
     async fn from_context(cx: &Context<C>, state: &S) -> Result<Self> {
         let uri = cx.request().uri().clone();
-        let Bytes(body) = Bytes::from_context(cx, state).await?;
+        let Body(body) = Body::from_context(cx, state).await?;
         let parsed = tokio::task::spawn_blocking(move || parse(&body)).await;
         let records = parsed
             .map_err(|error| Error::worker("sitemap parser panicked").with_source(error))?

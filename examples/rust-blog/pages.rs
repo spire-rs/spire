@@ -1,6 +1,6 @@
 //! What the crawl visits and extracts.
 
-use spire::extract::Select;
+use spire::extract::html::Select;
 use spire::request::Tags;
 
 /// The kinds of page the crawl visits, routed by tag. `Router::require`
