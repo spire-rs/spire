@@ -97,11 +97,12 @@ struct InFlight {
     fetch_time: Option<FetchTime>,
 }
 
-/// How a request went, as far as its host's limit is concerned: a host
-/// asking to slow down, or timing out, is throttling the crawl.
-fn signal(outcome: &Outcome) -> Signal {
+/// How a request went, as far as its host is concerned: a host answering
+/// `429` or `503`, or timing out, is throttling the crawl. A handler's
+/// backoff pauses its tag, not the host, so it is neither a success nor
+/// throttling.
+pub(super) fn signal(outcome: &Outcome) -> Signal {
     match outcome {
-        Outcome::Backoff { .. } => Signal::Throttled,
         Outcome::Fail(error)
             if error.kind() == ErrorKind::Timeout
                 || matches!(
@@ -111,7 +112,7 @@ fn signal(outcome: &Outcome) -> Signal {
         {
             Signal::Throttled
         }
-        Outcome::Fail(_) | Outcome::Retry { .. } => Signal::Failed,
+        Outcome::Fail(_) | Outcome::Retry { .. } | Outcome::Backoff { .. } => Signal::Failed,
         Outcome::Continue | Outcome::Abort(_) | Outcome::Stop => Signal::Ok,
     }
 }
@@ -128,11 +129,17 @@ impl Run {
         outcome: &Outcome,
     ) {
         let now = Instant::now();
-        let signal = signal(outcome);
-        // A retryable error with `Retry-After` pauses the host it came from.
+        // A retryable error with `Retry-After` pauses the host it came from
+        // for exactly as long, without slowing it down further: the host
+        // said how long to wait, so there is nothing to guess.
         let pause = match outcome {
             Outcome::Fail(error) if error.is_retryable() => error.retry_after(),
             _ => None,
+        };
+        let signal = if pause.is_some() {
+            Signal::Failed
+        } else {
+            signal(outcome)
         };
         // Hosts are tracked as soon as one is throttled, so it slows down
         // even in a crawl without limits or gaps.

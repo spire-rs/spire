@@ -29,11 +29,12 @@ holding up requests to other hosts.
 ## Slowing down
 
 A host is *throttled* when it answers `429 Too Many Requests` or `503
-Service Unavailable`, when a request to it times out, or when a handler
-backs off. Every crawl slows a throttled host down, without being asked:
+Service Unavailable`, or when a request to it times out. Every crawl slows
+a throttled host down, without being asked:
 
-- A `Retry-After` header pauses the host for as long as it asks: no
-  request starts to it until then, whatever its tag.
+- A `Retry-After` header pauses the host for exactly as long as it asks: no
+  request starts to it until then, whatever its tag, and it resumes at the
+  same pace after.
 - Once its concurrency cannot go lower, each round of throttling doubles the
   gap between its requests: from the delay's minimum, or one second without
   one, up to a maximum of one minute. Each success halves it back.

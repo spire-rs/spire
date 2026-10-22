@@ -30,7 +30,10 @@ pub(crate) enum Admit {
 
 struct Host {
     in_flight: usize,
-    next_start: Option<Instant>,
+    /// When the last request to the host started.
+    last_start: Option<Instant>,
+    /// Starts nothing before then, e.g. for a `Retry-After`.
+    paused_until: Option<Instant>,
     /// The policy's delay, its minimum raised by a robots.txt `Crawl-delay`.
     delay: HostDelay,
     /// The current gap between starts, from the delay's minimum up to its
@@ -42,6 +45,16 @@ struct Host {
     /// flight then slow it down once, not once each.
     slowed: Option<Instant>,
     parked: VecDeque<Seed>,
+}
+
+impl Host {
+    /// The earliest instant the next request may start: the gap after the
+    /// last start, as the gap is now, or the end of a pause.
+    fn due(&self) -> Option<Instant> {
+        let gap = self.last_start.filter(|_| !self.gap.is_zero());
+        let after_gap = gap.map(|last| last + self.gap);
+        after_gap.max(self.paused_until)
+    }
 }
 
 /// The state of every host a run has seen.
@@ -83,7 +96,8 @@ impl Hosts {
         if !self.by_key.contains_key(key) {
             let host = Host {
                 in_flight: 0,
-                next_start: None,
+                last_start: None,
+                paused_until: None,
                 delay: self.policy.delay,
                 gap: self.policy.delay.min(),
                 limit: Limit::new(),
@@ -106,7 +120,7 @@ impl Hosts {
             };
             host.in_flight < limit
         });
-        let due = host.next_start.is_none_or(|at| at <= now);
+        let due = host.due().is_none_or(|at| at <= now);
         capacity && due
     }
 
@@ -159,18 +173,15 @@ impl Hosts {
     pub(crate) fn started(&mut self, key: &str, now: Instant) {
         let host = self.host(key);
         host.in_flight += 1;
-        if !host.gap.is_zero() {
-            let next = now + host.gap;
-            host.next_start = Some(host.next_start.map_or(next, |at| at.max(next)));
-        }
+        host.last_start = Some(now);
     }
 
     /// Starts no request to `key` before `until`, e.g. for a `Retry-After`.
     pub(crate) fn pause(&mut self, key: &str, until: Instant) {
         let host = self.host(key);
-        if host.next_start.is_none_or(|at| at < until) {
+        if host.paused_until.is_none_or(|at| at < until) {
             tracing::info!(target: TRACING_TARGET, host = key, "pausing host, as it asked");
-            host.next_start = Some(until);
+            host.paused_until = Some(until);
         }
     }
 
@@ -236,7 +247,7 @@ impl Hosts {
         self.by_key
             .values()
             .filter(|host| !host.parked.is_empty())
-            .filter_map(|host| host.next_start)
+            .filter_map(Host::due)
             .min()
     }
 

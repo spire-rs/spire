@@ -8,13 +8,15 @@ use std::time::Duration;
 /// a minimum, growing towards a maximum while the host is throttled.
 ///
 /// A host is throttled when it answers `429 Too Many Requests` or `503
-/// Service Unavailable`, a request to it times out, or a handler backs off.
+/// Service Unavailable`, or a request to it times out.
 /// Once its concurrency cannot go lower, at a fixed limit or at one with
 /// [`HostConcurrency::adaptive`](crate::crawler::HostConcurrency::adaptive),
 /// each round of throttling doubles its gap, from the minimum, or one
 /// second without one, up to the maximum. Each success halves it back to
-/// the minimum. A `Retry-After` from the host pauses it for as long as it
-/// asks, beyond the maximum if need be.
+/// the minimum. A `Retry-After` from the host pauses it for exactly as long
+/// as it asks, beyond the maximum if need be, without widening its gap.
+/// The next request waits for the gap after the last one started, as the
+/// gap is when it is due, so a widened gap applies at once.
 ///
 /// A [`Duration`] is the minimum, with the [default maximum](Self::DEFAULT_MAX). A
 /// range sets both ends; the same value at both ends keeps the gap fixed.
