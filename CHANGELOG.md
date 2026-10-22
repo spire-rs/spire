@@ -10,6 +10,11 @@ and this project adheres to
 
 ### Added
 
+- `spire-core`: adaptive host concurrency. `with_host_concurrency` takes a
+  `HostConcurrency`: a fixed number as before, or
+  `HostConcurrency::adaptive(max)`, a limit per host that grows with each
+  round of fast responses and halves on `429`, `503`, timeouts, or
+  responses slower than twice the host's best.
 - `spire`: `Html::visible_text`, the text a reader sees, one line per
   block, and `Html::main_text`, the text of the page's main content without
   navigation.
@@ -30,6 +35,11 @@ and this project adheres to
 
 ### Changed
 
+- **Breaking:** adaptive host delays are replaced by adaptive host
+  concurrency, which adapts the one setting a crawl has to choose, how many
+  requests a host gets at once, instead of a delay aiming at a separate
+  average concurrency. `HostDelay` and `AdaptiveDelay` are removed, and
+  `with_host_delay` takes a `Duration` again, as a minimum gap.
 - **Breaking:** the redb types moved from `spire::frontier::redb` and
   `spire::dataset` to one `spire::redb` module: `RedbStore`, `RedbFrontier`,
   `RedbSeen`, `RedbDataset` and the `redb` crate.

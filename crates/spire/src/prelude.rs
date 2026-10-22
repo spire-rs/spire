@@ -9,7 +9,7 @@ pub use crate::backend::HttpClient;
 pub use crate::backend::{Backend, Client as _, StatusPolicy};
 #[cfg(feature = "thirtyfour")]
 pub use crate::backend::{BrowserBackend, BrowserSession};
-pub use crate::crawler::HostDelay;
+pub use crate::crawler::HostConcurrency;
 pub use crate::dataset::{Data, Dataset, InMemDataset};
 #[cfg(feature = "thirtyfour")]
 pub use crate::extract::Tab;

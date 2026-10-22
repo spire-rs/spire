@@ -26,39 +26,35 @@ Hosts are told apart by their authority, so `http://` and `https://` of the
 same host share their limits. A request whose host is busy waits without
 holding up requests to other hosts.
 
-## Adaptive delays
+## Adaptive concurrency
 
-A fixed delay is either too slow for a fast site or too fast for a slow one.
-`HostDelay::adaptive` gives each host its own delay instead, adapted to how
-fast it answers:
+A fixed limit is either too timid for a fast site or too much for a slow
+one. `HostConcurrency::adaptive` gives each host its own limit instead, up
+to a maximum, adapted to how it responds:
 
 ```rust,no_run
-use std::time::Duration;
-
 use spire::backend::HttpClient;
-use spire::crawler::HostDelay;
+use spire::crawler::HostConcurrency;
 use spire::{Crawler, Router};
 # async fn page() {}
 
-let delay = HostDelay::adaptive()
-    .with_target_concurrency(2)
-    .with_bounds(Duration::from_millis(100), Duration::from_secs(30));
 let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page))
-    .with_host_concurrency(4)
-    .with_host_delay(delay);
+    .with_host_concurrency(HostConcurrency::adaptive(8));
 ```
 
-- Each host starts at a 1 s delay. After every response, its delay moves
-  halfway towards the response time divided by the *target concurrency*:
-  the number of requests to aim for in flight per host, 1 by default. A host
-  answering in 400 ms with a target of 2 settles on 200 ms between requests.
-- A failed request never lowers the delay, so a server failing fast does not
-  look fast. A `429`, a `503` or a timeout doubles it.
-- The response time is how long the fetch took, not the handlers, so slow
+- Each host starts at one request at a time. Its limit grows by one for
+  every round of responses that come back about as fast as the host's best:
+  one more after one success at a limit of one, after two at two, and so on,
+  up to the maximum.
+- It halves when the host asks to slow down, with a `429` or a `503`, when a
+  request times out, or when responses take more than twice the host's best
+  time, which is how an overloaded server shows before it fails. It halves
+  at most once per round, never below one. Other failures leave it alone.
+- Response times are how long the fetch took, not the handlers, so slow
   parsing does not slow the crawl down.
-- Delays stay within the bounds, 0 to 60 s by default, and never go below a
-  robots.txt `Crawl-delay`. `with_host_concurrency` still caps the requests
-  in flight.
+- `with_host_delay` still spaces the requests to a host, and a robots.txt
+  `Crawl-delay` still raises it: a delay is a minimum gap, whatever the
+  limit allows.
 
 ## robots.txt
 

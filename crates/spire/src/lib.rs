@@ -38,7 +38,7 @@ pub mod crawler {
     #[cfg(feature = "robots")]
     #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
     pub use spire_core::crawler::Robots;
-    pub use spire_core::crawler::{AdaptiveDelay, HostDelay, Stats};
+    pub use spire_core::crawler::{HostConcurrency, Stats};
 
     #[cfg(doc)]
     use crate::Crawler;

@@ -1,21 +1,20 @@
 //! Per-host politeness: concurrency and delays.
 
 use std::collections::{HashMap, VecDeque};
-use std::num::NonZeroUsize;
 use std::time::Duration;
 
 use tokio::time::Instant;
 
-use crate::crawler::delay::{Feedback, HostDelay};
+use crate::crawler::concurrency::{Feedback, HostConcurrency, Limit};
 use crate::frontier::seed::Seed;
 
 /// How a crawl treats every host.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct HostPolicy {
     /// Requests in flight per host at most; unlimited if `None`.
-    pub(crate) max_concurrency: Option<NonZeroUsize>,
+    pub(crate) concurrency: Option<HostConcurrency>,
     /// Time between the starts of two requests to the same host.
-    pub(crate) delay: HostDelay,
+    pub(crate) delay: Duration,
 }
 
 /// What to do with a seed that is allowed to be crawled.
@@ -26,13 +25,13 @@ pub(crate) enum Admit {
     Parked,
 }
 
-#[derive(Default)]
 struct Host {
     in_flight: usize,
     next_start: Option<Instant>,
+    /// The policy's delay, raised by a robots.txt `Crawl-delay`.
     delay: Duration,
-    /// The lowest the delay may go, e.g. a robots.txt `Crawl-delay`.
-    floor: Duration,
+    /// The host's own limit, if limits adapt.
+    limit: Limit,
     parked: VecDeque<Seed>,
 }
 
@@ -61,7 +60,7 @@ impl Hosts {
     /// Tracks hosts if `policy` limits them, or if `delays` may be raised
     /// later, e.g. by a robots.txt `Crawl-delay`.
     pub(crate) fn new(policy: HostPolicy, delays: bool) -> Self {
-        let tracked = policy.max_concurrency.is_some() || !policy.delay.is_zero() || delays;
+        let tracked = policy.concurrency.is_some() || !policy.delay.is_zero() || delays;
         Self {
             policy,
             tracked,
@@ -74,8 +73,11 @@ impl Hosts {
         // Looked up first, so the key is only copied for a new host.
         if !self.by_key.contains_key(key) {
             let host = Host {
-                delay: self.policy.delay.initial(),
-                ..Host::default()
+                in_flight: 0,
+                next_start: None,
+                delay: self.policy.delay,
+                limit: Limit::new(),
+                parked: VecDeque::new(),
             };
             self.by_key.insert(key.to_owned(), host);
         }
@@ -85,9 +87,14 @@ impl Hosts {
     }
 
     fn is_free(policy: HostPolicy, host: &Host, now: Instant) -> bool {
-        let capacity = policy
-            .max_concurrency
-            .is_none_or(|max| host.in_flight < max.get());
+        let capacity = policy.concurrency.is_none_or(|concurrency| {
+            let limit = if concurrency.is_adaptive() {
+                host.limit.get()
+            } else {
+                concurrency.max()
+            };
+            host.in_flight < limit
+        });
         let due = host.next_start.is_none_or(|at| at <= now);
         capacity && due
     }
@@ -139,19 +146,23 @@ impl Hosts {
         }
     }
 
-    /// Whether delays adapt to responses, which then need [`Feedback`].
-    pub(crate) const fn adaptive(&self) -> bool {
-        matches!(self.policy.delay, HostDelay::Adaptive(_))
+    /// Whether limits adapt to responses, which then need [`Feedback`].
+    pub(crate) fn adaptive(&self) -> bool {
+        self.policy
+            .concurrency
+            .is_some_and(HostConcurrency::is_adaptive)
     }
 
-    /// Records that a request to `key` finished, adapting the host's delay
-    /// to `feedback` if delays are adaptive.
-    pub(crate) fn finished(&mut self, key: &str, feedback: Option<Feedback>) {
-        let policy = self.policy;
+    /// Records that a request to `key` finished at `now`, adapting the
+    /// host's limit to `feedback` if limits adapt.
+    pub(crate) fn finished(&mut self, key: &str, feedback: Option<Feedback>, now: Instant) {
+        let concurrency = self.policy.concurrency;
         let host = self.host(key);
         host.in_flight = host.in_flight.saturating_sub(1);
-        if let (HostDelay::Adaptive(adaptive), Some(feedback)) = (policy.delay, feedback) {
-            host.delay = adaptive.next(host.delay, feedback).max(host.floor);
+        if let (Some(concurrency), Some(feedback)) = (concurrency, feedback)
+            && concurrency.is_adaptive()
+        {
+            host.limit.update(concurrency.max(), feedback, now);
         }
     }
 
@@ -160,7 +171,6 @@ impl Hosts {
     #[cfg(feature = "robots")]
     pub(crate) fn raise_delay(&mut self, key: &str, delay: Duration) {
         let host = self.host(key);
-        host.floor = host.floor.max(delay);
         host.delay = host.delay.max(delay);
     }
 
@@ -198,8 +208,8 @@ mod tests {
 
     fn policy(max: usize, delay: u64) -> HostPolicy {
         HostPolicy {
-            max_concurrency: NonZeroUsize::new(max),
-            delay: Duration::from_secs(delay).into(),
+            concurrency: (max > 0).then(|| HostConcurrency::fixed(max)),
+            delay: Duration::from_secs(delay),
         }
     }
 
@@ -223,7 +233,7 @@ mod tests {
         ));
         assert!(hosts.take_ready(now).is_none());
 
-        hosts.finished("a.com", None);
+        hosts.finished("a.com", None, now);
         assert_eq!(hosts.take_ready(now).unwrap().uri().path(), "/2");
         assert_eq!(hosts.parked(), 0);
     }
@@ -278,41 +288,49 @@ mod tests {
     }
 
     #[test]
-    fn adaptive_delays_follow_each_host_above_its_floor() {
-        use crate::crawler::delay::{AdaptiveDelay, Signal};
+    fn adaptive_limits_gate_each_host() {
+        use crate::crawler::concurrency::Signal;
 
         let now = Instant::now();
         let policy = HostPolicy {
-            max_concurrency: None,
-            delay: AdaptiveDelay::new().into(),
+            concurrency: Some(HostConcurrency::adaptive(4)),
+            delay: Duration::ZERO,
         };
         let mut hosts = Hosts::new(policy, false);
+        assert!(hosts.adaptive());
+
+        // A host starts at one request at a time.
+        let first = seed("https://a.com/1");
+        assert!(matches!(hosts.admit(first.clone(), now), Admit::Start(_)));
+        hosts.start(&first, now);
+        assert!(matches!(
+            hosts.admit(seed("https://a.com/2"), now),
+            Admit::Parked
+        ));
+        assert!(matches!(
+            hosts.admit(seed("https://b.com/"), now),
+            Admit::Start(_)
+        ));
+
+        // A fast success raises it to two: the parked seed and one more
+        // start, and a fourth waits.
         let fast = Feedback {
-            latency: Some(Duration::ZERO),
+            started: now,
+            latency: Some(Duration::from_millis(100)),
             signal: Signal::Ok,
         };
-
-        // Each host starts at 1s, and halves towards a latency of zero.
-        assert!(hosts.adaptive());
-        assert_eq!(
-            hosts.start(&seed("https://a.com/"), now).as_deref(),
-            Some("a.com")
-        );
-        hosts.finished("a.com", Some(fast));
+        hosts.finished("a.com", Some(fast), now);
+        assert_eq!(hosts.by_key["a.com"].limit.get(), 2);
+        assert_eq!(hosts.take_ready(now).unwrap().uri().path(), "/2");
         hosts.started("a.com", now);
-        assert_eq!(
-            hosts.by_key["a.com"].next_start,
-            Some(now + Duration::from_millis(500))
-        );
-
-        // A `Crawl-delay` is a floor the delay does not go under.
-        #[cfg(feature = "robots")]
-        {
-            hosts.raise_delay("b.com", Duration::from_secs(2));
-            hosts.started("b.com", now);
-            hosts.finished("b.com", Some(fast));
-            assert_eq!(hosts.by_key["b.com"].delay, Duration::from_secs(2));
-        }
-        assert_eq!(hosts.by_key["a.com"].delay, Duration::from_millis(500));
+        assert!(matches!(
+            hosts.admit(seed("https://a.com/3"), now),
+            Admit::Start(_)
+        ));
+        hosts.started("a.com", now);
+        assert!(matches!(
+            hosts.admit(seed("https://a.com/4"), now),
+            Admit::Parked
+        ));
     }
 }
