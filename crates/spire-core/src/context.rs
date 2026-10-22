@@ -30,7 +30,7 @@ pub struct Context<C> {
     queue: Queue,
     datasets: Arc<Datasets>,
     response: OnceCell<Response<()>>,
-    /// Where to record how long the fetch took, for adaptive host delays.
+    /// Where to record how long the fetch took, for adaptive host limits.
     fetch_time: Option<FetchTime>,
 }
 

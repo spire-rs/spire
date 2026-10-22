@@ -838,35 +838,60 @@ mod resume {
     }
 }
 
-/// Crawls three pages of one host answering in 200ms, with `delay`, and
-/// returns how long it took.
-async fn crawl_slow_host(delay: crate::crawler::HostDelay) -> Duration {
-    use crate::testing::{MockClient, MockPage, MockSite};
+/// Crawls twelve pages of one host, each answering `page` after 100ms,
+/// with `concurrency`, and returns the most fetches in flight at once.
+async fn peak_fetches(
+    page: crate::testing::MockPage,
+    concurrency: crate::crawler::HostConcurrency,
+) -> usize {
+    use std::sync::atomic::AtomicUsize;
 
-    let page = MockPage::text("").with_latency(Duration::from_millis(200));
-    let site = (1..=3).fold(MockSite::new(), |site, i| {
+    use crate::testing::{MockClient, MockSite};
+
+    let page = page.with_latency(Duration::from_millis(100));
+    let site = (0..12).fold(MockSite::new(), |site, i| {
         site.page(&format!("https://example.com/{i}"), page.clone())
     });
-    let worker = from_fn(|cx: Context<MockClient>| async move { cx.response().await.map(drop) });
+    let counts = Arc::new((AtomicUsize::new(0), AtomicUsize::new(0)));
+    let worker = {
+        let counts = Arc::clone(&counts);
+        from_fn(move |cx: Context<MockClient>| {
+            let counts = Arc::clone(&counts);
+            async move {
+                let (now, peak) = &*counts;
+                let in_flight = now.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(in_flight, Ordering::SeqCst);
+                let response = cx.response().await.map(drop);
+                now.fetch_sub(1, Ordering::SeqCst);
+                response
+            }
+        })
+    };
     let crawler = Crawler::new(site, worker)
-        .with_host_delay(delay)
-        .with_seeds((1..=3).map(|i| seed(&i.to_string())));
-
-    let stats = crawler.run().await.unwrap();
-    assert_eq!(stats.succeeded, 3);
-    stats.elapsed
+        .with_frontier(InMemFrontier::fifo())
+        .with_host_concurrency(concurrency)
+        .with_seeds((0..12).map(|i| seed(&i.to_string())));
+    crawler.run().await.unwrap();
+    counts.1.load(Ordering::SeqCst)
 }
 
 #[tokio::test(start_paused = true)]
-async fn adaptive_host_delays_follow_response_times() {
-    use crate::crawler::HostDelay;
+async fn host_concurrency_is_fixed_or_adapts() {
+    use http::StatusCode;
 
-    // Fixed: requests start at 0s, 1s and 2s, the last ending at 2.2s.
-    let fixed = crawl_slow_host(Duration::from_secs(1).into()).await;
-    assert_eq!(fixed, Duration::from_millis(2200));
+    use crate::crawler::HostConcurrency;
+    use crate::testing::MockPage;
 
-    // Adaptive, from 1s: the first 200ms response lowers the delay to 0.6s,
-    // and the second to 0.4s, so requests start at 0s, 1s and 1.6s.
-    let adaptive = crawl_slow_host(HostDelay::adaptive().into()).await;
-    assert_eq!(adaptive, Duration::from_millis(1800));
+    // A fixed limit is reached at once.
+    let fixed = peak_fetches(MockPage::text(""), 3.into()).await;
+    assert_eq!(fixed, 3);
+
+    // An adaptive one grows from one to its maximum with every success.
+    let healthy = peak_fetches(MockPage::text(""), HostConcurrency::adaptive(4)).await;
+    assert_eq!(healthy, 4);
+
+    // A host asking to slow down keeps it at one.
+    let busy = MockPage::status(StatusCode::SERVICE_UNAVAILABLE);
+    let busy = peak_fetches(busy, HostConcurrency::adaptive(4)).await;
+    assert_eq!(busy, 1);
 }

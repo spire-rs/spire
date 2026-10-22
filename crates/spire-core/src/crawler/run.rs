@@ -10,7 +10,7 @@ use tracing::Instrument;
 
 use crate::backend::Backend;
 use crate::context::{Context, FetchTime};
-use crate::crawler::delay::{Feedback, Signal};
+use crate::crawler::concurrency::{Feedback, Signal};
 use crate::crawler::hosts::{Admit, Hosts};
 #[cfg(feature = "robots")]
 use crate::crawler::robots::{BackendSource, RobotsCache, RobotsSource, Verdict};
@@ -91,11 +91,13 @@ struct InFlight {
     seed: Seed,
     /// Its host's key, if hosts are tracked.
     host: Option<String>,
-    /// How long its fetch took, if host delays adapt to it.
+    /// When it started.
+    started: Instant,
+    /// How long its fetch took, if host limits adapt to it.
     fetch_time: Option<FetchTime>,
 }
 
-/// How a request went, as far as its host's delay is concerned: a host
+/// How a request went, as far as its host's limit is concerned: a host
 /// asking to slow down, or timing out, is throttling the crawl.
 fn signal(outcome: &Outcome) -> Signal {
     match outcome {
@@ -466,7 +468,8 @@ where
         }
 
         run.started += 1;
-        let host = run.hosts.start(&seed, Instant::now());
+        let now = Instant::now();
+        let host = run.hosts.start(&seed, now);
         let fetch_time = run.hosts.adaptive().then(FetchTime::default);
 
         let backend = self.backend.clone();
@@ -523,6 +526,7 @@ where
         let in_flight = InFlight {
             seed,
             host,
+            started: now,
             fetch_time,
         };
         run.in_flight.insert(id, in_flight);
@@ -537,7 +541,7 @@ where
                     return;
                 };
                 if let Some(host) = host {
-                    run.hosts.finished(&host, None);
+                    run.hosts.finished(&host, None, Instant::now());
                 }
                 self.tally(|stats| stats.cancelled += 1);
                 self.report(run, Report::Cancelled(seed)).await;
@@ -551,6 +555,7 @@ where
         let Some(InFlight {
             seed,
             host,
+            started,
             fetch_time,
         }) = run.in_flight.remove(&id)
         else {
@@ -558,10 +563,11 @@ where
         };
         if let Some(host) = host {
             let feedback = fetch_time.map(|fetch_time| Feedback {
+                started,
                 latency: *lock(&fetch_time),
                 signal: signal(&outcome),
             });
-            run.hosts.finished(&host, feedback);
+            run.hosts.finished(&host, feedback, Instant::now());
         }
         self.tally(|stats| stats.requests += 1);
 

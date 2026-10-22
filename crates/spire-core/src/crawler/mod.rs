@@ -1,6 +1,6 @@
 //! The [`Crawler`], which drives a crawl to completion.
 
-mod delay;
+mod concurrency;
 mod hosts;
 #[cfg(feature = "robots")]
 mod robots;
@@ -14,7 +14,7 @@ use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-pub use delay::{AdaptiveDelay, HostDelay};
+pub use concurrency::HostConcurrency;
 #[cfg(feature = "robots")]
 #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
 pub use robots::Robots;
@@ -220,21 +220,19 @@ impl<B, W> Crawler<B, W> {
         self
     }
 
-    /// Sets how many requests to the same host are in flight at once, at
-    /// least one. Unlimited by default.
+    /// Sets how many requests to the same host are in flight at once:
+    /// a fixed number, at least one, or a limit per host adapted to how it
+    /// responds with [`HostConcurrency::adaptive`]. Unlimited by default.
     #[must_use]
-    pub fn with_host_concurrency(mut self, limit: usize) -> Self {
-        let limit = NonZeroUsize::new(limit).unwrap_or(NonZeroUsize::MIN);
-        self.settings.hosts.max_concurrency = Some(limit);
+    pub fn with_host_concurrency(mut self, limit: impl Into<HostConcurrency>) -> Self {
+        self.settings.hosts.concurrency = Some(limit.into());
         self
     }
 
-    /// Waits between starting two requests to the same host: a fixed
-    /// [`Duration`], or a delay per host adapted to how fast it answers with
-    /// [`HostDelay::adaptive`].
+    /// Waits at least `delay` between starting two requests to the same host.
     #[must_use]
-    pub fn with_host_delay(mut self, delay: impl Into<HostDelay>) -> Self {
-        self.settings.hosts.delay = delay.into();
+    pub const fn with_host_delay(mut self, delay: Duration) -> Self {
+        self.settings.hosts.delay = delay;
         self
     }
 
