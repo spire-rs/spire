@@ -54,3 +54,44 @@ async fn main() -> Result<()> {
 Pages are `html`, `text`, `json`, `xml`, a `status`, or a `redirect`, which
 is followed as an HTTP client would. URLs without a page get a `404`, and
 error statuses fail the fetch as they do over HTTP.
+
+## Behaving like a server
+
+`MockSite` answers as a real server would, so the parts of a crawl that
+depend on the server can be tested too:
+
+- **Error statuses** go through the same `StatusPolicy` as the real
+  backends: a `404` is rejected, and a `429` or `503` with `Retry-After` is
+  retried after it. `with_status_policy(StatusPolicy::Accept)` hands every
+  status to the handlers instead.
+- **Redirects** with `MockPage::redirect` are followed, and the final URI is
+  set, so links resolve as they would over HTTP.
+- **Slow pages** with `MockPage::with_latency` take that long to answer,
+  e.g. to test timeouts or adaptive host concurrency. With
+  `#[tokio::test(start_paused = true)]`, the wait takes no real time.
+- **Conditional requests**: a page with an `ETag` or `Last-Modified` header
+  answers `304 Not Modified` to a request that still matches it, e.g. to
+  test `Revalidate`.
+
+```rust
+use std::time::Duration;
+
+use spire::request::http::header::{ETAG, RETRY_AFTER};
+use spire::request::http::{HeaderValue, StatusCode};
+use spire::testing::{MockPage, MockSite};
+
+let site = MockSite::new()
+    .page(
+        "https://shop.test/busy",
+        MockPage::status(StatusCode::TOO_MANY_REQUESTS)
+            .with_header(RETRY_AFTER, HeaderValue::from_static("5")),
+    )
+    .page(
+        "https://shop.test/slow",
+        MockPage::html("<p>slow</p>").with_latency(Duration::from_secs(10)),
+    )
+    .page(
+        "https://shop.test/cached",
+        MockPage::html("<p>v1</p>").with_header(ETAG, HeaderValue::from_static("\"v1\"")),
+    );
+```

@@ -121,19 +121,24 @@ retried, honouring `Retry-After`.
 
 [The Spire Book](https://spire-rs.github.io/spire) explains every part of a crawl:
 
-- [How a crawl works](https://spire-rs.github.io/spire/concepts.html): seeds, the frontier, backends,
-  routers and datasets
-- [Routing](https://spire-rs.github.io/spire/routing.html) by tag and path, with typed tags and several
-  handlers per page
-- [Extracting data](https://spire-rs.github.io/spire/extracting.html) from HTML, JSON and text
-- [Storing results](https://spire-rs.github.io/spire/datasets.html) in memory or as JSON Lines
-- [The frontier](https://spire-rs.github.io/spire/frontier.html): deduplication, depth, retries,
-  backoff, and crawls that survive a crash
-- [Limits and politeness](https://spire-rs.github.io/spire/politeness.html): per-host limits,
-  robots.txt and budgets
-- [Sitemaps](https://spire-rs.github.io/spire/sitemaps.html), [browsers](https://spire-rs.github.io/spire/browsers.html),
-  [middleware and proxies](https://spire-rs.github.io/spire/middleware.html), and
-  [testing](https://spire-rs.github.io/spire/testing.html)
+- **Getting started**: [installation](https://spire-rs.github.io/spire/installation.html), a
+  [first crawl](https://spire-rs.github.io/spire/first-crawl.html), and
+  [how a crawl works](https://spire-rs.github.io/spire/concepts.html)
+- **Handling pages**: [routing](https://spire-rs.github.io/spire/routing.html),
+  [extractors](https://spire-rs.github.io/spire/extractors.html), [HTML](https://spire-rs.github.io/spire/html.html), and
+  [storing results](https://spire-rs.github.io/spire/datasets.html)
+- **Discovering pages**: [following links](https://spire-rs.github.io/spire/links.html) and
+  [sitemaps](https://spire-rs.github.io/spire/sitemaps.html)
+- **Fetching**: [HTTP](https://spire-rs.github.io/spire/http.html), [browsers](https://spire-rs.github.io/spire/browsers.html), and
+  [middleware](https://spire-rs.github.io/spire/middleware.html)
+- **Running a crawl**: [the frontier](https://spire-rs.github.io/spire/frontier.html),
+  [errors and retries](https://spire-rs.github.io/spire/errors.html),
+  [limits and politeness](https://spire-rs.github.io/spire/politeness.html),
+  [recrawls](https://spire-rs.github.io/spire/recrawls.html), [crash safety](https://spire-rs.github.io/spire/redb.html), and
+  [logs and statistics](https://spire-rs.github.io/spire/observability.html)
+- **Extending spire**: [testing](https://spire-rs.github.io/spire/testing.html),
+  [custom backends](https://spire-rs.github.io/spire/custom-backends.html), and
+  [custom storage](https://spire-rs.github.io/spire/custom-storage.html)
 
 The API reference is on [docs.rs](https://docs.rs/spire).
 

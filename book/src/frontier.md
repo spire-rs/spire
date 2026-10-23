@@ -74,75 +74,66 @@ A crawler without `with_frontier` uses `InMemFrontier::fifo()` with the
 default retries, and no deduplication. Add `dedup` to any crawl that follows
 links, or it will crawl pages again whenever they are linked twice.
 
-## Retries
+## Seen sets
 
-`retry(3)` retries a failed request up to 3 times: after 500 ms, then
-doubling the delay up to 30 s, each delay shortened by up to 20% so requests
-failing together are not retried together. `RetryPolicy` changes those:
+`dedup` remembers every fingerprint it has seen, in memory. Long crawls have
+other options, through `dedup_with`:
+
+| Seen set | Memory | Exact |
+|---|---|---|
+| `InMemSeen`, which `dedup()` uses | About 16 bytes per URL | Yes |
+| `BloomSeen::new(expected, rate)` | About 1.2 bytes per expected URL at a 1% rate | No: a new URL is mistaken for a seen one, and skipped, at `rate` |
+| A redb store's `seen()` | Flat: kept on disk | Yes |
 
 ```rust
-use std::time::Duration;
-
 use spire::frontier::FrontierExt;
-use spire::frontier::facade::RetryPolicy;
 use spire::frontier::memory::InMemFrontier;
+use spire::frontier::seen::BloomSeen;
 
-let policy = RetryPolicy::new(5)
-    .with_base_delay(Duration::from_secs(1))
-    .with_max_delay(Duration::from_secs(60))
-    .with_jitter(50);
-let frontier = InMemFrontier::fifo().retry_with(policy);
+// Ten million URLs in about 12 MB, skipping one new URL in a hundred.
+let frontier = InMemFrontier::fifo().dedup_with(BloomSeen::new(10_000_000, 0.01));
 ```
 
-Only errors that may succeed next time are retried: timeouts, connection
-errors, and `408`, `429` and `5xx` statuses. Other `4xx` statuses, invalid
-requests and failed extractors are not. A handler can ask for a retry itself
-with `Outcome::retry()`.
+A Bloom filter past its expected size makes more mistakes; it logs a
+warning once.
 
-## Backoff
+## Stopping and resuming
 
-When a site answers `429 Too Many Requests` or `503 Service Unavailable`
-with a `Retry-After` header, the crawler pauses every request to that host
-for as long as it asks, then tries the request again; see
-[Limits and politeness](politeness.md). A handler pauses a tag itself with
-`Outcome::backoff(duration)`, which `tag_backoff` applies to every request
-with that tag, and `Outcome::abort()` skips every further request of its
-tag.
+A redb store keeps the frontier and the seen set across runs, crashes
+included: see [Crash safety with redb](redb.md).
 
-## Surviving a crash
-
-With the `redb` feature, `RedbStore` keeps the frontier and the seen set in
-one file on disk. Reopening the file after a crash resumes where the crawl
-stopped:
+Without it, a stopped crawl's state can be saved and restored by hand.
+`Crawler::snapshot` copies the seeds the frontier still holds, including
+those waiting for a retry and those the stop cancelled, and `InMemSeen` and
+`BloomSeen` have snapshots of their own. With the `serde` feature, both
+serialize:
 
 ```rust,no_run
+use std::sync::Arc;
+
 use spire::backend::HttpClient;
 use spire::frontier::FrontierExt;
-use spire::redb::RedbStore;
-use spire::frontier::seed::Seed;
+use spire::frontier::memory::InMemFrontier;
+use spire::frontier::seen::InMemSeen;
 use spire::{Crawler, Result, Router};
+# async fn page() {}
 
-# async fn crawl(router: Router<<HttpClient as spire::backend::Backend>::Client>) -> Result<()> {
-let store = RedbStore::open("crawl.redb").await?;
-let frontier = store.frontier().dedup_with(store.seen()).retry(3);
+# async fn crawl() -> Result<()> {
+let seen = Arc::new(InMemSeen::default());
+let first = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+    .with_frontier(InMemFrontier::fifo().dedup_with(Arc::clone(&seen)))
+    .with_max_requests(1000);
+first.run().await?;
+let (seeds, fingerprints) = (first.snapshot().unwrap_or_default(), seen.snapshot());
+// ... save both with serde, and load them in the next run ...
 
-let crawler = Crawler::new(HttpClient::default(), router)
-    .with_frontier(frontier)
-    // Refused as already seen when the crawl resumes.
-    .with_seed(Seed::get("https://example.com/")?);
-crawler.run().await?;
+// Restored as is: the queue without facades, the seen set from its
+// fingerprints.
+let seen = Arc::new(fingerprints.into_iter().collect::<InMemSeen>());
+let frontier = seeds.into_iter().collect::<InMemFrontier>().dedup_with(seen);
+let next = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+    .with_frontier(frontier);
+next.run().await?;
 # Ok(())
 # }
 ```
-
-The frontier queues seeds by priority, then in the order queued. A seed
-popped for crawling stays recorded until its outcome is reported, so the
-requests in flight at a crash are crawled again: a request may run twice,
-but none is lost. Commits are synced to disk at most once a second, so a
-crash repeats at most a second of work. `RedbStore::builder().sync_always()`
-syncs every commit instead, at a large cost in throughput.
-
-Without redb, `Crawler::snapshot` copies the seeds an in-memory frontier
-still holds, for example after a crawl was stopped. With the `serde`
-feature, seeds serialize, so they can be saved and seeded into the next
-crawl.

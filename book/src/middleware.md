@@ -1,4 +1,4 @@
-# Middleware and proxies
+# Middleware
 
 Middleware runs around a router for every request: before it, to change the
 request or answer without fetching; around it, to check the response's head,
@@ -10,8 +10,7 @@ middleware. The middleware added last runs first:
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::{HttpClient, Rotate};
-use spire::backend::reqwest::{Client, Proxy};
+use spire::backend::HttpClient;
 use spire::request::http::HeaderValue;
 use spire::request::http::header::USER_AGENT;
 use spire::worker::middleware::{self, Next, SetHeader};
@@ -26,7 +25,7 @@ async fn captcha<C: spire::backend::Client>(cx: Context<C>, next: Next<C>) -> Re
     Ok(next.run(cx).await)
 }
 
-async fn crawl() -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn crawl() -> Result<()> {
     let router = Router::new()
         .route("page", || async {})
         .layer(middleware::from_fn(captcha))
@@ -35,15 +34,18 @@ async fn crawl() -> std::result::Result<(), Box<dyn std::error::Error>> {
             HeaderValue::from_static("MyBot/1.0 (b)"),
         ]));
 
-    // Proxies are set per client, so `Rotate` cycles through one per proxy.
-    let mut proxies = Vec::new();
-    for proxy in ["http://proxy-a:8080", "http://proxy-b:8080"] {
-        let client = Client::builder().proxy(Proxy::all(proxy)?).build()?;
-        proxies.push(HttpClient::from(client));
-    }
-    let backend = Rotate::new(proxies);
-
-    Crawler::new(backend, router).run().await?;
+    Crawler::new(HttpClient::default(), router).run().await?;
     Ok(())
 }
 ```
+
+`Revalidate` is middleware too, for conditional requests: see
+[Recrawls](recrawls.md).
+
+## Rotating backends
+
+`backend::Rotate` cycles through several backends, one per request. It is
+for backends that cannot choose per request themselves, such as browsers,
+whose proxy and profile are fixed when a session starts: one browser
+backend per proxy, in turn. An HTTP client picks a proxy by URL on its
+own, see [HTTP](http.md).

@@ -6,17 +6,37 @@
 
 - [Installation](installation.md)
 - [Your first crawl](first-crawl.md)
-
-# Guide
-
 - [How a crawl works](concepts.md)
+
+# Handling pages
+
 - [Routing](routing.md)
-- [Extracting data](extracting.md)
+- [Extractors](extractors.md)
+- [HTML](html.md)
 - [Storing results](datasets.md)
-- [The frontier](frontier.md)
-- [Recrawls](recrawls.md)
-- [Limits and politeness](politeness.md)
+
+# Discovering pages
+
+- [Following links](links.md)
 - [Sitemaps](sitemaps.md)
+
+# Fetching
+
+- [HTTP](http.md)
 - [Browsers](browsers.md)
-- [Middleware and proxies](middleware.md)
+- [Middleware](middleware.md)
+
+# Running a crawl
+
+- [The frontier](frontier.md)
+- [Errors and retries](errors.md)
+- [Limits and politeness](politeness.md)
+- [Recrawls](recrawls.md)
+- [Crash safety with redb](redb.md)
+- [Logs and statistics](observability.md)
+
+# Extending spire
+
 - [Testing](testing.md)
+- [Custom backends](custom-backends.md)
+- [Custom storage](custom-storage.md)

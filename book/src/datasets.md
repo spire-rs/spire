@@ -104,46 +104,34 @@ a page's rows twice.
 
 ## In the crawl's database
 
-With the `redb` feature, a `RedbStore` holds datasets next to the frontier
-and the seen set, so one file holds the whole crawl. Items are stored as
-JSON, for types that implement both `Serialize` and `Deserialize`, and read
-back in the order they were written:
+With the `redb` feature, `store.dataset::<T>(name)` keeps items of type `T`
+in a table of the crawl's own redb file, as JSON, for types that implement
+both `Serialize` and `Deserialize`. Items survive a crash with the rest of
+the crawl: see [Crash safety with redb](redb.md).
+
+## Reading in batches
+
+`Data::read_all` takes every item, a batch at a time, and `into_batches`
+streams them, which suits large datasets. Datasets that can take several
+items at once do: a redb dataset takes a batch in one transaction instead of
+one per item. Writing works the same way: `Collect` writes a page's items as
+one batch, which the file and redb datasets store all at once or not at all.
 
 ```rust,no_run
-use serde::{Deserialize, Serialize};
-use spire::backend::HttpClient;
-use spire::frontier::FrontierExt;
-use spire::redb::RedbStore;
-use spire::frontier::seed::Seed;
-use spire::{Crawler, Result, Router};
+use futures::TryStreamExt;
+use spire::dataset::Data;
+# struct Product;
 
-#[derive(Serialize, Deserialize)]
-struct Product {
-    name: String,
-    price: Option<f64>,
+# async fn export(products: Data<Product>) -> spire::Result<()> {
+let mut batches = std::pin::pin!(products.into_batches(1000));
+while let Some(batch) = batches.try_next().await? {
+    println!("{} products", batch.len());
 }
-
-# async fn crawl(router: Router<<HttpClient as spire::backend::Backend>::Client>) -> Result<()> {
-let store = RedbStore::open("crawl.redb").await?;
-let crawler = Crawler::new(HttpClient::default(), router)
-    .with_frontier(store.frontier().dedup_with(store.seen()))
-    // Each dataset is a table, by name.
-    .with_dataset(store.dataset::<Product>("products"))
-    .with_seed(Seed::get("https://example.com/")?);
-crawler.run().await?;
-
-let products = crawler.dataset::<Product>()?.read_all().await?;
 # Ok(())
 # }
 ```
 
-Items are committed as they are written, and synced to disk with the
-frontier, so after a crash the reopened store has every item written before
-it. As with files, a page whose items were committed just before the crash
-may be crawled again and write them twice. Reading takes items out of the
-table: read them once the crawl is over.
-
 ## Your own
 
 Implement `spire::dataset::Dataset<T>` to store items anywhere else, such as
-a database. It has two methods, `write` and `read`.
+a database: see [Custom storage](custom-storage.md).
