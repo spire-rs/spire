@@ -14,6 +14,7 @@
 - [Extracting data](extracting.md)
 - [Storing results](datasets.md)
 - [The frontier](frontier.md)
+- [Recrawls](recrawls.md)
 - [Limits and politeness](politeness.md)
 - [Sitemaps](sitemaps.md)
 - [Browsers](browsers.md)

@@ -4,7 +4,7 @@ mod meta;
 
 use bytes::Bytes;
 pub(crate) use meta::Meta;
-pub use meta::{Attempt, Depth, RequestExt, ResponseExt, Tag, Tags};
+pub use meta::{Attempt, Depth, RequestExt, ResponseExt, Revisit, Tag, Tags};
 
 /// An HTTP request, with its body in memory.
 pub type Request<B = Bytes> = http::Request<B>;

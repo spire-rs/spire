@@ -36,6 +36,7 @@
 //! ```
 
 mod header;
+mod revalidate;
 
 use std::fmt;
 use std::future::Future;
@@ -43,6 +44,7 @@ use std::sync::Arc;
 
 use futures::future::BoxFuture;
 pub use header::SetHeader;
+pub use revalidate::{InMemValidators, Revalidate, Validator, Validators};
 
 use crate::context::Context;
 use crate::worker::{IntoOutcome, Outcome, Worker};

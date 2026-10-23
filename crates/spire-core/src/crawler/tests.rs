@@ -1011,3 +1011,48 @@ fn only_the_host_throttles_it() {
     );
     assert_eq!(signal(&Outcome::Continue), Signal::Ok);
 }
+
+#[tokio::test(start_paused = true)]
+async fn revisits_keep_the_crawl_going_until_it_is_stopped() {
+    use std::sync::Mutex;
+
+    use crate::request::{Revisit, Tag, Tags};
+
+    #[derive(Clone, Copy)]
+    struct Listing;
+
+    impl From<Listing> for Tag {
+        fn from(_: Listing) -> Self {
+            Self::from_static("listing")
+        }
+    }
+
+    impl Tags for Listing {
+        const ALL: &'static [Self] = &[Self];
+    }
+
+    impl Revisit for Listing {
+        fn interval(self) -> Option<Duration> {
+            Some(Duration::from_mins(1))
+        }
+    }
+
+    let start = Instant::now();
+    let visits = Arc::new(Mutex::new(Vec::new()));
+    let worker = {
+        let visits = Arc::clone(&visits);
+        from_fn(move |_: Context<Noop>| {
+            visits.lock().unwrap().push(start.elapsed().as_secs());
+            async {}
+        })
+    };
+    let crawler = Crawler::new(Noop, worker)
+        .with_frontier(InMemFrontier::fifo().revisit::<Listing>().dedup())
+        .with_time_limit(Duration::from_secs(150))
+        .with_seed(seed("list").with_tag(Listing));
+    let stats = crawler.run().await.unwrap();
+
+    // Crawled at once, then every minute, until the time limit.
+    assert_eq!(*visits.lock().unwrap(), [0, 60, 120]);
+    assert_eq!(stats.succeeded, 3);
+}

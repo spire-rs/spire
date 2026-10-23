@@ -66,7 +66,9 @@ pub mod frontier {
 #[cfg(feature = "redb")]
 #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
 pub mod redb {
-    pub use spire_redb::{RedbDataset, RedbFrontier, RedbSeen, RedbStore, RedbStoreBuilder, redb};
+    pub use spire_redb::{
+        RedbDataset, RedbFrontier, RedbSeen, RedbStore, RedbStoreBuilder, RedbValidators, redb,
+    };
 }
 
 /// Requests, responses and their crawl metadata.
@@ -75,7 +77,7 @@ pub mod request {
     pub use spire_core::request::*;
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-    pub use spire_macros::Tags;
+    pub use spire_macros::{Revisit, Tags};
 }
 
 /// Crawls requests with a [`Backend`], handling them with a [`Router`] by
@@ -125,6 +127,7 @@ mod book {
         Extracting: "extracting.md",
         Datasets: "datasets.md",
         Frontier: "frontier.md",
+        Recrawls: "recrawls.md",
         Politeness: "politeness.md",
         Sitemaps: "sitemaps.md",
         Browsers: "browsers.md",

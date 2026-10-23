@@ -23,6 +23,9 @@ pub struct Stats {
     pub skipped: usize,
     /// Requests still in flight when the shutdown grace period ended.
     pub cancelled: usize,
+    /// Requests the server answered `304 Not Modified`: unchanged since the
+    /// crawl last saw them, see `Revalidate`.
+    pub unchanged: usize,
     /// Wall-clock time of the run.
     pub elapsed: Duration,
 }

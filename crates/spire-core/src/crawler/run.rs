@@ -1,15 +1,17 @@
 //! The run loop of a [`Crawler`].
 
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::pin::pin;
 use std::time::Duration;
 
+use http::StatusCode;
 use tokio::task::{Id, JoinError, JoinSet};
 use tokio::time::{Instant, sleep_until, timeout};
 use tracing::Instrument;
 
 use crate::backend::Backend;
-use crate::context::{Context, FetchTime};
+use crate::context::{Context, FETCH, Fetch};
 use crate::crawler::concurrency::{Feedback, Signal};
 use crate::crawler::hosts::{Admit, Hosts};
 #[cfg(feature = "robots")]
@@ -74,7 +76,7 @@ enum Access {
 
 /// The state of a single run.
 struct Run {
-    tasks: JoinSet<Outcome>,
+    tasks: JoinSet<(Outcome, Fetch)>,
     /// The running requests.
     in_flight: HashMap<Id, InFlight>,
     robots: Option<RobotsRun>,
@@ -93,8 +95,6 @@ struct InFlight {
     host: Option<String>,
     /// When it started.
     started: Instant,
-    /// How long its fetch took, if host limits adapt to it.
-    fetch_time: Option<FetchTime>,
 }
 
 /// How a request went, as far as its host is concerned: a host answering
@@ -125,7 +125,7 @@ impl Run {
         host: Option<String>,
         seed: &Seed,
         started: Instant,
-        fetch_time: Option<FetchTime>,
+        fetch: Fetch,
         outcome: &Outcome,
     ) {
         let now = Instant::now();
@@ -149,7 +149,8 @@ impl Run {
         };
         let feedback = Feedback {
             started,
-            latency: fetch_time.and_then(|fetch_time| *lock(&fetch_time)),
+            latency: fetch.latency,
+            unchanged: fetch.status == Some(StatusCode::NOT_MODIFIED),
             signal,
         };
         self.hosts.finished(&host, Some(feedback), now);
@@ -511,7 +512,6 @@ where
         run.started += 1;
         let now = Instant::now();
         let host = run.hosts.start(&seed, now);
-        let fetch_time = run.hosts.adaptive().then(FetchTime::default);
 
         let backend = self.backend.clone();
         let worker = self.worker.clone();
@@ -529,7 +529,6 @@ where
         );
 
         let request = seed.clone().into_request();
-        let fetch_time_cx = fetch_time.clone();
         let task = async move {
             let started = Instant::now();
             let handle = async {
@@ -538,20 +537,25 @@ where
                     Err(error) => return Outcome::Fail(error),
                 };
                 let queue: Queue = queue.child_of(&request);
-                let mut cx = Context::from_parts(request, client, queue, datasets);
-                if let Some(fetch_time) = fetch_time_cx {
-                    cx = cx.with_fetch_time(fetch_time);
-                }
+                let cx = Context::from_parts(request, client, queue, datasets);
                 worker.handle(cx).await
             };
-
-            let outcome = match deadline {
-                Some(deadline) => timeout(deadline, handle).await.unwrap_or_else(|_| {
-                    let error = Error::new(ErrorKind::Timeout).with_message("request timed out");
-                    Outcome::Fail(error)
-                }),
-                None => handle.await,
-            };
+            // The context records the fetch into this task's scope, which
+            // outlives a timeout: a fetch that finished before the handlers
+            // ran out of time still counts.
+            let (outcome, fetch) = FETCH
+                .scope(Cell::default(), async {
+                    let outcome = match deadline {
+                        Some(deadline) => timeout(deadline, handle).await.unwrap_or_else(|_| {
+                            let error =
+                                Error::new(ErrorKind::Timeout).with_message("request timed out");
+                            Outcome::Fail(error)
+                        }),
+                        None => handle.await,
+                    };
+                    (outcome, FETCH.with(Cell::get))
+                })
+                .await;
 
             tracing::debug!(
                 target: TRACING_TARGET,
@@ -559,7 +563,7 @@ where
                 elapsed_ms = started.elapsed().as_millis(),
                 "request handled",
             );
-            outcome
+            (outcome, fetch)
         };
 
         // Boxed so spawning moves a pointer, not the whole request future.
@@ -568,14 +572,13 @@ where
             seed,
             host,
             started: now,
-            fetch_time,
         };
         run.in_flight.insert(id, in_flight);
     }
 
     /// Records a finished request and reports its outcome to the frontier.
-    async fn complete(&self, run: &mut Run, joined: Result<(Id, Outcome), JoinError>) {
-        let (id, outcome) = match joined {
+    async fn complete(&self, run: &mut Run, joined: Result<(Id, (Outcome, Fetch)), JoinError>) {
+        let (id, (outcome, fetch)) = match joined {
             Ok(joined) => joined,
             Err(error) if error.is_cancelled() => {
                 let Some(InFlight { seed, host, .. }) = run.in_flight.remove(&error.id()) else {
@@ -590,20 +593,24 @@ where
             }
             Err(error) => {
                 let failure = Error::worker("worker panicked").with_source(error.to_string());
-                (error.id(), Outcome::Fail(failure))
+                (error.id(), (Outcome::Fail(failure), Fetch::default()))
             }
         };
         let Some(InFlight {
             seed,
             host,
             started,
-            fetch_time,
         }) = run.in_flight.remove(&id)
         else {
             return;
         };
-        run.finish_host(host, &seed, started, fetch_time, &outcome);
-        self.tally(|stats| stats.requests += 1);
+        run.finish_host(host, &seed, started, fetch, &outcome);
+        self.tally(|stats| {
+            stats.requests += 1;
+            if fetch.status == Some(StatusCode::NOT_MODIFIED) {
+                stats.unchanged += 1;
+            }
+        });
 
         let uri = seed.uri().clone();
         let mut failure = None;

@@ -8,6 +8,29 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `spire-core`: revisits. `FrontierExt::revisit::<T>()` crawls a seed reported
+  done or failed again after its tag's `Revisit::interval`, waiting for the
+  next one once nothing else is queued. `#[derive(Revisit)]` implements it
+  from `#[revisit("1d")]` attributes, checked at compile time. Revisits go
+  directly on storage that implements the new `Schedule` trait, one per
+  page: `InMemFrontier` in memory, and `RedbFrontier` in its file, so they
+  survive a restart.
+- `spire-core`: the `Revalidate` middleware sends conditional requests with
+  the `ETag` and `Last-Modified` stored in `Validators`, skipping the
+  handlers of pages answered `304 Not Modified`, counted in
+  `Stats::unchanged`. `InMemValidators` keeps them for one run, and
+  `RedbStore::validators` across runs.
+- `spire-core`: `MockSite` answers conditional requests with `304`.
+
+### Fixed
+
+- `spire-thirtyfour`: a `BrowserBackend` dropped without `close()`, or a
+  session returning to a closed pool, no longer blocks the runtime while
+  thirtyfour tears the sessions down: they are quit on background tasks.
+- `spire-redb`: the README's timings now come from the `redb` benchmark.
+
 ## [0.5.0] - 2026-10-22
 
 New extractors and one module per format, batched dataset writes, adaptive

@@ -42,7 +42,7 @@ thirtyfour = { workspace = true, features = ["bidi"] }
 deadpool = { workspace = true, features = [] }
 
 # Async runtime
-tokio = { workspace = true, features = ["time", "macros"] }
+tokio = { workspace = true, features = ["rt", "time", "macros"] }
 futures = { workspace = true, features = [] }
 
 # Response bodies

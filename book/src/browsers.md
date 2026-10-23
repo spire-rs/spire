@@ -70,8 +70,9 @@ every request gets a tab in a fresh profile, so no cookies or storage carry
 over between requests. `keep_session_state` shares one profile instead, for
 example for a crawl that logs in first.
 
-Close the backend after the crawl with `close`, which quits the sessions:
-sessions that are dropped instead block the runtime while they quit.
+Close the backend after the crawl with `close`, which quits the sessions
+before going on. A backend dropped without it quits them on background
+tasks, which may not finish if the program exits right after.
 
 ## Responses
 

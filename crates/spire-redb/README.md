@@ -39,8 +39,10 @@ once a second: a crash rolls the store back to its last synced commit, a
 consistent earlier state, so it repeats at most a second of work and loses
 none, since a link is never committed after the page that found it.
 `RedbStore::builder().sync_always()` syncs every commit instead, repeating
-only the requests in flight, at a large cost in throughput: about 27 ms per
-page against 0.15 ms in one measurement on macOS.
+only the requests in flight, at a large cost in throughput. In the `redb`
+benchmark on macOS, pushing and popping a seed takes about 0.6 ms with batched
+syncs and about 11 ms with `sync_always`, twenty times slower; run
+`make bench ARGS=redb` to measure your own machine.
 
 ## Usage
 

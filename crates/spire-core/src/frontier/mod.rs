@@ -23,6 +23,8 @@
 //! - [`MaxDepth`] refuses seeds deeper than a limit.
 //! - [`Retry`] re-queues seeds after [`Report::Retry`], with a delay.
 //! - [`TagBackoff`] holds back a tag's seeds after [`Report::Backoff`].
+//! - [`Revisits`] crawls seeds again on a schedule, kept by storage that
+//!   implements [`Schedule`].
 //!
 //! Without a [`Retry`] facade, retries are refused and the seeds fail;
 //! without a [`TagBackoff`] facade, backoffs only delay the retried request.
@@ -41,11 +43,13 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
-use self::facade::{AllowedHosts, Dedup, Filter, MaxDepth, Retry, RetryPolicy, TagBackoff};
+use self::facade::{
+    AllowedHosts, Dedup, Filter, MaxDepth, Retry, RetryPolicy, Revisits, TagBackoff,
+};
 use self::seed::Seed;
 use self::seen::{InMemSeen, SeenSet};
 use crate::Result;
-use crate::request::Tag;
+use crate::request::{Revisit, Tag};
 
 /// Stores [`Seed`]s and decides which one is crawled next.
 pub trait Frontier: Send + Sync + 'static {
@@ -94,6 +98,36 @@ pub trait Frontier: Send + Sync + 'static {
     }
 }
 
+/// Storage that can hold seeds back until a time, for
+/// [`FrontierExt::revisit`].
+///
+/// [`InMemFrontier`](memory::InMemFrontier) keeps scheduled seeds in
+/// memory, and a redb frontier in its file, so they survive a restart. It is
+/// storage, not a facade: revisits sit directly on it, so every facade above
+/// sees them as it sees queued seeds.
+pub trait Schedule: Frontier {
+    /// Holds `seed` back until `due`, then hands it out from
+    /// [`pop`](Frontier::pop) like a queued seed. A seed with the same
+    /// [fingerprint](seed::Seed::fingerprint) scheduled before is replaced,
+    /// so a page has at most one revisit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying storage fails.
+    fn schedule(&self, seed: Seed, due: Instant) -> impl Future<Output = Result<()>> + Send;
+
+    /// Returns when the next scheduled seed is due, if any.
+    ///
+    /// [`pop`](Frontier::pop) does not wait for scheduled seeds by itself, so
+    /// a crawl over storage holding some ends once nothing else is queued;
+    /// [`Revisits`] waits for them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying storage fails.
+    fn next_due(&self) -> impl Future<Output = Result<Option<Instant>>> + Send;
+}
+
 impl<F: Frontier> Frontier for std::sync::Arc<F> {
     fn push(&self, seed: Seed) -> impl Future<Output = Result<Admission>> + Send {
         F::push(self, seed)
@@ -113,6 +147,16 @@ impl<F: Frontier> Frontier for std::sync::Arc<F> {
 
     fn snapshot(&self) -> Option<Vec<Seed>> {
         F::snapshot(self)
+    }
+}
+
+impl<F: Schedule> Schedule for std::sync::Arc<F> {
+    fn schedule(&self, seed: Seed, due: Instant) -> impl Future<Output = Result<()>> + Send {
+        F::schedule(self, seed, due)
+    }
+
+    fn next_due(&self) -> impl Future<Output = Result<Option<Instant>>> + Send {
+        F::next_due(self)
     }
 }
 
@@ -253,6 +297,20 @@ pub trait FrontierExt: Frontier + Sized {
     /// Holds back seeds of paused tags.
     fn tag_backoff(self) -> TagBackoff<Self> {
         TagBackoff::new(self)
+    }
+
+    /// Crawls pages again on a schedule: a seed reported done or failed is
+    /// crawled again after its tag's [`Revisit::interval`], so the crawl
+    /// keeps going, waiting for the next revisit once nothing else is
+    /// queued.
+    ///
+    /// It goes directly on the storage, which keeps the schedule, e.g.
+    /// `InMemFrontier::fifo().revisit::<Page>().dedup()`.
+    fn revisit<T: Revisit>(self) -> Revisits<Self, T>
+    where
+        Self: Schedule,
+    {
+        Revisits::new(self)
     }
 
     /// Wraps the frontier with a custom facade.
