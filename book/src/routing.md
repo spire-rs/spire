@@ -31,7 +31,7 @@ async fn page(uri: Uri, depth: Depth, html: Html, queue: Queue) -> Result<()> {
 ```
 
 If an extractor fails, for example because the page is not valid JSON, the
-handler does not run and the request fails. [Extracting data](extracting.md)
+handler does not run and the request fails. [Extractors](extractors.md)
 lists every extractor.
 
 ## Routes

@@ -155,8 +155,5 @@ let stats = crawler.run().await?;
 # }
 ```
 
-## Statistics
-
-`run` returns `Stats`: how many requests were made, succeeded, failed,
-retried, skipped and cancelled, and how long the crawl took. `stats()`
-returns them while the crawl runs, for example to report progress.
+How far a crawl got is in its statistics, see
+[Logs and statistics](observability.md).

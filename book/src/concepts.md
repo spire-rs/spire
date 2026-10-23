@@ -41,7 +41,7 @@ A crawl moves *seeds* from a *frontier*, through a *backend* and a
 2. The backend hands out a client, and the crawler builds a `Context`:
    the request, the client, a queue for new links, and the datasets.
 3. Middleware, if any, runs first. See
-   [Middleware and proxies](middleware.md).
+   [Middleware](middleware.md).
 4. The router picks a handler by the tag, or by the URL's path for an
    untagged request.
 5. The handler's extractors read what they need. The first one that needs
@@ -58,20 +58,9 @@ shut down.
 ## Outcomes
 
 A handler returns anything that converts into an `Outcome`: `()` and
-`Ok(())` mean the request is done, and an error fails it.
-
-| Outcome | Means |
-|---|---|
-| `Continue` | The request is done |
-| `Retry { after }` | Try it again, after a delay or the frontier's default |
-| `Backoff { scope, duration }` | Pause every request with this tag, then try this one again |
-| `Abort(scope)` | Skip every further request with this tag |
-| `Stop` | Stop the crawl: requests in flight finish, nothing new starts |
-| `Fail(error)` | The request failed: retried if the error is retryable |
-
-Helpers build the common ones: `Outcome::retry()`,
-`Outcome::retry_after(delay)`, `Outcome::backoff(duration)` and
-`Outcome::abort()`, plus `backoff_tag` and `abort_tag` for another tag.
+`Ok(())` mean the request is done, and an error fails it. Outcomes also
+retry a request, pause or skip a tag, or stop the crawl: see
+[Errors and retries](errors.md).
 
 ## `spire` and `spire-core`
 

@@ -89,8 +89,8 @@ async fn main() -> Result<()> {
 }
 ```
 
-[The Spire Book](https://spire-rs.github.io/spire) is the guide: routing, extraction, the frontier,
-politeness, sitemaps, browsers, middleware and testing, chapter by chapter.
+[The Spire Book](https://spire-rs.github.io/spire) is the guide: handling pages, discovering
+them, fetching over HTTP or with a browser, running and resuming a crawl, and extending spire.
 
 ## Examples
 

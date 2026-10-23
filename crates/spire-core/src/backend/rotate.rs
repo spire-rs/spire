@@ -7,8 +7,10 @@ use crate::Result;
 use crate::backend::Backend;
 
 /// A [`Backend`] cycling through several backends, one per request, e.g.
-/// HTTP clients behind different proxies, or browser pools with different
-/// profiles.
+/// browser pools behind different proxies or with different profiles.
+///
+/// An HTTP client can pick a proxy by URL itself, e.g. with reqwest's
+/// `Proxy::custom`, which needs no rotation of backends.
 ///
 /// Every backend must hand out the same type of client. Clones share their
 /// place in the cycle.
