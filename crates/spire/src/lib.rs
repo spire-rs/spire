@@ -126,6 +126,7 @@ mod book {
         Concepts: "concepts.md",
         Routing: "routing.md",
         Extractors: "extractors.md",
+        State: "state.md",
         Html: "html.md",
         Datasets: "datasets.md",
         Links: "links.md",

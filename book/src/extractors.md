@@ -12,7 +12,7 @@ the others share it.
 | `Depth`, `Attempt` | How many links from a seed it is, and which try this is |
 | `Queue` | The queue to follow links through, see [Following links](links.md) |
 | `Data<T>` | The dataset for items of type `T` |
-| `State<T>` | The router's state, or a part of it |
+| `State<T>` | The router's state, or a part of it, see [State](state.md) |
 | `Head` | The response's status, headers, and final URI after redirects |
 | `Body` | The response body, as bytes |
 | `Text` | The body as text |
