@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use html_to_markdown_rs::{ConversionOptions, PreprocessingOptions};
 use scraper::Selector;
-use spire_core::request::ResponseExt;
+use spire_core::response::ResponseExt;
 
 use super::text::{HIDDEN, MAIN};
 use crate::backend::Client;

@@ -23,8 +23,7 @@ const GZIP: [u8; 2] = [0x1f, 0x8b];
 /// limits of 50 000 URLs and 50 MiB: the records before a limit are kept.
 ///
 /// ```
-/// use spire::extract::sitemap::Sitemap;
-/// use spire::extract::sitemap::Record;
+/// use spire::extract::sitemap::{Record, Sitemap};
 /// use spire::frontier::queue::Queue;
 ///
 /// async fn sitemap(queue: Queue, Sitemap(records): Sitemap) -> spire::Result<()> {

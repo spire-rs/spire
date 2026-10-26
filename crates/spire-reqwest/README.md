@@ -70,7 +70,7 @@ spire-reqwest = { version = "0.6.0", default-features = false, features = ["nati
 | `http2` (default) | HTTP/2 negotiation |
 | `system-proxy` (default) | Proxies from the environment and system settings |
 | `gzip`, `brotli`, `zstd`, `deflate` | Transparent response decompression |
-| `cookies` | A cookie store shared by the whole crawl |
+| `cookies` | A cookie store shared by the whole crawl, or one per identity |
 | `socks` | SOCKS5 proxies |
 | `hickory-dns` | DNS through hickory instead of the system resolver |
 
@@ -79,20 +79,32 @@ For advanced usage and custom configurations, see the
 
 ## Advanced Usage Examples
 
-### Creating from reqwest Client
+### Configuring the client
+
+`HttpClient::from_builder` takes a function that makes the reqwest
+configuration, which a crawl with identities builds one client per identity
+from:
 
 ```rust
 use spire_reqwest::HttpClient;
 use std::time::Duration;
 
-let reqwest_client = reqwest::Client::builder()
-    .timeout(Duration::from_secs(30))
-    .user_agent("MyBot/1.0")
-    .build()
-    .unwrap();
-
-let backend = HttpClient::from(reqwest_client);
+let backend = HttpClient::from_builder(|| {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent("MyBot/1.0")
+})?;
+# Ok::<_, spire_core::Error>(())
 ```
+
+### Identities
+
+With `Crawler::with_identities`, each
+identity's requests go through a reqwest client of its own, with the
+identity's proxy and, with the `cookies` feature, its own cookie store.
+SOCKS proxies need the `socks` feature. See the
+[identities chapter](https://spire-rs.github.io/spire/identities.html) of
+the book.
 
 ## Error Handling
 
@@ -113,7 +125,7 @@ let backend = HttpClient::new().with_status_policy(StatusPolicy::Accept);
 ```
 
 Responses record the URL they were served from after redirects, available
-through `spire_core::request::ResponseExt::final_uri`.
+through `spire_core::response::ResponseExt::final_uri`.
 
 ## Performance Considerations
 

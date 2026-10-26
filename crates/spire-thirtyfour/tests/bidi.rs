@@ -43,7 +43,7 @@ async fn reports_real_statuses_and_follows_redirects() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(response.headers()[CONTENT_TYPE], "text/html; charset=utf-8");
-    let final_uri = spire_core::request::ResponseExt::final_uri(&response);
+    let final_uri = spire_core::response::ResponseExt::final_uri(&response);
     assert_eq!(final_uri.unwrap(), "https://httpbin.org/get");
     drop(session);
 

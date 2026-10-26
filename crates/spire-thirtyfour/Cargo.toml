@@ -57,7 +57,7 @@ tracing = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
-tokio = { workspace = true, features = ["rt", "macros"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "io-util"] }
 
 [lints]
 workspace = true

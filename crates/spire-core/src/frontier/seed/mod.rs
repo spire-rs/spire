@@ -14,7 +14,7 @@ mod repr;
 
 pub use fingerprint::Fingerprint;
 
-use crate::request::{Attempt, Depth, Meta, Request, Tag};
+use crate::request::{Attempt, Depth, Request, RequestMeta, Tag};
 use crate::{Error, Result};
 
 /// A request waiting in the frontier.
@@ -87,7 +87,7 @@ impl Seed {
     }
 
     /// Sets the priority, `0` by default; frontiers that order by priority,
-    /// such as [`InMemFrontier::priority`](crate::frontier::memory::InMemFrontier::priority),
+    /// such as [`InMemFrontier::priority`](crate::frontier::InMemFrontier::priority),
     /// crawl higher priorities first.
     #[must_use]
     pub const fn with_priority(mut self, priority: i32) -> Self {
@@ -109,7 +109,16 @@ impl Seed {
         self
     }
 
-    /// Returns the headers and body, creating them on first use.
+    /// Sends the request as the identity named `name`, e.g. a logged-in
+    /// account, rather than one the crawl picks; see
+    /// [`Crawler::with_identities`](crate::Crawler::with_identities).
+    #[must_use]
+    pub fn with_identity(mut self, name: impl Into<Box<str>>) -> Self {
+        self.extras_mut().identity = Some(name.into());
+        self
+    }
+
+    /// Returns the headers, body and identity, creating them on first use.
     fn extras_mut(&mut self) -> &mut Extras {
         self.extras.get_or_insert_with(Box::default)
     }
@@ -168,6 +177,12 @@ impl Seed {
         self.depth
     }
 
+    /// Returns the name of the identity the seed is pinned to, if any.
+    #[must_use]
+    pub fn identity(&self) -> Option<&str> {
+        self.extras.as_ref()?.identity.as_deref()
+    }
+
     /// Returns the priority.
     #[must_use]
     pub const fn priority(&self) -> i32 {
@@ -203,16 +218,17 @@ impl Seed {
     /// attempt as extensions.
     #[must_use]
     pub fn into_request(self) -> Request {
-        let Extras { headers, body } = self.extras.map(|extras| *extras).unwrap_or_default();
+        let Extras { headers, body, .. } = self.extras.map(|extras| *extras).unwrap_or_default();
         let mut request = Request::new(body);
         *request.method_mut() = self.method;
         *request.uri_mut() = self.uri;
         *request.headers_mut() = headers;
 
-        request.extensions_mut().insert(Meta {
+        request.extensions_mut().insert(RequestMeta {
             tag: self.tag,
             depth: self.depth,
             attempt: self.attempt,
+            identity: None,
         });
         request
     }
@@ -233,6 +249,7 @@ pub(crate) fn fingerprint(method: &Method, uri: &Uri, body: &[u8]) -> Fingerprin
 struct Extras {
     headers: HeaderMap,
     body: Bytes,
+    identity: Option<Box<str>>,
 }
 
 impl TryFrom<&str> for Seed {

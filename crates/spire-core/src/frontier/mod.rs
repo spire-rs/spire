@@ -1,12 +1,11 @@
 //! The frontier: requests waiting to be crawled.
 //!
 //! A [`Frontier`] stores [`Seed`]s and decides which one is crawled next.
-//! [`InMemFrontier`](memory::InMemFrontier) provides the storage; facades wrap any frontier to add
+//! [`InMemFrontier`] provides the storage; facades wrap any frontier to add
 //! behavior and are chained with [`FrontierExt`]:
 //!
 //! ```
-//! use spire_core::frontier::FrontierExt;
-//! use spire_core::frontier::memory::InMemFrontier;
+//! use spire_core::frontier::{FrontierExt, InMemFrontier};
 //!
 //! let frontier = InMemFrontier::fifo()
 //!     .dedup()
@@ -33,7 +32,7 @@
 
 pub(crate) mod dynamic;
 pub mod facade;
-pub mod memory;
+mod memory;
 pub mod queue;
 pub mod score;
 pub mod seed;
@@ -49,6 +48,7 @@ use tokio::time::Instant;
 use self::facade::{
     AllowedHosts, Dedup, Filter, MaxDepth, Retry, RetryPolicy, Revisits, Scored, TagBackoff,
 };
+pub use self::memory::InMemFrontier;
 use self::score::Score;
 use self::seed::Seed;
 use self::seen::{InMemSeen, SeenSet};
@@ -105,7 +105,7 @@ pub trait Frontier: Send + Sync + 'static {
 /// Storage that can hold seeds back until a time, for
 /// [`FrontierExt::revisit`].
 ///
-/// [`InMemFrontier`](memory::InMemFrontier) keeps scheduled seeds in
+/// [`InMemFrontier`] keeps scheduled seeds in
 /// memory, and a redb frontier in its file, so they survive a restart. It is
 /// storage, not a facade: revisits sit directly on it, so every facade above
 /// sees them as it sees queued seeds.
@@ -326,9 +326,8 @@ pub trait FrontierExt: Frontier + Sized {
     /// priority. A FIFO or LIFO frontier ignores priorities.
     ///
     /// ```
-    /// use spire_core::frontier::FrontierExt;
-    /// use spire_core::frontier::memory::InMemFrontier;
     /// use spire_core::frontier::score::{Keywords, ShallowFirst};
+    /// use spire_core::frontier::{FrontierExt, InMemFrontier};
     ///
     /// let frontier = InMemFrontier::priority()
     ///     .dedup()

@@ -4,7 +4,8 @@ use bytes::Bytes;
 
 use crate::Result;
 use crate::backend::{Backend, Client};
-use crate::request::{Request, Response};
+use crate::request::Request;
+use crate::response::Response;
 
 /// A backend whose client answers every request with an empty `200 OK`.
 ///

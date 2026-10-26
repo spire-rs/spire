@@ -10,7 +10,7 @@ use tokio::time::Instant;
 
 use crate::crawler::Robots;
 use crate::frontier::seed::Seed;
-use crate::{Error, TRACING_TARGET};
+use crate::{Result, TRACING_TARGET};
 
 /// Whether robots.txt lets a seed be crawled.
 pub(crate) enum Verdict {
@@ -147,12 +147,7 @@ impl RobotsCache {
 
     /// Records the result of fetching `origin`'s robots.txt, returning the
     /// seeds to admit again and the `Crawl-delay` to honour.
-    pub(crate) fn fetched(
-        &mut self,
-        key: &str,
-        result: Result<Rules, Error>,
-        now: Instant,
-    ) -> Fetched {
+    pub(crate) fn fetched(&mut self, key: &str, result: Result<Rules>, now: Instant) -> Fetched {
         let Some(entry) = self.origins.get_mut(key) else {
             return Fetched::default();
         };
@@ -253,8 +248,8 @@ impl RobotsCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ErrorKind;
     use crate::request::Tag;
+    use crate::{Error, ErrorKind};
 
     fn seed(uri: &str) -> Seed {
         Seed::get(uri).unwrap()
@@ -264,7 +259,7 @@ mod tests {
         Rules::parse(txt.as_bytes(), "bot")
     }
 
-    fn unreachable() -> Result<Rules, Error> {
+    fn unreachable() -> Result<Rules> {
         Err(Error::new(ErrorKind::Http))
     }
 

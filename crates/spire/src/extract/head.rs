@@ -1,7 +1,7 @@
 use crate::backend::Client;
 use crate::extract::FromContext;
-use crate::request::ResponseExt;
 use crate::request::http::{HeaderMap, StatusCode, Uri};
+use crate::response::ResponseExt;
 use crate::{Context, Error, Result};
 
 /// Extracts the head of the response: its status, headers, and the URI it

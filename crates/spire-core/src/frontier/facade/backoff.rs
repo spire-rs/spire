@@ -172,9 +172,8 @@ mod tests {
     use tokio::time::advance;
 
     use super::*;
-    use crate::frontier::FrontierExt;
-    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::test_util::{pop_path, seed};
+    use crate::frontier::{FrontierExt, InMemFrontier};
 
     fn backoff(tag: Option<&str>, secs: u64) -> Report {
         Report::Backoff {

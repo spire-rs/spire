@@ -1,5 +1,5 @@
 //! Workers, which handle fetched requests, their [`Outcome`]s, and the
-//! [`middleware`] around them.
+//! [`middleware`].
 
 pub mod middleware;
 mod outcome;

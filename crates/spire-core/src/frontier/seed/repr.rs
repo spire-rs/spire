@@ -23,6 +23,8 @@ struct SeedRepr {
     priority: i32,
     #[serde(default)]
     attempt: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    identity: Option<String>,
 }
 
 /// Serializes the method and URI as strings, headers and body as bytes.
@@ -43,6 +45,7 @@ impl serde::Serialize for Seed {
             depth: self.depth.get(),
             priority: self.priority,
             attempt: self.attempt.get(),
+            identity: self.identity().map(str::to_owned),
         };
         repr.serialize(serializer)
     }
@@ -69,6 +72,9 @@ impl<'de> serde::Deserialize<'de> for Seed {
         seed.depth = Depth::new(repr.depth);
         seed.priority = repr.priority;
         seed.attempt = Attempt::new(repr.attempt);
+        if let Some(identity) = repr.identity {
+            seed = seed.with_identity(identity);
+        }
         Ok(seed)
     }
 }
@@ -92,6 +98,7 @@ mod tests {
             .with_tag("api")
             .with_depth(Depth::new(2))
             .with_priority(-1)
+            .with_identity("account-a")
             .next_attempt();
 
         let json = serde_json::to_string(&seed).unwrap();
@@ -103,6 +110,7 @@ mod tests {
             (Depth::new(2), -1, Attempt::new(1))
         );
         assert_eq!(back.headers()["accept"], "application/json");
+        assert_eq!(back.identity(), Some("account-a"));
 
         let minimal: Seed =
             serde_json::from_str(r#"{"method":"GET","uri":"https://example.com/"}"#).unwrap();

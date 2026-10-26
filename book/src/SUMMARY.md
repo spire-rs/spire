@@ -27,6 +27,7 @@
 - [HTTP](http.md)
 - [Browsers](browsers.md)
 - [Middleware](middleware.md)
+- [Identities](identities.md)
 
 # Running a crawl
 

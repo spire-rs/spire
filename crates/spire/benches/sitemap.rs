@@ -12,7 +12,8 @@ use spire::backend::Client;
 use spire::extract::FromContext;
 use spire::extract::sitemap::Sitemap;
 use spire::frontier::seed::Seed;
-use spire::request::{Request, Response};
+use spire::request::Request;
+use spire::response::Response;
 use spire::{Context, Result};
 
 /// URLs in the sitemap: the protocol's limit.

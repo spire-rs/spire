@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 use http::header::RETRY_AFTER;
 use http::{HeaderMap, StatusCode};
 
-use crate::request::{Response, ResponseExt};
+use crate::response::{Response, ResponseExt};
 use crate::{Error, ErrorKind, Result};
 
 /// How a backend treats error statuses, e.g. `HttpClient` from

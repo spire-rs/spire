@@ -26,7 +26,8 @@ use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use spire::backend::{Backend, Client};
-use spire::request::{Request, Response};
+use spire::request::Request;
+use spire::response::Response;
 use spire::{Crawler, Error, ErrorKind, Result, Router};
 
 /// Serves pages from a directory, e.g. a site mirrored to disk.

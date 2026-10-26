@@ -95,10 +95,9 @@ impl AllowedHosts {
 
 #[cfg(test)]
 mod tests {
-    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::seed::Seed;
     use crate::frontier::test_util::seed;
-    use crate::frontier::{Admission, Frontier, FrontierExt};
+    use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
 
     #[tokio::test]
     async fn filter_refuses_rejected_seeds() {

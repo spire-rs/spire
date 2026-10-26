@@ -4,10 +4,9 @@ use std::sync::Arc;
 use super::MockSite;
 use crate::backend::Backend;
 use crate::dataset::{Data, Dataset, Datasets};
-use crate::frontier::Frontier;
-use crate::frontier::memory::InMemFrontier;
 use crate::frontier::queue::Queue;
 use crate::frontier::seed::Seed;
+use crate::frontier::{Frontier, InMemFrontier};
 use crate::worker::{Outcome, Worker};
 use crate::{Context, Result};
 

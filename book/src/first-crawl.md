@@ -44,11 +44,10 @@ struct Product {
 use spire::backend::HttpClient;
 use spire::dataset::InMemDataset;
 use spire::extract::html::Select;
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
-use spire::request::Tags;
+use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::handler::{Collect, FollowLinks};
+use spire::request::Tags;
 use spire::{Crawler, Result, Router};
 #
 # #[derive(Debug, Clone, Copy, Tags)]

@@ -39,7 +39,7 @@ mod site;
 mod visit;
 
 pub use page::MockPage;
-pub use site::{MockClient, MockSite};
+pub use site::{MockClient, MockSite, Sent};
 pub use visit::Visit;
 
 #[cfg(test)]

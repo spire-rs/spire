@@ -15,9 +15,50 @@ and this project adheres to
   was served from. `Markdown::from_html` converts with `MarkdownOptions`:
   the whole body, without images, or with links as plain text. Conversion is
   done by html-to-markdown-rs.
+- `spire-core`: identities. An `Identity` keeps who a request appears to
+  come from together: a proxy, the headers that go with it, and its own
+  cookies. `Crawler::with_identities` sends every request as one of
+  `Identities`, listed with `Identities::new` or built on demand with
+  `Identities::from_fn`, up to `max_active` at once, picked in turn, at
+  random or per host. Identities whose requests keep failing are retired
+  and replaced, or set aside for longer each time. `Seed::with_identity`
+  pins a seed to one, `RequestExt::identity` reads it, and robots.txt is
+  fetched as one too.
+- `spire-core`: `Backend::connect_as` connects a request as its identity,
+  through its proxy, keeping each identity's cookies apart. By default it
+  refuses an identity with a proxy, so a backend that cannot route through
+  one never sends from the crawler's own IP; `MockSite` overrides it, with
+  `MockSite::sent` and `unreachable_through` to test crawls with identities.
+- `spire-core`: `Identity::downgrade` and `WeakIdentity`, for backends to
+  drop what they keep per identity once it is gone.
+- `spire-core`: browser profiles. A `Profile` is a browser's user agent and
+  the headers a real browser of that version sends with it: Chromium's
+  client hints, `Accept`, `Accept-Language`, `Upgrade-Insecure-Requests` and
+  `Sec-Fetch-*`. `Identity::with_profile` presents as one, and `UserAgents`
+  picks one per identity, deterministically, with browsers and platforms
+  weighted by how common they are.
+- `spire-reqwest`: `HttpClient` overrides `connect_as`, with a reqwest client
+  per identity, dropped once the identity is gone. `HttpClient::from_builder`
+  builds it from a function that makes the reqwest configuration, which
+  identities' clients are built from too.
+- `spire-thirtyfour`: `BrowserBackend` overrides `connect_as`, with a browser
+  profile per identity in every browser it uses: a BiDi user context with its
+  proxy, user agent and headers, kept while the identity is in use. Proxies
+  asking for credentials are answered with those of the proxy URL.
 
 ### Changed
 
+- **Breaking:** `SetHeader::rotate` is removed: rotating a user agent on its
+  own is what identities fix. `SetHeader::new` is unchanged.
+- **Breaking:** `Response` and `ResponseExt` moved from `request` to a
+  `response` module.
+- **Breaking:** `InMemFrontier` moved from `frontier::memory` to `frontier`,
+  as `InMemDataset` and `InMemSeen` are at their modules' roots.
+- **Breaking:** `backend::Rotate` is removed: identities cover browser pools
+  behind different proxies or with different profiles.
+- **Breaking:** `HttpClient` no longer converts `From<reqwest::Client>`: a
+  built client cannot be rebuilt for identities. `HttpClient::from_builder`
+  takes the function that would build it.
 - `spire`: when a page has no `<main>`, `<article>` or `role="main"`
   element, `Html::main_text` leaves the body's `<header>` and `<footer>` out
   too.

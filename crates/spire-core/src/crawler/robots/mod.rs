@@ -11,6 +11,7 @@ pub(crate) use cache::{RobotsCache, Verdict};
 pub(crate) use source::{BackendSource, RobotsSource};
 
 use crate::backend::Backend;
+use crate::crawler::connector::Connector;
 use crate::request::Tag;
 
 /// How a crawl fetches and obeys robots.txt, see
@@ -72,7 +73,8 @@ impl Robots {
     /// Fetches robots.txt with `backend` instead of the crawl's.
     #[must_use]
     pub fn with_backend<B: Backend>(mut self, backend: B) -> Self {
-        self.source = Some(Arc::new(BackendSource::new(Arc::new(backend))));
+        let connector = Connector::new(Arc::new(backend));
+        self.source = Some(Arc::new(BackendSource::new(Arc::new(connector))));
         self
     }
 

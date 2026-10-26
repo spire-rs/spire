@@ -1,14 +1,16 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::future::{Future, ready};
 use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
-use http::{StatusCode, Uri};
+use http::{HeaderMap, StatusCode, Uri};
 
 use super::{MockPage, Visit};
 use crate::backend::{Backend, Client, StatusPolicy};
 use crate::frontier::seed::Seed;
-use crate::request::{Request, Response, ResponseExt};
+use crate::identity::Identity;
+use crate::request::Request;
+use crate::response::{Response, ResponseExt};
 use crate::sync::lock;
 use crate::{Error, Result};
 
@@ -21,7 +23,8 @@ const MAX_REDIRECTS: usize = 10;
 /// real backends treat them, by a [`StatusPolicy`]: by default, an error
 /// status fails the fetch, so the crawler retries or fails the request.
 ///
-/// Clones share the record of [`requests`](Self::requests).
+/// Clones share the record of [`requests`](Self::requests). Crawls with
+/// identities can be tested too, see [`sent`](Self::sent).
 ///
 /// # Examples
 ///
@@ -53,7 +56,21 @@ const MAX_REDIRECTS: usize = 10;
 pub struct MockSite {
     pages: Arc<HashMap<Uri, MockPage>>,
     status_policy: StatusPolicy,
-    requests: Arc<Mutex<Vec<Uri>>>,
+    /// Identities whose proxy refuses every connection.
+    unreachable: Arc<HashSet<String>>,
+    sent: Arc<Mutex<Vec<Sent>>>,
+}
+
+/// A request a [`MockSite`] received, see [`MockSite::sent`].
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct Sent {
+    /// The requested URI.
+    pub uri: Uri,
+    /// The name of the identity it went out as, if any.
+    pub identity: Option<String>,
+    /// Its headers.
+    pub headers: HeaderMap,
 }
 
 impl MockSite {
@@ -82,12 +99,31 @@ impl MockSite {
         self
     }
 
+    /// Fails every fetch through the identity named `name`, as a proxy
+    /// refusing connections would: a retryable error without a status.
+    #[must_use]
+    pub fn unreachable_through(mut self, name: impl Into<String>) -> Self {
+        Arc::make_mut(&mut self.unreachable).insert(name.into());
+        self
+    }
+
     /// Returns the URIs fetched so far, in order, including clones' fetches.
     /// Redirects are followed within a fetch, so only the requested URI is
     /// listed.
     #[must_use]
     pub fn requests(&self) -> Vec<Uri> {
-        lock(&self.requests).clone()
+        lock(&self.sent)
+            .iter()
+            .map(|sent| sent.uri.clone())
+            .collect()
+    }
+
+    /// Returns the requests received so far, in order, with their identity
+    /// and headers. Fetches through an
+    /// [unreachable](Self::unreachable_through) identity are included.
+    #[must_use]
+    pub fn sent(&self) -> Vec<Sent> {
+        lock(&self.sent).clone()
     }
 
     /// Prepares a [`Visit`] to `seed`, to run one request through a worker.
@@ -149,10 +185,24 @@ impl Backend for MockSite {
     type Client = MockClient;
 
     fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send {
-        ready(Ok(MockClient {
+        ready(Ok(self.client(None)))
+    }
+
+    /// Records each request's identity, see [`MockSite::sent`], and refuses
+    /// those [unreachable](MockSite::unreachable_through). Proxies are
+    /// accepted, as nothing is sent through them.
+    fn connect_as(&self, identity: &Identity) -> impl Future<Output = Result<Self::Client>> + Send {
+        ready(Ok(self.client(Some(identity.clone()))))
+    }
+}
+
+impl MockSite {
+    fn client(&self, identity: Option<Identity>) -> MockClient {
+        MockClient {
             site: self.clone(),
+            identity,
             body: Mutex::new(None),
-        }))
+        }
     }
 }
 
@@ -160,12 +210,26 @@ impl Backend for MockSite {
 #[derive(Debug)]
 pub struct MockClient {
     site: MockSite,
+    identity: Option<Identity>,
     body: Mutex<Option<Bytes>>,
 }
 
 impl MockClient {
     async fn serve(&self, request: &Request) -> Result<Response<()>> {
-        lock(&self.site.requests).push(request.uri().clone());
+        let identity = self
+            .identity
+            .as_ref()
+            .map(|identity| identity.name().to_owned());
+        lock(&self.site.sent).push(Sent {
+            uri: request.uri().clone(),
+            identity: identity.clone(),
+            headers: request.headers().clone(),
+        });
+        if identity.is_some_and(|name| self.site.unreachable.contains(&name)) {
+            return Err(Error::new(crate::ErrorKind::Http)
+                .with_message("the proxy refused the connection")
+                .with_uri(request.uri().clone()));
+        }
         let (page, served_from) = self.site.serve(request.uri())?;
         if !page.latency.is_zero() {
             tokio::time::sleep(page.latency).await;

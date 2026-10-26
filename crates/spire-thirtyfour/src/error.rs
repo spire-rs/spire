@@ -45,7 +45,8 @@ pub(crate) fn from_webdriver(error: WebDriverError) -> Error {
 pub(crate) fn from_bidi(error: BidiError) -> Error {
     let kind = match error.error.as_str() {
         "timeout" => ErrorKind::Timeout,
-        "invalid argument" => ErrorKind::Invalid,
+        // Asked of a driver that cannot, e.g. a proxy per user context.
+        "invalid argument" | "unsupported operation" => ErrorKind::Invalid,
         // Navigation failures such as DNS or connection errors, usually
         // transient.
         "unknown error" if error.message.contains("net::ERR_") => ErrorKind::Http,
