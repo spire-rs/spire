@@ -51,7 +51,7 @@ Add spire with the HTTP backend, and tokio:
 
 ```toml
 [dependencies]
-spire = { version = "0.5", features = ["reqwest"] }
+spire = { version = "0.6", features = ["reqwest"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 

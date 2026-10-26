@@ -210,7 +210,7 @@ If you find a bug, please create an issue on GitHub with:
 
 - Rust version: [e.g. 1.95.0]
 - OS: [e.g. Ubuntu 22.04]
-- Spire version: [e.g. 0.5.0]
+- Spire version: [e.g. 0.6.0]
 
 **Additional context** Any other relevant information.
 ```

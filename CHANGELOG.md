@@ -8,6 +8,12 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-26
+
+Recrawls, with revisits on a schedule and conditional requests, and
+best-first crawling, with scores from the URL and from the page. Breaking
+changes are marked.
+
 ### Added
 
 - `spire-core`: revisits. `FrontierExt::revisit::<T>()` crawls a seed reported
@@ -33,6 +39,11 @@ and this project adheres to
 - `spire`: `FollowLinks::score_page` and `FollowLinks::score_links` give
   followed links a priority: the page's score, computed once, plus each
   link's, e.g. from its anchor text.
+
+### Changed
+
+- **Breaking:** scraper, re-exported by `spire::extract::html`, is updated
+  from 0.27 to 0.29.
 
 ### Fixed
 
@@ -275,7 +286,8 @@ Rust 1.95.
 
 - Initial placeholder release for name reservation
 
-[Unreleased]: https://github.com/spire-rs/spire/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/spire-rs/spire/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/spire-rs/spire/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/spire-rs/spire/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/spire-rs/spire/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/spire-rs/spire/compare/v0.2.0...v0.3.0
