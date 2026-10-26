@@ -8,6 +8,20 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `spire`: the `markdown` feature and the `Markdown` extractor, a page's main
+  content as Markdown with its links and images resolved against the URI it
+  was served from. `Markdown::from_html` converts with `MarkdownOptions`:
+  the whole body, without images, or with links as plain text. Conversion is
+  done by html-to-markdown-rs.
+
+### Changed
+
+- `spire`: when a page has no `<main>`, `<article>` or `role="main"`
+  element, `Html::main_text` leaves the body's `<header>` and `<footer>` out
+  too.
+
 ## [0.6.0] - 2026-10-26
 
 Recrawls, with revisits on a schedule and conditional requests, and

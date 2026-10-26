@@ -1,5 +1,6 @@
 //! HTML: the [`Html`] extractor and its methods, extraction with [`Select`]
-//! and [`Element`], a page's [`Meta`] and [`JsonLd`], and the
+//! and [`Element`], a page's [`Meta`] and [`JsonLd`], its main content as
+//! `Markdown` with the `markdown` feature, and the
 //! [scraper](https://docs.rs/scraper) parser behind them.
 //!
 //! [`Html`] wraps a scraper [`Document`], to walk a page's tree directly
@@ -9,6 +10,8 @@
 //! at [`node::Element`].
 
 mod document;
+#[cfg(feature = "markdown")]
+mod markdown;
 mod meta;
 pub(crate) mod select;
 mod text;
@@ -19,5 +22,8 @@ pub use scraper::{Html as Document, *};
 pub use spire_macros::Select;
 
 pub use self::document::Html;
+#[cfg(feature = "markdown")]
+#[cfg_attr(docsrs, doc(cfg(feature = "markdown")))]
+pub use self::markdown::{Markdown, MarkdownOptions};
 pub use self::meta::{JsonLd, Meta};
 pub use self::select::{Element, Select};

@@ -29,10 +29,44 @@ its text or attributes.
 `visible_text()` is the text a reader sees: the body without scripts and
 styles, one line per paragraph or list item. `main_text()` keeps only the
 main content, the first `<main>`, `<article>` or `role="main"` element,
-without navigation and asides, for indexing or summarizing pages. To walk
+without navigation and asides, or else the body without its header and
+footer as well, for indexing or summarizing pages. To walk
 the tree yourself, `Html` wraps a `spire::extract::html::Document`, scraper's
 document, and `spire::extract::html` re-exports the rest of scraper at the
 version spire uses.
+
+## Markdown
+
+With the `markdown` feature, the `Markdown` extractor converts the page's
+main content, as `main_text()` finds it, to Markdown: headings, lists,
+emphasis, links, images, tables, block quotes and code are kept, which
+suits a model's context, a vector store or a search index. Links and images
+resolve against the URI the page was served from, and its `<base href>`:
+
+```rust
+use spire::extract::html::Markdown;
+
+async fn page(Markdown(markdown): Markdown) {
+    println!("{markdown}");
+}
+```
+
+`Markdown::from_html` converts with options: the whole body instead of the
+main content, without images, or with links as plain text:
+
+```rust
+use spire::extract::html::{Html, Markdown, MarkdownOptions};
+use spire::request::http::Uri;
+
+fn convert(html: &Html, uri: Uri) -> spire::Result<Markdown> {
+    let options = MarkdownOptions::new().with_base(uri).whole_body().without_images();
+    Markdown::from_html(html, &options)
+}
+```
+
+The conversion is done by
+[html-to-markdown-rs](https://docs.rs/html-to-markdown-rs), which logs an
+`html_to_markdown::convert` span for every page.
 
 ## Selecting with a derive
 

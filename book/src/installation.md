@@ -14,6 +14,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 | Feature | Enables |
 |---|---|
 | `html` (default) | The `Html` and `Element` extractors and the `Select` trait |
+| `markdown` | The `Markdown` extractor, a page's main content as Markdown |
 | `macros` | `#[derive(Select)]` and `#[derive(Tags)]` |
 | `reqwest` | `HttpClient`, the HTTP backend |
 | `thirtyfour` | `BrowserBackend`, the WebDriver backend |
