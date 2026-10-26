@@ -33,7 +33,6 @@
 
 mod identities;
 mod pool;
-mod profile;
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -44,7 +43,6 @@ use http::{HeaderMap, HeaderValue, Uri};
 
 pub use self::identities::Identities;
 pub(crate) use self::pool::{Health, IdentityPool};
-pub use self::profile::{Browser, Platform, Profile, UserAgents};
 use crate::request::{Request, RequestMeta};
 use crate::{Error, Result};
 
@@ -60,7 +58,6 @@ struct Inner {
     name: Box<str>,
     proxy: Option<Uri>,
     headers: HeaderMap,
-    profile: Option<Profile>,
 }
 
 impl Identity {
@@ -71,7 +68,6 @@ impl Identity {
             name: name.into(),
             proxy: None,
             headers: HeaderMap::new(),
-            profile: None,
         }))
     }
 
@@ -122,19 +118,6 @@ impl Identity {
         self
     }
 
-    /// Presents as `profile` on every request: a browser's user agent, and
-    /// the headers that go with it, see [`Profile`]. The identity's own
-    /// [headers](Self::with_header) win over the profile's.
-    ///
-    /// Profiles are for HTTP backends: a real browser sends its own user
-    /// agent and client hints, so a browser backend refuses an identity with
-    /// a profile.
-    #[must_use]
-    pub fn with_profile(mut self, profile: Profile) -> Self {
-        Arc::make_mut(&mut self.0).profile = Some(profile);
-        self
-    }
-
     /// Returns the name.
     #[must_use]
     pub fn name(&self) -> &str {
@@ -147,16 +130,10 @@ impl Identity {
         self.0.proxy.as_ref()
     }
 
-    /// Returns the headers sent on every request, besides the profile's.
+    /// Returns the headers sent on every request.
     #[must_use]
     pub fn headers(&self) -> &HeaderMap {
         &self.0.headers
-    }
-
-    /// Returns the profile, if the identity presents as a browser.
-    #[must_use]
-    pub fn profile(&self) -> Option<&Profile> {
-        self.0.profile.as_ref()
     }
 
     /// Returns a weak reference to this identity, which tells whether it is
@@ -168,16 +145,12 @@ impl Identity {
         WeakIdentity(Arc::downgrade(&self.0))
     }
 
-    /// Sends `request` as this identity: with its headers and its
-    /// profile's, unless the request sets them, and recorded for
+    /// Sends `request` as this identity: with its headers, unless the
+    /// request sets them, and recorded for
     /// [`RequestExt::identity`](crate::request::RequestExt::identity).
     pub(crate) fn apply(&self, request: &mut Request) {
-        let mut added = self.profile().map(Profile::headers).unwrap_or_default();
-        for (name, value) in self.headers() {
-            added.insert(name.clone(), value.clone());
-        }
         let headers = request.headers_mut();
-        for (name, value) in &added {
+        for (name, value) in self.headers() {
             if !headers.contains_key(name) {
                 headers.insert(name.clone(), value.clone());
             }
@@ -236,7 +209,6 @@ impl fmt::Debug for Identity {
             .field("name", &self.name())
             .field("proxy", &proxy)
             .field("headers", &self.headers().keys().collect::<Vec<_>>())
-            .field("profile", &self.profile())
             .finish()
     }
 }

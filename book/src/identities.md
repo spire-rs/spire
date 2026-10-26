@@ -66,50 +66,6 @@ Names should follow from `n`, as above, so a resumed crawl builds the same
 identities again. A function that fails, e.g. on a malformed proxy URL,
 fails the request that needed the identity.
 
-## Profiles
-
-A user agent on its own gives a request away: a browser sends it with
-headers that agree with it, such as Chrome's client hints. A `Profile` is a
-browser's user agent and those headers, as a real browser of that version
-sends them on a navigation, and `UserAgents` picks one per identity, with
-browsers and platforms as common as they are on the web:
-
-```rust
-use spire::identity::{Browser, Identities, Identity, UserAgents};
-use spire::request::http::HeaderValue;
-
-let agents = UserAgents::new()
-    .browsers([Browser::Chrome, Browser::Firefox])
-    .language(HeaderValue::from_static("de-DE,de;q=0.9"));
-
-let identities = Identities::from_fn(move |n| {
-    Identity::new(format!("session-{n}"))
-        .with_proxy(format!("http://user-session-{n}:secret@gate.example:7000"))
-        .map(|identity| identity.with_profile(agents.pick(n)))
-});
-```
-
-- `UserAgents::new()` picks desktop Chrome, Safari, Edge and Firefox, in
-  proportion to their shares, 65, 18, 10 and 7, at their latest two major
-  versions as of the spire release, Safari at its latest.
-- `browsers` keeps only some of them, as common relative to each other as
-  on the web; `share` changes one's share, and a share of zero leaves it
-  out. `versions` picks other versions, and `platforms` mobile ones.
-- `pick(n)` is deterministic, so identity `n` presents as the same browser
-  in every run.
-- `Profile::new(Browser::Chrome, 156, Platform::Windows)` builds one
-  profile by hand.
-
-An identity's own headers win over its profile's, and a request's own over
-both. A profile leaves `Accept-Encoding` to the backend, which knows the
-encodings it can decode. It cannot match a browser's header order or TLS
-fingerprint, so it makes requests consistent, not indistinguishable from a
-browser's.
-
-Profiles are for HTTP backends. A browser sends its own user agent and
-client hints, matching its real version, so `BrowserBackend` refuses an
-identity with a profile; give a browser identity a proxy and plain headers.
-
 ## Picking one per request
 
 - `in_turn()`, the default, gives each request the next identity.
@@ -196,3 +152,10 @@ Identities keep a visitor consistent; they are not a disguise. A user agent
 names a browser, but a request sent over reqwest's TLS stack does not have
 that browser's TLS fingerprint, and sites that check it will see the
 difference.
+
+The same goes for headers. An identity's user agent can be any string, e.g.
+a current one from [ua_generator](https://docs.rs/ua_generator), but a real
+browser sends more than its user agent: Chrome sends client hints with
+every request, `Accept` and `Sec-Fetch-*` headers that agree with its
+version, and all of them in a fixed order. A user agent alone is consistent
+per identity, but not with the rest of the request.

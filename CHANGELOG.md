@@ -31,12 +31,6 @@ and this project adheres to
   `MockSite::sent` and `unreachable_through` to test crawls with identities.
 - `spire-core`: `Identity::downgrade` and `WeakIdentity`, for backends to
   drop what they keep per identity once it is gone.
-- `spire-core`: browser profiles. A `Profile` is a browser's user agent and
-  the headers a real browser of that version sends with it: Chromium's
-  client hints, `Accept`, `Accept-Language`, `Upgrade-Insecure-Requests` and
-  `Sec-Fetch-*`. `Identity::with_profile` presents as one, and `UserAgents`
-  picks one per identity, deterministically, with browsers and platforms
-  weighted by how common they are.
 - `spire-reqwest`: `HttpClient` overrides `connect_as`, with a reqwest client
   per identity, dropped once the identity is gone. `HttpClient::from_builder`
   builds it from a function that makes the reqwest configuration, which

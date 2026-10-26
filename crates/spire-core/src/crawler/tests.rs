@@ -1122,35 +1122,6 @@ mod identities {
     }
 
     #[tokio::test]
-    async fn profiles_headers_come_under_the_identitys_and_the_seeds() {
-        use http::header::{ACCEPT, ACCEPT_LANGUAGE};
-
-        use crate::identity::{Browser, Platform, Profile};
-
-        let profile = Profile::new(Browser::Firefox, 154, Platform::Linux).unwrap();
-        let identity = Identity::new("a")
-            .with_profile(profile)
-            .with_header(ACCEPT_LANGUAGE, HeaderValue::from_static("de-DE"));
-        let site = site(&["a.test"]);
-        let seed = Seed::get("https://a.test/")
-            .unwrap()
-            .with_header(ACCEPT, HeaderValue::from_static("application/json"));
-        let crawler = Crawler::new(site.clone(), from_fn(fetch))
-            .with_identities(Identities::new([identity]))
-            .with_seed(seed);
-
-        crawler.run().await.unwrap();
-        let headers = &site.sent()[0].headers;
-        assert_eq!(
-            headers[USER_AGENT],
-            "Mozilla/5.0 (X11; Linux x86_64; rv:154.0) Gecko/20100101 Firefox/154.0"
-        );
-        assert_eq!(headers[ACCEPT_LANGUAGE], "de-DE");
-        assert_eq!(headers[ACCEPT], "application/json");
-        assert_eq!(headers["sec-fetch-mode"], "navigate");
-    }
-
-    #[tokio::test]
     async fn handlers_see_their_identity() {
         let worker = from_fn(|cx: Context<MockClient>| async move {
             assert_eq!(cx.request().identity().map(Identity::name), Some("only"));
