@@ -2,6 +2,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 
+mod from_ref;
 mod revisit;
 mod select;
 mod tags;
@@ -16,6 +17,21 @@ use syn::{DeriveInput, Error, parse_macro_input};
 pub fn derive_select(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     select::expand(&input)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
+
+/// Derives `spire::extract::FromRef` for every field of a router state, so
+/// handlers and extractors can take a part of the state, e.g.
+/// `State<Pool>`, instead of all of it.
+///
+/// Each field's type gets `FromRef<State>`, cloning the field; a field
+/// with `#[from_ref(skip)]` does not. Two fields of the same type conflict,
+/// so skip all but one.
+#[proc_macro_derive(FromRef, attributes(from_ref))]
+pub fn derive_from_ref(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    from_ref::expand(&input)
         .unwrap_or_else(Error::into_compile_error)
         .into()
 }

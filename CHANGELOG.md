@@ -39,6 +39,9 @@ changes are marked.
 - `spire`: `FollowLinks::score_page` and `FollowLinks::score_links` give
   followed links a priority: the page's score, computed once, plus each
   link's, e.g. from its anchor text.
+- `spire-macros`: `#[derive(FromRef)]` implements `FromRef` for the type of
+  every field of a router state, so handlers take parts of it with `State`;
+  `#[from_ref(skip)]` leaves a field out.
 
 ### Changed
 

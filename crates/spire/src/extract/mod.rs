@@ -53,6 +53,9 @@ pub use body::{Body, Json, Text};
 pub use browser::Tab;
 pub use head::Head;
 pub use query::Query;
+#[cfg(feature = "macros")]
+#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+pub use spire_macros::FromRef;
 pub use state::{FromRef, State};
 
 use crate::Context;

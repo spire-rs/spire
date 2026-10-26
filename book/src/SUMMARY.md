@@ -12,6 +12,7 @@
 
 - [Routing](routing.md)
 - [Extractors](extractors.md)
+- [State](state.md)
 - [HTML](html.md)
 - [Storing results](datasets.md)
 

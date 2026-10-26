@@ -142,31 +142,5 @@ let router: Router<Noop> = Router::new().route("listing", (
 
 ## State
 
-`Router::with_state` shares a value with every handler, which takes it with
-the `State` extractor. `FromRef` takes a part of it instead:
-
-```rust
-use spire::Router;
-use spire::extract::{FromRef, State};
-# use spire::backend::Noop;
-
-#[derive(Clone)]
-struct AppState {
-    api_key: String,
-}
-
-struct ApiKey(String);
-
-impl FromRef<AppState> for ApiKey {
-    fn from_ref(state: &AppState) -> Self {
-        Self(state.api_key.clone())
-    }
-}
-
-async fn page(State(ApiKey(key)): State<ApiKey>) {
-    println!("{key}");
-}
-
-let state = AppState { api_key: "secret".into() };
-let router: Router<Noop, AppState> = Router::with_state(state).route("page", page);
-```
+`Router::with_state` shares a value with every handler, which takes it, or
+a part of it, with the `State` extractor: see [State](state.md).

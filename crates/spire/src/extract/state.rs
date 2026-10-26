@@ -26,6 +26,10 @@ use crate::extract::FromContext;
 ///     }
 /// }
 /// ```
+///
+/// With the `macros` feature, `#[derive(FromRef)]` on the state implements
+/// it for the type of every field, cloning the field; `#[from_ref(skip)]`
+/// leaves a field out.
 pub trait FromRef<T> {
     /// Converts `input` into `Self`.
     fn from_ref(input: &T) -> Self;

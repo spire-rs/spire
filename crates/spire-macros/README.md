@@ -98,6 +98,29 @@ let router = Router::new()
   `page: Page` (or `Option<Page>`) as an argument.
 - The enum must be `Copy` and have only unit variants with distinct names.
 
+### `FromRef`
+
+Derives `spire::extract::FromRef` for the type of every field of a router
+state, so a handler takes only the parts it needs with `State`:
+
+```rust,ignore
+use spire::extract::{FromRef, State};
+
+#[derive(Clone, FromRef)]
+struct AppState {
+    db: Db,
+    #[from_ref(skip)]
+    api_key: String,
+}
+
+async fn page(State(db): State<Db>) {}
+```
+
+- Each field is cloned, so keep large or shared parts behind an `Arc`.
+- Two fields of the same type conflict: `#[from_ref(skip)]` leaves all but
+  one out.
+- The struct must have named fields and no generic parameters.
+
 ## Usage
 
 This crate is typically not used directly. Instead, enable the `macros` feature
