@@ -25,6 +25,8 @@
 //! - [`TagBackoff`] holds back a tag's seeds after [`Report::Backoff`].
 //! - [`Revisits`] crawls seeds again on a schedule, kept by storage that
 //!   implements [`Schedule`].
+//! - [`Scored`] adds a [`Score`] to every pushed seed's priority, for
+//!   best-first crawling.
 //!
 //! Without a [`Retry`] facade, retries are refused and the seeds fail;
 //! without a [`TagBackoff`] facade, backoffs only delay the retried request.
@@ -33,6 +35,7 @@ pub(crate) mod dynamic;
 pub mod facade;
 pub mod memory;
 pub mod queue;
+pub mod score;
 pub mod seed;
 pub mod seen;
 #[cfg(test)]
@@ -44,8 +47,9 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use self::facade::{
-    AllowedHosts, Dedup, Filter, MaxDepth, Retry, RetryPolicy, Revisits, TagBackoff,
+    AllowedHosts, Dedup, Filter, MaxDepth, Retry, RetryPolicy, Revisits, Scored, TagBackoff,
 };
+use self::score::Score;
 use self::seed::Seed;
 use self::seen::{InMemSeen, SeenSet};
 use crate::Result;
@@ -311,6 +315,28 @@ pub trait FrontierExt: Frontier + Sized {
         Self: Schedule,
     {
         Revisits::new(self)
+    }
+
+    /// Adds `scorer`'s score to the priority of every seed pushed, so a
+    /// frontier that orders by priority crawls the best seeds first.
+    ///
+    /// The score adds to the seed's own [`priority`](Seed::with_priority),
+    /// e.g. one a handler gave a link, and stacked scorers add up. Seeds
+    /// are scored once, when pushed: retries and revisits keep their
+    /// priority. A FIFO or LIFO frontier ignores priorities.
+    ///
+    /// ```
+    /// use spire_core::frontier::FrontierExt;
+    /// use spire_core::frontier::memory::InMemFrontier;
+    /// use spire_core::frontier::score::{Keywords, ShallowFirst};
+    ///
+    /// let frontier = InMemFrontier::priority()
+    ///     .dedup()
+    ///     .score(Keywords::new(["laptop", "review"]).with_weight(10))
+    ///     .score(ShallowFirst);
+    /// ```
+    fn score<S: Score>(self, scorer: S) -> Scored<Self, S> {
+        Scored::new(self, scorer)
     }
 
     /// Wraps the frontier with a custom facade.

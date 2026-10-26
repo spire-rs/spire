@@ -42,6 +42,12 @@ tracking parameters such as `utm_source`, so
 - `InMemFrontier::priority()` crawls the highest `with_priority` first, then
   in the order queued.
 
+A redb store's frontier orders by priority too, see
+[Crash safety with redb](redb.md).
+
+Priorities can be scored for every link, so the crawl reaches the pages
+that matter first: see [Best-first crawling](best-first.md).
+
 ## Facades
 
 `FrontierExt` adds facades, each wrapping the frontier before it:

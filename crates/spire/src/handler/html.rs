@@ -2,7 +2,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use scraper::Selector;
+use scraper::{ElementRef, Selector};
 
 use crate::backend::Client;
 use crate::extract::FromContext;
@@ -34,7 +34,15 @@ use crate::{Context, TRACING_TARGET};
 pub struct FollowLinks {
     tag: Tag,
     selector: Option<(Arc<str>, Selector)>,
+    page_scorer: Option<Arc<PageScorer>>,
+    link_scorer: Option<Arc<LinkScorer>>,
 }
+
+/// Scores a page, for every link found on it.
+type PageScorer = dyn Fn(&Html) -> i32 + Send + Sync;
+
+/// Scores a link from its element.
+type LinkScorer = dyn Fn(ElementRef<'_>) -> i32 + Send + Sync;
 
 impl FollowLinks {
     /// Follows every link of the page, queueing it with `tag`.
@@ -42,6 +50,8 @@ impl FollowLinks {
         Self {
             tag: tag.into(),
             selector: None,
+            page_scorer: None,
+            link_scorer: None,
         }
     }
 
@@ -57,16 +67,78 @@ impl FollowLinks {
         self
     }
 
-    /// The `href` of every link to follow, as written in the page.
-    fn hrefs(&self, page: &Html) -> Vec<String> {
-        let Some((_, selector)) = &self.selector else {
-            return page.links();
+    /// Adds `scorer`'s score of the page to the priority of every link
+    /// found on it, scoring the page once, so a frontier that orders by
+    /// priority crawls the links of the most relevant pages first.
+    ///
+    /// It adds to [`score_links`](Self::score_links), and a
+    /// [scoring](crate::frontier::FrontierExt::score) frontier adds its own
+    /// score on top.
+    ///
+    /// ```
+    /// use spire::frontier::score::Keywords;
+    /// use spire::handler::FollowLinks;
+    ///
+    /// let keywords = Keywords::new(["laptop", "review"]);
+    /// let follow = FollowLinks::new("page")
+    ///     .score_page(move |page| 10 * keywords.matches(&page.title().unwrap_or_default()));
+    /// ```
+    pub fn score_page<F>(mut self, scorer: F) -> Self
+    where
+        F: Fn(&Html) -> i32 + Send + Sync + 'static,
+    {
+        self.page_scorer = Some(Arc::new(scorer));
+        self
+    }
+
+    /// Adds `scorer`'s score of every link's element, e.g. by its anchor
+    /// text, to the link's priority, so a frontier that orders by priority
+    /// crawls the most promising links first.
+    ///
+    /// It adds to [`score_page`](Self::score_page), and a
+    /// [scoring](crate::frontier::FrontierExt::score) frontier adds its own
+    /// score on top.
+    ///
+    /// ```
+    /// use spire::frontier::score::Keywords;
+    /// use spire::handler::FollowLinks;
+    ///
+    /// let keywords = Keywords::new(["laptop", "review"]);
+    /// let follow = FollowLinks::new("page")
+    ///     .score_links(move |link| keywords.matches(&link.text().collect::<String>()));
+    /// ```
+    pub fn score_links<F>(mut self, scorer: F) -> Self
+    where
+        F: Fn(ElementRef<'_>) -> i32 + Send + Sync + 'static,
+    {
+        self.link_scorer = Some(Arc::new(scorer));
+        self
+    }
+
+    /// Every link to follow, with its `href` as written in the page.
+    fn links(&self, page: &Html) -> Vec<Link> {
+        let scored = self.page_scorer.is_some() || self.link_scorer.is_some();
+        let page_score = self.page_scorer.as_ref().map_or(0, |scorer| scorer(page));
+        let link = |(href, element): (&str, ElementRef<'_>)| {
+            let link = Link::from(href).with_tag(self.tag.clone());
+            if !scored {
+                return link;
+            }
+            let link_score = self
+                .link_scorer
+                .as_ref()
+                .map_or(0, |scorer| scorer(element));
+            link.with_priority(page_score.saturating_add(link_score))
         };
-        page.0
-            .select(selector)
-            .filter_map(|element| element.value().attr("href"))
-            .map(str::to_owned)
-            .collect()
+        match &self.selector {
+            Some((_, selector)) => page
+                .0
+                .select(selector)
+                .filter_map(|element| Some((element.value().attr("href")?, element)))
+                .map(link)
+                .collect(),
+            None => page.anchors().map(link).collect(),
+        }
     }
 }
 
@@ -75,6 +147,8 @@ impl fmt::Debug for FollowLinks {
         f.debug_struct("FollowLinks")
             .field("tag", &self.tag)
             .field("selector", &self.selector.as_ref().map(|(css, _)| css))
+            .field("score_page", &self.page_scorer.is_some())
+            .field("score_links", &self.link_scorer.is_some())
             .finish()
     }
 }
@@ -86,10 +160,7 @@ where
 {
     async fn call(&self, cx: &Context<C>, state: &S) -> Outcome {
         let follow = async {
-            let hrefs = self.hrefs(&Html::from_context(cx, state).await?);
-            let links = hrefs
-                .into_iter()
-                .map(|href| Link::from(href).with_tag(self.tag.clone()));
+            let links = self.links(&Html::from_context(cx, state).await?);
             let queued = cx.queue().follow_all(links).await?;
             tracing::debug!(target: TRACING_TARGET, queued, tag = %self.tag, "followed links");
             Ok::<_, crate::Error>(())

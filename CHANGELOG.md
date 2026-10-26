@@ -23,6 +23,16 @@ and this project adheres to
   `Stats::unchanged`. `InMemValidators` keeps them for one run, and
   `RedbStore::validators` across runs.
 - `spire-core`: `MockSite` answers conditional requests with `304`.
+- `spire-core`: best-first crawling. `FrontierExt::score` adds a `Score` to
+  the priority of every pushed seed, so a priority frontier crawls the best
+  first; `Keywords` scores keywords in the URL, `ShallowFirst` shallower
+  seeds, and closures from `&Seed` are scorers. Stacked scorers add up, on
+  top of the seed's own priority.
+- `spire-core`: `Link::with_priority` sets a followed link's priority.
+- `spire`: `Html::anchors` returns every link with its `<a>` element.
+- `spire`: `FollowLinks::score_page` and `FollowLinks::score_links` give
+  followed links a priority: the page's score, computed once, plus each
+  link's, e.g. from its anchor text.
 
 ### Fixed
 

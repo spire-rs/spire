@@ -90,9 +90,9 @@ impl Queue {
 
     /// Adds a link found on the current request, one level deeper.
     ///
-    /// The followed request has the link's tag, or else the seed's. Tags are
-    /// not inherited: an untagged link goes to the router's path routes or
-    /// fallback, so pagination tags its links explicitly.
+    /// The followed request has the link's tag and priority, or else the
+    /// seed's. Tags are not inherited: an untagged link goes to the router's
+    /// path routes or fallback, so pagination tags its links explicitly.
     ///
     /// The tag is not part of the [`Fingerprint`](crate::frontier::seed::Fingerprint):
     /// with a deduplicating frontier, a URL already followed under one tag is
@@ -118,6 +118,9 @@ impl Queue {
 
         if let Some(tag) = link.tag {
             seed = seed.with_tag(tag);
+        }
+        if let Some(priority) = link.priority {
+            seed = seed.with_priority(priority);
         }
         if let Some(parent) = &self.parent {
             seed = seed.with_depth(parent.depth.child());
@@ -231,6 +234,37 @@ mod tests {
                 ("https://example.com/own".to_owned(), tag("detail"), 3),
                 ("https://example.com/seed".to_owned(), tag("seed"), 3),
                 ("https://example.com/root".to_owned(), None, 0),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn follow_sets_the_link_priority() {
+        let frontier = Arc::new(InMemFrontier::priority());
+        let child = Queue::from_dyn(frontier.clone()).child_of(&page("https://example.com/"));
+
+        child.follow("/plain").await.unwrap();
+        child
+            .follow(Link::from("/scored").with_priority(7))
+            .await
+            .unwrap();
+        let seed = Seed::get("https://example.com/seed")
+            .unwrap()
+            .with_priority(3);
+        child.follow(seed).await.unwrap();
+
+        let mut priorities: Vec<_> = Frontier::snapshot(&*frontier)
+            .unwrap()
+            .iter()
+            .map(|seed| (seed.uri().path().to_owned(), seed.priority()))
+            .collect();
+        priorities.sort_by_key(|(_, priority)| -priority);
+        assert_eq!(
+            priorities,
+            [
+                ("/scored".to_owned(), 7),
+                ("/seed".to_owned(), 3),
+                ("/plain".to_owned(), 0),
             ]
         );
     }

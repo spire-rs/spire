@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::LazyLock;
 
 use derive_more::{Deref, DerefMut};
-use scraper::Selector;
+use scraper::{ElementRef, Selector};
 
 use super::select::{Select, private, select_in};
 use crate::backend::Client;
@@ -55,11 +55,16 @@ impl Html {
     /// which resolves relative links.
     #[must_use]
     pub fn links(&self) -> Vec<String> {
+        self.anchors().map(|(href, _)| href.to_owned()).collect()
+    }
+
+    /// Returns every link with its element, in document order: the `href`
+    /// as written in the page, and the `<a>` element, e.g. to score the
+    /// link by its text with [`Link::with_priority`](crate::frontier::queue::Link::with_priority).
+    pub fn anchors(&self) -> impl Iterator<Item = (&str, ElementRef<'_>)> {
         self.0
             .select(&LINKS)
-            .filter_map(|element| element.value().attr("href"))
-            .map(str::to_owned)
-            .collect()
+            .filter_map(|element| Some((element.value().attr("href")?, element)))
     }
 
     /// Extracts a `T` from the document, see [`Select`]: the first match of
@@ -161,6 +166,16 @@ mod tests {
         let html = Html::parse(PAGE);
         assert_eq!(html.title().as_deref(), Some("Shop"));
         assert_eq!(html.links(), ["/lamp", "/chair"]);
+    }
+
+    #[test]
+    fn anchors_pair_links_with_their_elements() {
+        let html = Html::parse(PAGE);
+        let anchors: Vec<_> = html
+            .anchors()
+            .map(|(href, anchor)| (href, anchor.value().name()))
+            .collect();
+        assert_eq!(anchors, [("/lamp", "a"), ("/chair", "a")]);
     }
 
     #[test]

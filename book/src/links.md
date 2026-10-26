@@ -32,6 +32,11 @@ The `FollowLinks` handler does this for a whole page: every link, or those
 matching a CSS selector, with the tag to give them, see
 [Routing](routing.md).
 
+`Link::with_priority` sets how soon a link is crawled, on a frontier that
+orders by priority, and `FollowLinks` scores the links it follows with
+`score_page` and `score_links`:
+see [Best-first crawling](best-first.md).
+
 ## Where links resolve
 
 A relative link resolves against the page it was found on. When the request

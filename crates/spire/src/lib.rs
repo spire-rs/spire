@@ -129,6 +129,7 @@ mod book {
         Html: "html.md",
         Datasets: "datasets.md",
         Links: "links.md",
+        BestFirst: "best-first.md",
         Sitemaps: "sitemaps.md",
         Http: "http.md",
         Browsers: "browsers.md",
