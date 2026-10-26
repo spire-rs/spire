@@ -332,7 +332,7 @@ impl Profile {
 /// use spire_core::http::HeaderValue;
 ///
 /// let agents = UserAgents::new()
-///     .weighted([(Browser::Chrome, 3), (Browser::Firefox, 1)])
+///     .browsers([Browser::Chrome, Browser::Firefox])
 ///     .language(HeaderValue::from_static("de-DE,de;q=0.9"));
 ///
 /// let identities = Identities::from_fn(move |n| {
@@ -348,17 +348,18 @@ pub struct UserAgents {
 }
 
 impl Default for UserAgents {
-    /// Desktop Chrome, Safari, Edge and Firefox, in that order of how
-    /// common they are, at their latest two major versions, Safari at its
-    /// latest.
+    /// Desktop Chrome, Safari, Edge and Firefox, at their latest two major
+    /// versions, Safari at its latest, see [`UserAgents::new`].
     fn default() -> Self {
         Self {
-            browsers: vec![
-                (Browser::Chrome, 65),
-                (Browser::Safari, 18),
-                (Browser::Edge, 10),
-                (Browser::Firefox, 7),
-            ],
+            browsers: [
+                Browser::Chrome,
+                Browser::Safari,
+                Browser::Edge,
+                Browser::Firefox,
+            ]
+            .map(|browser| (browser, default_share(browser)))
+            .to_vec(),
             platforms: Platform::DESKTOP.to_vec(),
             versions: Vec::new(),
             language: None,
@@ -367,24 +368,51 @@ impl Default for UserAgents {
 }
 
 impl UserAgents {
-    /// Picks among desktop browsers, see [`Default`].
+    /// Picks among desktop Chrome, Safari, Edge and Firefox, in proportion
+    /// to their shares: 65, 18, 10 and 7, roughly how common each is. Each
+    /// runs on its own mix of desktop platforms, at its latest two major
+    /// versions, Safari at its latest.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Picks browsers in proportion to their weights.
+    /// Picks only among `browsers`, keeping their shares, so they stay as
+    /// common relative to each other as on the web.
     ///
     /// # Panics
     ///
-    /// Panics if no browser has a weight above zero, or none of them runs on
-    /// the [platforms](Self::platforms).
+    /// Panics if none of `browsers` runs on the
+    /// [platforms](Self::platforms).
     #[must_use]
-    pub fn weighted(mut self, browsers: impl IntoIterator<Item = (Browser, u32)>) -> Self {
+    pub fn browsers(mut self, browsers: impl IntoIterator<Item = Browser>) -> Self {
         self.browsers = browsers
             .into_iter()
-            .filter(|(_, weight)| *weight > 0)
+            .map(|browser| {
+                let share = self
+                    .browsers
+                    .iter()
+                    .find(|(other, _)| *other == browser)
+                    .map_or_else(|| default_share(browser), |(_, share)| *share);
+                (browser, share)
+            })
             .collect();
+        self.check();
+        self
+    }
+
+    /// Picks `browser` in proportion to `share` among the others' shares,
+    /// adding it if it was left out; a share of zero leaves it out.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no browser left runs on the [platforms](Self::platforms).
+    #[must_use]
+    pub fn share(mut self, browser: Browser, share: u32) -> Self {
+        self.browsers.retain(|(other, _)| *other != browser);
+        if share > 0 {
+            self.browsers.push((browser, share));
+        }
         self.check();
         self
     }
@@ -492,6 +520,16 @@ impl fmt::Debug for UserAgents {
             .field("platforms", &self.platforms)
             .field("versions", &self.versions)
             .finish_non_exhaustive()
+    }
+}
+
+/// How common `browser` is, relative to the others.
+const fn default_share(browser: Browser) -> u32 {
+    match browser {
+        Browser::Chrome => 65,
+        Browser::Safari => 18,
+        Browser::Edge => 10,
+        Browser::Firefox => 7,
     }
 }
 
@@ -639,7 +677,7 @@ mod tests {
     #[test]
     fn picks_respect_the_settings() {
         let agents = UserAgents::new()
-            .weighted([(Browser::Safari, 1)])
+            .browsers([Browser::Safari])
             .platforms([Platform::Ios])
             .versions(Browser::Safari, 25..=25)
             .language(HeaderValue::from_static("fr-FR"));
@@ -652,10 +690,23 @@ mod tests {
     }
 
     #[test]
+    fn browsers_keep_their_shares_and_share_changes_one() {
+        let agents = UserAgents::new().browsers([Browser::Firefox, Browser::Chrome]);
+        assert_eq!(
+            agents.browsers,
+            [(Browser::Firefox, 7), (Browser::Chrome, 65)]
+        );
+
+        let agents = agents.share(Browser::Firefox, 30).share(Browser::Chrome, 0);
+        assert_eq!(agents.browsers, [(Browser::Firefox, 30)]);
+        assert!((0..50).all(|n| agents.pick(n).browser() == Browser::Firefox));
+    }
+
+    #[test]
     #[should_panic(expected = "no browser that runs on its platforms")]
     fn impossible_settings_panic() {
         let _ = UserAgents::new()
-            .weighted([(Browser::Edge, 1)])
+            .browsers([Browser::Edge])
             .platforms([Platform::Linux]);
     }
 }

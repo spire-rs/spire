@@ -326,7 +326,8 @@ mod tests {
 
     #[test]
     fn http_proxies_carry_their_credentials() {
-        let (http, credentials) = config("http://user%40x:p%3Ass@proxy.test:8080").unwrap();
+        // Fake credentials, for the test.
+        let (http, credentials) = config("http://user%40x:p%3Ass@proxy.test:8080").unwrap(); // trufflehog:ignore
         assert_eq!(http["httpProxy"], "proxy.test:8080");
         assert_eq!(http["sslProxy"], "proxy.test:8080");
         let credentials = credentials.unwrap();

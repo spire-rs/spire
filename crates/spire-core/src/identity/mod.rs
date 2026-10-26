@@ -264,7 +264,8 @@ mod tests {
     #[test]
     fn debug_hides_proxy_credentials() {
         let identity = Identity::new("a")
-            .with_proxy("http://user:secret@proxy.test:8080")
+            // Fake credentials, for the test.
+            .with_proxy("http://user:secret@proxy.test:8080") // trufflehog:ignore
             .unwrap()
             .with_header(USER_AGENT, HeaderValue::from_static("Bot"));
         let debug = format!("{identity:?}");

@@ -16,11 +16,11 @@ use spire::request::http::header::{ACCEPT_LANGUAGE, USER_AGENT};
 # fn main() -> Result<()> {
 let identities = Identities::new([
     Identity::new("de")
-        .with_proxy("http://user:secret@proxy-de.example:8080")?
+        .with_proxy("http://proxy-de.example:8080")?
         .with_header(USER_AGENT, HeaderValue::from_static("MyBot/1.0 (de)"))
         .with_header(ACCEPT_LANGUAGE, HeaderValue::from_static("de-DE,de;q=0.9")),
     Identity::new("us")
-        .with_proxy("http://user:secret@proxy-us.example:8080")?
+        .with_proxy("http://proxy-us.example:8080")?
         .with_header(USER_AGENT, HeaderValue::from_static("MyBot/1.0 (us)")),
 ])
 .sticky_per_host();
@@ -29,8 +29,8 @@ let identities = Identities::new([
 ```
 
 An identity's headers are added to every request it sends, unless the
-request sets them itself. Its proxy credentials never show up in logs or
-`Debug` output.
+request sets them itself. A proxy URL may carry credentials, as the
+gateway below does; they never show up in logs or `Debug` output.
 
 ## Many identities
 
@@ -79,7 +79,7 @@ use spire::identity::{Browser, Identities, Identity, UserAgents};
 use spire::request::http::HeaderValue;
 
 let agents = UserAgents::new()
-    .weighted([(Browser::Chrome, 3), (Browser::Firefox, 1)])
+    .browsers([Browser::Chrome, Browser::Firefox])
     .language(HeaderValue::from_static("de-DE,de;q=0.9"));
 
 let identities = Identities::from_fn(move |n| {
@@ -89,9 +89,12 @@ let identities = Identities::from_fn(move |n| {
 });
 ```
 
-- `UserAgents::new()` picks desktop Chrome, Safari, Edge and Firefox, at
-  their latest two major versions as of the spire release, Safari at its
-  latest; `versions` picks others, and `platforms` mobile ones.
+- `UserAgents::new()` picks desktop Chrome, Safari, Edge and Firefox, in
+  proportion to their shares, 65, 18, 10 and 7, at their latest two major
+  versions as of the spire release, Safari at its latest.
+- `browsers` keeps only some of them, as common relative to each other as
+  on the web; `share` changes one's share, and a share of zero leaves it
+  out. `versions` picks other versions, and `platforms` mobile ones.
 - `pick(n)` is deterministic, so identity `n` presents as the same browser
   in every run.
 - `Profile::new(Browser::Chrome, 156, Platform::Windows)` builds one
