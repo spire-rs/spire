@@ -13,11 +13,13 @@ use crate::request::Tag;
 ///
 /// let next = Link::from("/page/2");
 /// let detail = Link::from("../items/42").with_tag("item");
+/// let next = Link::from("/page/3").with_priority(10);
 /// ```
 #[derive(Debug, Clone)]
 pub struct Link {
     pub(crate) target: Target,
     pub(crate) tag: Option<Tag>,
+    pub(crate) priority: Option<i32>,
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +35,7 @@ impl Link {
         Self {
             target: Target::Href(href.into()),
             tag: None,
+            priority: None,
         }
     }
 
@@ -40,6 +43,16 @@ impl Link {
     #[must_use]
     pub fn with_tag(mut self, tag: impl Into<Tag>) -> Self {
         self.tag = Some(tag.into());
+        self
+    }
+
+    /// Sets the followed request's priority, e.g. scored from the page the
+    /// link was found on; frontiers that order by priority crawl higher
+    /// priorities first. A [scoring](crate::frontier::FrontierExt::score)
+    /// frontier adds its score to it.
+    #[must_use]
+    pub const fn with_priority(mut self, priority: i32) -> Self {
+        self.priority = Some(priority);
         self
     }
 }
@@ -73,6 +86,7 @@ impl From<Seed> for Link {
         Self {
             target: Target::Seed(Box::new(seed)),
             tag: None,
+            priority: None,
         }
     }
 }

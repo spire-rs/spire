@@ -23,6 +23,9 @@ async fn page(html: Html) -> Result<()> {
 }
 ```
 
+`anchors()` gives every link together with its `<a>` element, e.g. to read
+its text or attributes.
+
 `visible_text()` is the text a reader sees: the body without scripts and
 styles, one line per paragraph or list item. `main_text()` keeps only the
 main content, the first `<main>`, `<article>` or `role="main"` element,

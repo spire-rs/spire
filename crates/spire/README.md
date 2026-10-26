@@ -127,7 +127,8 @@ retried, honouring `Retry-After`.
 - **Handling pages**: [routing](https://spire-rs.github.io/spire/routing.html),
   [extractors](https://spire-rs.github.io/spire/extractors.html), [HTML](https://spire-rs.github.io/spire/html.html), and
   [storing results](https://spire-rs.github.io/spire/datasets.html)
-- **Discovering pages**: [following links](https://spire-rs.github.io/spire/links.html) and
+- **Discovering pages**: [following links](https://spire-rs.github.io/spire/links.html),
+  [best-first crawling](https://spire-rs.github.io/spire/best-first.html), and
   [sitemaps](https://spire-rs.github.io/spire/sitemaps.html)
 - **Fetching**: [HTTP](https://spire-rs.github.io/spire/http.html), [browsers](https://spire-rs.github.io/spire/browsers.html), and
   [middleware](https://spire-rs.github.io/spire/middleware.html)

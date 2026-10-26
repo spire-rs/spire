@@ -18,6 +18,7 @@
 # Discovering pages
 
 - [Following links](links.md)
+- [Best-first crawling](best-first.md)
 - [Sitemaps](sitemaps.md)
 
 # Fetching
