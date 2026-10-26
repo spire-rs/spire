@@ -20,9 +20,8 @@ use crate::{Result, TRACING_TARGET};
 /// Past `expected` URLs the rate climbs; the filter logs a warning once.
 ///
 /// ```
-/// use spire_core::frontier::FrontierExt;
-/// use spire_core::frontier::memory::InMemFrontier;
 /// use spire_core::frontier::seen::BloomSeen;
+/// use spire_core::frontier::{FrontierExt, InMemFrontier};
 ///
 /// // Ten million URLs at a 1% false-positive rate: about 12 MB.
 /// let seen = BloomSeen::new(10_000_000, 0.01);
@@ -291,8 +290,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedups_a_frontier() {
-        use crate::frontier::memory::InMemFrontier;
-        use crate::frontier::{Admission, Frontier, FrontierExt};
+        use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
 
         let frontier = InMemFrontier::fifo().dedup_with(BloomSeen::new(100, 0.001));
         let seed = || Seed::get("https://example.com/page").unwrap();

@@ -77,9 +77,8 @@ failing together are not retried together. `RetryPolicy` changes those:
 ```rust
 use std::time::Duration;
 
-use spire::frontier::FrontierExt;
 use spire::frontier::facade::RetryPolicy;
-use spire::frontier::memory::InMemFrontier;
+use spire::frontier::{FrontierExt, InMemFrontier};
 
 let policy = RetryPolicy::new(5)
     .with_base_delay(Duration::from_secs(1))

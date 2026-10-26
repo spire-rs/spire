@@ -62,20 +62,18 @@ async fn the_last_layer_runs_first() {
 }
 
 #[tokio::test]
-async fn set_header_rotates_and_keeps_the_seeds_own() {
+async fn set_header_keeps_the_seeds_own() {
     let seen = Arc::new(Mutex::new(Vec::new()));
-    let agents = ["a", "b"].map(HeaderValue::from_static);
-    let worker = recording("user-agent", &seen).layer(SetHeader::rotate(USER_AGENT, agents));
+    let agent = HeaderValue::from_static("a");
+    let worker = recording("user-agent", &seen).layer(SetHeader::new(USER_AGENT, agent));
 
     let site = site();
-    for _ in 0..3 {
-        let outcome = site.visit(seed("https://example.com/")).run(&worker).await;
-        assert!(matches!(outcome, Outcome::Continue));
-    }
+    let outcome = site.visit(seed("https://example.com/")).run(&worker).await;
+    assert!(matches!(outcome, Outcome::Continue));
     let own = seed("https://example.com/").with_header(USER_AGENT, HeaderValue::from_static("own"));
     let outcome = site.visit(own).run(&worker).await;
     assert!(matches!(outcome, Outcome::Continue));
-    assert_eq!(*seen.lock().unwrap(), ["a", "b", "a", "own"]);
+    assert_eq!(*seen.lock().unwrap(), ["a", "own"]);
 }
 
 #[tokio::test]
@@ -155,10 +153,4 @@ async fn failed_middleware_fails_the_request() {
         .run(&worker)
         .await;
     assert!(matches!(outcome, Outcome::Fail(_)));
-}
-
-#[test]
-#[should_panic(expected = "needs a value for `user-agent`")]
-fn rotating_no_values_panics() {
-    let _ = SetHeader::rotate(USER_AGENT, []);
 }

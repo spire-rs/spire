@@ -9,10 +9,9 @@
 use spire::backend::HttpClient;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::html::{Element, Html, Select};
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
+use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::request::Tags;
 use spire::request::http::Uri;
 use spire::{Crawler, Result, Router};

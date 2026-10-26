@@ -61,8 +61,13 @@ pub mod frontier {
     pub use spire_core::frontier::*;
 }
 
-/// A crawl stored in redb: a crash-safe frontier, seen set and datasets in
-/// one file, see [`RedbStore`](crate::redb::RedbStore).
+/// Identities: who a request appears to come from, with its proxy,
+/// headers and cookies.
+pub mod identity {
+    pub use spire_core::identity::*;
+}
+
+/// redb: a crash-safe frontier, seen set and datasets in one file.
 #[cfg(feature = "redb")]
 #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
 pub mod redb {
@@ -71,13 +76,18 @@ pub mod redb {
     };
 }
 
-/// Requests, responses and their crawl metadata.
+/// Requests and their crawl metadata.
 pub mod request {
     pub use spire_core::http;
     pub use spire_core::request::*;
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
     pub use spire_macros::{Revisit, Tags};
+}
+
+/// Responses and their crawl metadata.
+pub mod response {
+    pub use spire_core::response::*;
 }
 
 /// Crawls requests with a [`Backend`], handling them with a [`Router`] by
@@ -135,6 +145,7 @@ mod book {
         Http: "http.md",
         Browsers: "browsers.md",
         Middleware: "middleware.md",
+        Identities: "identities.md",
         Frontier: "frontier.md",
         Errors: "errors.md",
         Politeness: "politeness.md",

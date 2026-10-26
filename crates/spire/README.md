@@ -56,11 +56,10 @@ Crawl a listing, follow its pagination and extract every product:
 use spire::backend::HttpClient;
 use spire::dataset::InMemDataset;
 use spire::extract::html::Select;
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
-use spire::request::Tags;
+use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::handler::{Collect, FollowLinks};
+use spire::request::Tags;
 use spire::{Crawler, Result, Router};
 
 /// The kinds of page the crawl visits, routed by tag.
@@ -131,8 +130,9 @@ retried, honouring `Retry-After`.
 - **Discovering pages**: [following links](https://spire-rs.github.io/spire/links.html),
   [best-first crawling](https://spire-rs.github.io/spire/best-first.html), and
   [sitemaps](https://spire-rs.github.io/spire/sitemaps.html)
-- **Fetching**: [HTTP](https://spire-rs.github.io/spire/http.html), [browsers](https://spire-rs.github.io/spire/browsers.html), and
-  [middleware](https://spire-rs.github.io/spire/middleware.html)
+- **Fetching**: [HTTP](https://spire-rs.github.io/spire/http.html), [browsers](https://spire-rs.github.io/spire/browsers.html),
+  [middleware](https://spire-rs.github.io/spire/middleware.html), and
+  [identities](https://spire-rs.github.io/spire/identities.html)
 - **Running a crawl**: [the frontier](https://spire-rs.github.io/spire/frontier.html),
   [errors and retries](https://spire-rs.github.io/spire/errors.html),
   [limits and politeness](https://spire-rs.github.io/spire/politeness.html),

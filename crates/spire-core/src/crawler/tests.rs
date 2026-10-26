@@ -6,10 +6,9 @@ use tokio::time::{Instant, sleep};
 
 use crate::backend::Noop;
 use crate::dataset::InMemDataset;
-use crate::frontier::FrontierExt;
 use crate::frontier::facade::RetryPolicy;
-use crate::frontier::memory::InMemFrontier;
 use crate::frontier::seed::Seed;
+use crate::frontier::{FrontierExt, InMemFrontier};
 use crate::request::RequestExt;
 use crate::worker::{Outcome, from_fn};
 use crate::{Context, Crawler, Error, ErrorKind};
@@ -544,7 +543,8 @@ mod robots {
     use super::*;
     use crate::backend::{Backend, Client};
     use crate::crawler::Robots;
-    use crate::request::{Request, Response};
+    use crate::request::Request;
+    use crate::response::Response;
     use crate::sync::lock;
 
     /// The robots.txt responses of each host: statuses and bodies.
@@ -1055,4 +1055,169 @@ async fn revisits_keep_the_crawl_going_until_it_is_stopped() {
     // Crawled at once, then every minute, until the time limit.
     assert_eq!(*visits.lock().unwrap(), [0, 60, 120]);
     assert_eq!(stats.succeeded, 3);
+}
+
+mod identities {
+    use http::HeaderValue;
+    use http::header::USER_AGENT;
+
+    use super::*;
+    use crate::identity::{Identities, Identity};
+    use crate::testing::{MockClient, MockPage, MockSite, Sent};
+
+    fn site(hosts: &[&str]) -> MockSite {
+        hosts.iter().fold(MockSite::new(), |site, host| {
+            site.page(&format!("https://{host}/"), MockPage::html(""))
+                .page(&format!("https://{host}/next"), MockPage::html(""))
+        })
+    }
+
+    fn agent(name: &str) -> HeaderValue {
+        HeaderValue::from_str(&format!("Bot/{name}")).unwrap()
+    }
+
+    /// Identities `id-0`, `id-1`... each with its own user agent.
+    fn generated() -> Identities {
+        Identities::from_fn(|n| {
+            let name = format!("id-{n}");
+            Ok(Identity::new(name.clone()).with_header(USER_AGENT, agent(&name)))
+        })
+    }
+
+    async fn fetch(cx: Context<MockClient>) -> crate::Result<()> {
+        cx.response().await.map(drop)
+    }
+
+    fn by_host(sent: &[Sent]) -> Vec<(String, Option<String>)> {
+        let mut sent: Vec<_> = sent
+            .iter()
+            .map(|sent| (sent.uri.host().unwrap().to_owned(), sent.identity.clone()))
+            .collect();
+        sent.sort();
+        sent
+    }
+
+    #[tokio::test]
+    async fn requests_go_out_with_their_identitys_headers() {
+        let site = site(&["a.test"]);
+        let own = Seed::get("https://a.test/next")
+            .unwrap()
+            .with_header(USER_AGENT, HeaderValue::from_static("own"));
+        let crawler = Crawler::new(site.clone(), from_fn(fetch))
+            .with_identities(generated().max_active(1))
+            .with_seeds([Seed::get("https://a.test/").unwrap(), own]);
+
+        crawler.run().await.unwrap();
+        let mut agents: Vec<_> = site
+            .sent()
+            .iter()
+            .map(|sent| {
+                assert_eq!(sent.identity.as_deref(), Some("id-0"));
+                sent.headers[USER_AGENT].to_str().unwrap().to_owned()
+            })
+            .collect();
+        agents.sort();
+        // A seed's own header wins over its identity's.
+        assert_eq!(agents, ["Bot/id-0", "own"]);
+    }
+
+    #[tokio::test]
+    async fn handlers_see_their_identity() {
+        let worker = from_fn(|cx: Context<MockClient>| async move {
+            assert_eq!(cx.request().identity().map(Identity::name), Some("only"));
+        });
+        let crawler = Crawler::new(site(&["a.test"]), worker)
+            .with_identities(Identities::new([Identity::new("only")]))
+            .with_seed(Seed::get("https://a.test/").unwrap());
+        let stats = crawler.run().await.unwrap();
+        assert_eq!(stats.succeeded, 1);
+    }
+
+    #[tokio::test]
+    async fn sticky_identities_keep_each_host() {
+        let site = site(&["a.test", "b.test"]);
+        let crawler = Crawler::new(site.clone(), from_fn(fetch))
+            .with_concurrency(1)
+            .with_identities(generated().max_active(2).sticky_per_host())
+            .with_seeds(
+                ["a.test/", "b.test/", "a.test/next", "b.test/next"]
+                    .map(|path| Seed::get(format!("https://{path}")).unwrap()),
+            );
+
+        crawler.run().await.unwrap();
+        let id = |n: &str| Some(n.to_owned());
+        assert_eq!(
+            by_host(&site.sent()),
+            [
+                ("a.test".to_owned(), id("id-0")),
+                ("a.test".to_owned(), id("id-0")),
+                ("b.test".to_owned(), id("id-1")),
+                ("b.test".to_owned(), id("id-1")),
+            ]
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn failing_identities_are_replaced_and_their_requests_retried() {
+        let site = site(&["a.test"]).unreachable_through("id-0");
+        let crawler = Crawler::new(site.clone(), from_fn(fetch))
+            .with_concurrency(1)
+            .with_frontier(InMemFrontier::fifo().retry_with(RetryPolicy::new(3)))
+            .with_identities(generated().max_active(1).max_failures(1))
+            .with_seed(Seed::get("https://a.test/").unwrap());
+
+        let stats = crawler.run().await.unwrap();
+        assert_eq!((stats.succeeded, stats.retried, stats.failed), (1, 1, 0));
+        let used: Vec<_> = site.sent().into_iter().map(|sent| sent.identity).collect();
+        assert_eq!(used, [Some("id-0".to_owned()), Some("id-1".to_owned())]);
+    }
+
+    #[tokio::test]
+    async fn pinned_seeds_go_out_as_their_identity() {
+        let site = site(&["a.test"]);
+        let identities = Identities::new([Identity::new("guest"), Identity::new("account")]);
+        let crawler = Crawler::new(site.clone(), from_fn(fetch))
+            .with_identities(identities)
+            .with_seeds([
+                Seed::get("https://a.test/")
+                    .unwrap()
+                    .with_identity("account"),
+                Seed::get("https://a.test/next")
+                    .unwrap()
+                    .with_identity("account"),
+            ]);
+
+        crawler.run().await.unwrap();
+        assert!(
+            site.sent()
+                .iter()
+                .all(|sent| sent.identity.as_deref() == Some("account"))
+        );
+    }
+
+    #[cfg(feature = "robots")]
+    #[tokio::test]
+    async fn robots_txt_goes_out_as_an_identity() {
+        let site = site(&["a.test"]).page(
+            "https://a.test/robots.txt",
+            MockPage::text("User-agent: *\nDisallow: /next\n"),
+        );
+        let crawler = Crawler::new(site.clone(), from_fn(fetch))
+            .with_robots("bot")
+            .with_identities(generated().max_active(1).sticky_per_host())
+            .with_seeds([
+                Seed::get("https://a.test/").unwrap(),
+                Seed::get("https://a.test/next").unwrap(),
+            ]);
+
+        let stats = crawler.run().await.unwrap();
+        assert_eq!((stats.requests, stats.skipped), (1, 1));
+        let sent = site.sent();
+        assert_eq!(sent[0].uri.path(), "/robots.txt");
+        assert!(
+            sent.iter()
+                .all(|sent| sent.identity.as_deref() == Some("id-0"))
+        );
+        assert_eq!(sent[0].headers[USER_AGENT], "Bot/id-0");
+    }
 }

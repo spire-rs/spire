@@ -14,15 +14,19 @@ use spire::backend::reqwest::Client;
 // reqwest's defaults:
 let backend = HttpClient::default();
 
-// Or a client of your own, e.g. with a user agent and a timeout.
-let client = Client::builder()
-    .user_agent("MyBot/1.0 (+https://example.com/bot)")
-    .timeout(Duration::from_secs(30))
-    .build()?;
-let backend = HttpClient::from(client);
+// Or a configuration of your own, e.g. with a user agent and a timeout.
+let backend = HttpClient::from_builder(|| {
+    Client::builder()
+        .user_agent("MyBot/1.0 (+https://example.com/bot)")
+        .timeout(Duration::from_secs(30))
+})?;
 # Ok(())
 # }
 ```
+
+`from_builder` takes a function that makes the configuration, rather than a
+built client, because a crawl with [identities](identities.md) builds a
+client per identity from it, dropped once the identity is gone.
 
 `spire::backend::reqwest` re-exports reqwest at the version spire uses.
 Compression, cookies, SOCKS proxies and DNS through hickory are features of
@@ -64,35 +68,15 @@ served from, which links resolve against: see
 
 ## Proxies
 
-reqwest takes proxies from the environment by default (`HTTP_PROXY`,
-`HTTPS_PROXY`, `NO_PROXY`). `Proxy::custom` picks one from the URL whenever
-reqwest opens a connection, so one client can keep each host on the same
-proxy, or send only some sites through one:
+To send requests through proxies, give the crawl
+[identities](identities.md): each one a proxy with its own user agent and
+cookies. `HttpClient` builds a reqwest client per identity, from its
+configuration, with the identity's proxy and, with the `cookies` feature, a
+cookie store of its own, and the crawl sets aside proxies that keep
+failing. A `socks5` proxy needs the `socks` feature.
 
-```rust,no_run
-use std::hash::{BuildHasher, RandomState};
-
-use spire::backend::HttpClient;
-use spire::backend::reqwest::{Client, Proxy};
-
-# fn main() -> Result<(), Box<dyn std::error::Error>> {
-let proxies = ["http://proxy-a:8080", "http://proxy-b:8080"];
-let hasher = RandomState::new();
-let client = Client::builder()
-    // Each host always goes through the same proxy.
-    .proxy(Proxy::custom(move |url| {
-        let host = url.host_str()?;
-        let index = hasher.hash_one(host) % proxies.len() as u64;
-        Some(proxies[index as usize])
-    }))
-    .build()?;
-let backend = HttpClient::from(client);
-# Ok(())
-# }
-```
-
-The choice is made per connection, not per request: reqwest keeps
-connections open per host and reuses them, so requests to a host keep
-going through the proxy its connection was opened through. Nor does reqwest
-notice a proxy that keeps failing; requests through it fail and are retried
-like any other.
+Without identities, reqwest takes proxies from the environment by default
+(`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`), and a configuration of your own
+can route through any proxy reqwest supports, e.g. only some sites through
+one with `Proxy::custom`. reqwest picks such a proxy per connection, and
+does not notice one that keeps failing.

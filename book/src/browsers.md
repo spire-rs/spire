@@ -70,6 +70,18 @@ every request gets a tab in a fresh profile, so no cookies or storage carry
 over between requests. `keep_session_state` shares one profile instead, for
 example for a crawl that logs in first.
 
+With [identities](identities.md), each identity gets a profile of its own in
+every browser it uses: a user context with its proxy, user agent and
+headers, which every request from it carries, the page's scripts and images
+included. The profile is kept while the identity is in use, so its cookies
+and storage carry over between its requests, never to another identity's.
+Proxies asking for credentials get those of the identity's proxy URL. A
+browser cannot use a SOCKS proxy with credentials, and drivers without a
+proxy per profile fail such requests as `Invalid`.
+
+An identity's profile lives in one browser, so with several sessions, its
+requests in different browsers keep separate cookies.
+
 Close the backend after the crawl with `close`, which quits the sessions
 before going on. A backend dropped without it quits them on background
 tasks, which may not finish if the program exits right after.

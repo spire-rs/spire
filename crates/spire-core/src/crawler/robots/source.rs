@@ -1,5 +1,6 @@
 //! Fetching robots.txt with any backend.
 
+use std::future::Future;
 use std::sync::Arc;
 
 use futures::FutureExt;
@@ -8,7 +9,9 @@ use http::{StatusCode, Uri};
 use robotxt::{AccessResult, Robots};
 
 use crate::backend::{Backend, Client};
+use crate::crawler::connector::Connector;
 use crate::frontier::seed::Seed;
+use crate::request::Request;
 use crate::{Error, ErrorKind, Result};
 
 /// Fetches robots.txt files; type-erased so the backend may differ from the
@@ -22,29 +25,37 @@ pub(crate) trait RobotsSource: Send + Sync + 'static {
     fn fetch(&self, url: Uri, agent: Arc<str>) -> BoxFuture<'static, Result<Robots>>;
 }
 
-/// A [`RobotsSource`] that fetches with a [`Backend`].
-pub(crate) struct BackendSource<B>(Arc<B>);
+/// A [`RobotsSource`] that fetches with a [`Backend`], through a
+/// [`Connector`]: as one of the crawl's identities, the one robots.txt's
+/// host is kept on, so it does not go out from the crawler's own IP.
+pub(crate) struct BackendSource<B>(Arc<Connector<B>>);
 
-impl<B> BackendSource<B> {
-    pub(crate) const fn new(backend: Arc<B>) -> Self {
-        Self(backend)
+impl<B: Backend> BackendSource<B> {
+    pub(crate) const fn new(connector: Arc<Connector<B>>) -> Self {
+        Self(connector)
     }
 }
 
 impl<B: Backend> RobotsSource for BackendSource<B> {
     fn fetch(&self, url: Uri, agent: Arc<str>) -> BoxFuture<'static, Result<Robots>> {
-        let backend = self.0.clone();
+        let connector = self.0.clone();
         async move {
-            match download(&*backend, url).await {
-                Download::Body(body) => Ok(Robots::from_access(
-                    AccessResult::Successful(&body),
-                    &*agent,
-                )),
-                Download::Access(access) => Ok(Robots::from_access(access, &*agent)),
-                Download::Unreachable(error) => Err(error),
-            }
+            let seed = Seed::try_from(url)?;
+            let mut request = seed.clone().into_request();
+            let identity = connector.identify(&seed, &mut request)?;
+            let download = download(connector.connect(identity.as_ref()), request).await;
+            parse(download, &agent)
         }
         .boxed()
+    }
+}
+
+/// Parses a downloaded robots.txt for `agent`.
+fn parse(download: Download, agent: &str) -> Result<Robots> {
+    match download {
+        Download::Body(body) => Ok(Robots::from_access(AccessResult::Successful(&body), agent)),
+        Download::Access(access) => Ok(Robots::from_access(access, agent)),
+        Download::Unreachable(error) => Err(error),
     }
 }
 
@@ -56,13 +67,11 @@ enum Download {
     Unreachable(Error),
 }
 
-async fn download<B: Backend>(backend: &B, url: Uri) -> Download {
-    let request = match Seed::try_from(url) {
-        Ok(seed) => seed.into_request(),
-        Err(error) => return Download::Unreachable(error),
-    };
-
-    let client = match backend.connect().await {
+async fn download<C: Client>(
+    connect: impl Future<Output = Result<C>>,
+    request: Request,
+) -> Download {
+    let client = match connect.await {
         Ok(client) => client,
         Err(error) => return classify_error(error),
     };

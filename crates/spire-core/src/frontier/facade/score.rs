@@ -53,11 +53,10 @@ impl<F: Frontier, S: Score> Frontier for Scored<F, S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::score::{Keywords, ShallowFirst};
     use crate::frontier::seed::Seed;
     use crate::frontier::test_util::{pop_path, seed};
-    use crate::frontier::{Frontier, FrontierExt};
+    use crate::frontier::{Frontier, FrontierExt, InMemFrontier};
     use crate::request::Depth;
 
     #[tokio::test]

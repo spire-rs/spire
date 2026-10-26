@@ -16,10 +16,8 @@ use spire_core::{Error, Result};
 use thirtyfour::error::WebDriverResult;
 use thirtyfour::{Capabilities, WebDriver};
 
-use crate::error::{from_bidi, from_webdriver};
-
-/// The user context every browser starts with; it cannot be removed.
-const DEFAULT_USER_CONTEXT: &str = "default";
+use crate::error::from_webdriver;
+use crate::profiles::Profiles;
 
 /// Where sessions are started.
 #[derive(Clone)]
@@ -104,6 +102,38 @@ impl Quit for WebDriver {
     }
 }
 
+/// A browser in the pool: its WebDriver session, and the profiles of the
+/// identities it served.
+pub(crate) struct Browser {
+    driver: WebDriver,
+    pub(crate) profiles: Profiles,
+}
+
+impl Browser {
+    fn new(driver: WebDriver) -> Self {
+        Self {
+            driver,
+            profiles: Profiles::new(),
+        }
+    }
+}
+
+impl Deref for Browser {
+    type Target = WebDriver;
+
+    fn deref(&self) -> &WebDriver {
+        &self.driver
+    }
+}
+
+impl Quit for Browser {
+    fn quit(self) -> impl Future<Output = ()> + Send {
+        // The profiles' tasks end with them, before the session.
+        drop(self.profiles);
+        quit(self.driver)
+    }
+}
+
 /// A session in the pool, quit when dropped without blocking the runtime.
 ///
 /// The pool drops sessions it no longer wants, e.g. when the backend is
@@ -111,7 +141,7 @@ impl Quit for WebDriver {
 /// returns to a closed pool. A dropped session that was not quit yet is
 /// quit on a task of the current runtime; only without one does it fall back
 /// to thirtyfour's blocking teardown.
-pub(crate) struct Pooled<T: Quit = WebDriver>(Option<T>);
+pub(crate) struct Pooled<T: Quit = Browser>(Option<T>);
 
 impl<T: Quit> Pooled<T> {
     pub(crate) const fn new(value: T) -> Self {
@@ -144,21 +174,11 @@ impl<T: Quit> Drop for Pooled<T> {
     }
 }
 
-/// Removes the browser profiles the session's requests used, closing their
-/// tabs, cookies and storage with them.
-async fn remove_profiles(driver: &WebDriver) -> Result<()> {
-    let bidi = driver.bidi().await.map_err(from_webdriver)?;
-    let browser = bidi.browser();
-    let profiles = browser.get_user_contexts().await.map_err(from_bidi)?;
-    for profile in profiles.user_contexts {
-        if profile.user_context.as_str() != DEFAULT_USER_CONTEXT {
-            browser
-                .remove_user_context(profile.user_context)
-                .await
-                .map_err(from_bidi)?;
-        }
-    }
-    Ok(())
+/// Resets a browser between requests: closes their tabs, and removes the
+/// profiles of requests and of identities no longer in use.
+async fn reset(browser: &Browser) -> Result<()> {
+    let bidi = browser.bidi().await.map_err(from_webdriver)?;
+    browser.profiles.reset(&bidi).await
 }
 
 impl Manager for Sessions {
@@ -186,23 +206,23 @@ impl Manager for Sessions {
         }
 
         tracing::debug!(target: crate::TRACING_TARGET, %endpoint, "session started");
-        Ok(Pooled::new(driver))
+        Ok(Pooled::new(Browser::new(driver)))
     }
 
     async fn recycle(&self, pooled: &mut Pooled, metrics: &Metrics) -> RecycleResult<Error> {
         let expired = self.max_age.is_some_and(|max_age| metrics.age() >= max_age);
-        // Listing the profiles also checks the session is alive.
+        // Resetting the profiles also checks the session is alive.
         let failed = if expired {
             None
         } else {
-            remove_profiles(pooled).await.err()
+            reset(pooled).await.err()
         };
         if !expired && failed.is_none() {
             return Ok(());
         }
 
-        if let Some(driver) = pooled.take() {
-            quit(driver).await;
+        if let Some(browser) = pooled.take() {
+            browser.quit().await;
         }
         Err(match failed {
             Some(error) => RecycleError::Backend(error.with_message("session failed to recycle")),

@@ -57,9 +57,8 @@ impl<F: Frontier, S: SeenSet> Frontier for Dedup<F, S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::test_util::{pop_path, seed};
-    use crate::frontier::{Admission, Frontier, FrontierExt};
+    use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
 
     #[tokio::test]
     async fn refuses_duplicates() {

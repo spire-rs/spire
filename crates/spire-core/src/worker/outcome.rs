@@ -148,17 +148,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ErrorKind;
+    use crate::{ErrorKind, Result};
 
     #[test]
     fn conversions() {
         assert!(matches!(().into_outcome(), Outcome::Continue));
         assert!(matches!(None::<Outcome>.into_outcome(), Outcome::Continue));
 
-        let ok: Result<(), Error> = Ok(());
+        let ok: Result<()> = Ok(());
         assert!(matches!(ok.into_outcome(), Outcome::Continue));
 
-        let err: Result<(), Error> = Err(Error::new(ErrorKind::Http));
+        let err: Result<()> = Err(Error::new(ErrorKind::Http));
         assert!(matches!(err.into_outcome(), Outcome::Fail(_)));
 
         let retry: Result<(), Outcome> = Err(Outcome::retry());

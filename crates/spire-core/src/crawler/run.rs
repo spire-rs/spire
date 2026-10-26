@@ -3,6 +3,7 @@
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::pin::pin;
+use std::sync::Arc;
 use std::time::Duration;
 
 use http::StatusCode;
@@ -13,6 +14,7 @@ use tracing::Instrument;
 use crate::backend::Backend;
 use crate::context::{Context, FETCH, Fetch};
 use crate::crawler::concurrency::{Feedback, Signal};
+use crate::crawler::connector::Connector;
 use crate::crawler::hosts::{Admit, Hosts};
 #[cfg(feature = "robots")]
 use crate::crawler::robots::{BackendSource, RobotsCache, RobotsSource, Verdict};
@@ -20,6 +22,7 @@ use crate::crawler::{Crawler, Live, Stats};
 use crate::frontier::queue::Queue;
 use crate::frontier::seed::Seed;
 use crate::frontier::{Ack, Pop, Report};
+use crate::identity::{Health, Identity};
 use crate::request::Tag;
 use crate::sync::lock;
 use crate::worker::{Outcome, Scope, Worker};
@@ -33,8 +36,8 @@ const MAX_PARKED: usize = 4096;
 #[cfg(feature = "robots")]
 struct RobotsRun {
     cache: RobotsCache,
-    source: std::sync::Arc<dyn RobotsSource>,
-    agent: std::sync::Arc<str>,
+    source: Arc<dyn RobotsSource>,
+    agent: Arc<str>,
     tasks: JoinSet<RobotsEvent>,
 }
 
@@ -75,12 +78,14 @@ enum Access {
 }
 
 /// The state of a single run.
-struct Run {
+struct Run<B> {
     tasks: JoinSet<(Outcome, Fetch)>,
     /// The running requests.
     in_flight: HashMap<Id, InFlight>,
     robots: Option<RobotsRun>,
     hosts: Hosts,
+    /// Connects for requests and robots.txt, as an identity or plainly.
+    connector: Arc<Connector<B>>,
     aborted: HashSet<Option<Tag>>,
     started: usize,
     stopping: bool,
@@ -91,6 +96,8 @@ struct Run {
 /// A running request.
 struct InFlight {
     seed: Seed,
+    /// The identity it went out as, if any.
+    identity: Option<Identity>,
     /// Its host's key, if hosts are tracked.
     host: Option<String>,
     /// When it started.
@@ -117,7 +124,7 @@ pub(super) fn signal(outcome: &Outcome) -> Signal {
     }
 }
 
-impl Run {
+impl<B: Backend> Run<B> {
     /// Records that a request for `seed` to `host` finished with `outcome`:
     /// a throttled host is slowed down, and one with `Retry-After` paused.
     fn finish_host(
@@ -286,21 +293,7 @@ where
 
         let settings = &self.settings;
         let deadline = settings.time_limit.map(|limit| started + limit);
-        // A robots.txt `Crawl-delay` may slow a host down, so hosts are
-        // tracked whenever robots.txt is obeyed.
-        let robots = self.robots_run();
-        let hosts = Hosts::new(settings.hosts, robots.is_some());
-        let mut run = Run {
-            tasks: JoinSet::new(),
-            in_flight: HashMap::new(),
-            robots,
-            hosts,
-            aborted: HashSet::new(),
-            started: 0,
-            stopping: false,
-            grace: None,
-            error: None,
-        };
+        let mut run = self.new_run();
         tracing::info!(target: TRACING_TARGET, concurrency = settings.concurrency.get(), "crawl started");
 
         // Timers and the shutdown signal are created once and re-armed as
@@ -387,9 +380,34 @@ where
         }
     }
 
+    /// Sets up the state of a run: its identities, robots.txt and hosts.
+    fn new_run(&self) -> Run<B> {
+        let backend = self.backend.clone();
+        let connector = Arc::new(match &self.identities {
+            Some(identities) => Connector::with_identities(backend, identities.clone()),
+            None => Connector::new(backend),
+        });
+        let robots = self.robots_run(&connector);
+        // A robots.txt `Crawl-delay` may slow a host down, so hosts are
+        // tracked whenever robots.txt is obeyed.
+        let hosts = Hosts::new(self.settings.hosts, robots.is_some());
+        Run {
+            tasks: JoinSet::new(),
+            in_flight: HashMap::new(),
+            robots,
+            hosts,
+            connector,
+            aborted: HashSet::new(),
+            started: 0,
+            stopping: false,
+            grace: None,
+            error: None,
+        }
+    }
+
     /// Starts requests until the concurrency limit or budget is reached or
     /// no seed is ready, returning when the next one will be.
-    async fn fill(&self, run: &mut Run) -> Option<Instant> {
+    async fn fill(&self, run: &mut Run<B>) -> Option<Instant> {
         let settings = &self.settings;
         let mut wait = run.robots_tick();
 
@@ -430,7 +448,7 @@ where
 
     /// Starts a popped seed now, parks it until robots.txt and its host
     /// allow it, or skips it if robots.txt disallows it.
-    async fn admit(&self, run: &mut Run, seed: Seed) {
+    async fn admit(&self, run: &mut Run<B>, seed: Seed) {
         match run.robots_access(seed) {
             Access::Allow(seed) => match run.hosts.admit(seed, Instant::now()) {
                 Admit::Start(seed) => self.start(run, seed).await,
@@ -441,15 +459,16 @@ where
         }
     }
 
-    /// Builds the robots.txt state, fetching with the crawl's backend unless
-    /// [`Robots`](crate::crawler::Robots) sets another.
+    /// Builds the robots.txt state, fetching through the run's connector,
+    /// as one of its identities if it has any, unless
+    /// [`Robots`](crate::crawler::Robots) sets another backend.
     #[cfg(feature = "robots")]
-    fn robots_run(&self) -> Option<RobotsRun> {
+    fn robots_run(&self, connector: &Arc<Connector<B>>) -> Option<RobotsRun> {
         let config = self.settings.robots.clone()?;
         let source = config
             .source
             .clone()
-            .unwrap_or_else(|| std::sync::Arc::new(BackendSource::new(self.backend.clone())));
+            .unwrap_or_else(|| Arc::new(BackendSource::new(connector.clone())));
 
         Some(RobotsRun {
             agent: config.agent.clone(),
@@ -461,13 +480,13 @@ where
 
     #[cfg(not(feature = "robots"))]
     #[expect(clippy::unused_self, reason = "mirrors the signature with `robots`")]
-    const fn robots_run(&self) -> Option<RobotsRun> {
+    const fn robots_run(&self, _connector: &Arc<Connector<B>>) -> Option<RobotsRun> {
         None
     }
 
     /// Applies a fetched robots.txt and admits the seeds that waited for it.
     #[cfg(feature = "robots")]
-    async fn robots_fetched(&self, run: &mut Run, (origin, result): RobotsEvent) {
+    async fn robots_fetched(&self, run: &mut Run<B>, (origin, result): RobotsEvent) {
         let Some(robots) = &mut run.robots else {
             return;
         };
@@ -491,19 +510,19 @@ where
 
     #[cfg(not(feature = "robots"))]
     #[expect(clippy::unused_self, reason = "mirrors the signature with `robots`")]
-    fn robots_fetched(&self, _run: &mut Run, never: RobotsEvent) -> std::future::Ready<()> {
+    fn robots_fetched(&self, _run: &mut Run<B>, never: RobotsEvent) -> std::future::Ready<()> {
         match never {}
     }
 
     /// Skips `seed` without crawling it.
-    async fn skip(&self, run: &mut Run, seed: Seed, reason: &'static str) {
+    async fn skip(&self, run: &mut Run<B>, seed: Seed, reason: &'static str) {
         tracing::debug!(target: TRACING_TARGET, uri = %seed.uri(), reason, "skipping request");
         self.tally(|stats| stats.skipped += 1);
         self.report(run, Report::Skipped(seed)).await;
     }
 
     /// Skips `seed` if its tag was aborted, and otherwise spawns the request.
-    async fn start(&self, run: &mut Run, seed: Seed) {
+    async fn start(&self, run: &mut Run<B>, seed: Seed) {
         if run.is_aborted(&seed) {
             self.skip(run, seed, "tag aborted").await;
             return;
@@ -513,7 +532,6 @@ where
         let now = Instant::now();
         let host = run.hosts.start(&seed, now);
 
-        let backend = self.backend.clone();
         let worker = self.worker.clone();
         let queue = self.queue();
         let datasets = self.datasets.clone();
@@ -528,11 +546,21 @@ where
             attempt = %seed.attempt(),
         );
 
-        let request = seed.clone().into_request();
+        // The identity is picked now, as the request starts, so a failure to
+        // pick one fails the request like any other.
+        let connector = run.connector.clone();
+        let mut request = seed.clone().into_request();
+        let identity = connector.identify(&seed, &mut request);
+        let used = identity.as_ref().ok().cloned().flatten();
+
         let task = async move {
             let started = Instant::now();
             let handle = async {
-                let client = match backend.connect().await {
+                let connected = match identity {
+                    Ok(identity) => connector.connect(identity.as_ref()).await,
+                    Err(error) => Err(error),
+                };
+                let client = match connected {
                     Ok(client) => client,
                     Err(error) => return Outcome::Fail(error),
                 };
@@ -570,6 +598,7 @@ where
         let id = run.tasks.spawn(Box::pin(task.instrument(span))).id();
         let in_flight = InFlight {
             seed,
+            identity: used,
             host,
             started: now,
         };
@@ -577,7 +606,7 @@ where
     }
 
     /// Records a finished request and reports its outcome to the frontier.
-    async fn complete(&self, run: &mut Run, joined: Result<(Id, (Outcome, Fetch)), JoinError>) {
+    async fn complete(&self, run: &mut Run<B>, joined: Result<(Id, (Outcome, Fetch)), JoinError>) {
         let (id, (outcome, fetch)) = match joined {
             Ok(joined) => joined,
             Err(error) if error.is_cancelled() => {
@@ -598,6 +627,7 @@ where
         };
         let Some(InFlight {
             seed,
+            identity,
             host,
             started,
         }) = run.in_flight.remove(&id)
@@ -605,6 +635,10 @@ where
             return;
         };
         run.finish_host(host, &seed, started, fetch, &outcome);
+        if let Some(identity) = &identity {
+            run.connector
+                .finished(identity, Health::of(&outcome, fetch.status));
+        }
         self.tally(|stats| {
             stats.requests += 1;
             if fetch.status == Some(StatusCode::NOT_MODIFIED) {
@@ -674,7 +708,13 @@ where
 
     /// Pauses `scope` for `duration`, returning the report that retries
     /// `seed` once the pause ends.
-    async fn backoff(&self, run: &mut Run, seed: Seed, scope: Scope, duration: Duration) -> Report {
+    async fn backoff(
+        &self,
+        run: &mut Run<B>,
+        seed: Seed,
+        scope: Scope,
+        duration: Duration,
+    ) -> Report {
         let tag = match scope {
             Scope::SameTag => seed.tag().cloned(),
             Scope::Tag(tag) => Some(tag),
@@ -695,7 +735,7 @@ where
     }
 
     /// Reports to the frontier; a failure stops the run.
-    async fn report(&self, run: &mut Run, report: Report) -> Option<Ack> {
+    async fn report(&self, run: &mut Run<B>, report: Report) -> Option<Ack> {
         match self.frontier.report(report).await {
             Ok(ack) => Some(ack),
             Err(error) => {

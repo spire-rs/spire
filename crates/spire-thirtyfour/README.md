@@ -36,6 +36,10 @@ waiting on the page.
 - **Isolation**: every request gets a tab in a fresh browser profile, so no
   cookies or storage carry over; `keep_session_state` shares one profile
   instead, e.g. for a logged-in crawl.
+- **Identities**: with `Crawler::with_identities`, each identity gets a
+  browser profile of its own, with its proxy, user agent and headers, and
+  cookies kept between its requests; proxies asking for credentials get
+  them.
 - **Endpoints**: remote WebDriver servers (chromedriver, geckodriver, Selenium
   grids), rotated between in turn, or drivers downloaded and spawned
   automatically with the `manager` feature.

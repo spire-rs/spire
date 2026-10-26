@@ -1,19 +1,28 @@
 use std::future::{Future, ready};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use spire_core::backend::{Backend, Client, StatusPolicy};
-use spire_core::request::{Request, Response};
+use spire_core::identity::Identity;
+use spire_core::request::Request;
+use spire_core::response::Response;
 use spire_core::{Error, ErrorKind, Result};
 
+use crate::clients::Clients;
 use crate::conversion::{head_from_reqwest, request_to_reqwest};
 
 /// An HTTP [`Backend`] built on [`reqwest::Client`].
 ///
 /// Every request of a crawl gets an [`HttpSession`], and all of them share
-/// the underlying connection pool, cookie store and configuration of the
-/// wrapped client. Error statuses are turned into errors according to the
+/// one reqwest client: its connection pool, cookie store and
+/// configuration. Error statuses are turned into errors according to the
 /// [`StatusPolicy`].
+///
+/// It is built from a function that makes the reqwest configuration, see
+/// [`from_builder`](Self::from_builder), because a crawl with
+/// [identities](spire_core::identity) gets a client per identity from it,
+/// with the identity's proxy and, with the `cookies` feature, a cookie store
+/// of its own. An identity's client is dropped once the identity is gone.
 ///
 /// # Examples
 ///
@@ -22,17 +31,17 @@ use crate::conversion::{head_from_reqwest, request_to_reqwest};
 ///
 /// use spire_reqwest::{HttpClient, StatusPolicy};
 ///
-/// let client = reqwest::Client::builder()
-///     .timeout(Duration::from_secs(30))
-///     .user_agent("MyBot/1.0")
-///     .build()
-///     .unwrap();
-///
-/// let backend = HttpClient::from(client).with_status_policy(StatusPolicy::Accept);
+/// let backend = HttpClient::from_builder(|| {
+///     reqwest::Client::builder()
+///         .timeout(Duration::from_secs(30))
+///         .user_agent("MyBot/1.0")
+/// })?
+/// .with_status_policy(StatusPolicy::Accept);
+/// # Ok::<_, spire_core::Error>(())
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct HttpClient {
-    client: reqwest::Client,
+    clients: Clients,
     status_policy: StatusPolicy,
 }
 
@@ -43,6 +52,34 @@ impl HttpClient {
         Self::default()
     }
 
+    /// Creates a client from the configuration `builder` makes, which
+    /// identities' clients are built from too.
+    ///
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// use spire_reqwest::HttpClient;
+    ///
+    /// let backend = HttpClient::from_builder(|| {
+    ///     reqwest::Client::builder().timeout(Duration::from_secs(30))
+    /// })?;
+    /// # Ok::<_, spire_core::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Backend`](ErrorKind::Backend) error if reqwest cannot
+    /// build the client, e.g. when TLS fails to initialize.
+    pub fn from_builder<F>(builder: F) -> Result<Self>
+    where
+        F: Fn() -> reqwest::ClientBuilder + Send + Sync + 'static,
+    {
+        Ok(Self {
+            clients: Clients::new(Arc::new(builder))?,
+            status_policy: StatusPolicy::default(),
+        })
+    }
+
     /// Sets how error statuses are treated.
     #[must_use]
     pub const fn with_status_policy(mut self, policy: StatusPolicy) -> Self {
@@ -50,10 +87,10 @@ impl HttpClient {
         self
     }
 
-    /// Returns the wrapped [`reqwest::Client`].
+    /// Returns the [`reqwest::Client`] requests without an identity use.
     #[must_use]
     pub const fn as_reqwest(&self) -> &reqwest::Client {
-        &self.client
+        self.clients.direct()
     }
 
     /// Returns the [`StatusPolicy`].
@@ -63,23 +100,27 @@ impl HttpClient {
     }
 }
 
-impl From<reqwest::Client> for HttpClient {
-    fn from(client: reqwest::Client) -> Self {
-        Self {
-            client,
-            status_policy: StatusPolicy::default(),
-        }
-    }
-}
-
 impl Backend for HttpClient {
     type Client = HttpSession;
 
     fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send {
-        ready(Ok(HttpSession {
+        ready(Ok(self.session(self.clients.direct().clone())))
+    }
+
+    /// Sends the identity's requests with a reqwest client of its own, with
+    /// its proxy and cookies.
+    fn connect_as(&self, identity: &Identity) -> impl Future<Output = Result<Self::Client>> + Send {
+        ready(self.clients.of(identity).map(|client| self.session(client)))
+    }
+}
+
+impl HttpClient {
+    fn session(&self, client: reqwest::Client) -> HttpSession {
+        HttpSession {
             http: self.clone(),
+            client,
             body: Mutex::new(None),
-        }))
+        }
     }
 }
 
@@ -88,6 +129,8 @@ impl Backend for HttpClient {
 #[derive(Debug)]
 pub struct HttpSession {
     http: HttpClient,
+    /// The reqwest client it sends with: the crawl's, or its identity's.
+    client: reqwest::Client,
     body: Mutex<Option<Bytes>>,
 }
 
@@ -105,7 +148,6 @@ impl Client for HttpSession {
         let failed = |error: Error| error.with_uri(uri.clone());
         let converted = request_to_reqwest(request).map_err(failed)?;
         let response = self
-            .http
             .client
             .execute(converted)
             .await

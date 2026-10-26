@@ -53,8 +53,7 @@ that matter first: see [Best-first crawling](best-first.md).
 `FrontierExt` adds facades, each wrapping the frontier before it:
 
 ```rust
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
+use spire::frontier::{FrontierExt, InMemFrontier};
 
 let frontier = InMemFrontier::fifo()
     .dedup()
@@ -92,9 +91,8 @@ other options, through `dedup_with`:
 | A redb store's `seen()` | Flat: kept on disk | Yes |
 
 ```rust
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seen::BloomSeen;
+use spire::frontier::{FrontierExt, InMemFrontier};
 
 // Ten million URLs in about 12 MB, skipping one new URL in a hundred.
 let frontier = InMemFrontier::fifo().dedup_with(BloomSeen::new(10_000_000, 0.01));
@@ -118,9 +116,8 @@ serialize:
 use std::sync::Arc;
 
 use spire::backend::HttpClient;
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seen::InMemSeen;
+use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::{Crawler, Result, Router};
 # async fn page() {}
 

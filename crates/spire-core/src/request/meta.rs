@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::time::Duration;
 
-use http::Uri;
+use crate::identity::Identity;
 
 /// A label that routes a request to its handler.
 ///
@@ -233,116 +233,10 @@ impl fmt::Display for Attempt {
 /// The crawl metadata of a request, stored as one extension: one allocation
 /// per request instead of one per value.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct Meta {
+pub(crate) struct RequestMeta {
     pub(crate) tag: Option<Tag>,
     pub(crate) depth: Depth,
     pub(crate) attempt: Attempt,
-}
-
-/// Reads crawl metadata from a [`Request`](crate::request::Request).
-///
-/// A request gets its [`Tag`], [`Depth`] and [`Attempt`] from the seed it is
-/// made from, in [`Seed::into_request`]. A request built any other way has
-/// no tag, the root depth and the first attempt; to give one metadata, e.g.
-/// to test a handler, build it from a seed:
-///
-/// ```
-/// use spire_core::frontier::seed::Seed;
-/// use spire_core::request::{RequestExt, Tag};
-///
-/// let request = Seed::get("https://example.com/")?.with_tag("page").into_request();
-/// assert_eq!(request.tag(), Some(&Tag::from("page")));
-/// # Ok::<_, spire_core::Error>(())
-/// ```
-///
-/// [`Seed::into_request`]: crate::frontier::seed::Seed::into_request
-pub trait RequestExt {
-    /// Returns the tag, if the request has one.
-    fn tag(&self) -> Option<&Tag>;
-
-    /// Returns the depth, defaulting to [`Depth::ROOT`].
-    fn depth(&self) -> Depth;
-
-    /// Returns the attempt, defaulting to [`Attempt::FIRST`].
-    fn attempt(&self) -> Attempt;
-}
-
-impl<B> RequestExt for http::Request<B> {
-    fn tag(&self) -> Option<&Tag> {
-        self.extensions().get::<Meta>()?.tag.as_ref()
-    }
-
-    fn depth(&self) -> Depth {
-        self.extensions()
-            .get::<Meta>()
-            .map(|meta| meta.depth)
-            .unwrap_or_default()
-    }
-
-    fn attempt(&self) -> Attempt {
-        self.extensions()
-            .get::<Meta>()
-            .map(|meta| meta.attempt)
-            .unwrap_or_default()
-    }
-}
-
-/// The URI a response was finally served from, after redirects.
-#[derive(Debug, Clone)]
-struct FinalUri(Uri);
-
-/// Reads and writes crawl metadata on a [`Response`](crate::request::Response).
-pub trait ResponseExt {
-    /// Returns the URI the response was served from after redirects, if the
-    /// backend recorded it.
-    ///
-    /// Resolve relative links against this rather than the request URI.
-    fn final_uri(&self) -> Option<&Uri>;
-
-    /// Records the URI the response was served from; called by backends.
-    fn set_final_uri(&mut self, uri: Uri);
-}
-
-impl<B> ResponseExt for http::Response<B> {
-    fn final_uri(&self) -> Option<&Uri> {
-        self.extensions().get::<FinalUri>().map(|FinalUri(uri)| uri)
-    }
-
-    fn set_final_uri(&mut self, uri: Uri) {
-        self.extensions_mut().insert(FinalUri(uri));
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::request::{Request, Response};
-
-    #[test]
-    fn request_metadata_defaults() {
-        let request = Request::new(());
-        assert_eq!(request.tag(), None);
-        assert_eq!(request.depth(), Depth::ROOT);
-        assert_eq!(request.attempt(), Attempt::FIRST);
-    }
-
-    #[test]
-    fn response_final_uri() {
-        let mut response = Response::new(());
-        assert_eq!(response.final_uri(), None);
-        response.set_final_uri(Uri::from_static("https://example.com/moved"));
-        assert_eq!(response.final_uri().unwrap(), "https://example.com/moved");
-    }
-
-    #[test]
-    fn request_metadata_from_extensions() {
-        let mut request = Request::new(());
-        request.extensions_mut().insert(Meta {
-            tag: Some(Tag::from_static("page")),
-            depth: Depth::new(2),
-            attempt: Attempt::FIRST,
-        });
-        assert_eq!(request.tag(), Some(&Tag::from("page")));
-        assert_eq!(request.depth().child(), Depth::new(3));
-    }
+    /// Picked by the crawl when the request starts, after the rest.
+    pub(crate) identity: Option<Identity>,
 }

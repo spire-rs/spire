@@ -16,12 +16,12 @@ pub use crate::extract::Tab;
 #[cfg(feature = "html")]
 pub use crate::extract::html::{Element, Html, JsonLd, Meta, Select};
 pub use crate::extract::{Body, FromRef, Head, Json, Query, State, Text};
-pub use crate::frontier::memory::InMemFrontier;
 pub use crate::frontier::queue::{Link, Queue};
 pub use crate::frontier::seed::Seed;
-pub use crate::frontier::{Admission, Frontier, FrontierExt};
+pub use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
 #[cfg(feature = "html")]
 pub use crate::handler::{Collect, FollowLinks};
-pub use crate::request::{Attempt, Depth, RequestExt as _, ResponseExt as _, Tag, Tags};
+pub use crate::request::{Attempt, Depth, RequestExt as _, Tag, Tags};
+pub use crate::response::ResponseExt as _;
 pub use crate::worker::{IntoOutcome, Outcome, WorkerExt};
 pub use crate::{Context, Crawler, Error, ErrorKind, Result, Router};

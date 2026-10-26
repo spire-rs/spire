@@ -8,7 +8,9 @@ pub mod crawler;
 pub mod dataset;
 mod error;
 pub mod frontier;
+pub mod identity;
 pub mod request;
+pub mod response;
 mod sync;
 #[cfg(any(test, feature = "testing"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "testing")))]

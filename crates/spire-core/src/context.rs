@@ -13,9 +13,10 @@ use tokio::time::Instant;
 use crate::Result;
 use crate::backend::Client;
 use crate::dataset::{Data, Dataset, Datasets};
-use crate::frontier::memory::InMemFrontier;
+use crate::frontier::InMemFrontier;
 use crate::frontier::queue::Queue;
-use crate::request::{Request, Response, ResponseExt};
+use crate::request::Request;
+use crate::response::{Response, ResponseExt};
 
 /// A request being crawled, with everything needed to handle it.
 ///

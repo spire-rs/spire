@@ -14,10 +14,9 @@ in the URL's path and query, and `ShallowFirst` scores minus the depth.
 Stacked scorers add up:
 
 ```rust
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::score::{Keywords, ShallowFirst};
 use spire::frontier::seed::Seed;
+use spire::frontier::{FrontierExt, InMemFrontier};
 
 let frontier = InMemFrontier::priority()
     .dedup()

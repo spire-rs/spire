@@ -60,10 +60,9 @@ Crawl a site two links deep and print every title:
 ```rust
 use spire::backend::HttpClient;
 use spire::extract::html::Html;
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
+use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::{Crawler, Result, Router};
 
 /// Prints the title of every page and follows its links.

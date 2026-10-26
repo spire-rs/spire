@@ -1,6 +1,7 @@
 //! The [`Crawler`], which drives a crawl to completion.
 
 mod concurrency;
+mod connector;
 mod delay;
 mod hosts;
 #[cfg(feature = "robots")]
@@ -30,10 +31,10 @@ use crate::crawler::hosts::HostPolicy;
 use crate::dataset::{Data, Dataset, Datasets};
 use crate::frontier::dynamic::DynFrontier;
 use crate::frontier::facade::RetryPolicy;
-use crate::frontier::memory::InMemFrontier;
 use crate::frontier::queue::Queue;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Frontier, FrontierExt};
+use crate::frontier::{Frontier, FrontierExt, InMemFrontier};
+use crate::identity::Identities;
 use crate::sync::lock;
 use crate::worker::Worker;
 
@@ -64,9 +65,8 @@ const DEFAULT_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 /// use std::time::Duration;
 ///
 /// use spire_core::backend::Noop;
-/// use spire_core::frontier::FrontierExt;
-/// use spire_core::frontier::memory::InMemFrontier;
 /// use spire_core::frontier::seed::Seed;
+/// use spire_core::frontier::{FrontierExt, InMemFrontier};
 /// use spire_core::worker::from_fn;
 /// use spire_core::{Context, Crawler, Result};
 ///
@@ -95,6 +95,8 @@ const DEFAULT_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 /// [`Outcome::Stop`]: crate::worker::Outcome::Stop
 pub struct Crawler<B, W> {
     backend: Arc<B>,
+    /// The identities requests go out as, if not directly.
+    identities: Option<Identities>,
     worker: Arc<W>,
     frontier: Arc<dyn DynFrontier>,
     datasets: Arc<Datasets>,
@@ -151,6 +153,7 @@ impl<B, W> Crawler<B, W> {
 
         Self {
             backend: Arc::new(backend),
+            identities: None,
             worker: Arc::new(worker),
             frontier: Arc::new(frontier),
             datasets: Arc::default(),
@@ -284,6 +287,32 @@ impl<B, W> Crawler<B, W> {
         self
     }
 
+    /// Sends every request as one of `identities`: through its proxy, with
+    /// its headers and its own cookies, so each looks like one visitor.
+    /// robots.txt is fetched as an identity too, unless robots.txt has a
+    /// backend of its own.
+    ///
+    /// The backend connects each request as its identity, see
+    /// [`Backend::connect_as`]; one that cannot route through a proxy fails
+    /// the requests of identities that have one. Identities that keep
+    /// failing are taken out of use, see [`Identities`].
+    ///
+    /// ```
+    /// use spire_core::backend::Noop;
+    /// use spire_core::identity::{Identities, Identity};
+    /// use spire_core::worker::from_fn;
+    /// use spire_core::{Context, Crawler};
+    ///
+    /// let identities = Identities::new([Identity::new("a"), Identity::new("b")]);
+    /// let worker = from_fn(|_: Context<Noop>| async {});
+    /// let crawler = Crawler::new(Noop, worker).with_identities(identities);
+    /// ```
+    #[must_use]
+    pub fn with_identities(mut self, identities: Identities) -> Self {
+        self.identities = Some(identities);
+        self
+    }
+
     /// Returns the backend, e.g. to shut it down after a run.
     #[must_use]
     pub fn backend(&self) -> &B {
@@ -346,6 +375,7 @@ impl<B, W> fmt::Debug for Crawler<B, W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Crawler")
             .field("settings", &self.settings)
+            .field("identities", &self.identities)
             .field("queued", &self.frontier.size_hint())
             .field("datasets", &self.datasets)
             .finish_non_exhaustive()

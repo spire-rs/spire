@@ -49,9 +49,8 @@ impl<F: Frontier> Frontier for MaxDepth<F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::test_util::seed;
-    use crate::frontier::{Admission, Frontier, FrontierExt};
+    use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
     use crate::request::Depth;
 
     #[tokio::test]

@@ -9,6 +9,7 @@ mod backend;
 mod error;
 mod navigate;
 mod pool;
+mod profiles;
 mod session;
 
 pub use spire_core::backend::StatusPolicy;

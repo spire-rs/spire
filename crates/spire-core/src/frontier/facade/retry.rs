@@ -240,9 +240,8 @@ mod tests {
     use tokio::time::{Instant, advance};
 
     use super::*;
-    use crate::frontier::FrontierExt;
-    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::test_util::{pop_path, seed};
+    use crate::frontier::{FrontierExt, InMemFrontier};
 
     #[test]
     fn policy_delay_doubles_and_caps() {

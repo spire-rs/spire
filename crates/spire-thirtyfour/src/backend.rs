@@ -6,6 +6,7 @@ use deadpool::Runtime;
 use deadpool::managed::{Pool, PoolError};
 use spire_core::backend::{Backend, StatusPolicy};
 use spire_core::http::Uri;
+use spire_core::identity::Identity;
 use spire_core::{Error, ErrorKind, Result};
 use thirtyfour::bidi::BrowsingContextId;
 use thirtyfour::bidi::modules::browsing_context::{Create, CreateType};
@@ -14,7 +15,7 @@ use thirtyfour::{
 };
 
 use crate::error::{from_bidi, from_webdriver};
-use crate::pool::{Endpoint, Sessions, quit};
+use crate::pool::{Endpoint, Quit, Sessions};
 use crate::session::BrowserSession;
 
 /// A browser [`Backend`] that hands out pooled WebDriver sessions.
@@ -23,7 +24,9 @@ use crate::session::BrowserSession;
 /// [`max_sessions`](BrowserBuilder::max_sessions), and reused across
 /// requests. Every request gets a tab in a fresh browser profile, so no
 /// cookies or storage carry over, unless
-/// [`keep_session_state`](BrowserBuilder::keep_session_state) is set.
+/// [`keep_session_state`](BrowserBuilder::keep_session_state) is set. With
+/// [identities](spire_core::identity), each identity gets a profile of its
+/// own instead, see [`connect_as`](Backend::connect_as).
 ///
 /// The backend speaks WebDriver BiDi, which current chromedriver and
 /// geckodriver support: responses carry the page's real status and headers,
@@ -77,8 +80,8 @@ impl BrowserBackend {
     pub async fn close(&self) {
         let idle = self.pool.retain(|_, _| false).removed;
         for mut pooled in idle {
-            if let Some(driver) = pooled.take() {
-                quit(driver).await;
+            if let Some(browser) = pooled.take() {
+                browser.quit().await;
             }
         }
         self.pool.close();
@@ -100,8 +103,30 @@ impl Backend for BrowserBackend {
     type Client = BrowserSession;
 
     async fn connect(&self) -> Result<BrowserSession> {
+        self.session(None).await
+    }
+
+    /// Opens the request's tab in the identity's own browser profile, a
+    /// user context with its proxy, user agent and headers, created the
+    /// first time the identity uses a browser and kept while it is in use.
+    /// Cookies and storage carry over between the identity's requests in
+    /// one browser, never to another identity's.
+    ///
+    /// Proxies asking for credentials are answered with those of the
+    /// identity's proxy URL. Browsers do not support SOCKS proxies with
+    /// credentials, and fail with an [`Invalid`](ErrorKind::Invalid) error
+    /// on drivers without a proxy per user context.
+    async fn connect_as(&self, identity: &Identity) -> Result<BrowserSession> {
+        self.session(Some(identity)).await
+    }
+}
+
+impl BrowserBackend {
+    /// Hands out a pooled session with a tab for the next request, in the
+    /// profile of `identity` if it has one.
+    async fn session(&self, identity: Option<&Identity>) -> Result<BrowserSession> {
         // Boxed: the pool's future holds a whole session start.
-        let driver = Box::pin(self.pool.get())
+        let browser = Box::pin(self.pool.get())
             .await
             .map_err(|error| match error {
                 PoolError::Backend(error) => error,
@@ -111,13 +136,19 @@ impl Backend for BrowserBackend {
                 error => Error::backend("failed to get a browser session").with_source(error),
             })?;
         let sessions = self.pool.manager();
-        let bidi = driver.bidi().await.map_err(from_webdriver)?;
+        let bidi = browser.bidi().await.map_err(from_webdriver)?;
 
-        // A tab of its own, in a fresh profile unless state is kept; the pool
-        // removes the profile when the session comes back.
-        let context = if sessions.isolate {
-            let profile = bidi.browser().create_user_context().await;
-            let profile = profile.map_err(from_bidi)?.user_context;
+        // A tab of its own, in the identity's profile, or in a fresh profile
+        // unless state is kept; resetting the browser closes the tab.
+        let profile = match identity {
+            Some(identity) => Some(browser.profiles.context_of(&bidi, identity).await?),
+            None if sessions.isolate => {
+                let profile = bidi.browser().create_user_context().await;
+                Some(profile.map_err(from_bidi)?.user_context)
+            }
+            None => None,
+        };
+        let context = if let Some(profile) = profile {
             let tab = bidi.send(Create {
                 r#type: CreateType::Tab,
                 reference_context: None,
@@ -125,19 +156,22 @@ impl Backend for BrowserBackend {
                 user_context: Some(profile),
             });
             let context = tab.await.map_err(from_bidi)?.context;
+            if let Some(identity) = identity {
+                browser.profiles.opened(&context, identity);
+            }
             let handle = WindowHandle::from(context.as_str());
-            driver
+            browser
                 .switch_to_window(handle)
                 .await
                 .map_err(from_webdriver)?;
             context
         } else {
-            let handle = driver.window().await.map_err(from_webdriver)?;
+            let handle = browser.window().await.map_err(from_webdriver)?;
             BrowsingContextId::from(handle.to_string())
         };
 
         Ok(BrowserSession::new(
-            driver,
+            browser,
             bidi,
             context,
             sessions.page_load_timeout,

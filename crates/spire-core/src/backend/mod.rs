@@ -5,31 +5,60 @@
 //! that turns a [`Request`] into a [`Response`].
 
 mod noop;
-mod rotate;
 mod status;
 
 use std::future::Future;
 
 use bytes::Bytes;
 pub use noop::Noop;
-pub use rotate::Rotate;
 pub use status::StatusPolicy;
 
 use crate::Result;
-use crate::request::{Request, Response};
+use crate::identity::Identity;
+use crate::request::Request;
+use crate::response::Response;
 
 /// Hands out a [`Client`] for every request of a crawl.
 pub trait Backend: Send + Sync + 'static {
     /// The client used to fetch a single request.
     type Client: Client;
 
-    /// Returns a client for the next request.
+    /// Returns a client for the next request, sent directly, from the
+    /// crawler itself, with the backend's own cookies and sessions.
     ///
     /// # Errors
     ///
     /// Returns an error if no client can be created, e.g. when a pool is
     /// exhausted or a browser fails to start.
     fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send;
+
+    /// Returns a client for the next request, which goes out as `identity`,
+    /// for a crawl with [identities](crate::identity).
+    ///
+    /// The client must send its request through the identity's
+    /// [proxy](Identity::proxy), and keep each identity's cookies and
+    /// session state apart from every other's, so that one identity always
+    /// looks like one visitor. The identity's [headers](Identity::headers)
+    /// are already on the request.
+    ///
+    /// By default, an identity without a proxy connects as
+    /// [`connect`](Self::connect) does, and one with a proxy is refused, so
+    /// a request is never sent from the crawler's own IP by mistake.
+    /// Backends that route through proxies, or keep cookies or sessions,
+    /// override it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Invalid`](crate::ErrorKind::Invalid) error if the
+    /// identity's proxy is not supported, or an error if no client can be
+    /// created.
+    fn connect_as(&self, identity: &Identity) -> impl Future<Output = Result<Self::Client>> + Send {
+        let supported = identity.require_no_proxy();
+        async move {
+            supported?;
+            self.connect().await
+        }
+    }
 }
 
 /// Loads the page of the one [`Request`] it is handed out for.

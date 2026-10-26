@@ -1,10 +1,9 @@
 //! Frontiers, seeds and seen sets: what every request goes through.
 
 use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
-use spire_core::frontier::memory::InMemFrontier;
 use spire_core::frontier::seed::{Fingerprint, Seed};
 use spire_core::frontier::seen::{BloomSeen, InMemSeen, SeenSet};
-use spire_core::frontier::{Frontier, FrontierExt, Pop};
+use spire_core::frontier::{Frontier, FrontierExt, InMemFrontier, Pop};
 
 /// Seeds per push/pop round.
 const SEEDS: usize = 1_000;

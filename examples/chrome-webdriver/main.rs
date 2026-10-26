@@ -16,10 +16,9 @@
 use spire::backend::BrowserBackend;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::Tab;
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::queue::{Link, Queue};
 use spire::frontier::seed::Seed;
+use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::request::Tags;
 use spire::{Crawler, Error, Result, Router};
 use tracing_subscriber::EnvFilter;

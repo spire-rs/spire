@@ -188,8 +188,7 @@ impl fmt::Debug for Queue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frontier::memory::InMemFrontier;
-    use crate::frontier::{FrontierExt, Pop};
+    use crate::frontier::{FrontierExt, InMemFrontier, Pop};
     use crate::request::Tag;
 
     async fn drain(frontier: &InMemFrontier) -> Vec<(String, Option<String>, u32)> {

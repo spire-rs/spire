@@ -22,7 +22,7 @@ use crate::worker::{IntoOutcome, Outcome};
 /// hand.
 ///
 /// It is implemented for async functions of up to 16 [extractors] whose
-/// return type implements [`IntoOutcome`], such as `()`, `Result<(), Error>`
+/// return type implements [`IntoOutcome`], such as `()`, `Result<()>`
 /// or [`Outcome`]. Handlers borrow the [`Context`], so several can handle one
 /// request: a tuple of up to 4 handlers runs them in turn on the same page,
 /// fetched once, and stops at the first outcome other than

@@ -7,7 +7,8 @@ use super::{MockPage, MockSite};
 use crate::backend::{Backend, Client, StatusPolicy};
 use crate::dataset::InMemDataset;
 use crate::frontier::seed::Seed;
-use crate::request::{Request, ResponseExt};
+use crate::request::Request;
+use crate::response::ResponseExt;
 use crate::worker::{Outcome, from_fn};
 use crate::{Context, ErrorKind, Result};
 

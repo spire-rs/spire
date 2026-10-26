@@ -6,6 +6,7 @@
 compile_error!("At least one TLS feature must be enabled: 'rustls-tls' or 'native-tls'");
 
 mod client;
+mod clients;
 mod conversion;
 
 pub use reqwest;

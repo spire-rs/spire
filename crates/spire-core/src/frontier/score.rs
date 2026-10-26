@@ -28,9 +28,8 @@ where
 /// anchor text.
 ///
 /// ```
-/// use spire_core::frontier::FrontierExt;
-/// use spire_core::frontier::memory::InMemFrontier;
 /// use spire_core::frontier::score::Keywords;
+/// use spire_core::frontier::{FrontierExt, InMemFrontier};
 ///
 /// let frontier = InMemFrontier::priority().score(Keywords::new(["laptop", "review"]));
 /// ```

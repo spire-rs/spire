@@ -47,8 +47,9 @@ will feel familiar.
   requests, time and each request's duration.
 - **Two backends**: plain HTTP through reqwest, and real browsers over
   WebDriver for pages that need JavaScript.
-- **Middleware and testing**: change every request, rotate user agents and
-  proxies, and test handlers against fixed pages without a network.
+- **Middleware, identities and testing**: change every request, send each as
+  one consistent visitor with its own proxy, user agent and cookies, and
+  test handlers against fixed pages without a network.
 
 ## The crates
 

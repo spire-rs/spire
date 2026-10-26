@@ -101,9 +101,8 @@ mod tests {
     use tokio::time::advance;
 
     use super::*;
-    use crate::frontier::FrontierExt;
-    use crate::frontier::memory::InMemFrontier;
     use crate::frontier::test_util::{pop_path, seed};
+    use crate::frontier::{FrontierExt, InMemFrontier};
     use crate::request::{Tag, Tags};
 
     #[derive(Debug, Clone, Copy)]

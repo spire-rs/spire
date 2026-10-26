@@ -49,9 +49,8 @@ A facade wraps a frontier to change what it accepts or hands out, and a
 use std::future::Future;
 
 use spire::Result;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
-use spire::frontier::{Ack, Admission, Frontier, FrontierExt, FrontierLayer, Pop, Report};
+use spire::frontier::{Ack, Admission, Frontier, FrontierExt, FrontierLayer, InMemFrontier, Pop, Report};
 
 /// Logs every seed handed out for crawling.
 struct Logged<F>(F);

@@ -41,7 +41,7 @@ brotli = ["reqwest/brotli"]
 zstd = ["reqwest/zstd"]
 deflate = ["reqwest/deflate"]
 
-# A cookie store shared by every request of the crawl
+# A cookie store shared by every request of the crawl, or one per identity
 cookies = ["reqwest/cookies"]
 # SOCKS5 proxies
 socks = ["reqwest/socks"]
@@ -58,7 +58,7 @@ bytes = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Testing
-tokio = { workspace = true, features = ["rt", "macros"] }
+tokio = { workspace = true, features = ["rt", "macros", "net", "io-util"] }
 
 [lints]
 workspace = true

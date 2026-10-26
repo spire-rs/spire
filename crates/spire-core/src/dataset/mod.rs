@@ -5,11 +5,10 @@
 //! through a [`Data`] handle:
 //!
 //! ```
-//! use spire_core::Crawler;
 //! use spire_core::backend::Noop;
 //! use spire_core::dataset::InMemDataset;
 //! use spire_core::worker::from_fn;
-//! use spire_core::{Context, Result};
+//! use spire_core::{Context, Crawler, Result};
 //!
 //! # async fn example() -> Result<()> {
 //! let worker = from_fn(|cx: Context<Noop>| async move {

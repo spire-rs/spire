@@ -15,9 +15,8 @@ attribute on each variant to revisit:
 use std::time::Duration;
 
 use spire::backend::HttpClient;
-use spire::frontier::FrontierExt;
-use spire::frontier::memory::InMemFrontier;
 use spire::frontier::seed::Seed;
+use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::request::{Revisit, Tags};
 use spire::{Crawler, Result, Router};
 

@@ -9,7 +9,8 @@ use spire_core::backend::{Client, StatusPolicy};
 use spire_core::http::header::{
     CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HeaderValue, TRANSFER_ENCODING,
 };
-use spire_core::request::{Request, Response, ResponseExt};
+use spire_core::request::Request;
+use spire_core::response::{Response, ResponseExt};
 use spire_core::{Error, Result};
 use thirtyfour::WebDriver;
 use thirtyfour::bidi::{BiDi, BrowsingContextId};
