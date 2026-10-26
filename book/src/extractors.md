@@ -21,6 +21,7 @@ the others share it.
 | `html::Element<T>` | A `T: Select` extracted from the HTML (`html` feature) |
 | `html::Meta` | The page's title, description, canonical URL, language, robots, Open Graph and Twitter fields (`html` feature) |
 | `html::JsonLd<T>` | The page's JSON-LD structured data (`html` feature) |
+| `html::Markdown` | The page's main content as Markdown (`markdown` feature), see [HTML](html.md#markdown) |
 | `sitemap::Sitemap` | The body parsed as a sitemap (`sitemap` feature), see [Sitemaps](sitemaps.md) |
 | `Tab` | The browser's tab, to interact with the page (`thirtyfour` feature), see [Browsers](browsers.md) |
 
