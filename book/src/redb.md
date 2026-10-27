@@ -7,7 +7,7 @@ crawl where it stopped, after a clean stop or a crash.
 
 ```rust,no_run
 use serde::{Deserialize, Serialize};
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::frontier::FrontierExt;
 use spire::frontier::seed::Seed;
 use spire::redb::RedbStore;
@@ -26,7 +26,7 @@ let store = RedbStore::open("crawl.redb").await?;
 let router = Router::new()
     .fallback(page)
     .layer(Revalidate::new(store.validators()));
-let crawler = Crawler::new(HttpClient::default(), router)
+let crawler = Crawler::new(ReqwestBackend::default(), router)
     .with_frontier(store.frontier().dedup_with(store.seen()).retry(3))
     .with_dataset(store.dataset::<Product>("products"))
     // Refused as already seen when the crawl resumes.

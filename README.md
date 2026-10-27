@@ -58,7 +58,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 Crawl a site two links deep and print every title:
 
 ```rust
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::extract::html::{Html, Links};
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
         .max_depth(2)
         .allow_hosts(["example.com"]);
 
-    let crawler = Crawler::new(HttpClient::default(), router)
+    let crawler = Crawler::new(ReqwestBackend::default(), router)
         .with_frontier(frontier)
         .with_seed(Seed::get("https://example.com/")?);
     crawler.run().await?;

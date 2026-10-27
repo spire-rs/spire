@@ -5,7 +5,7 @@ Register a dataset on the crawler, then write to it through the `Data<T>`
 extractor:
 
 ```rust,no_run
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::html::Html;
 use spire::frontier::seed::Seed;
@@ -24,7 +24,7 @@ async fn page(uri: Uri, html: Html, titles: Data<Title>) -> Result<()> {
 }
 
 # async fn crawl() -> Result<()> {
-let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+let crawler = Crawler::new(ReqwestBackend::default(), Router::new().fallback(page))
     .with_dataset(InMemDataset::<Title>::new())
     .with_seed(Seed::get("https://example.com/")?);
 crawler.run().await?;

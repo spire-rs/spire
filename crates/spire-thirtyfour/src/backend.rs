@@ -16,15 +16,15 @@ use thirtyfour::{
 
 use crate::error::{from_bidi, from_webdriver};
 use crate::pool::{Endpoint, Quit, Sessions};
-use crate::session::BrowserSession;
+use crate::session::ThirtyfourSession;
 
 /// A browser [`Backend`] that hands out pooled WebDriver sessions.
 ///
 /// Sessions are started on demand, up to
-/// [`max_sessions`](BrowserBuilder::max_sessions), and reused across
+/// [`max_sessions`](ThirtyfourBuilder::max_sessions), and reused across
 /// requests. Every request gets a tab in a fresh browser profile, so no
 /// cookies or storage carry over, unless
-/// [`keep_session_state`](BrowserBuilder::keep_session_state) is set. With
+/// [`keep_session_state`](ThirtyfourBuilder::keep_session_state) is set. With
 /// [identities](spire_core::identity), each identity gets a profile of its
 /// own instead, see [`connect_as`](Backend::connect_as).
 ///
@@ -42,10 +42,10 @@ use crate::session::BrowserSession;
 /// # Examples
 ///
 /// ```no_run
-/// use spire_thirtyfour::BrowserBackend;
+/// use spire_thirtyfour::ThirtyfourBackend;
 ///
 /// # async fn example() -> spire_core::Result<()> {
-/// let backend = BrowserBackend::builder()
+/// let backend = ThirtyfourBackend::builder()
 ///     .remote("http://localhost:4444")
 ///     .max_sessions(4)
 ///     .build()?;
@@ -57,14 +57,14 @@ use crate::session::BrowserSession;
 /// # }
 /// ```
 #[derive(Clone)]
-pub struct BrowserBackend {
+pub struct ThirtyfourBackend {
     pool: Pool<Sessions>,
 }
 
-impl BrowserBackend {
+impl ThirtyfourBackend {
     /// Returns a builder for a backend.
-    pub fn builder() -> BrowserBuilder {
-        BrowserBuilder::default()
+    pub fn builder() -> ThirtyfourBuilder {
+        ThirtyfourBuilder::default()
     }
 
     /// Returns the number of sessions, in use and idle.
@@ -88,10 +88,10 @@ impl BrowserBackend {
     }
 }
 
-impl fmt::Debug for BrowserBackend {
+impl fmt::Debug for ThirtyfourBackend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let status = self.pool.status();
-        f.debug_struct("BrowserBackend")
+        f.debug_struct("ThirtyfourBackend")
             .field("sessions", &status.size)
             .field("idle", &status.available)
             .field("max_sessions", &status.max_size)
@@ -99,10 +99,10 @@ impl fmt::Debug for BrowserBackend {
     }
 }
 
-impl Backend for BrowserBackend {
-    type Client = BrowserSession;
+impl Backend for ThirtyfourBackend {
+    type Client = ThirtyfourSession;
 
-    async fn connect(&self) -> Result<BrowserSession> {
+    async fn connect(&self) -> Result<ThirtyfourSession> {
         self.session(None).await
     }
 
@@ -119,16 +119,16 @@ impl Backend for BrowserBackend {
     ///
     /// Identities with user-agent profiles fail as `Invalid` before a
     /// session is acquired: the real browser supplies its own headers.
-    async fn connect_as(&self, identity: &Identity) -> Result<BrowserSession> {
+    async fn connect_as(&self, identity: &Identity) -> Result<ThirtyfourSession> {
         identity.require_no_profile()?;
         self.session(Some(identity)).await
     }
 }
 
-impl BrowserBackend {
+impl ThirtyfourBackend {
     /// Hands out a pooled session with a tab for the next request, in the
     /// profile of `identity` if it has one.
-    async fn session(&self, identity: Option<&Identity>) -> Result<BrowserSession> {
+    async fn session(&self, identity: Option<&Identity>) -> Result<ThirtyfourSession> {
         // Boxed: the pool's future holds a whole session start.
         let browser = Box::pin(self.pool.get())
             .await
@@ -174,7 +174,7 @@ impl BrowserBackend {
             BrowsingContextId::from(handle.to_string())
         };
 
-        Ok(BrowserSession::new(
+        Ok(ThirtyfourSession::new(
             browser,
             bidi,
             context,
@@ -184,13 +184,13 @@ impl BrowserBackend {
     }
 }
 
-/// Builds a [`BrowserBackend`].
+/// Builds a [`ThirtyfourBackend`].
 ///
 /// At least one endpoint is required: a [`remote`](Self::remote) WebDriver
 /// server, or a [`managed`](Self::managed) driver with the `manager` feature.
 /// Sessions are spread across endpoints in turn.
 #[must_use]
-pub struct BrowserBuilder {
+pub struct ThirtyfourBuilder {
     remotes: Vec<String>,
     #[cfg(feature = "manager")]
     managed: bool,
@@ -203,7 +203,7 @@ pub struct BrowserBuilder {
     status_policy: StatusPolicy,
 }
 
-impl Default for BrowserBuilder {
+impl Default for ThirtyfourBuilder {
     fn default() -> Self {
         Self {
             remotes: Vec::new(),
@@ -220,7 +220,7 @@ impl Default for BrowserBuilder {
     }
 }
 
-impl BrowserBuilder {
+impl ThirtyfourBuilder {
     /// Adds a WebDriver server run elsewhere, e.g. `chromedriver --port=4444`
     /// or a Selenium grid.
     pub fn remote(mut self, url: impl Into<String>) -> Self {
@@ -243,14 +243,14 @@ impl BrowserBuilder {
     /// set here:
     ///
     /// ```
-    /// use spire_thirtyfour::BrowserBackend;
+    /// use spire_thirtyfour::ThirtyfourBackend;
     /// use spire_thirtyfour::thirtyfour::{ChromiumLikeCapabilities, DesiredCapabilities};
     ///
     /// let mut capabilities = DesiredCapabilities::chrome();
     /// capabilities.add_arg("--headless=new").unwrap();
     /// capabilities.add_arg("--user-agent=MyBot/1.0").unwrap();
     ///
-    /// let builder = BrowserBackend::builder().capabilities(capabilities);
+    /// let builder = ThirtyfourBackend::builder().capabilities(capabilities);
     /// ```
     pub fn capabilities(mut self, capabilities: impl Into<Capabilities>) -> Self {
         self.capabilities = Some(capabilities.into());
@@ -304,7 +304,7 @@ impl BrowserBuilder {
     ///
     /// Returns an [`Invalid`](ErrorKind::Invalid) error if no endpoint was
     /// added or a remote URL is not an absolute `http(s)` URL.
-    pub fn build(self) -> Result<BrowserBackend> {
+    pub fn build(self) -> Result<ThirtyfourBackend> {
         let mut endpoints = Vec::with_capacity(self.remotes.len() + 1);
         for url in self.remotes {
             let uri: Uri = url.parse()?;
@@ -351,13 +351,13 @@ impl BrowserBuilder {
             .map_err(|error| {
                 Error::backend("failed to build the session pool").with_source(error)
             })?;
-        Ok(BrowserBackend { pool })
+        Ok(ThirtyfourBackend { pool })
     }
 }
 
-impl fmt::Debug for BrowserBuilder {
+impl fmt::Debug for ThirtyfourBuilder {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BrowserBuilder")
+        f.debug_struct("ThirtyfourBuilder")
             .field("remotes", &self.remotes)
             .field("max_sessions", &self.max_sessions)
             .field("page_load_timeout", &self.page_load_timeout)
@@ -381,14 +381,14 @@ mod tests {
 
     #[test]
     fn requires_an_endpoint() {
-        let error = BrowserBackend::builder().build().unwrap_err();
+        let error = ThirtyfourBackend::builder().build().unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Invalid);
     }
 
     #[test]
     fn rejects_non_http_remotes() {
         for url in ["localhost:4444", "ftp://localhost", "not a url"] {
-            let result = BrowserBackend::builder().remote(url).build();
+            let result = ThirtyfourBackend::builder().remote(url).build();
             assert!(result.is_err(), "{url} should be rejected");
         }
     }
@@ -397,7 +397,7 @@ mod tests {
     async fn refuses_user_agent_profiles_before_acquiring_a_session() {
         use spire_core::identity::UserAgents;
 
-        let backend = BrowserBackend::builder()
+        let backend = ThirtyfourBackend::builder()
             .remote("http://127.0.0.1:1")
             .build()
             .unwrap();
@@ -410,7 +410,7 @@ mod tests {
 
     #[tokio::test]
     async fn builds_lazily_and_closes() {
-        let backend = BrowserBackend::builder()
+        let backend = ThirtyfourBackend::builder()
             .remote("http://127.0.0.1:4444/")
             .max_sessions(2)
             .build()

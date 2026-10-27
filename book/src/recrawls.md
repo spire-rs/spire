@@ -14,7 +14,7 @@ attribute on each variant to revisit:
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::request::{Revisit, Tags};
@@ -38,7 +38,7 @@ let router = Router::new()
     .route(Page::Listing, listing)
     .route(Page::Product, product)
     .route(Page::About, about);
-let crawler = Crawler::new(HttpClient::default(), router)
+let crawler = Crawler::new(ReqwestBackend::default(), router)
     .with_frontier(InMemFrontier::fifo().revisit::<Page>().dedup())
     // A crawl that revisits never runs out of work: stop it with a time
     // limit or its shutdown token.
@@ -76,7 +76,7 @@ seen, `If-None-Match` with its `ETag`, and `If-Modified-Since` with its
 change, so its handlers are skipped:
 
 ```rust,no_run
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::frontier::FrontierExt;
 use spire::redb::RedbStore;
 use spire::worker::WorkerExt;
@@ -89,7 +89,7 @@ let store = RedbStore::open("crawl.redb").await?;
 let router = Router::new()
     .fallback(page)
     .layer(Revalidate::new(store.validators()));
-let crawler = Crawler::new(HttpClient::default(), router)
+let crawler = Crawler::new(ReqwestBackend::default(), router)
     .with_frontier(store.frontier().dedup_with(store.seen()));
 
 let stats = crawler.run().await?;

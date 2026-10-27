@@ -13,7 +13,7 @@
 //! ./chromedriver/<platform>/chromedriver-<platform>/chromedriver --port=4444
 //! ```
 
-use spire::backend::BrowserBackend;
+use spire::backend::ThirtyfourBackend;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::Tab;
 use spire::frontier::queue::{Link, Queue};
@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    let backend = BrowserBackend::builder()
+    let backend = ThirtyfourBackend::builder()
         .remote("http://127.0.0.1:4444")
         .max_sessions(2)
         .build()?;

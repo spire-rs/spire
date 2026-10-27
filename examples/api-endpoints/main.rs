@@ -6,7 +6,7 @@
 //! queues the next until [`LAST_PAGE`].
 
 use serde::Deserialize;
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::Json;
 use spire::frontier::queue::{Link, Queue};
@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
         .route(Endpoint::Pages, pages)
         .require::<Endpoint>();
 
-    let crawler = Crawler::new(HttpClient::default(), router)
+    let crawler = Crawler::new(ReqwestBackend::default(), router)
         .with_frontier(InMemFrontier::fifo().dedup().retry(2))
         .with_dataset(InMemDataset::<Slide>::new())
         .with_dataset(InMemDataset::<Visit>::new())

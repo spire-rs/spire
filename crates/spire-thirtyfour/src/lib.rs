@@ -15,8 +15,8 @@ mod session;
 pub use spire_core::backend::StatusPolicy;
 pub use thirtyfour;
 
-pub use crate::backend::{BrowserBackend, BrowserBuilder};
-pub use crate::session::BrowserSession;
+pub use crate::backend::{ThirtyfourBackend, ThirtyfourBuilder};
+pub use crate::session::ThirtyfourSession;
 
 /// Tracing target for browser backend operations.
 const TRACING_TARGET: &str = "spire_thirtyfour";

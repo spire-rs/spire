@@ -1,6 +1,6 @@
 # Custom backends
 
-A backend fetches pages. `HttpClient` and `BrowserBackend` are two; any
+A backend fetches pages. `ReqwestBackend` and `ThirtyfourBackend` are two; any
 other source of pages, such as a local mirror, an API with its own client,
 or a service that renders pages for you, is a backend of your own.
 

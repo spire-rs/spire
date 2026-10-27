@@ -6,7 +6,7 @@
 //! route for `/links/**` handles them, and the deduplicating frontier visits
 //! each page once.
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::html::{Element, Links, Select};
 use spire::frontier::queue::Queue;
@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
         .route_path("/links/**", links)
         .require::<Page>();
 
-    let crawler = Crawler::new(HttpClient::default(), router)
+    let crawler = Crawler::new(ReqwestBackend::default(), router)
         .with_frontier(InMemFrontier::fifo().dedup().max_depth(2).retry(2))
         .with_dataset(InMemDataset::<Story>::new())
         .with_dataset(InMemDataset::<LinkPage>::new())

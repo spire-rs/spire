@@ -11,10 +11,10 @@ of it, limits per host keep a single site from taking them all:
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::{Crawler, Router};
 # async fn page() {}
-let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+let crawler = Crawler::new(ReqwestBackend::default(), Router::new().fallback(page))
     .with_concurrency(32)
     // At most 2 requests in flight to the same host,
     .with_host_concurrency(2)
@@ -46,10 +46,10 @@ keeps the gap fixed:
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::{Crawler, Router};
 # async fn page() {}
-let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+let crawler = Crawler::new(ReqwestBackend::default(), Router::new().fallback(page))
     // At least 200 ms between requests, up to 5 minutes for a struggling host.
     .with_host_delay(Duration::from_millis(200)..=Duration::from_secs(300));
 ```
@@ -61,12 +61,12 @@ one. `HostConcurrency::adaptive` gives each host its own limit instead, up
 to a maximum, adapted to how it responds:
 
 ```rust,no_run
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::crawler::HostConcurrency;
 use spire::{Crawler, Router};
 # async fn page() {}
 
-let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+let crawler = Crawler::new(ReqwestBackend::default(), Router::new().fallback(page))
     .with_host_concurrency(HostConcurrency::adaptive(8));
 ```
 
@@ -94,7 +94,7 @@ for your user agent, and honours its `Crawl-delay`:
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::crawler::Robots;
 use spire::{Crawler, Router};
 # async fn page() {}
@@ -102,7 +102,7 @@ use spire::{Crawler, Router};
 let robots = Robots::new("MyBot")
     // Kept for 6 hours instead of the default 24, then fetched again.
     .with_max_age(Duration::from_secs(6 * 60 * 60));
-let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+let crawler = Crawler::new(ReqwestBackend::default(), Router::new().fallback(page))
     .with_robots(robots);
 ```
 
@@ -138,11 +138,11 @@ grace period cancels them first.
 example on Ctrl-C:
 
 ```rust,no_run
-# use spire::backend::HttpClient;
+# use spire::backend::ReqwestBackend;
 # use spire::{Crawler, Result, Router};
 # async fn page() {}
 # async fn crawl() -> Result<()> {
-let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page));
+let crawler = Crawler::new(ReqwestBackend::default(), Router::new().fallback(page));
 
 let token = crawler.shutdown_token();
 tokio::spawn(async move {

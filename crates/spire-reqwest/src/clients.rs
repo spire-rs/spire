@@ -1,4 +1,4 @@
-//! The reqwest clients of an [`HttpClient`](crate::HttpClient): one for
+//! The reqwest clients of an [`ReqwestBackend`](crate::ReqwestBackend): one for
 //! requests without an identity, and one per identity, with the identity's
 //! proxy and its own cookies.
 
@@ -12,7 +12,7 @@ use spire_core::{Error, Result};
 /// Makes the builder every client starts from.
 pub(crate) type Builder = dyn Fn() -> reqwest::ClientBuilder + Send + Sync;
 
-/// Every reqwest client of an [`HttpClient`](crate::HttpClient), all from
+/// Every reqwest client of an [`ReqwestBackend`](crate::ReqwestBackend), all from
 /// one configuration.
 #[derive(Clone)]
 pub(crate) struct Clients {

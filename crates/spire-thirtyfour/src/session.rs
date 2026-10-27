@@ -32,7 +32,7 @@ use crate::pool::Sessions;
 /// Navigation goes through WebDriver BiDi, so responses carry the page's
 /// real status and headers, and requests are sent with their method,
 /// headers and body.
-pub struct BrowserSession {
+pub struct ThirtyfourSession {
     driver: Object<Sessions>,
     bidi: BiDi,
     context: BrowsingContextId,
@@ -42,7 +42,7 @@ pub struct BrowserSession {
     navigated: AtomicBool,
 }
 
-impl BrowserSession {
+impl ThirtyfourSession {
     pub(crate) const fn new(
         driver: Object<Sessions>,
         bidi: BiDi,
@@ -93,7 +93,7 @@ impl BrowserSession {
     }
 }
 
-impl Deref for BrowserSession {
+impl Deref for ThirtyfourSession {
     type Target = WebDriver;
 
     fn deref(&self) -> &Self::Target {
@@ -101,15 +101,15 @@ impl Deref for BrowserSession {
     }
 }
 
-impl fmt::Debug for BrowserSession {
+impl fmt::Debug for ThirtyfourSession {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BrowserSession")
+        f.debug_struct("ThirtyfourSession")
             .field("context", &self.context)
             .finish_non_exhaustive()
     }
 }
 
-impl Client for BrowserSession {
+impl Client for ThirtyfourSession {
     /// Navigates the tab to the request URI, sent with its method, headers
     /// and body, and returns the head of the response the page ended on
     /// after redirects, checked against the backend's [`StatusPolicy`].

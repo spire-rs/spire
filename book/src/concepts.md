@@ -27,8 +27,8 @@ A crawl moves *seeds* from a *frontier*, through a *backend* and a
 - **The crawler** pops seeds and runs up to `with_concurrency` of them at
   once, within the limits of each host. See
   [Limits and politeness](politeness.md).
-- **A backend** hands out a client for each request. `HttpClient` fetches
-  over HTTP, and `BrowserBackend` loads the page in a browser. See
+- **A backend** hands out a client for each request. `ReqwestBackend` fetches
+  over HTTP, and `ThirtyfourBackend` loads the page in a browser. See
   [Browsers](browsers.md).
 - **The worker** handles each request. It is usually a `Router`, which
   picks handlers by the request's tag. See [Routing](routing.md).

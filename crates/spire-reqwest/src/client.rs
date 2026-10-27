@@ -13,7 +13,7 @@ use crate::conversion::{head_from_reqwest, request_to_reqwest};
 
 /// An HTTP [`Backend`] built on [`reqwest::Client`].
 ///
-/// Every request of a crawl gets an [`HttpSession`], and all of them share
+/// Every request of a crawl gets a [`ReqwestSession`], and all of them share
 /// one reqwest client: its connection pool, cookie store and
 /// configuration. Error statuses are turned into errors according to the
 /// [`StatusPolicy`].
@@ -29,9 +29,9 @@ use crate::conversion::{head_from_reqwest, request_to_reqwest};
 /// ```
 /// use std::time::Duration;
 ///
-/// use spire_reqwest::{HttpClient, StatusPolicy};
+/// use spire_reqwest::{ReqwestBackend, StatusPolicy};
 ///
-/// let backend = HttpClient::from_builder(|| {
+/// let backend = ReqwestBackend::from_builder(|| {
 ///     reqwest::Client::builder()
 ///         .timeout(Duration::from_secs(30))
 ///         .user_agent("MyBot/1.0")
@@ -40,12 +40,12 @@ use crate::conversion::{head_from_reqwest, request_to_reqwest};
 /// # Ok::<_, spire_core::Error>(())
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct HttpClient {
+pub struct ReqwestBackend {
     clients: Clients,
     status_policy: StatusPolicy,
 }
 
-impl HttpClient {
+impl ReqwestBackend {
     /// Creates a client with reqwest's default configuration.
     #[must_use]
     pub fn new() -> Self {
@@ -58,9 +58,9 @@ impl HttpClient {
     /// ```
     /// use std::time::Duration;
     ///
-    /// use spire_reqwest::HttpClient;
+    /// use spire_reqwest::ReqwestBackend;
     ///
-    /// let backend = HttpClient::from_builder(|| {
+    /// let backend = ReqwestBackend::from_builder(|| {
     ///     reqwest::Client::builder().timeout(Duration::from_secs(30))
     /// })?;
     /// # Ok::<_, spire_core::Error>(())
@@ -100,8 +100,8 @@ impl HttpClient {
     }
 }
 
-impl Backend for HttpClient {
-    type Client = HttpSession;
+impl Backend for ReqwestBackend {
+    type Client = ReqwestSession;
 
     fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send {
         ready(Ok(self.session(self.clients.direct().clone())))
@@ -114,9 +114,9 @@ impl Backend for HttpClient {
     }
 }
 
-impl HttpClient {
-    fn session(&self, client: reqwest::Client) -> HttpSession {
-        HttpSession {
+impl ReqwestBackend {
+    fn session(&self, client: reqwest::Client) -> ReqwestSession {
+        ReqwestSession {
             http: self.clone(),
             client,
             body: Mutex::new(None),
@@ -124,25 +124,25 @@ impl HttpClient {
     }
 }
 
-/// The [`Client`] an [`HttpClient`] hands out for one request: it sends the
+/// The [`Client`] a [`ReqwestBackend`] hands out for one request: it sends the
 /// request and keeps the body it receives.
 #[derive(Debug)]
-pub struct HttpSession {
-    http: HttpClient,
+pub struct ReqwestSession {
+    http: ReqwestBackend,
     /// The reqwest client it sends with: the crawl's, or its identity's.
     client: reqwest::Client,
     body: Mutex<Option<Bytes>>,
 }
 
-impl HttpSession {
-    /// Returns the [`HttpClient`] the session belongs to.
+impl ReqwestSession {
+    /// Returns the [`ReqwestBackend`] the session belongs to.
     #[must_use]
-    pub const fn http(&self) -> &HttpClient {
+    pub const fn http(&self) -> &ReqwestBackend {
         &self.http
     }
 }
 
-impl Client for HttpSession {
+impl Client for ReqwestSession {
     async fn fetch(&self, request: &Request) -> Result<Response<()>> {
         let uri = request.uri().clone();
         let failed = |error: Error| error.with_uri(uri.clone());
@@ -203,7 +203,7 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_request_is_rejected_before_sending() {
-        let session = HttpClient::new().connect().await.unwrap();
+        let session = ReqwestBackend::new().connect().await.unwrap();
         let error = session
             .fetch(&Request::new(Bytes::new()))
             .await
@@ -214,7 +214,7 @@ mod tests {
 
     #[tokio::test]
     async fn sessions_share_the_client() {
-        let backend = HttpClient::new().with_status_policy(StatusPolicy::Accept);
+        let backend = ReqwestBackend::new().with_status_policy(StatusPolicy::Accept);
         let session = backend.connect().await.unwrap();
         assert_eq!(session.http().status_policy(), StatusPolicy::Accept);
     }

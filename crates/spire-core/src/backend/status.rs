@@ -6,8 +6,8 @@ use http::{HeaderMap, StatusCode};
 use crate::response::{Response, ResponseExt};
 use crate::{Error, ErrorKind, Result};
 
-/// How a backend treats error statuses, e.g. `HttpClient` from
-/// `spire-reqwest` or `BrowserBackend` from `spire-thirtyfour`.
+/// How a backend treats error statuses, e.g. `ReqwestBackend` from
+/// `spire-reqwest` or `ThirtyfourBackend` from `spire-thirtyfour`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StatusPolicy {

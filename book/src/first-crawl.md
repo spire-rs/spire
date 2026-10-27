@@ -41,7 +41,7 @@ struct Product {
 ## The crawl
 
 ```rust,no_run
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::dataset::InMemDataset;
 use spire::extract::html::Select;
 use spire::frontier::seed::Seed;
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
         .route(Page::Product, Collect::<Product>::new())
         .require::<Page>();
 
-    let crawler = Crawler::new(HttpClient::default(), router)
+    let crawler = Crawler::new(ReqwestBackend::default(), router)
         .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3).tag_backoff())
         .with_dataset(InMemDataset::<Product>::new())
         .with_concurrency(16)

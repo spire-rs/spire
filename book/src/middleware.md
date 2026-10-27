@@ -12,7 +12,7 @@ middleware added last runs first:
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::request::http::HeaderValue;
 use spire::request::http::header::USER_AGENT;
 use spire::worker::middleware::{self, Next, SetHeader};
@@ -33,7 +33,7 @@ async fn crawl() -> Result<()> {
         .layer(middleware::from_fn(captcha))
         .layer(SetHeader::new(USER_AGENT, HeaderValue::from_static("MyBot/1.0")));
 
-    Crawler::new(HttpClient::default(), router).run().await?;
+    Crawler::new(ReqwestBackend::default(), router).run().await?;
     Ok(())
 }
 ```

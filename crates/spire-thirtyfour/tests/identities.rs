@@ -18,7 +18,7 @@ use spire_core::http::header::{HeaderName, USER_AGENT};
 use spire_core::identity::{Identities, Identity};
 use spire_core::worker::from_fn;
 use spire_core::{Context, Crawler, Error};
-use spire_thirtyfour::{BrowserBackend, BrowserSession};
+use spire_thirtyfour::{ThirtyfourBackend, ThirtyfourSession};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
@@ -95,7 +95,7 @@ fn identity(name: &str, proxy: &str) -> Identity {
 /// returning the text of each page.
 async fn crawl(identities: Identities, pages: usize) -> Option<Vec<String>> {
     let url = std::env::var("SPIRE_WEBDRIVER").ok()?;
-    let backend = BrowserBackend::builder()
+    let backend = ThirtyfourBackend::builder()
         .remote(url)
         .max_sessions(1)
         .build()
@@ -103,7 +103,7 @@ async fn crawl(identities: Identities, pages: usize) -> Option<Vec<String>> {
 
     let texts = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&texts);
-    let worker = from_fn(move |cx: Context<BrowserSession>| {
+    let worker = from_fn(move |cx: Context<ThirtyfourSession>| {
         let seen = Arc::clone(&seen);
         async move {
             cx.response().await?;

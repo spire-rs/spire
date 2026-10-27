@@ -18,7 +18,7 @@
 
 Reqwest-based HTTP client backend for Spire.
 
-This crate provides [`HttpClient`], an HTTP backend implementation that
+This crate provides [`ReqwestBackend`], an HTTP backend implementation that
 integrates with the Spire web scraping framework using the popular
 [reqwest](https://github.com/seanmonstar/reqwest) library.
 
@@ -29,7 +29,7 @@ of the popular [reqwest](https://github.com/seanmonstar/reqwest) library. This
 backend enables high-performance HTTP-based web scraping with support for
 cookies, headers, redirects, and other HTTP features.
 
-`HttpClient` implements both the `Backend` and `Client` traits from
+`ReqwestBackend` implements both the `Backend` and `Client` traits from
 `spire-core`: every request of a crawl shares one connection pool.
 
 ## Features
@@ -81,15 +81,15 @@ For advanced usage and custom configurations, see the
 
 ### Configuring the client
 
-`HttpClient::from_builder` takes a function that makes the reqwest
+`ReqwestBackend::from_builder` takes a function that makes the reqwest
 configuration, which a crawl with identities builds one client per identity
 from:
 
 ```rust
-use spire_reqwest::HttpClient;
+use spire_reqwest::ReqwestBackend;
 use std::time::Duration;
 
-let backend = HttpClient::from_builder(|| {
+let backend = ReqwestBackend::from_builder(|| {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .user_agent("MyBot/1.0")
@@ -119,9 +119,9 @@ not retried. `StatusPolicy::Accept` returns every response to the handler
 instead:
 
 ```rust
-use spire_reqwest::{HttpClient, StatusPolicy};
+use spire_reqwest::{ReqwestBackend, StatusPolicy};
 
-let backend = HttpClient::new().with_status_policy(StatusPolicy::Accept);
+let backend = ReqwestBackend::new().with_status_policy(StatusPolicy::Accept);
 ```
 
 Responses record the URL they were served from after redirects, available
@@ -131,7 +131,7 @@ through `spire_core::response::ResponseExt::final_uri`.
 
 - The reqwest client maintains connection pools automatically.
 - Cookies and session state are maintained per reqwest client instance.
-- Consider reusing `HttpClient` instances when possible to benefit from
+- Consider reusing `ReqwestBackend` instances when possible to benefit from
   connection pooling.
 
 ## Contributing
