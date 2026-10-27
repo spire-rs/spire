@@ -184,6 +184,15 @@ impl Identity {
         &self.0.headers
     }
 
+    /// Returns a weak reference to this identity, which tells whether it is
+    /// still in use: once the crawl retires it and its last request ends,
+    /// it is gone. Backends use it to drop what they keep per identity,
+    /// such as a client or a browser profile.
+    #[must_use]
+    pub fn downgrade(&self) -> WeakIdentity {
+        WeakIdentity(Arc::downgrade(&self.0))
+    }
+
     /// Sends `request` as this identity: with its headers, unless the
     /// request sets them, and recorded for
     /// [`RequestExt::identity`](crate::request::RequestExt::identity).

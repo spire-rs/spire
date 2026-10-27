@@ -3,20 +3,9 @@ use std::sync::{Arc, Weak};
 
 use super::{Identity, Inner};
 
-impl Identity {
-    /// Returns a weak reference to this identity, which tells whether it is
-    /// still in use: once the crawl retires it and its last request ends,
-    /// it is gone. Backends use it to drop what they keep per identity,
-    /// such as a client or a browser profile.
-    #[must_use]
-    pub fn downgrade(&self) -> WeakIdentity {
-        WeakIdentity(Arc::downgrade(&self.0))
-    }
-}
-
 /// A weak reference to an [`Identity`], from [`Identity::downgrade`].
 #[derive(Clone)]
-pub struct WeakIdentity(Weak<Inner>);
+pub struct WeakIdentity(pub(super) Weak<Inner>);
 
 impl WeakIdentity {
     /// Returns the identity, unless it is gone.
