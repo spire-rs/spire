@@ -1,21 +1,21 @@
 # HTTP
 
-With the `reqwest` feature, `HttpClient` fetches pages over HTTP with
+With the `reqwest` feature, `ReqwestBackend` fetches pages over HTTP with
 [reqwest](https://docs.rs/reqwest). Every request of a crawl shares one
 connection pool.
 
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::backend::reqwest::Client;
 
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 // reqwest's defaults:
-let backend = HttpClient::default();
+let backend = ReqwestBackend::default();
 
 // Or a configuration of your own, e.g. with a user agent and a timeout.
-let backend = HttpClient::from_builder(|| {
+let backend = ReqwestBackend::from_builder(|| {
     Client::builder()
         .user_agent("MyBot/1.0 (+https://example.com/bot)")
         .timeout(Duration::from_secs(30))
@@ -34,7 +34,7 @@ Compression, cookies, SOCKS proxies and DNS through hickory are features of
 
 ## Error statuses
 
-`HttpClient` applies a `StatusPolicy` to every response, before its body is
+`ReqwestBackend` applies a `StatusPolicy` to every response, before its body is
 downloaded:
 
 - `StatusPolicy::Classify`, the default, turns error statuses into errors,
@@ -45,9 +45,9 @@ downloaded:
   status, e.g. to record `404`s. The `Head` extractor reads the status.
 
 ```rust
-use spire::backend::{HttpClient, StatusPolicy};
+use spire::backend::{ReqwestBackend, StatusPolicy};
 
-let backend = HttpClient::new().with_status_policy(StatusPolicy::Accept);
+let backend = ReqwestBackend::new().with_status_policy(StatusPolicy::Accept);
 ```
 
 ## Failed transfers
@@ -70,7 +70,7 @@ served from, which links resolve against: see
 
 To send requests through proxies, give the crawl
 [identities](identities.md): each one a proxy with its own user agent and
-cookies. `HttpClient` builds a reqwest client per identity, from its
+cookies. `ReqwestBackend` builds a reqwest client per identity, from its
 configuration, with the identity's proxy and, with the `cookies` feature, a
 cookie store of its own, and the crawl sets aside proxies that keep
 failing. A `socks5` proxy needs the `socks` feature.

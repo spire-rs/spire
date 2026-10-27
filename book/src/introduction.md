@@ -7,7 +7,7 @@ fetching them concurrently and politely, retrying what fails, and stopping
 once there is nothing left to do.
 
 ```rust,no_run
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::extract::html::{Html, Links};
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
@@ -21,7 +21,7 @@ async fn page(html: Html, links: Links, queue: Queue) -> Result<()> {
 
 # async fn crawl() -> Result<()> {
 let router = Router::new().fallback(page);
-let crawler = Crawler::new(HttpClient::default(), router)
+let crawler = Crawler::new(ReqwestBackend::default(), router)
     .with_seed(Seed::get("https://example.com/")?);
 crawler.run().await?;
 # Ok(())
@@ -61,8 +61,8 @@ feature flags:
 | `spire` | The router, handlers and extractors, and everything below |
 | `spire-core` | The crawler, frontier, backend traits, datasets and middleware |
 | `spire-macros` | `#[derive(Select)]` and `#[derive(Tags)]` |
-| `spire-reqwest` | `HttpClient`, the HTTP backend |
-| `spire-thirtyfour` | `BrowserBackend`, the WebDriver backend |
+| `spire-reqwest` | `ReqwestBackend`, the HTTP backend |
+| `spire-thirtyfour` | `ThirtyfourBackend`, the WebDriver backend |
 | `spire-redb` | `RedbStore`, a crash-safe frontier on disk |
 
 The API reference is on [docs.rs](https://docs.rs/spire). This book is the

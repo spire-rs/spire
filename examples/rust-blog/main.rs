@@ -23,7 +23,7 @@ mod scope;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::crawler::Robots;
 use spire::dataset::{InMemDataset, JsonlDataset};
 use spire::frontier::FrontierExt;
@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
         .retry(3)
         .tag_backoff();
 
-    let crawler = Crawler::new(HttpClient::default(), router)
+    let crawler = Crawler::new(ReqwestBackend::default(), router)
         .with_frontier(frontier)
         // robots.txt is obeyed, and the sitemaps it lists are queued.
         .with_robots(Robots::new("spire-example").with_sitemaps(Page::Sitemap))

@@ -6,7 +6,7 @@ of the sitemap itself. Seed sitemaps yourself, or let `Robots::with_sitemaps`
 queue the ones each site's robots.txt lists:
 
 ```rust,no_run
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::crawler::Robots;
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
@@ -29,7 +29,7 @@ async fn crawl() -> Result<()> {
         .route(Page::Sitemap, FollowSitemap::new(Page::Product))
         .route(Page::Product, product);
 
-    let crawler = Crawler::new(HttpClient::default(), router)
+    let crawler = Crawler::new(ReqwestBackend::default(), router)
         .with_frontier(InMemFrontier::fifo().dedup().allow_hosts(["example.com"]))
         .with_robots(Robots::new("MyBot").with_sitemaps(Page::Sitemap))
         .with_seed(Seed::get("https://example.com/")?.with_tag(Page::Home));

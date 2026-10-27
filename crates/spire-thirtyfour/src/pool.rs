@@ -1,6 +1,6 @@
-//! The pool of WebDriver sessions behind a [`BrowserBackend`].
+//! The pool of WebDriver sessions behind a [`ThirtyfourBackend`].
 //!
-//! [`BrowserBackend`]: crate::BrowserBackend
+//! [`ThirtyfourBackend`]: crate::ThirtyfourBackend
 
 use std::fmt;
 use std::future::Future;
@@ -137,7 +137,7 @@ impl Quit for Browser {
 /// A session in the pool, quit when dropped without blocking the runtime.
 ///
 /// The pool drops sessions it no longer wants, e.g. when the backend is
-/// dropped without [`close`](crate::BrowserBackend::close), or a session
+/// dropped without [`close`](crate::ThirtyfourBackend::close), or a session
 /// returns to a closed pool. A dropped session that was not quit yet is
 /// quit on a task of the current runtime; only without one does it fall back
 /// to thirtyfour's blocking teardown.

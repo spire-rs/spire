@@ -21,7 +21,7 @@ Browser automation backend for Spire, built on
 
 ## Overview
 
-`BrowserBackend` keeps a pool of WebDriver sessions and hands one to every
+`ThirtyfourBackend` keeps a pool of WebDriver sessions and hands one to every
 request. Fetching a request navigates to it and returns the rendered page
 source, so JavaScript-heavy pages scrape like any other. Through `Deref`, the
 session also exposes the full `WebDriver` API for clicking, scrolling and
@@ -59,10 +59,10 @@ spire = { version = "0.6.0", features = ["thirtyfour"] }
 ```rust,no_run
 use std::time::Duration;
 
-use spire_thirtyfour::BrowserBackend;
+use spire_thirtyfour::ThirtyfourBackend;
 
 async fn example() -> spire_core::Result<()> {
-    let backend = BrowserBackend::builder()
+    let backend = ThirtyfourBackend::builder()
         .remote("http://localhost:4444")
         .max_sessions(4)
         .page_load_timeout(Duration::from_secs(20))
@@ -79,10 +79,10 @@ Sessions start headless Chrome by default. Pass your own capabilities for
 another browser or for browser flags:
 
 ```rust
-use spire_thirtyfour::BrowserBackend;
+use spire_thirtyfour::ThirtyfourBackend;
 use spire_thirtyfour::thirtyfour::DesiredCapabilities;
 
-let builder = BrowserBackend::builder()
+let builder = ThirtyfourBackend::builder()
     .remote("http://localhost:4444")
     .capabilities(DesiredCapabilities::firefox());
 ```
@@ -91,7 +91,7 @@ let builder = BrowserBackend::builder()
 
 - **`rustls-tls`** (default): TLS to the WebDriver server through rustls.
 - **`native-tls`**: TLS through the platform's native library.
-- **`manager`**: `BrowserBuilder::managed` downloads, caches and spawns the
+- **`manager`**: `ThirtyfourBuilder::managed` downloads, caches and spawns the
   driver for the browser in the capabilities. The browser itself must be
   installed.
 

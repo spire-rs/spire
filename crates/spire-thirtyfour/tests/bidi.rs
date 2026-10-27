@@ -11,11 +11,11 @@ use spire_core::frontier::seed::Seed;
 use spire_core::http::header::{CONTENT_TYPE, HeaderValue};
 use spire_core::http::{Method, StatusCode};
 use spire_core::request::Request;
-use spire_thirtyfour::{BrowserBackend, BrowserBuilder};
+use spire_thirtyfour::{ThirtyfourBackend, ThirtyfourBuilder};
 
-fn builder() -> Option<BrowserBuilder> {
+fn builder() -> Option<ThirtyfourBuilder> {
     let url = std::env::var("SPIRE_WEBDRIVER").ok()?;
-    Some(BrowserBackend::builder().remote(url).max_sessions(1))
+    Some(ThirtyfourBackend::builder().remote(url).max_sessions(1))
 }
 
 fn get(uri: &str) -> Request {

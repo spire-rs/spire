@@ -44,17 +44,22 @@ and this project adheres to
   `MockSite::sent` and `unreachable_through` to test crawls with identities.
 - `spire-core`: `Identity::downgrade` and `WeakIdentity`, for backends to
   drop what they keep per identity once it is gone.
-- `spire-reqwest`: `HttpClient` overrides `connect_as`, with a reqwest client
-  per identity, dropped once the identity is gone. `HttpClient::from_builder`
+- `spire-reqwest`: `ReqwestBackend` overrides `connect_as`, with a reqwest client
+  per identity, dropped once the identity is gone. `ReqwestBackend::from_builder`
   builds it from a function that makes the reqwest configuration, which
   identities' clients are built from too.
-- `spire-thirtyfour`: `BrowserBackend` overrides `connect_as`, with a browser
+- `spire-thirtyfour`: `ThirtyfourBackend` overrides `connect_as`, with a browser
   profile per identity in every browser it uses: a BiDi user context with its
   proxy, user agent and headers, kept while the identity is in use. Proxies
   asking for credentials are answered with those of the proxy URL.
 
 ### Changed
 
+- **Breaking:** renamed `HttpClient` and `HttpSession` to `ReqwestBackend` and
+  `ReqwestSession`, and `BrowserBackend`, `BrowserBuilder` and
+  `BrowserSession` to `ThirtyfourBackend`, `ThirtyfourBuilder` and
+  `ThirtyfourSession`. Backend and session names now identify their
+  underlying library.
 - **Breaking:** `extract::html` re-exports scraper as `html::scraper`,
   instead of every scraper item, so `html::Selector` is now
   `html::scraper::Selector` and `html::Document` is `html::scraper::Html`,
@@ -72,8 +77,8 @@ and this project adheres to
   as `InMemDataset` and `InMemSeen` are at their modules' roots.
 - **Breaking:** `backend::Rotate` is removed: identities cover browser pools
   behind different proxies or with different profiles.
-- **Breaking:** `HttpClient` no longer converts `From<reqwest::Client>`: a
-  built client cannot be rebuilt for identities. `HttpClient::from_builder`
+- **Breaking:** `ReqwestBackend` no longer converts `From<reqwest::Client>`: a
+  built client cannot be rebuilt for identities. `ReqwestBackend::from_builder`
   takes the function that would build it.
 - `spire`: when a page has no `<main>`, `<article>` or `role="main"`
   element, `Html::main_text` leaves the body's `<header>` and `<footer>` out

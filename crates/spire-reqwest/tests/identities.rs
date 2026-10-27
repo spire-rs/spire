@@ -16,7 +16,7 @@ use spire_core::http::header::USER_AGENT;
 use spire_core::identity::{Identities, Identity};
 use spire_core::worker::from_fn;
 use spire_core::{Context, Crawler, Error};
-use spire_reqwest::{HttpClient, HttpSession};
+use spire_reqwest::{ReqwestBackend, ReqwestSession};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
@@ -95,13 +95,13 @@ fn seeds(n: usize) -> Vec<Seed> {
 /// Crawls `seeds` one at a time as `identities`, returning the bodies the
 /// proxies answered with.
 async fn crawl(
-    backend: HttpClient,
+    backend: ReqwestBackend,
     identities: Identities,
     seeds: Vec<Seed>,
 ) -> (Stats, Vec<String>) {
     let bodies = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&bodies);
-    let worker = from_fn(move |cx: Context<HttpSession>| {
+    let worker = from_fn(move |cx: Context<ReqwestSession>| {
         let seen = Arc::clone(&seen);
         async move {
             cx.response().await?;
@@ -127,7 +127,7 @@ async fn crawl(
 async fn requests_go_through_their_identitys_proxy() {
     let (a, b) = (proxy("a").await, proxy("b").await);
     let identities = Identities::new([identity("a", &a), identity("b", &b)]);
-    let (stats, bodies) = crawl(HttpClient::new(), identities, seeds(4)).await;
+    let (stats, bodies) = crawl(ReqwestBackend::new(), identities, seeds(4)).await;
 
     assert_eq!(stats.succeeded, 4, "{stats:?}");
     for (body, (name, page)) in bodies.iter().zip([("a", 1), ("b", 2), ("a", 3), ("b", 4)]) {
@@ -141,7 +141,7 @@ async fn requests_go_through_their_identitys_proxy() {
 async fn each_identity_keeps_its_own_cookies() {
     let (a, b) = (proxy("a").await, proxy("b").await);
     let identities = Identities::new([identity("a", &a), identity("b", &b)]);
-    let (_, bodies) = crawl(HttpClient::new(), identities, seeds(4)).await;
+    let (_, bodies) = crawl(ReqwestBackend::new(), identities, seeds(4)).await;
 
     // The first request of each identity has no cookie; the second gets
     // back only the cookie its own proxy set.
@@ -156,7 +156,7 @@ async fn a_dead_proxy_is_set_aside_and_its_requests_retried() {
     let (dead, live) = (dead_proxy().await, proxy("live").await);
     let identities =
         Identities::new([identity("dead", &dead), identity("live", &live)]).max_failures(1);
-    let (stats, bodies) = crawl(HttpClient::new(), identities, seeds(3)).await;
+    let (stats, bodies) = crawl(ReqwestBackend::new(), identities, seeds(3)).await;
 
     assert_eq!((stats.succeeded, stats.failed), (3, 0), "{stats:?}");
     assert!(stats.retried >= 1, "{stats:?}");
@@ -173,6 +173,6 @@ async fn unsupported_proxies_fail_without_retrying() {
     let socks = Identity::new("socks")
         .with_proxy("socks5://127.0.0.1:1080")
         .unwrap();
-    let (stats, _) = crawl(HttpClient::new(), Identities::new([socks]), seeds(1)).await;
+    let (stats, _) = crawl(ReqwestBackend::new(), Identities::new([socks]), seeds(1)).await;
     assert_eq!((stats.failed, stats.retried), (1, 0), "{stats:?}");
 }

@@ -1,9 +1,9 @@
-//! Extractors for the [`BrowserSession`] backend.
+//! Extractors for the [`ThirtyfourSession`] backend.
 
 use std::fmt;
 use std::ops::Deref;
 
-use spire_thirtyfour::BrowserSession;
+use spire_thirtyfour::ThirtyfourSession;
 use spire_thirtyfour::thirtyfour::WebDriver;
 
 use crate::extract::FromContext;
@@ -105,10 +105,10 @@ impl fmt::Debug for Tab {
     }
 }
 
-impl<S: Sync> FromContext<BrowserSession, S> for Tab {
+impl<S: Sync> FromContext<ThirtyfourSession, S> for Tab {
     type Rejection = Error;
 
-    async fn from_context(cx: &Context<BrowserSession>, _: &S) -> Result<Self> {
+    async fn from_context(cx: &Context<ThirtyfourSession>, _: &S) -> Result<Self> {
         let head = cx.response().await?;
         Ok(Self {
             driver: cx.client().driver(),

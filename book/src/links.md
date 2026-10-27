@@ -93,13 +93,13 @@ page, which `max_depth` limits.
 while the crawl runs, from a task of your own:
 
 ```rust,no_run
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::frontier::seed::Seed;
 use spire::{Crawler, Result, Router};
 # async fn page() {}
 
 # async fn crawl() -> Result<()> {
-let crawler = Crawler::new(HttpClient::default(), Router::new().fallback(page));
+let crawler = Crawler::new(ReqwestBackend::default(), Router::new().fallback(page));
 let queue = crawler.queue();
 queue.push(Seed::get("https://example.com/")?).await?;
 crawler.run().await?;

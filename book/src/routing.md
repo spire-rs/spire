@@ -3,11 +3,11 @@
 A `Router` picks the handler for each request. It is the crawl's worker:
 
 ```rust,no_run
-# use spire::backend::HttpClient;
+# use spire::backend::ReqwestBackend;
 # use spire::{Crawler, Router};
 # async fn listing() {}
 let router = Router::new().route("listing", listing);
-let crawler = Crawler::new(HttpClient::default(), router);
+let crawler = Crawler::new(ReqwestBackend::default(), router);
 ```
 
 ## Handlers

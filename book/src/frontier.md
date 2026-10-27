@@ -115,7 +115,7 @@ serialize:
 ```rust,no_run
 use std::sync::Arc;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::frontier::seen::InMemSeen;
 use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::{Crawler, Result, Router};
@@ -123,7 +123,7 @@ use spire::{Crawler, Result, Router};
 
 # async fn crawl() -> Result<()> {
 let seen = Arc::new(InMemSeen::default());
-let first = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+let first = Crawler::new(ReqwestBackend::default(), Router::new().fallback(page))
     .with_frontier(InMemFrontier::fifo().dedup_with(Arc::clone(&seen)))
     .with_max_requests(1000);
 first.run().await?;
@@ -134,7 +134,7 @@ let (seeds, fingerprints) = (first.snapshot().unwrap_or_default(), seen.snapshot
 // fingerprints.
 let seen = Arc::new(fingerprints.into_iter().collect::<InMemSeen>());
 let frontier = seeds.into_iter().collect::<InMemFrontier>().dedup_with(seen);
-let next = Crawler::new(HttpClient::default(), Router::new().fallback(page))
+let next = Crawler::new(ReqwestBackend::default(), Router::new().fallback(page))
     .with_frontier(frontier);
 next.run().await?;
 # Ok(())

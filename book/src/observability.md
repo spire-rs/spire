@@ -51,12 +51,12 @@ while it runs, e.g. to report progress from another task:
 use std::sync::Arc;
 use std::time::Duration;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::{Crawler, Result, Router};
 # async fn page() {}
 
 # async fn crawl() -> Result<()> {
-let crawler = Arc::new(Crawler::new(HttpClient::default(), Router::new().fallback(page)));
+let crawler = Arc::new(Crawler::new(ReqwestBackend::default(), Router::new().fallback(page)));
 
 let progress = Arc::clone(&crawler);
 tokio::spawn(async move {

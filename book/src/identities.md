@@ -60,7 +60,7 @@ only explicit headers; `Identity::profile()` returns the separate profile.
 Profiles omit `Accept-Encoding`; reqwest advertises the encodings enabled
 by its decoders, unless you explicitly override that header.
 
-`BrowserBackend::connect_as` refuses an identity with a user-agent profile
+`ThirtyfourBackend::connect_as` refuses an identity with a user-agent profile
 as `Invalid` before opening a session. A real browser supplies its own user
 agent and client hints, matching its installed version.
 
@@ -140,7 +140,7 @@ proxy refuses an identity that has one, failing its requests rather than
 sending them from your own IP: that is what `connect_as` does unless a
 backend overrides it.
 
-`HttpClient` overrides it with a reqwest client per identity, built from
+`ReqwestBackend` overrides it with a reqwest client per identity, built from
 its configuration with the identity's proxy and, with the `cookies`
 feature, a cookie store of its own, dropped once the identity is gone; see
 [HTTP](http.md):
@@ -148,14 +148,14 @@ feature, a cookie store of its own, dropped once the identity is gone; see
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::HttpClient;
+use spire::backend::ReqwestBackend;
 use spire::backend::reqwest::Client;
 use spire::identity::{Identities, Identity};
 use spire::{Crawler, Result, Router};
 # async fn page() {}
 
 # async fn crawl() -> Result<()> {
-let backend = HttpClient::from_builder(|| Client::builder().timeout(Duration::from_secs(30)))?;
+let backend = ReqwestBackend::from_builder(|| Client::builder().timeout(Duration::from_secs(30)))?;
 let identities = Identities::from_fn(|n| {
     Identity::new(format!("session-{n}"))
         .with_proxy(format!("http://user-session-{n}:secret@gate.example:7000"))
@@ -169,7 +169,7 @@ crawler.run().await?;
 # }
 ```
 
-`BrowserBackend` overrides it with a browser profile per identity, a user
+`ThirtyfourBackend` overrides it with a browser profile per identity, a user
 context with its proxy, user agent and headers, see
 [Browsers](browsers.md#sessions).
 

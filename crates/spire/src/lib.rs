@@ -26,10 +26,12 @@ pub mod backend {
     pub use spire_core::backend::*;
     #[cfg(feature = "reqwest")]
     #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-    pub use spire_reqwest::{HttpClient, reqwest};
+    pub use spire_reqwest::{ReqwestBackend, reqwest};
     #[cfg(feature = "thirtyfour")]
     #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-    pub use spire_thirtyfour::{BrowserBackend, BrowserBuilder, BrowserSession, thirtyfour};
+    pub use spire_thirtyfour::{
+        ThirtyfourBackend, ThirtyfourBuilder, ThirtyfourSession, thirtyfour,
+    };
 }
 
 /// The crawler's settings and statistics; the [`Crawler`] itself is at the
