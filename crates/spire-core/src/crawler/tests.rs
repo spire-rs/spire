@@ -1121,6 +1121,50 @@ mod identities {
         assert_eq!(agents, ["Bot/id-0", "own"]);
     }
 
+    #[cfg(feature = "user-agents")]
+    #[tokio::test]
+    async fn profile_headers_are_defaults_below_identity_and_request_headers() {
+        use http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE};
+
+        use crate::identity::{Browser, UserAgents};
+
+        let agents = UserAgents::new().browsers([Browser::Chrome]);
+        let profile = agents.pick(0);
+        let site = site(&["a.test"]);
+        let identities = Identities::from_fn(move |n| {
+            Ok(Identity::new(format!("id-{n}"))
+                .with_header(ACCEPT_LANGUAGE, HeaderValue::from_static("de-DE"))
+                .with_profile(agents.pick(n)))
+        })
+        .max_active(1);
+        let own = Seed::get("https://a.test/next")
+            .unwrap()
+            .with_header(USER_AGENT, HeaderValue::from_static("own"))
+            .with_header(ACCEPT_LANGUAGE, HeaderValue::from_static("fr-FR"));
+        Crawler::new(site.clone(), from_fn(fetch))
+            .with_identities(identities)
+            .with_seeds([Seed::get("https://a.test/").unwrap(), own])
+            .run()
+            .await
+            .unwrap();
+
+        let sent = site.sent();
+        assert_eq!(sent.len(), 2);
+        for request in &sent {
+            assert_eq!(request.identity.as_deref(), Some("id-0"));
+            assert!(request.headers.contains_key(ACCEPT));
+            assert!(request.headers.contains_key("sec-ch-ua"));
+            assert!(!request.headers.contains_key(ACCEPT_ENCODING));
+            if request.uri.path() == "/next" {
+                assert_eq!(request.headers[USER_AGENT], "own");
+                assert_eq!(request.headers[ACCEPT_LANGUAGE], "fr-FR");
+            } else {
+                assert_eq!(request.headers[USER_AGENT], profile.user_agent());
+                assert_eq!(request.headers[ACCEPT_LANGUAGE], "de-DE");
+            }
+        }
+    }
+
     #[tokio::test]
     async fn handlers_see_their_identity() {
         let worker = from_fn(|cx: Context<MockClient>| async move {

@@ -18,6 +18,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 | `macros` | `#[derive(Select)]` and `#[derive(Tags)]` |
 | `reqwest` | `HttpClient`, the HTTP backend |
 | `thirtyfour` | `BrowserBackend`, the WebDriver backend |
+| `user-agents` | Browser user agents with matching navigation headers for identities |
 | `robots` | Obeying robots.txt with `Crawler::with_robots` |
 | `sitemap` | The `Sitemap` extractor and the `FollowSitemap` handler |
 | `serde` | Serializable seeds for snapshots |

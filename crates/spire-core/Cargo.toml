@@ -40,12 +40,17 @@ json = ["serde", "dep:serde_json", "tokio/fs", "tokio/io-util"]
 csv = ["serde", "dep:csv", "tokio/fs", "tokio/io-util"]
 # `MockSite` and `Visit`, to test handlers without a network
 testing = []
+# Browser user agents with matching navigation headers
+user-agents = ["dep:uagent"]
 
 [dependencies]
 # Async runtime
 tokio = { workspace = true, features = ["rt", "time", "macros", "sync"] }
 tokio-util = { workspace = true, features = [] }
 futures = { workspace = true, features = [] }
+
+# Browser navigation profiles
+uagent = { workspace = true, optional = true, features = [] }
 
 # HTTP
 http = { workspace = true, features = [] }

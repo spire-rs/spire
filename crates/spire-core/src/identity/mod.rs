@@ -40,6 +40,9 @@ use std::sync::{Arc, Weak};
 
 use http::header::IntoHeaderName;
 use http::{HeaderMap, HeaderValue, Uri};
+#[cfg(feature = "user-agents")]
+#[cfg_attr(docsrs, doc(cfg(feature = "user-agents")))]
+pub use uagent::{Browser, Platform, Profile, UserAgents};
 
 pub use self::identities::Identities;
 pub(crate) use self::pool::{Health, IdentityPool};
@@ -58,6 +61,8 @@ struct Inner {
     name: Box<str>,
     proxy: Option<Uri>,
     headers: HeaderMap,
+    #[cfg(feature = "user-agents")]
+    profile: Option<Profile>,
 }
 
 impl Identity {
@@ -68,6 +73,8 @@ impl Identity {
             name: name.into(),
             proxy: None,
             headers: HeaderMap::new(),
+            #[cfg(feature = "user-agents")]
+            profile: None,
         }))
     }
 
@@ -118,6 +125,45 @@ impl Identity {
         self
     }
 
+    /// Presents as this browser profile. Identity headers override the
+    /// profile's headers, and request headers override both.
+    ///
+    /// Real browser backends refuse profiles: their own browser supplies
+    /// its user agent and client hints.
+    #[cfg(feature = "user-agents")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "user-agents")))]
+    #[must_use]
+    pub fn with_profile(mut self, profile: Profile) -> Self {
+        Arc::make_mut(&mut self.0).profile = Some(profile);
+        self
+    }
+
+    /// Returns the browser profile, kept separate from identity headers.
+    #[cfg(feature = "user-agents")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "user-agents")))]
+    #[must_use]
+    pub fn profile(&self) -> Option<&Profile> {
+        self.0.profile.as_ref()
+    }
+
+    /// Fails if this identity has a browser profile, for backends whose
+    /// real browser supplies its own user agent and client hints.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Invalid`](crate::ErrorKind::Invalid) error if a profile
+    /// is set. Without `user-agents`, always succeeds.
+    pub fn require_no_profile(&self) -> Result<()> {
+        #[cfg(feature = "user-agents")]
+        if self.profile().is_some() {
+            return Err(Error::invalid(format!(
+                "identity `{}` has a user-agent profile, which a real browser cannot use",
+                self.name()
+            )));
+        }
+        Ok(())
+    }
+
     /// Returns the name.
     #[must_use]
     pub fn name(&self) -> &str {
@@ -130,7 +176,7 @@ impl Identity {
         self.0.proxy.as_ref()
     }
 
-    /// Returns the headers sent on every request.
+    /// Returns the identity headers, excluding its browser profile.
     #[must_use]
     pub fn headers(&self) -> &HeaderMap {
         &self.0.headers
@@ -153,6 +199,18 @@ impl Identity {
         for (name, value) in self.headers() {
             if !headers.contains_key(name) {
                 headers.insert(name.clone(), value.clone());
+            }
+        }
+        #[cfg(feature = "user-agents")]
+        if let Some(profile) = self.profile() {
+            for header in profile.headers() {
+                if !headers.contains_key(header.name) {
+                    // uagent generates validated names and values from its captures.
+                    let name = http::HeaderName::from_static(header.name);
+                    let value = HeaderValue::from_str(&header.value)
+                        .expect("uagent profile headers are valid HTTP headers");
+                    headers.insert(name, value);
+                }
             }
         }
         let meta = request
@@ -232,6 +290,23 @@ mod tests {
     use http::header::USER_AGENT;
 
     use super::*;
+
+    #[cfg(feature = "user-agents")]
+    #[test]
+    fn replacing_a_profile_preserves_explicit_headers_and_clones() {
+        let chrome = Profile::new(Browser::Chrome, Platform::Windows).unwrap();
+        let firefox = Profile::new(Browser::Firefox, Platform::Linux).unwrap();
+        let original = Identity::new("a")
+            .with_profile(chrome.clone())
+            .with_header(USER_AGENT, HeaderValue::from_static("explicit"));
+        let changed = original.clone().with_profile(firefox.clone());
+        assert_eq!(original.profile(), Some(&chrome));
+        assert_eq!(changed.profile(), Some(&firefox));
+        assert_eq!(changed.headers()[USER_AGENT], "explicit");
+        assert_eq!(changed.headers().len(), 1);
+        assert!(changed.require_no_profile().is_err());
+        assert!(Identity::new("plain").require_no_profile().is_ok());
+    }
 
     #[test]
     fn debug_hides_proxy_credentials() {
