@@ -54,7 +54,8 @@ fn extract(c: &mut Criterion) {
     group.bench_function("select", |b| {
         b.iter(|| parsed.select::<Vec<Product>>().unwrap());
     });
-    group.bench_function("links", |b| b.iter(|| parsed.links()));
+    let base = "https://shop.test/products".parse().unwrap();
+    group.bench_function("links", |b| b.iter(|| parsed.links(&base)));
     group.finish();
 }
 

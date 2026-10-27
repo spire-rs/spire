@@ -8,7 +8,7 @@
 
 use spire::backend::HttpClient;
 use spire::dataset::{Data, InMemDataset};
-use spire::extract::html::{Element, Html, Select};
+use spire::extract::html::{Element, Links, Select};
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
@@ -47,8 +47,7 @@ async fn story(data: Data<Story>, Element(story): Element<Story>) -> Result<()> 
 
 /// Follows every link on the page; the followed pages come back here through
 /// the path route.
-async fn links(uri: Uri, queue: Queue, data: Data<LinkPage>, page: Html) -> Result<()> {
-    let links = page.links();
+async fn links(uri: Uri, queue: Queue, data: Data<LinkPage>, links: Links) -> Result<()> {
     data.write(LinkPage {
         path: uri.path().to_owned(),
         links: links.len(),

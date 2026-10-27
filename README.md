@@ -59,16 +59,16 @@ Crawl a site two links deep and print every title:
 
 ```rust
 use spire::backend::HttpClient;
-use spire::extract::html::Html;
+use spire::extract::html::{Html, Links};
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::{Crawler, Result, Router};
 
 /// Prints the title of every page and follows its links.
-async fn page(queue: Queue, page: Html) -> Result<()> {
+async fn page(queue: Queue, page: Html, links: Links) -> Result<()> {
     println!("{:?}", page.title());
-    queue.follow_all(page.links()).await?;
+    queue.follow_all(links).await?;
     Ok(())
 }
 

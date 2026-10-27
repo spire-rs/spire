@@ -10,6 +10,13 @@ and this project adheres to
 
 ### Added
 
+- `spire`: the `Links` extractor: the links of a page a visitor can follow,
+  `<a>` and `<area>`, resolved against its `<base href>` and final URI as a
+  browser resolves them, each with its `rel` values, text and kind. Filters
+  narrow them (`followable`, `same_host`, `with_rel`, `of_kind`),
+  `Links::within` scopes them to a selector, and they convert into links to
+  follow.
+- `spire`: `FollowLinks::skip_nofollow` leaves out `rel="nofollow"` links.
 - `spire`: the `markdown` feature and the `Markdown` extractor, a page's main
   content as Markdown with its links and images resolved against the URI it
   was served from. `Markdown::from_html` converts with `MarkdownOptions`:
@@ -42,6 +49,15 @@ and this project adheres to
 
 ### Changed
 
+- **Breaking:** `extract::html` re-exports scraper as `html::scraper`,
+  instead of every scraper item, so `html::Selector` is now
+  `html::scraper::Selector` and `html::Document` is `html::scraper::Html`,
+  like the `reqwest`, `thirtyfour` and `redb` re-exports.
+- **Breaking:** `FollowLinks::score_links` scores each link as a `PageLink`,
+  with its URI, text and `rel`, instead of its element.
+- **Breaking:** `Html::links` takes the page's URI and returns `Links`,
+  resolved, instead of the `href`s as written; `Html::anchors` still gives
+  them with their elements.
 - **Breaking:** `SetHeader::rotate` is removed: rotating a user agent on its
   own is what identities fix. `SetHeader::new` is unchanged.
 - **Breaking:** `Response` and `ResponseExt` moved from `request` to a
@@ -56,6 +72,11 @@ and this project adheres to
 - `spire`: when a page has no `<main>`, `<article>` or `role="main"`
   element, `Html::main_text` leaves the body's `<header>` and `<footer>` out
   too.
+
+### Fixed
+
+- `spire`: `FollowLinks` resolves links against the page's `<base href>`,
+  as browsers do; it resolved them against the page's URI alone.
 
 ## [0.6.0] - 2026-10-26
 

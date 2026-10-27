@@ -49,7 +49,7 @@ async fn rendered(queue: Queue, data: Data<Rendered>, tab: Tab) -> Result<()> {
         .map_err(|error| Error::backend("failed to read the url").with_source(error))?;
 
     let page = tab.snapshot().await?;
-    let links = page.links();
+    let links = page.links(&url.as_str().parse()?);
     data.write(Rendered {
         url: url.to_string(),
         title,
@@ -59,7 +59,7 @@ async fn rendered(queue: Queue, data: Data<Rendered>, tab: Tab) -> Result<()> {
 
     let links = links
         .into_iter()
-        .map(|href| Link::from(href).with_tag(Page::Rendered));
+        .map(|link| Link::from(link).with_tag(Page::Rendered));
     queue.follow_all(links).await?;
     Ok(())
 }

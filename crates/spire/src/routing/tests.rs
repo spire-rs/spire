@@ -150,15 +150,21 @@ async fn rejected_extractors_fail_and_optional_ones_do_not() {
 #[cfg(feature = "html")]
 async fn crawls_and_resolves_links_after_redirects() {
     use crate::dataset::{Data, InMemDataset};
-    use crate::extract::html::Html;
+    use crate::extract::html::{Html, Links};
     use crate::frontier::queue::Queue;
     use crate::request::http::Uri;
     use crate::{Crawler, Result};
 
-    async fn page(uri: Uri, queue: Queue, data: Data<String>, page: Html) -> Result<()> {
+    async fn page(
+        uri: Uri,
+        queue: Queue,
+        data: Data<String>,
+        page: Html,
+        links: Links,
+    ) -> Result<()> {
         let title = page.title().unwrap_or_default();
         data.write(format!("{} {title}", uri.path())).await?;
-        queue.follow_all(page.links()).await?;
+        queue.follow_all(links).await?;
         Ok(())
     }
 

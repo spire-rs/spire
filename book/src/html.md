@@ -12,16 +12,19 @@ anything implementing `Select`:
 
 ```rust
 use spire::Result;
-use spire::extract::html::Html;
+use spire::extract::html::{Html, Links};
 
-async fn page(html: Html) -> Result<()> {
+async fn page(html: Html, links: Links) -> Result<()> {
     println!("{:?}", html.title());
-    for link in html.links() {
-        println!("{link}");
+    for link in &links {
+        println!("{} {}", link.uri(), link.text());
     }
     Ok(())
 }
 ```
+
+`Links` holds the page's links, resolved as a browser resolves them, with
+their `rel` values and text: see [Following links](links.md#the-links-of-a-page).
 
 `anchors()` gives every link together with its `<a>` element, e.g. to read
 its text or attributes.
@@ -31,9 +34,9 @@ styles, one line per paragraph or list item. `main_text()` keeps only the
 main content, the first `<main>`, `<article>` or `role="main"` element,
 without navigation and asides, or else the body without its header and
 footer as well, for indexing or summarizing pages. To walk
-the tree yourself, `Html` wraps a `spire::extract::html::Document`, scraper's
-document, and `spire::extract::html` re-exports the rest of scraper at the
-version spire uses.
+the tree yourself, `Html` wraps scraper's document, and
+`spire::extract::html::scraper` re-exports scraper at the version spire
+uses.
 
 ## Markdown
 
@@ -155,13 +158,14 @@ Both parse the page; a handler that also takes `Html` can call
 
 ## Walking the tree yourself
 
-`Html` wraps scraper's document, `html::Document`, so a handler can reach
-everything scraper offers: elements, nodes and CSS selectors, re-exported in
-`spire::extract::html` at the version spire uses, so no dependency of your
-own has to match it:
+`Html` wraps scraper's document, so a handler can reach everything scraper
+offers: elements, nodes and CSS selectors. `spire::extract::html::scraper`
+re-exports scraper at the version spire uses, so no dependency of your own
+has to match it:
 
 ```rust
-use spire::extract::html::{Html, Selector};
+use spire::extract::html::Html;
+use spire::extract::html::scraper::Selector;
 
 async fn page(html: Html) {
     let headings = Selector::parse("h2").unwrap();

@@ -31,15 +31,16 @@ use crate::{Context, Error, Result};
 /// # #[cfg(feature = "html")]
 /// # mod example {
 /// use spire::backend::thirtyfour::By;
-/// use spire::extract::Tab;
+/// use spire::extract::{Head, Tab};
 /// use spire::frontier::queue::Queue;
 ///
-/// async fn handler(queue: Queue, tab: Tab) -> spire::Result<()> {
+/// async fn handler(head: Head, queue: Queue, tab: Tab) -> spire::Result<()> {
 ///     if let Ok(more) = tab.find(By::Css("button.more")).await {
 ///         let _ = more.click().await;
 ///     }
+///     // The page as it is after the click.
 ///     let page = tab.snapshot().await?;
-///     queue.follow_all(page.links()).await?;
+///     queue.follow_all(page.links(&head.uri)).await?;
 ///     Ok(())
 /// }
 /// # }

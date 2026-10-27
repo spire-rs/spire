@@ -18,14 +18,14 @@ them, returning anything that converts into an `Outcome`: nothing, a
 
 ```rust
 use spire::Result;
-use spire::extract::html::Html;
+use spire::extract::html::{Html, Links};
 use spire::frontier::queue::Queue;
 use spire::request::Depth;
 use spire::request::http::Uri;
 
-async fn page(uri: Uri, depth: Depth, html: Html, queue: Queue) -> Result<()> {
+async fn page(uri: Uri, depth: Depth, html: Html, links: Links, queue: Queue) -> Result<()> {
     println!("{uri} at depth {depth}: {:?}", html.title());
-    queue.follow_all(html.links()).await?;
+    queue.follow_all(links).await?;
     Ok(())
 }
 ```
@@ -134,7 +134,8 @@ let router: Router<Noop> = Router::new().route("listing", (
 ## Built-in handlers
 
 - **`FollowLinks::new(tag)`** queues every link on the page with `tag`, or
-  only those matching `.select(css)`.
+  only those matching `.select(css)`, and without `rel="nofollow"` ones
+  with `.skip_nofollow()`.
 - **`Collect::<T>::new()`** extracts every `T: Select` on the page and
   writes them to the dataset for `T`.
 - **`FollowSitemap::new(tag)`**, with the `sitemap` feature, follows a
