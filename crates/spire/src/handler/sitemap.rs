@@ -1,12 +1,13 @@
 use sitemapo::Record;
 use sitemapo::record::Entry;
 
-use crate::backend::Client;
+use crate::backend::Session;
+use crate::crawler::Tag;
 use crate::extract::FromContext;
 use crate::extract::sitemap::Sitemap;
 use crate::frontier::seed::Seed;
 use crate::handler::Handler;
-use crate::request::{RequestExt, Tag};
+use crate::http::RequestExt;
 use crate::worker::{IntoOutcome, Outcome};
 use crate::{Context, Result, TRACING_TARGET};
 
@@ -52,7 +53,7 @@ impl FollowSitemap {
         }
     }
 
-    async fn follow<C: Client, S: Sync>(&self, cx: &Context<C>, state: &S) -> Result<()> {
+    async fn follow<C: Session, S: Sync>(&self, cx: &Context<C>, state: &S) -> Result<()> {
         let queue = cx.queue().clone();
         let tag = cx.request().tag().cloned();
         let Sitemap(records) = Sitemap::from_context(cx, state).await?;
@@ -96,7 +97,7 @@ fn by_priority(pages: &mut [Entry]) {
 
 impl<C, S> Handler<C, FollowSitemap, S> for FollowSitemap
 where
-    C: Client,
+    C: Session,
     S: Send + Sync + 'static,
 {
     async fn call(&self, cx: &Context<C>, state: &S) -> Outcome {

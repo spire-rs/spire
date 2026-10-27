@@ -4,7 +4,7 @@ use derive_more::{Deref, DerefMut};
 use flate2::bufread::GzDecoder;
 use sitemapo::{Parser, Record};
 
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::extract::{Body, FromContext};
 use crate::{Context, Error, ErrorKind, Result};
 
@@ -40,7 +40,7 @@ pub struct Sitemap(pub Vec<Record>);
 
 impl<C, S> FromContext<C, S> for Sitemap
 where
-    C: Client,
+    C: Session,
     S: Sync,
 {
     type Rejection = Error;

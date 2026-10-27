@@ -3,7 +3,7 @@ use std::future::{Future, ready};
 
 use spire_core::Result;
 use spire_core::frontier::seed::Fingerprint;
-use spire_core::http::HeaderValue;
+use spire_core::http::http::HeaderValue;
 use spire_core::worker::middleware::{Validator, Validators};
 
 use crate::store::{RedbStore, VALIDATORS};

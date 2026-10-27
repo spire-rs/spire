@@ -7,11 +7,10 @@ queue the ones each site's robots.txt lists:
 
 ```rust,no_run
 use spire::backend::ReqwestBackend;
-use spire::crawler::Robots;
+use spire::crawler::{Robots, Tags};
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::handler::FollowSitemap;
-use spire::request::Tags;
 use spire::{Crawler, Result, Router};
 
 #[derive(Debug, Clone, Copy, Tags)]

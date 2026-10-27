@@ -94,15 +94,15 @@ what the handler returns instead of running when extraction fails, anything
 that converts into an `Outcome`, usually an `Error`:
 
 ```rust
-use spire::backend::Client;
+use spire::backend::Session;
 use spire::extract::FromContext;
-use spire::request::http::header::CONTENT_LANGUAGE;
+use spire::http::http::header::CONTENT_LANGUAGE;
 use spire::{Context, Error, Result};
 
 /// The response's `Content-Language`, rejecting pages without one.
 struct Language(String);
 
-impl<C: Client, S: Sync> FromContext<C, S> for Language {
+impl<C: Session, S: Sync> FromContext<C, S> for Language {
     type Rejection = Error;
 
     async fn from_context(cx: &Context<C>, _: &S) -> Result<Self> {
@@ -121,7 +121,7 @@ async fn page(Language(language): Language) {
 }
 ```
 
-`cx.response()` fetches the request on its first call and shares the
-response with every other extractor, and `cx.body()` reads the body as it is
-now, e.g. a browser page as currently rendered. An extractor that only reads
-the request, like `Uri`, never fetches it.
+`cx.response()` fetches the request on its first call and shares the complete
+response with every other extractor. `cx.body()` cheaply clones its cached
+bytes, including a fixed HTML snapshot for browser responses. An extractor
+that only reads the request, like `Uri`, never fetches it.

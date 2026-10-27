@@ -9,7 +9,7 @@ use spire_thirtyfour::thirtyfour::WebDriver;
 use crate::extract::FromContext;
 #[cfg(feature = "html")]
 use crate::extract::html::Html;
-use crate::request::http::{HeaderMap, StatusCode};
+use crate::http::http::{HeaderMap, StatusCode};
 use crate::{Context, Error, Result};
 
 /// Navigates the browser to the request URI, if no extractor did yet, and
@@ -111,7 +111,7 @@ impl<S: Sync> FromContext<ThirtyfourSession, S> for Tab {
     async fn from_context(cx: &Context<ThirtyfourSession>, _: &S) -> Result<Self> {
         let head = cx.response().await?;
         Ok(Self {
-            driver: cx.client().driver(),
+            driver: cx.session().driver(),
             status: head.status(),
             headers: head.headers().clone(),
         })

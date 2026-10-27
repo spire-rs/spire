@@ -91,6 +91,34 @@ async fn main() -> Result<()> {
 [The Spire Book](https://spire-rs.github.io/spire) is the guide: handling pages, discovering
 them, fetching over HTTP or with a browser, running and resuming a crawl, and extending spire.
 
+## Feature flags
+
+Defaults are `html` and `rustls-tls`; choose an HTTP or browser backend
+explicitly. `full` enables every feature below except `native-tls` and
+`testing`. Backend-specific options are enabled on their own crates.
+
+| Feature | Enables |
+|---|---|
+| `html` (default) | `Html`, `Element`, `Links`, `Meta`, `JsonLd`, `Select`, `Collect` and `FollowLinks` |
+| `markdown` | The `Markdown` extractor; also enables `html` |
+| `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
+| `reqwest` | `ReqwestBackend` and the reqwest re-export |
+| `thirtyfour` | `ThirtyfourBackend`, `Tab` and the thirtyfour re-export |
+| `user-agents` | Browser profiles and matching navigation headers for identities |
+| `robots` | Obeying robots.txt with `Crawler::with_robots` |
+| `sitemap` | The `Sitemap` extractor and `FollowSitemap` handler |
+| `serde` | Serializable seeds, fingerprints and Bloom snapshots |
+| `json` | `JsonlDataset`; also enables `serde` |
+| `csv` | `CsvDataset`; also enables `serde` |
+| `redb` | Crash-safe frontier, seen set and datasets through `RedbStore` |
+| `rustls-tls` (default) | Rustls TLS for enabled backends |
+| `native-tls` | Platform-native TLS for enabled backends |
+| `testing` | Offline testing with `MockSite`, `MockPage`, `MockSession` and `Visit` |
+| `full` | Every feature except `native-tls` and `testing` |
+
+See [Installation](https://spire-rs.github.io/spire/installation.html) for
+backend-specific compression, proxy, cookie and driver-management options.
+
 ## Examples
 
 Each example in [`examples/`](examples/) is a small crawl, documented at the

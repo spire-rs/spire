@@ -3,15 +3,15 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use ::http::{StatusCode, Uri};
 use futures::FutureExt;
 use futures::future::BoxFuture;
-use http::{StatusCode, Uri};
 use robotxt::{AccessResult, Robots};
 
-use crate::backend::{Backend, Client};
+use crate::backend::{Backend, Session};
 use crate::crawler::connector::Connector;
 use crate::frontier::seed::Seed;
-use crate::request::Request;
+use crate::http::Request;
 use crate::{Error, ErrorKind, Result};
 
 /// Fetches robots.txt files; type-erased so the backend may differ from the
@@ -67,7 +67,7 @@ enum Download {
     Unreachable(Error),
 }
 
-async fn download<C: Client>(
+async fn download<C: Session>(
     connect: impl Future<Output = Result<C>>,
     request: Request,
 ) -> Download {
@@ -91,10 +91,7 @@ async fn download<C: Client>(
         );
     }
 
-    match client.body().await {
-        Ok(body) => Download::Body(body),
-        Err(error) => Download::Unreachable(error),
-    }
+    Download::Body(response.into_body())
 }
 
 /// Classifies an error status per RFC 9309, or `None` if it means robots.txt

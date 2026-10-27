@@ -3,10 +3,11 @@
 //! frontier traffic are measured.
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use spire_core::Context;
 use spire_core::backend::Noop;
+use spire_core::crawler::Crawler;
 use spire_core::frontier::seed::Seed;
 use spire_core::worker::from_fn;
-use spire_core::{Context, Crawler};
 
 /// Requests per crawl.
 const REQUESTS: usize = 1_000;

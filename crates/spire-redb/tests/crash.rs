@@ -5,11 +5,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use spire_core::backend::Noop;
+use spire_core::crawler::Crawler;
 use spire_core::dataset::InMemDataset;
 use spire_core::frontier::FrontierExt;
 use spire_core::frontier::seed::Seed;
 use spire_core::worker::from_fn;
-use spire_core::{Context, Crawler, Error};
+use spire_core::{Context, Error};
 use spire_redb::RedbStore;
 use tokio::sync::Notify;
 

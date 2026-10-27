@@ -5,13 +5,14 @@ use std::time::Duration;
 use tokio::time::{Instant, sleep};
 
 use crate::backend::Noop;
+use crate::crawler::Crawler;
 use crate::dataset::InMemDataset;
 use crate::frontier::facade::RetryPolicy;
 use crate::frontier::seed::Seed;
 use crate::frontier::{FrontierExt, InMemFrontier};
-use crate::request::RequestExt;
+use crate::http::RequestExt;
 use crate::worker::{Outcome, from_fn};
-use crate::{Context, Crawler, Error, ErrorKind};
+use crate::{Context, Error, ErrorKind};
 
 fn seed(path: &str) -> Seed {
     Seed::get(format!("https://example.com/{path}")).unwrap()
@@ -538,13 +539,12 @@ mod robots {
     use std::future::{Future, ready};
     use std::sync::Mutex;
 
-    use http::StatusCode;
+    use ::http::StatusCode;
 
     use super::*;
-    use crate::backend::{Backend, Client};
+    use crate::backend::{Backend, Session};
     use crate::crawler::Robots;
-    use crate::request::Request;
-    use crate::response::Response;
+    use crate::http::{Request, Response};
     use crate::sync::lock;
 
     /// The robots.txt responses of each host: statuses and bodies.
@@ -570,13 +570,10 @@ mod robots {
     }
 
     impl Backend for Site {
-        type Client = Page;
+        type Session = Page;
 
         fn connect(&self) -> impl Future<Output = crate::Result<Page>> + Send {
-            let page = Page {
-                site: self.clone(),
-                body: Mutex::new(""),
-            };
+            let page = Page { site: self.clone() };
             ready(Ok(page))
         }
     }
@@ -584,17 +581,12 @@ mod robots {
     /// A request to a [`Site`], keeping the body it was served.
     struct Page {
         site: Site,
-        body: Mutex<&'static str>,
     }
 
-    impl Client for Page {
-        fn fetch(
-            &self,
-            request: &Request,
-        ) -> impl Future<Output = crate::Result<Response<()>>> + Send {
+    impl Session for Page {
+        fn fetch(&self, request: &Request) -> impl Future<Output = crate::Result<Response>> + Send {
             if request.uri().path() != "/robots.txt" {
-                *lock(&self.body) = "page";
-                return ready(Ok(Response::new(())));
+                return ready(Ok(Response::new(bytes::Bytes::from_static(b"page"))));
             }
 
             self.site.fetches.fetch_add(1, Ordering::SeqCst);
@@ -607,14 +599,9 @@ mod robots {
                 _ => script.pop_front().unwrap_or((404, "")),
             };
 
-            *lock(&self.body) = body;
-            let mut response = Response::new(());
+            let mut response = Response::new(bytes::Bytes::from_static(body.as_bytes()));
             *response.status_mut() = StatusCode::from_u16(status).unwrap();
             ready(Ok(response))
-        }
-
-        fn body(&self) -> impl Future<Output = crate::Result<bytes::Bytes>> + Send {
-            ready(Ok(bytes::Bytes::from_static(lock(&self.body).as_bytes())))
         }
     }
 
@@ -846,7 +833,7 @@ async fn peak_fetches(
 ) -> usize {
     use std::sync::atomic::AtomicUsize;
 
-    use crate::testing::{MockClient, MockSite};
+    use crate::testing::{MockSession, MockSite};
 
     let page = page.with_latency(Duration::from_millis(100));
     let site = (0..12).fold(MockSite::new(), |site, i| {
@@ -855,7 +842,7 @@ async fn peak_fetches(
     let counts = Arc::new((AtomicUsize::new(0), AtomicUsize::new(0)));
     let worker = {
         let counts = Arc::clone(&counts);
-        from_fn(move |cx: Context<MockClient>| {
+        from_fn(move |cx: Context<MockSession>| {
             let counts = Arc::clone(&counts);
             async move {
                 let (now, peak) = &*counts;
@@ -877,7 +864,7 @@ async fn peak_fetches(
 
 #[tokio::test(start_paused = true)]
 async fn host_concurrency_is_fixed_or_adapts() {
-    use http::StatusCode;
+    use ::http::StatusCode;
 
     use crate::crawler::HostConcurrency;
     use crate::testing::MockPage;
@@ -904,13 +891,13 @@ async fn fetch_times(
 ) -> Vec<(String, Duration)> {
     use std::sync::Mutex;
 
-    use crate::testing::MockClient;
+    use crate::testing::MockSession;
 
     let start = Instant::now();
     let times = Arc::new(Mutex::new(Vec::new()));
     let worker = {
         let times = Arc::clone(&times);
-        from_fn(move |cx: Context<MockClient>| {
+        from_fn(move |cx: Context<MockSession>| {
             let path = cx.request().uri().path().to_owned();
             times.lock().unwrap().push((path, start.elapsed()));
             async move { cx.response().await.map(drop) }
@@ -928,7 +915,7 @@ async fn fetch_times(
 
 #[tokio::test(start_paused = true)]
 async fn throttled_hosts_get_wider_gaps() {
-    use http::StatusCode;
+    use ::http::StatusCode;
 
     use crate::testing::{MockPage, MockSite};
 
@@ -947,8 +934,8 @@ async fn throttled_hosts_get_wider_gaps() {
 
 #[tokio::test(start_paused = true)]
 async fn retry_after_pauses_the_whole_host() {
-    use http::header::RETRY_AFTER;
-    use http::{HeaderValue, StatusCode};
+    use ::http::header::RETRY_AFTER;
+    use ::http::{HeaderValue, StatusCode};
 
     use crate::testing::{MockPage, MockSite};
 
@@ -970,8 +957,8 @@ async fn retry_after_pauses_the_whole_host() {
 
 #[tokio::test(start_paused = true)]
 async fn retry_after_pauses_without_widening_the_gap() {
-    use http::header::RETRY_AFTER;
-    use http::{HeaderValue, StatusCode};
+    use ::http::header::RETRY_AFTER;
+    use ::http::{HeaderValue, StatusCode};
 
     use crate::testing::{MockPage, MockSite};
 
@@ -998,7 +985,7 @@ fn only_the_host_throttles_it() {
     use crate::crawler::concurrency::Signal;
 
     let unavailable =
-        Error::new(ErrorKind::Http).with_status(http::StatusCode::SERVICE_UNAVAILABLE);
+        Error::new(ErrorKind::Http).with_status(::http::StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(signal(&Outcome::Fail(unavailable)), Signal::Throttled);
     assert_eq!(
         signal(&Outcome::Fail(Error::new(ErrorKind::Timeout))),
@@ -1016,7 +1003,7 @@ fn only_the_host_throttles_it() {
 async fn revisits_keep_the_crawl_going_until_it_is_stopped() {
     use std::sync::Mutex;
 
-    use crate::request::{Revisit, Tag, Tags};
+    use crate::crawler::{Revisit, Tag, Tags};
 
     #[derive(Clone, Copy)]
     struct Listing;
@@ -1058,12 +1045,12 @@ async fn revisits_keep_the_crawl_going_until_it_is_stopped() {
 }
 
 mod identities {
-    use http::HeaderValue;
-    use http::header::USER_AGENT;
+    use ::http::HeaderValue;
+    use ::http::header::USER_AGENT;
 
     use super::*;
     use crate::identity::{Identities, Identity};
-    use crate::testing::{MockClient, MockPage, MockSite, Sent};
+    use crate::testing::{MockPage, MockSession, MockSite, Sent};
 
     fn site(hosts: &[&str]) -> MockSite {
         hosts.iter().fold(MockSite::new(), |site, host| {
@@ -1084,7 +1071,7 @@ mod identities {
         })
     }
 
-    async fn fetch(cx: Context<MockClient>) -> crate::Result<()> {
+    async fn fetch(cx: Context<MockSession>) -> crate::Result<()> {
         cx.response().await.map(drop)
     }
 
@@ -1124,7 +1111,7 @@ mod identities {
     #[cfg(feature = "user-agents")]
     #[tokio::test]
     async fn profile_headers_are_defaults_below_identity_and_request_headers() {
-        use http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE};
+        use ::http::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE};
 
         use crate::identity::{Browser, UserAgents};
 
@@ -1167,7 +1154,7 @@ mod identities {
 
     #[tokio::test]
     async fn handlers_see_their_identity() {
-        let worker = from_fn(|cx: Context<MockClient>| async move {
+        let worker = from_fn(|cx: Context<MockSession>| async move {
             assert_eq!(cx.request().identity().map(Identity::name), Some("only"));
         });
         let crawler = Crawler::new(site(&["a.test"]), worker)

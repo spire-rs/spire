@@ -8,9 +8,9 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::Result;
+use crate::crawler::Attempt;
 use crate::frontier::seed::Seed;
 use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
-use crate::request::Attempt;
 use crate::sync::lock;
 
 /// How often and how fast a [`Retry`] facade retries.

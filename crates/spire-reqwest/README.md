@@ -29,8 +29,8 @@ of the popular [reqwest](https://github.com/seanmonstar/reqwest) library. This
 backend enables high-performance HTTP-based web scraping with support for
 cookies, headers, redirects, and other HTTP features.
 
-`ReqwestBackend` implements both the `Backend` and `Client` traits from
-`spire-core`: every request of a crawl shares one connection pool.
+`ReqwestBackend` implements `Backend`, and `ReqwestSession` implements
+`Session`, from `spire-core`: requests share the backend's connection pool.
 
 ## Features
 
@@ -125,7 +125,7 @@ let backend = ReqwestBackend::new().with_status_policy(StatusPolicy::Accept);
 ```
 
 Responses record the URL they were served from after redirects, available
-through `spire_core::response::ResponseExt::final_uri`.
+through `spire_core::http::ResponseExt::final_uri`.
 
 ## Performance Considerations
 

@@ -1,11 +1,9 @@
 use std::future::{Future, ready};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use bytes::Bytes;
-use spire_core::backend::{Backend, Client, StatusPolicy};
+use spire_core::backend::{Backend, Session, StatusPolicy};
+use spire_core::http::{Request, Response};
 use spire_core::identity::Identity;
-use spire_core::request::Request;
-use spire_core::response::Response;
 use spire_core::{Error, ErrorKind, Result};
 
 use crate::clients::Clients;
@@ -101,15 +99,18 @@ impl ReqwestBackend {
 }
 
 impl Backend for ReqwestBackend {
-    type Client = ReqwestSession;
+    type Session = ReqwestSession;
 
-    fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send {
+    fn connect(&self) -> impl Future<Output = Result<Self::Session>> + Send {
         ready(Ok(self.session(self.clients.direct().clone())))
     }
 
     /// Sends the identity's requests with a reqwest client of its own, with
     /// its proxy and cookies.
-    fn connect_as(&self, identity: &Identity) -> impl Future<Output = Result<Self::Client>> + Send {
+    fn connect_as(
+        &self,
+        identity: &Identity,
+    ) -> impl Future<Output = Result<Self::Session>> + Send {
         ready(self.clients.of(identity).map(|client| self.session(client)))
     }
 }
@@ -119,19 +120,17 @@ impl ReqwestBackend {
         ReqwestSession {
             http: self.clone(),
             client,
-            body: Mutex::new(None),
         }
     }
 }
 
-/// The [`Client`] a [`ReqwestBackend`] hands out for one request: it sends the
-/// request and keeps the body it receives.
+/// The [`Session`] a [`ReqwestBackend`] hands out for one request: it sends the
+/// request and returns the complete response.
 #[derive(Debug)]
 pub struct ReqwestSession {
     http: ReqwestBackend,
     /// The reqwest client it sends with: the crawl's, or its identity's.
     client: reqwest::Client,
-    body: Mutex<Option<Bytes>>,
 }
 
 impl ReqwestSession {
@@ -142,8 +141,8 @@ impl ReqwestSession {
     }
 }
 
-impl Client for ReqwestSession {
-    async fn fetch(&self, request: &Request) -> Result<Response<()>> {
+impl Session for ReqwestSession {
+    async fn fetch(&self, request: &Request) -> Result<Response> {
         let uri = request.uri().clone();
         let failed = |error: Error| error.with_uri(uri.clone());
         let converted = request_to_reqwest(request).map_err(failed)?;
@@ -162,22 +161,8 @@ impl Client for ReqwestSession {
             .bytes()
             .await
             .map_err(|error| failed(classify(error)))?;
-        *lock(&self.body) = Some(body);
-        Ok(head)
+        Ok(head.map(|()| body))
     }
-
-    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
-        let body = lock(&self.body).clone();
-        ready(body.ok_or_else(|| Error::worker("the request was not fetched yet")))
-    }
-}
-
-/// Locks a mutex, recovering it if a holder panicked: the body is replaced
-/// whole, so it is never left half-written.
-fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 /// Classifies a failed transfer, so the crawler only retries what may
@@ -204,12 +189,8 @@ mod tests {
     #[tokio::test]
     async fn invalid_request_is_rejected_before_sending() {
         let session = ReqwestBackend::new().connect().await.unwrap();
-        let error = session
-            .fetch(&Request::new(Bytes::new()))
-            .await
-            .unwrap_err();
+        let error = session.fetch(&Request::default()).await.unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Invalid);
-        assert!(session.body().await.is_err());
     }
 
     #[tokio::test]

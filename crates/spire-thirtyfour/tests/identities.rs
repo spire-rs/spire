@@ -12,12 +12,13 @@ use std::sync::{Arc, Mutex};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use spire_core::crawler::Crawler;
 use spire_core::frontier::seed::Seed;
-use spire_core::http::HeaderValue;
-use spire_core::http::header::{HeaderName, USER_AGENT};
+use spire_core::http::http::HeaderValue;
+use spire_core::http::http::header::{HeaderName, USER_AGENT};
 use spire_core::identity::{Identities, Identity};
 use spire_core::worker::from_fn;
-use spire_core::{Context, Crawler, Error};
+use spire_core::{Context, Error};
 use spire_thirtyfour::{ThirtyfourBackend, ThirtyfourSession};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;

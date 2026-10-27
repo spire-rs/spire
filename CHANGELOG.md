@@ -10,6 +10,15 @@ and this project adheres to
 
 ### Added
 
+- `spire`: `Links::visible`, `PageLink::visibility`, and `Visibility`.
+  HTTP clients estimate hidden links from attributes and inline CSS;
+  Thirtyfour captures link data and browser-computed visibility together
+  through the optional `Session::document` capability and `Document::links`.
+- `spire-core`: `FrontierExt::avoid_traps` and `TrapPolicy`, bounding URL
+  prefixes by depth, fan-out, candidate count and suspicious path patterns.
+  `Admission::PrefixBudgetExceeded` distinguishes budgets from
+  `SuspectedTrap`. Refusals are counted and logged.
+
 - `spire`: the `user-agents` feature (included in `full`), backed by uagent
   0.1. `Identity::with_profile` supplies browser navigation headers below
   identity and request overrides; `spire::identity` re-exports `Profile`,
@@ -55,6 +64,26 @@ and this project adheres to
 
 ### Changed
 
+- **Breaking:** `spire-core` exposes `Crawler` through `crawler::Crawler`
+  only. The root re-export is removed; `spire::Crawler` is unchanged.
+
+- **Breaking:** `backend::Client` is now `Session`, and `Backend::Client`
+  is `Backend::Session`. `Session::fetch` returns a complete
+  `Response<Bytes>`; the separate session `body()` operation is removed.
+  `Context::session` replaces `client()`, and `Context` caches both the head
+  and body. Browser responses are fixed snapshots; live observations use
+  the optional `Document` capability or `Tab`. `MockClient` is `MockSession`.
+
+- **Breaking:** requests, responses and their extension traits now live together in
+  `spire::http` and `spire_core::http`. The full upstream crate is available
+  as `http::http`; `Request`, `Response` and their extension traits are
+  re-exported alongside it. `Tag`, `Tags`, `Depth`, `Attempt`, `Revisit` and
+  their derive macros live in `crawler`. The old `request` and `response`
+  modules and `spire_core`'s direct upstream `http` re-export are removed.
+
+- **Breaking:** `FollowLinks` skips hidden links by default. Unknown links
+  remain followable; `include_hidden()` restores following hidden links.
+
 - **Breaking:** renamed `HttpClient` and `HttpSession` to `ReqwestBackend` and
   `ReqwestSession`, and `BrowserBackend`, `BrowserBuilder` and
   `BrowserSession` to `ThirtyfourBackend`, `ThirtyfourBuilder` and
@@ -71,8 +100,6 @@ and this project adheres to
   them with their elements.
 - **Breaking:** `SetHeader::rotate` is removed: rotating a user agent on its
   own is what identities fix. `SetHeader::new` is unchanged.
-- **Breaking:** `Response` and `ResponseExt` moved from `request` to a
-  `response` module.
 - **Breaking:** `InMemFrontier` moved from `frontier::memory` to `frontier`,
   as `InMemDataset` and `InMemSeen` are at their modules' roots.
 - **Breaking:** `backend::Rotate` is removed: identities cover browser pools

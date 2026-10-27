@@ -8,19 +8,15 @@ pub mod crawler;
 pub mod dataset;
 mod error;
 pub mod frontier;
+pub mod http;
 pub mod identity;
-pub mod request;
-pub mod response;
 mod sync;
 #[cfg(any(test, feature = "testing"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 pub mod testing;
 pub mod worker;
 
-pub use http;
-
 pub use crate::context::Context;
-pub use crate::crawler::Crawler;
 pub use crate::error::{BoxError, Error, ErrorKind, Result};
 
 /// Tracing target for crawler operations.

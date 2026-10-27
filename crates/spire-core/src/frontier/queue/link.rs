@@ -1,7 +1,7 @@
-use http::Uri;
+use ::http::Uri;
 
+use crate::crawler::Tag;
 use crate::frontier::seed::Seed;
-use crate::request::Tag;
 
 /// A link to follow with [`Queue::follow`](crate::frontier::queue::Queue::follow).
 ///

@@ -6,10 +6,10 @@
 
 #[cfg(feature = "reqwest")]
 pub use crate::backend::ReqwestBackend;
-pub use crate::backend::{Backend, Client as _, StatusPolicy};
+pub use crate::backend::{Backend, Session as _, StatusPolicy};
 #[cfg(feature = "thirtyfour")]
 pub use crate::backend::{ThirtyfourBackend, ThirtyfourSession};
-pub use crate::crawler::HostConcurrency;
+pub use crate::crawler::{Attempt, Depth, HostConcurrency, Tag, Tags};
 pub use crate::dataset::{Data, Dataset, InMemDataset};
 #[cfg(feature = "thirtyfour")]
 pub use crate::extract::Tab;
@@ -21,7 +21,6 @@ pub use crate::frontier::seed::Seed;
 pub use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
 #[cfg(feature = "html")]
 pub use crate::handler::{Collect, FollowLinks};
-pub use crate::request::{Attempt, Depth, RequestExt as _, Tag, Tags};
-pub use crate::response::ResponseExt as _;
+pub use crate::http::{RequestExt as _, ResponseExt as _};
 pub use crate::worker::{IntoOutcome, Outcome, WorkerExt};
 pub use crate::{Context, Crawler, Error, ErrorKind, Result, Router};

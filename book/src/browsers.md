@@ -3,8 +3,8 @@
 `ThirtyfourBackend` drives real browsers over WebDriver BiDi, with the page's
 real status and headers, any request method, and a fresh browser profile per
 request. The page is loaded once, by the first extractor that needs it, and
-body extractors such as `Html` read it as currently rendered. `Tab` is
-the request's tab, to interact with the page; `tab.snapshot()` then parses it
+body extractors such as `Html` read the snapshot captured by the fetch.
+`Tab` is the request's tab, to interact with the page; `tab.snapshot()` then parses it
 again, including what the interaction changed:
 
 ```rust,no_run

@@ -4,7 +4,7 @@ use std::ops::RangeInclusive;
 use std::time::Duration;
 
 /// The gap between starting two requests to the same host, see
-/// [`Crawler::with_host_delay`](crate::Crawler::with_host_delay): at least
+/// [`Crawler::with_host_delay`](crate::crawler::Crawler::with_host_delay): at least
 /// a minimum, growing towards a maximum while the host is throttled.
 ///
 /// A host is throttled when it answers `429 Too Many Requests` or `503
@@ -24,7 +24,7 @@ use std::time::Duration;
 /// ```
 /// use std::time::Duration;
 ///
-/// use spire_core::Crawler;
+/// use spire_core::crawler::Crawler;
 /// use spire_core::backend::Noop;
 /// use spire_core::worker::from_fn;
 ///

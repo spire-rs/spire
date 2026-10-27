@@ -7,13 +7,13 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 /// How many requests to the same host run at once, see
-/// [`Crawler::with_host_concurrency`](crate::Crawler::with_host_concurrency).
+/// [`Crawler::with_host_concurrency`](crate::crawler::Crawler::with_host_concurrency).
 ///
 /// A number is a fixed limit. [`HostConcurrency::adaptive`] gives each host
 /// its own limit, adapted to how it responds.
 ///
 /// ```
-/// use spire_core::Crawler;
+/// use spire_core::crawler::Crawler;
 /// use spire_core::backend::Noop;
 /// use spire_core::crawler::HostConcurrency;
 /// use spire_core::worker::from_fn;

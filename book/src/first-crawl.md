@@ -10,7 +10,7 @@ router picks the handler for it by that tag. Tags can be plain strings, but
 an enum deriving `Tags` lets the compiler check them:
 
 ```rust
-use spire::request::Tags;
+use spire::crawler::Tags;
 
 /// The kinds of page the crawl visits.
 #[derive(Debug, Clone, Copy, Tags)]
@@ -47,7 +47,7 @@ use spire::extract::html::Select;
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::handler::{Collect, FollowLinks};
-use spire::request::Tags;
+use spire::crawler::Tags;
 use spire::{Crawler, Result, Router};
 #
 # #[derive(Debug, Clone, Copy, Tags)]

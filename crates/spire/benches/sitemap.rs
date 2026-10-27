@@ -8,12 +8,11 @@ use bytes::Bytes;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use spire::backend::Client;
+use spire::backend::Session;
 use spire::extract::FromContext;
 use spire::extract::sitemap::Sitemap;
 use spire::frontier::seed::Seed;
-use spire::request::Request;
-use spire::response::Response;
+use spire::http::{Request, Response};
 use spire::{Context, Result};
 
 /// URLs in the sitemap: the protocol's limit.
@@ -22,13 +21,9 @@ const URLS: usize = 50_000;
 /// A client serving one fixed body.
 struct Serve(Bytes);
 
-impl Client for Serve {
-    fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
-        ready(Ok(Response::new(())))
-    }
-
-    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
-        ready(Ok(self.0.clone()))
+impl Session for Serve {
+    fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response>> + Send {
+        ready(Ok(Response::new(self.0.clone())))
     }
 }
 

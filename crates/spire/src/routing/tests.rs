@@ -3,9 +3,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::backend::Noop;
+use crate::crawler::{Depth, Tag, Tags};
 use crate::extract::{FromRef, State, Text};
 use crate::frontier::seed::Seed;
-use crate::request::{Depth, Tag, Tags};
 use crate::testing::{MockPage, MockSite};
 use crate::worker::{Outcome, Worker};
 use crate::{Context, ErrorKind, Router};
@@ -152,7 +152,7 @@ async fn crawls_and_resolves_links_after_redirects() {
     use crate::dataset::{Data, InMemDataset};
     use crate::extract::html::{Html, Links};
     use crate::frontier::queue::Queue;
-    use crate::request::http::Uri;
+    use crate::http::http::Uri;
     use crate::{Crawler, Result};
 
     async fn page(
@@ -324,16 +324,16 @@ async fn handler_tuples_share_one_fetch_and_stop_early() {
 #[tokio::test]
 async fn routers_run_inside_middleware() {
     use crate::Crawler;
-    use crate::request::http::HeaderValue;
-    use crate::request::http::header::USER_AGENT;
-    use crate::testing::MockClient;
+    use crate::http::http::HeaderValue;
+    use crate::http::http::header::USER_AGENT;
+    use crate::testing::MockSession;
     use crate::worker::WorkerExt;
     use crate::worker::middleware::{self, Next, SetHeader};
 
     let agents = Arc::new(std::sync::Mutex::new(Vec::new()));
     let record = {
         let agents = Arc::clone(&agents);
-        middleware::from_fn(move |cx: Context<MockClient>, next: Next<MockClient>| {
+        middleware::from_fn(move |cx: Context<MockSession>, next: Next<MockSession>| {
             let agent = cx.request().headers()[USER_AGENT].clone();
             agents.lock().unwrap().push(agent);
             next.run(cx)

@@ -11,11 +11,11 @@ pub(crate) use cache::{RobotsCache, Verdict};
 pub(crate) use source::{BackendSource, RobotsSource};
 
 use crate::backend::Backend;
+use crate::crawler::Tag;
 use crate::crawler::connector::Connector;
-use crate::request::Tag;
 
 /// How a crawl fetches and obeys robots.txt, see
-/// [`Crawler::with_robots`](crate::Crawler::with_robots).
+/// [`Crawler::with_robots`](crate::crawler::Crawler::with_robots).
 ///
 /// robots.txt is fetched once per origin (scheme, host and port) before its
 /// first request, and handled as RFC 9309 describes:

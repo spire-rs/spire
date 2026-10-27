@@ -14,6 +14,7 @@ mod markdown;
 mod meta;
 pub(crate) mod select;
 mod text;
+mod visibility;
 
 pub use scraper;
 #[cfg(feature = "macros")]
@@ -21,7 +22,7 @@ pub use scraper;
 pub use spire_macros::Select;
 
 pub use self::document::Html;
-pub use self::links::{LinkKind, Links, PageLink};
+pub use self::links::{LinkKind, Links, PageLink, Visibility};
 #[cfg(feature = "markdown")]
 #[cfg_attr(docsrs, doc(cfg(feature = "markdown")))]
 pub use self::markdown::{Markdown, MarkdownOptions};

@@ -38,6 +38,40 @@ the tree yourself, `Html` wraps scraper's document, and
 `spire::extract::html::scraper` re-exports scraper at the version spire
 uses.
 
+## Hidden links
+
+`links.visible()` removes links known or estimated to be hidden and keeps
+links whose visibility is unknown. `PageLink::visibility()` distinguishes
+`Visibility::Visible`, `Hidden` and `Unknown`.
+
+With an HTTP backend, checks use attributes and inline styles on the link
+and its ancestors: `hidden`, `display:none`, `visibility:hidden`,
+`aria-hidden="true"` paired with `tabindex="-1"`, zero-sized clipped boxes,
+and large negative absolute/fixed offsets. A CSS tokenizer handles inline
+comments, escapes and declaration boundaries. It does not load external
+stylesheets, apply `<style>` rules, execute scripts, or calculate layout.
+A link without an obvious hiding rule is `Unknown`, not proven visible.
+
+With `ThirtyfourBackend`, the `Links` extractor and `FollowLinks` use
+the `Document` capability returned by `Session::document()`: one capture of
+its current URI, base URI, link attributes and visibility. Computed styles
+include stylesheets and script changes. Checks cover rendered boxes, opacity, rectangular clipping
+and off-canvas placement. Below-the-fold links remain followable. Capture
+does not scroll or modify the document. Image-map geometry and unsupported
+clip shapes remain `Unknown`; checks do not establish whether another
+element covers a link, and do not traverse frames or shadow roots.
+
+`Html::parse`, `Html::links`, `Links::within` and `Tab::snapshot()` operate on
+serialized HTML, so their visibility remains an HTML-only estimate even
+when that HTML came from a browser. Use the `Links` extractor for rendered
+observations. Each extraction observes the current DOM; it is not a live
+collection and is not synchronized with a separate `Html` argument.
+
+`FollowLinks` applies `visible()` by default, including with `select(...)`.
+Use `include_hidden()` to opt out. Manual `Queue::follow` and raw iteration
+of `Links` do not filter visibility automatically. Combine link filtering
+with URL expansion limits; see [Avoiding traps](avoiding-traps.md).
+
 ## Markdown
 
 With the `markdown` feature, the `Markdown` extractor converts the page's
@@ -59,7 +93,7 @@ main content, without images, or with links as plain text:
 
 ```rust
 use spire::extract::html::{Html, Markdown, MarkdownOptions};
-use spire::request::http::Uri;
+use spire::http::http::Uri;
 
 fn convert(html: &Html, uri: Uri) -> spire::Result<Markdown> {
     let options = MarkdownOptions::new().with_base(uri).whole_body().without_images();

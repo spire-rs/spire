@@ -8,8 +8,8 @@ use tokio::time::Instant;
 use crate::Result;
 use crate::backend::Backend;
 use crate::frontier::seed::Seed;
+use crate::http::Request;
 use crate::identity::{Health, Identities, Identity, IdentityPool};
-use crate::request::Request;
 
 /// Connects for the requests of a run, and robots.txt: as one of the run's
 /// identities if it has any, or else directly.
@@ -57,7 +57,7 @@ impl<B: Backend> Connector<B> {
     /// # Errors
     ///
     /// Returns the backend's error.
-    pub(crate) async fn connect(&self, identity: Option<&Identity>) -> Result<B::Client> {
+    pub(crate) async fn connect(&self, identity: Option<&Identity>) -> Result<B::Session> {
         match identity {
             Some(identity) => self.backend.connect_as(identity).await,
             None => self.backend.connect().await,

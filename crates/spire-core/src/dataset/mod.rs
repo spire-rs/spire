@@ -1,14 +1,15 @@
 //! Datasets: where handlers store what they scrape.
 //!
 //! A crawl holds at most one [`Dataset`] per item type. Datasets are
-//! registered on the [`Crawler`](crate::Crawler) and reached from handlers
+//! registered on the [`Crawler`](crate::crawler::Crawler) and reached from handlers
 //! through a [`Data`] handle:
 //!
 //! ```
 //! use spire_core::backend::Noop;
 //! use spire_core::dataset::InMemDataset;
 //! use spire_core::worker::from_fn;
-//! use spire_core::{Context, Crawler, Result};
+//! use spire_core::crawler::Crawler;
+//! use spire_core::{Context, Result};
 //!
 //! # async fn example() -> Result<()> {
 //! let worker = from_fn(|cx: Context<Noop>| async move {

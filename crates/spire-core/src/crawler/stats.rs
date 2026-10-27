@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-/// Totals of a [`Crawler::run`](crate::Crawler::run), live while it runs
-/// through [`Crawler::stats`](crate::Crawler::stats).
+/// Totals of a [`Crawler::run`](crate::crawler::Crawler::run), live while it runs
+/// through [`Crawler::stats`](crate::crawler::Crawler::stats).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Stats {

@@ -7,9 +7,6 @@ compile_error!("At least one TLS feature must be enabled: 'rustls-tls' or 'nativ
 
 mod backend;
 mod error;
-mod navigate;
-mod pool;
-mod profiles;
 mod session;
 
 pub use spire_core::backend::StatusPolicy;

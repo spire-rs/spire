@@ -6,9 +6,9 @@ use std::sync::Mutex;
 use tokio::time::Instant;
 
 use crate::Result;
+use crate::crawler::Tag;
 use crate::frontier::seed::Seed;
 use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
-use crate::request::Tag;
 use crate::sync::lock;
 
 /// A facade that holds back seeds of tags paused by [`Report::Backoff`].

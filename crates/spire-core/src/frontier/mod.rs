@@ -46,14 +46,15 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use self::facade::{
-    AllowedHosts, Dedup, Filter, MaxDepth, Retry, RetryPolicy, Revisits, Scored, TagBackoff,
+    AllowedHosts, AvoidTraps, Dedup, Filter, MaxDepth, Retry, RetryPolicy, Revisits, Scored,
+    TagBackoff, TrapPolicy,
 };
 pub use self::memory::InMemFrontier;
 use self::score::Score;
 use self::seed::Seed;
 use self::seen::{InMemSeen, SeenSet};
 use crate::Result;
-use crate::request::{Revisit, Tag};
+use crate::crawler::{Revisit, Tag};
 
 /// Stores [`Seed`]s and decides which one is crawled next.
 pub trait Frontier: Send + Sync + 'static {
@@ -178,6 +179,10 @@ pub enum Admission {
     Unsupported,
     /// The seed was refused because it is outside the crawl's scope.
     OutOfScope,
+    /// The seed was refused because its URL prefix looks like a scraper trap.
+    SuspectedTrap,
+    /// The seed was refused because its URL prefix exhausted a configured budget.
+    PrefixBudgetExceeded,
 }
 
 impl Admission {
@@ -285,6 +290,20 @@ pub trait FrontierExt: Frontier + Sized {
     /// Refuses seeds deeper than `depth`.
     fn max_depth(self, depth: u32) -> MaxDepth<Self> {
         MaxDepth::new(self, depth)
+    }
+
+    /// Bounds expanding URL prefixes with conservative, configurable
+    /// heuristics. Opt in alongside robots.txt and deduplication; legitimate
+    /// large archives or opaque identifiers may need higher budgets.
+    ///
+    /// Put this outside retry/revisit facades to check queued seeds too.
+    fn avoid_traps(self) -> AvoidTraps<Self> {
+        self.avoid_traps_with(TrapPolicy::default())
+    }
+
+    /// Bounds expanding URL prefixes using `policy`, see [`Self::avoid_traps`].
+    fn avoid_traps_with(self, policy: TrapPolicy) -> AvoidTraps<Self> {
+        AvoidTraps::new(self, policy)
     }
 
     /// Retries failed seeds up to `max_retries` times with exponential

@@ -3,9 +3,9 @@
 //! A handler is an async function whose arguments are extractors, which
 //! implement [`FromContext`]. They borrow the context, so any of them may
 //! read the response: the request is fetched once, by the first that needs
-//! it, and body extractors read the page as it is when they run.
+//! it, and body extractors share the cached response snapshot.
 //!
-//! - Request and crawl: [`Uri`](crate::request::http::Uri), [`Query`],
+//! - Request and crawl: [`Uri`](crate::http::http::Uri), [`Query`],
 //!   [`Tag`], an enum deriving [`Tags`], [`Depth`], [`Attempt`], [`Queue`]
 //!   and [`Data`].
 //! - Response: [`Head`] for the status and headers, and for the body
@@ -23,10 +23,10 @@
 //! [`Select`]: html::Select
 //! [`Meta`]: html::Meta
 //! [`JsonLd`]: html::JsonLd
-//! [`Tag`]: crate::request::Tag
-//! [`Tags`]: crate::request::Tags
-//! [`Depth`]: crate::request::Depth
-//! [`Attempt`]: crate::request::Attempt
+//! [`Tag`]: crate::crawler::Tag
+//! [`Tags`]: crate::crawler::Tags
+//! [`Depth`]: crate::crawler::Depth
+//! [`Attempt`]: crate::crawler::Attempt
 //! [`Queue`]: crate::frontier::queue::Queue
 //! [`Data`]: crate::dataset::Data
 

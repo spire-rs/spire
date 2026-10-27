@@ -20,8 +20,8 @@ them, returning anything that converts into an `Outcome`: nothing, a
 use spire::Result;
 use spire::extract::html::{Html, Links};
 use spire::frontier::queue::Queue;
-use spire::request::Depth;
-use spire::request::http::Uri;
+use spire::crawler::Depth;
+use spire::http::http::Uri;
 
 async fn page(uri: Uri, depth: Depth, html: Html, links: Links, queue: Queue) -> Result<()> {
     println!("{uri} at depth {depth}: {:?}", html.title());
@@ -73,7 +73,7 @@ router's routes, when both routers route the same one.
 
 ```rust
 use spire::Router;
-use spire::request::Tags;
+use spire::crawler::Tags;
 # use spire::backend::Noop;
 
 #[derive(Debug, Clone, Copy, Tags)]

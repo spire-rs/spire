@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::time::Duration;
 
-use crate::request::Tag;
+use crate::crawler::Tag;
 use crate::{BoxError, Error};
 
 /// What the crawler should do after a worker handled a request.

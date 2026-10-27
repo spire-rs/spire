@@ -10,8 +10,8 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use futures::StreamExt;
 use serde_json::{Value, json};
-use spire_core::http::header::HeaderName;
-use spire_core::http::{HeaderMap, Method, StatusCode, Uri};
+use spire_core::http::http::header::HeaderName;
+use spire_core::http::http::{HeaderMap, Method, StatusCode, Uri};
 use spire_core::{Error, ErrorKind, Result};
 use thirtyfour::bidi::modules::browsing_context::{Navigate, ReadinessState};
 use thirtyfour::bidi::modules::network::{
@@ -377,7 +377,7 @@ fn to_bytes_value(bytes: &[u8]) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use spire_core::http::HeaderValue;
+    use spire_core::http::http::HeaderValue;
 
     use super::*;
 

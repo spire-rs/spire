@@ -10,8 +10,8 @@ its own cookies, and `Crawler::with_identities` sends every request as one.
 ```rust
 use spire::Result;
 use spire::identity::{Identities, Identity};
-use spire::request::http::HeaderValue;
-use spire::request::http::header::{ACCEPT_LANGUAGE, USER_AGENT};
+use spire::http::http::HeaderValue;
+use spire::http::http::header::{ACCEPT_LANGUAGE, USER_AGENT};
 
 # fn main() -> Result<()> {
 let identities = Identities::new([
@@ -148,14 +148,13 @@ feature, a cookie store of its own, dropped once the identity is gone; see
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::ReqwestBackend;
-use spire::backend::reqwest::Client;
+use spire::backend::{ReqwestBackend, reqwest};
 use spire::identity::{Identities, Identity};
 use spire::{Crawler, Result, Router};
 # async fn page() {}
 
 # async fn crawl() -> Result<()> {
-let backend = ReqwestBackend::from_builder(|| Client::builder().timeout(Duration::from_secs(30)))?;
+let backend = ReqwestBackend::from_builder(|| reqwest::Client::builder().timeout(Duration::from_secs(30)))?;
 let identities = Identities::from_fn(|n| {
     Identity::new(format!("session-{n}"))
         .with_proxy(format!("http://user-session-{n}:secret@gate.example:7000"))

@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use futures::StreamExt;
 use serde_json::{Value, json};
-use spire_core::http::Uri;
-use spire_core::http::header::USER_AGENT;
+use spire_core::http::http::Uri;
+use spire_core::http::http::header::USER_AGENT;
 use spire_core::identity::{Identity, WeakIdentity};
 use spire_core::{Error, Result};
 use thirtyfour::bidi::modules::browser::CreateUserContext;

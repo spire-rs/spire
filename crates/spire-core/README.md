@@ -21,7 +21,7 @@ crawler, its frontier, backends, workers and datasets.
 
 ## Overview
 
-- A [`Backend`] hands out a [`Client`] per request: an HTTP client, a pooled
+- A [`Backend`] hands out a [`Session`] per request: an HTTP client, a pooled
   browser session, or anything else that turns a request into a response.
 - A [`Worker`] handles each request and returns an [`Outcome`]: continue,
   retry, back off, stop or fail.
@@ -38,12 +38,18 @@ serializable, so a stopped crawl's frontier and seen set can be snapshotted
 and restored. `JsonlDataset` and `CsvDataset`, with the `json` and `csv`
 features, write results to files.
 
-## Feature Flags
+## Feature flags
 
-- **`robots`**: fetch and obey robots.txt with `Crawler::with_robots`.
-- **`serde`**: serializable `Seed`, `Fingerprint` and `BloomSnapshot`.
-- **`json`**: `JsonlDataset`, writing results as JSON Lines.
-- **`csv`**: `CsvDataset`, writing results as CSV.
+No features are enabled by default.
+
+| Feature | Enables |
+|---|---|
+| `robots` | Fetching and obeying robots.txt with `Crawler::with_robots` |
+| `serde` | Serialization of `Seed`, `Fingerprint` and `BloomSnapshot` |
+| `json` | `JsonlDataset`, writing JSON Lines; also enables `serde` |
+| `csv` | `CsvDataset`, writing CSV; also enables `serde` |
+| `testing` | `MockSite`, `MockPage`, `MockSession` and `Visit` for offline tests |
+| `user-agents` | `Identity::with_profile` and the uagent `Profile`, `UserAgents`, `Browser` and `Platform` re-exports |
 
 Most users depend on `spire`, which adds a router, handlers and extractors on
 top of this crate. Depend on `spire-core` directly to implement a backend, a
@@ -56,7 +62,8 @@ use spire_core::backend::Noop;
 use spire_core::frontier::seed::Seed;
 use spire_core::frontier::{FrontierExt, InMemFrontier};
 use spire_core::worker::{Outcome, from_fn};
-use spire_core::{Context, Crawler, Result};
+use spire_core::crawler::Crawler;
+use spire_core::{Context, Result};
 
 async fn handle(cx: Context<Noop>) -> Result<Outcome> {
     let queue = cx.queue().clone();
@@ -89,9 +96,9 @@ async fn example() -> Result<()> {
 ```
 
 [`Backend`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Backend.html
-[`Client`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Client.html
+[`Session`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Session.html
 [`Worker`]: https://docs.rs/spire-core/latest/spire_core/worker/trait.Worker.html
 [`Outcome`]: https://docs.rs/spire-core/latest/spire_core/worker/enum.Outcome.html
 [`Frontier`]: https://docs.rs/spire-core/latest/spire_core/frontier/trait.Frontier.html
 [`Seed`]: https://docs.rs/spire-core/latest/spire_core/frontier/struct.Seed.html
-[`Crawler`]: https://docs.rs/spire-core/latest/spire_core/struct.Crawler.html
+[`Crawler`]: https://docs.rs/spire-core/latest/spire_core/crawler/struct.Crawler.html

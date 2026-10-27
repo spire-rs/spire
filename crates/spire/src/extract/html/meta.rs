@@ -6,7 +6,7 @@ use scraper::Selector;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::extract::FromContext;
 use crate::extract::html::Html;
 use crate::{Context, Error, Result};
@@ -138,7 +138,7 @@ pub struct Meta {
 
 impl<C, S> FromContext<C, S> for Meta
 where
-    C: Client,
+    C: Session,
     S: Sync,
 {
     type Rejection = Error;
@@ -184,7 +184,7 @@ pub struct JsonLd<T = Value>(pub Vec<T>);
 
 impl<C, S, T> FromContext<C, S> for JsonLd<T>
 where
-    C: Client,
+    C: Session,
     S: Sync,
     T: DeserializeOwned,
 {

@@ -1,10 +1,10 @@
 //! The serialized form of a [`Seed`].
 
+use ::http::{HeaderValue, Method};
 use bytes::Bytes;
-use http::{HeaderValue, Method};
 
+use crate::crawler::{Attempt, Depth, Tag};
 use crate::frontier::seed::Seed;
-use crate::request::{Attempt, Depth, Tag};
 
 /// The serialized form of a [`Seed`]: `http` types are not serializable.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -61,7 +61,7 @@ impl<'de> serde::Deserialize<'de> for Seed {
         let mut seed = Self::new(method, uri).map_err(D::Error::custom)?;
 
         for (name, value) in repr.headers {
-            let name = http::HeaderName::from_bytes(name.as_bytes()).map_err(D::Error::custom)?;
+            let name = ::http::HeaderName::from_bytes(name.as_bytes()).map_err(D::Error::custom)?;
             let value = HeaderValue::from_bytes(&value).map_err(D::Error::custom)?;
             seed.extras_mut().headers.append(name, value);
         }
@@ -81,7 +81,7 @@ impl<'de> serde::Deserialize<'de> for Seed {
 
 #[cfg(test)]
 mod tests {
-    use http::Uri;
+    use ::http::Uri;
 
     use super::*;
 
@@ -91,7 +91,7 @@ mod tests {
         let seed = Seed::new(Method::POST, Uri::from_static("https://example.com/api"))
             .unwrap()
             .with_header(
-                http::header::ACCEPT,
+                ::http::header::ACCEPT,
                 HeaderValue::from_static("application/json"),
             )
             .with_body("{}")

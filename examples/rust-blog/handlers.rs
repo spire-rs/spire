@@ -6,11 +6,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde::Serialize;
 use spire::Result;
+use spire::crawler::Depth;
 use spire::dataset::Data;
 use spire::extract::html::Element;
 use spire::extract::{FromRef, State};
-use spire::request::Depth;
-use spire::request::http::Uri;
+use spire::http::http::Uri;
 
 use crate::pages::{Article, Page};
 

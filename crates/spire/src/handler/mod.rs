@@ -31,7 +31,7 @@ use crate::worker::{IntoOutcome, Outcome};
 /// ```
 /// use spire::Router;
 /// use spire::extract::Text;
-/// use spire::request::Tag;
+/// use spire::crawler::Tag;
 ///
 /// async fn log(tag: Tag, Text(body): Text) {
 ///     println!("{tag}: {} bytes", body.len());

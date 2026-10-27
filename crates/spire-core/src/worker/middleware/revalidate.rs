@@ -3,12 +3,12 @@ use std::fmt;
 use std::future::{Future, ready};
 use std::sync::{Arc, Mutex};
 
-use http::header::{ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED};
-use http::{HeaderMap, HeaderValue, Method, StatusCode};
+use ::http::header::{ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED};
+use ::http::{HeaderMap, HeaderValue, Method, StatusCode};
 
 use super::{Middleware, Next};
 use crate::Result;
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::context::Context;
 use crate::frontier::seed::{Fingerprint, fingerprint};
 use crate::sync::lock;
@@ -108,7 +108,8 @@ impl Validators for InMemValidators {
 /// use spire_core::backend::Noop;
 /// use spire_core::worker::middleware::{InMemValidators, Revalidate};
 /// use spire_core::worker::{WorkerExt, from_fn};
-/// use spire_core::{Context, Crawler};
+/// use spire_core::crawler::Crawler;
+/// use spire_core::Context;
 ///
 /// let worker = from_fn(|cx: Context<Noop>| async move { cx.body().await.map(drop) })
 ///     .layer(Revalidate::new(InMemValidators::new()));
@@ -134,7 +135,7 @@ impl<V> fmt::Debug for Revalidate<V> {
 
 impl<C, V> Middleware<C> for Revalidate<V>
 where
-    C: Client,
+    C: Session,
     V: Validators,
 {
     async fn handle(&self, mut cx: Context<C>, next: Next<C>) -> Outcome {
@@ -181,13 +182,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use http::header::ETAG;
+    use ::http::header::ETAG;
 
     use super::*;
+    use crate::crawler::Crawler;
     use crate::frontier::seed::Seed;
-    use crate::testing::{MockClient, MockPage, MockSite};
+    use crate::testing::{MockPage, MockSession, MockSite};
     use crate::worker::{WorkerExt, from_fn};
-    use crate::{Crawler, Error, Result};
+    use crate::{Error, Result};
 
     /// Crawls `site`'s `/` once with `validators`, returning how many times
     /// the handler ran and the crawl's unchanged count.
@@ -195,7 +197,7 @@ mod tests {
         let runs = Arc::new(Mutex::new(0));
         let worker = {
             let runs = Arc::clone(&runs);
-            from_fn(move |cx: Context<MockClient>| {
+            from_fn(move |cx: Context<MockSession>| {
                 let runs = Arc::clone(&runs);
                 async move {
                     cx.body().await?;
@@ -261,7 +263,7 @@ mod tests {
         let site = MockSite::new().page("https://example.com/", page);
         let validators = InMemValidators::new();
         let failing =
-            from_fn(|_: Context<MockClient>| async { Err::<(), _>(Error::worker("bad page")) })
+            from_fn(|_: Context<MockSession>| async { Err::<(), _>(Error::worker("bad page")) })
                 .layer(Revalidate::new(validators.clone()));
         let crawler =
             Crawler::new(site, failing).with_seed(Seed::get("https://example.com/").unwrap());

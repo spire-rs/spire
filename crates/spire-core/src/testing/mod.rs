@@ -1,5 +1,4 @@
-//! Testing handlers without a network: [`MockSite`] serves fixed
-//! [`MockPage`]s, and a [`Visit`] runs one request through a worker.
+//! Test handlers offline with [`MockSite`], [`MockPage`] and [`Visit`].
 //!
 //! A [`MockSite`] is a [`Backend`](crate::backend::Backend), so a whole crawl
 //! can run against it. To test what a handler does with one page, without
@@ -12,7 +11,7 @@
 //! use spire_core::worker::{Outcome, from_fn};
 //! use spire_core::{Context, Result};
 //!
-//! async fn page(cx: Context<impl spire_core::backend::Client>) -> Result<()> {
+//! async fn page(cx: Context<impl spire_core::backend::Session>) -> Result<()> {
 //!     let body = cx.body().await?;
 //!     cx.dataset::<usize>()?.write(body.len()).await?;
 //!     cx.queue().follow("/next").await?;
@@ -39,7 +38,7 @@ mod site;
 mod visit;
 
 pub use page::MockPage;
-pub use site::{MockClient, MockSite, Sent};
+pub use site::{MockSession, MockSite, Sent};
 pub use visit::Visit;
 
 #[cfg(test)]

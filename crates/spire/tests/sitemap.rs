@@ -11,13 +11,12 @@ use std::io::Write;
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use spire::crawler::Robots;
+use spire::crawler::{Robots, Tags};
 use spire::dataset::{Data, InMemDataset};
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::handler::FollowSitemap;
-use spire::request::Tags;
-use spire::request::http::Uri;
+use spire::http::http::Uri;
 use spire::testing::{MockPage, MockSite};
 use spire::{Crawler, Result, Router};
 

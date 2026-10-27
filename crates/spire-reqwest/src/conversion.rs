@@ -1,6 +1,5 @@
-use spire_core::request::Request;
-use spire_core::response::{Response, ResponseExt};
-use spire_core::{Error, Result, http};
+use spire_core::http::{Request, Response, ResponseExt, http};
+use spire_core::{Error, Result};
 
 /// Converts a request to a `reqwest::Request`, copying its body.
 ///

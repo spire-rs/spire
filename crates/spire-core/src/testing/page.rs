@@ -1,8 +1,8 @@
 use std::time::Duration;
 
+use ::http::header::{CONTENT_TYPE, IntoHeaderName};
+use ::http::{HeaderMap, HeaderValue, StatusCode, Uri};
 use bytes::Bytes;
-use http::header::{CONTENT_TYPE, IntoHeaderName};
-use http::{HeaderMap, HeaderValue, StatusCode, Uri};
 
 /// A response a [`MockSite`](super::MockSite) serves.
 #[derive(Debug, Clone)]
