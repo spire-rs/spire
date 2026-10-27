@@ -8,6 +8,11 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `spire`: compile-fail tests for the errors of `#[derive(Select)]` and
+  `#[derive(Tags)]`, run with trybuild on the CI toolchain.
+
 ## [0.7.0] - 2026-10-27
 
 ### Added

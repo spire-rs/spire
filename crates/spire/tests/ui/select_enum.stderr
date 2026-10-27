@@ -1,0 +1,5 @@
+error: `Select` can only be derived for structs
+ --> tests/ui/select_enum.rs:4:1
+  |
+4 | enum Product {
+  | ^^^^

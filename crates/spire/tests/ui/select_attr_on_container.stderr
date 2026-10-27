@@ -1,0 +1,5 @@
+error: `attr` is only allowed on fields
+ --> tests/ui/select_attr_on_container.rs:4:28
+  |
+4 | #[select("article", attr = "id")]
+  |                            ^^^^

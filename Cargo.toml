@@ -116,3 +116,6 @@ syn = { version = "3.0", features = [] }
 
 # Benchmarking
 criterion = { version = "0.8", features = ["async_tokio", "html_reports"] }
+
+# Compile-fail tests
+trybuild = { version = "1.0", features = [] }

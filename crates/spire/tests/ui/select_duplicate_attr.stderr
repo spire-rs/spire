@@ -1,0 +1,5 @@
+error: duplicate `#[select]` attribute
+ --> tests/ui/select_duplicate_attr.rs:6:5
+  |
+6 |     #[select("h3")]
+  |     ^

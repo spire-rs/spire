@@ -1,0 +1,5 @@
+error: `Tags` cannot be derived for generic enums
+ --> tests/ui/tags_generic.rs:4:10
+  |
+4 | enum Page<T> {
+  |          ^

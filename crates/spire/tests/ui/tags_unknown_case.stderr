@@ -1,0 +1,5 @@
+error: expected one of `lowercase`, `UPPERCASE`, `PascalCase`, `camelCase`, `snake_case`, `SCREAMING_SNAKE_CASE`, `kebab-case`, `SCREAMING-KEBAB-CASE`
+ --> tests/ui/tags_unknown_case.rs:4:20
+  |
+4 | #[tag(rename_all = "Title Case")]
+  |                    ^^^^^^^^^^^^

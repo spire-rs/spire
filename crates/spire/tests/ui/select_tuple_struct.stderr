@@ -1,0 +1,5 @@
+error: `Select` needs a struct with named fields
+ --> tests/ui/select_tuple_struct.rs:4:1
+  |
+4 | struct Product(#[select("h2")] String);
+  | ^^^^^^

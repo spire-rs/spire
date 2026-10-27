@@ -1,0 +1,5 @@
+error: a tag cannot be empty
+ --> tests/ui/tags_empty_name.rs:6:5
+  |
+6 |     #[tag(rename = "")]
+  |     ^

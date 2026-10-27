@@ -1,0 +1,5 @@
+error: `ItemList` and `Itemlist` are both tagged `itemlist`
+ --> tests/ui/tags_duplicate_rename_all.rs:7:5
+  |
+7 |     Itemlist,
+  |     ^^^^^^^^
