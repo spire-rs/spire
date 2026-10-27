@@ -30,7 +30,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Default feature set: HTML parsing, and rustls for any enabled backend
 default = ["html", "rustls-tls"]
 # Every feature except `native-tls` and `testing`
-full = ["html", "markdown", "macros", "robots", "sitemap", "serde", "json", "csv", "redb", "reqwest", "thirtyfour", "rustls-tls"]
+full = ["user-agents", "html", "markdown", "macros", "robots", "sitemap", "serde", "json", "csv", "redb", "reqwest", "thirtyfour", "rustls-tls"]
 
 # The `Html` and `Element` extractors and the `Select` trait
 html = ["dep:scraper", "dep:url"]
@@ -51,6 +51,8 @@ json = ["serde", "spire-core/json"]
 csv = ["serde", "spire-core/csv"]
 # `MockSite` and `Visit`, to test handlers without a network
 testing = ["spire-core/testing"]
+# Browser user agents with matching navigation headers
+user-agents = ["spire-core/user-agents"]
 
 # Crash-safe frontier and seen set stored in redb
 redb = ["dep:spire-redb"]

@@ -116,7 +116,11 @@ impl Backend for BrowserBackend {
     /// identity's proxy URL. Browsers do not support SOCKS proxies with
     /// credentials, and fail with an [`Invalid`](ErrorKind::Invalid) error
     /// on drivers without a proxy per user context.
+    ///
+    /// Identities with user-agent profiles fail as `Invalid` before a
+    /// session is acquired: the real browser supplies its own headers.
     async fn connect_as(&self, identity: &Identity) -> Result<BrowserSession> {
+        identity.require_no_profile()?;
         self.session(Some(identity)).await
     }
 }
@@ -387,6 +391,21 @@ mod tests {
             let result = BrowserBackend::builder().remote(url).build();
             assert!(result.is_err(), "{url} should be rejected");
         }
+    }
+
+    #[tokio::test]
+    async fn refuses_user_agent_profiles_before_acquiring_a_session() {
+        use spire_core::identity::UserAgents;
+
+        let backend = BrowserBackend::builder()
+            .remote("http://127.0.0.1:1")
+            .build()
+            .unwrap();
+        let identity = Identity::new("profiled").with_profile(UserAgents::new().pick(0));
+        let error = backend.connect_as(&identity).await.unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Invalid);
+        assert_eq!(backend.sessions(), 0);
+        backend.close().await;
     }
 
     #[tokio::test]

@@ -32,6 +32,38 @@ An identity's headers are added to every request it sends, unless the
 request sets them itself. A proxy URL may carry credentials, as the
 gateway below does; they never show up in logs or `Debug` output.
 
+## Browser user agents
+
+Enable `user-agents` (also included in `full`) to give an identity a
+[uagent](https://docs.rs/uagent) browser profile: a user agent and matching
+navigation headers, including Chromium client hints.
+
+```rust
+use spire::identity::{Browser, Identities, Identity, UserAgents};
+
+let agents = UserAgents::new().browsers([Browser::Chrome, Browser::Firefox]);
+let identities = Identities::from_fn(move |n| {
+    Identity::new(format!("session-{n}"))
+        .with_proxy(format!("http://user-session-{n}:secret@gate.example:7000"))
+        .map(|identity| identity.with_profile(agents.pick(n)))
+});
+```
+
+`Profile` and `Platform` are also re-exported from `spire::identity`.
+`pick(n)` selects the same profile for the same number, configuration and
+uagent version. Keep the lockfile when resuming a crawl: uagent capture
+updates can change the selected headers.
+
+Profile headers are defaults: the identity's explicit headers override
+them, and the request's headers override both. `Identity::headers()` returns
+only explicit headers; `Identity::profile()` returns the separate profile.
+Profiles omit `Accept-Encoding`; reqwest advertises the encodings enabled
+by its decoders, unless you explicitly override that header.
+
+`BrowserBackend::connect_as` refuses an identity with a user-agent profile
+as `Invalid` before opening a session. A real browser supplies its own user
+agent and client hints, matching its installed version.
+
 ## Many identities
 
 Listing a thousand identities by hand does not scale. `Identities::from_fn`
@@ -153,9 +185,8 @@ names a browser, but a request sent over reqwest's TLS stack does not have
 that browser's TLS fingerprint, and sites that check it will see the
 difference.
 
-The same goes for headers. An identity's user agent can be any string, e.g.
-a current one from [ua_generator](https://docs.rs/ua_generator), but a real
-browser sends more than its user agent: Chrome sends client hints with
-every request, `Accept` and `Sec-Fetch-*` headers that agree with its
-version, and all of them in a fixed order. A user agent alone is consistent
-per identity, but not with the rest of the request.
+Profiles supply matching header values, but reqwest does not preserve the
+browser's header order or emulate its TLS or HTTP/2 fingerprint. See
+[issue #60](https://github.com/spire-rs/spire/issues/60). Profiles describe a
+direct page navigation; they do not reproduce a browser's changing headers
+for every navigation or subresource request.

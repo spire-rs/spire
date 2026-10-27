@@ -33,16 +33,21 @@
 
 mod identities;
 mod pool;
+mod weak;
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use http::header::IntoHeaderName;
 use http::{HeaderMap, HeaderValue, Uri};
+#[cfg(feature = "user-agents")]
+#[cfg_attr(docsrs, doc(cfg(feature = "user-agents")))]
+pub use uagent::{Browser, Platform, Profile, UserAgents};
 
 pub use self::identities::Identities;
 pub(crate) use self::pool::{Health, IdentityPool};
+pub use self::weak::WeakIdentity;
 use crate::request::{Request, RequestMeta};
 use crate::{Error, Result};
 
@@ -58,6 +63,8 @@ struct Inner {
     name: Box<str>,
     proxy: Option<Uri>,
     headers: HeaderMap,
+    #[cfg(feature = "user-agents")]
+    profile: Option<Profile>,
 }
 
 impl Identity {
@@ -68,6 +75,8 @@ impl Identity {
             name: name.into(),
             proxy: None,
             headers: HeaderMap::new(),
+            #[cfg(feature = "user-agents")]
+            profile: None,
         }))
     }
 
@@ -118,6 +127,45 @@ impl Identity {
         self
     }
 
+    /// Presents as this browser profile. Identity headers override the
+    /// profile's headers, and request headers override both.
+    ///
+    /// Real browser backends refuse profiles: their own browser supplies
+    /// its user agent and client hints.
+    #[cfg(feature = "user-agents")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "user-agents")))]
+    #[must_use]
+    pub fn with_profile(mut self, profile: Profile) -> Self {
+        Arc::make_mut(&mut self.0).profile = Some(profile);
+        self
+    }
+
+    /// Returns the browser profile, kept separate from identity headers.
+    #[cfg(feature = "user-agents")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "user-agents")))]
+    #[must_use]
+    pub fn profile(&self) -> Option<&Profile> {
+        self.0.profile.as_ref()
+    }
+
+    /// Fails if this identity has a browser profile, for backends whose
+    /// real browser supplies its own user agent and client hints.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Invalid`](crate::ErrorKind::Invalid) error if a profile
+    /// is set. Without `user-agents`, always succeeds.
+    pub fn require_no_profile(&self) -> Result<()> {
+        #[cfg(feature = "user-agents")]
+        if self.profile().is_some() {
+            return Err(Error::invalid(format!(
+                "identity `{}` has a user-agent profile, which a real browser cannot use",
+                self.name()
+            )));
+        }
+        Ok(())
+    }
+
     /// Returns the name.
     #[must_use]
     pub fn name(&self) -> &str {
@@ -130,7 +178,7 @@ impl Identity {
         self.0.proxy.as_ref()
     }
 
-    /// Returns the headers sent on every request.
+    /// Returns the identity headers, excluding its browser profile.
     #[must_use]
     pub fn headers(&self) -> &HeaderMap {
         &self.0.headers
@@ -155,43 +203,22 @@ impl Identity {
                 headers.insert(name.clone(), value.clone());
             }
         }
+        #[cfg(feature = "user-agents")]
+        if let Some(profile) = self.profile() {
+            for header in profile.headers() {
+                if !headers.contains_key(header.name) {
+                    // uagent generates validated names and values from its captures.
+                    let name = http::HeaderName::from_static(header.name);
+                    let value = HeaderValue::from_str(&header.value)
+                        .expect("uagent profile headers are valid HTTP headers");
+                    headers.insert(name, value);
+                }
+            }
+        }
         let meta = request
             .extensions_mut()
             .get_or_insert_default::<RequestMeta>();
         meta.identity = Some(self.clone());
-    }
-}
-
-/// A weak reference to an [`Identity`], from [`Identity::downgrade`].
-#[derive(Clone)]
-pub struct WeakIdentity(Weak<Inner>);
-
-impl WeakIdentity {
-    /// Returns the identity, unless it is gone.
-    #[must_use]
-    pub fn upgrade(&self) -> Option<Identity> {
-        self.0.upgrade().map(Identity)
-    }
-
-    /// Whether the identity is still in use.
-    #[must_use]
-    pub fn is_alive(&self) -> bool {
-        self.0.strong_count() > 0
-    }
-
-    /// Whether this refers to `identity` itself, not merely one with the
-    /// same name.
-    #[must_use]
-    pub fn refers_to(&self, identity: &Identity) -> bool {
-        std::ptr::eq(self.0.as_ptr(), Arc::as_ptr(&identity.0))
-    }
-}
-
-impl fmt::Debug for WeakIdentity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("WeakIdentity")
-            .field(&self.upgrade().as_ref().map(Identity::name))
-            .finish()
     }
 }
 
@@ -233,6 +260,23 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "user-agents")]
+    #[test]
+    fn replacing_a_profile_preserves_explicit_headers_and_clones() {
+        let chrome = Profile::new(Browser::Chrome, Platform::Windows).unwrap();
+        let firefox = Profile::new(Browser::Firefox, Platform::Linux).unwrap();
+        let original = Identity::new("a")
+            .with_profile(chrome.clone())
+            .with_header(USER_AGENT, HeaderValue::from_static("explicit"));
+        let changed = original.clone().with_profile(firefox.clone());
+        assert_eq!(original.profile(), Some(&chrome));
+        assert_eq!(changed.profile(), Some(&firefox));
+        assert_eq!(changed.headers()[USER_AGENT], "explicit");
+        assert_eq!(changed.headers().len(), 1);
+        assert!(changed.require_no_profile().is_err());
+        assert!(Identity::new("plain").require_no_profile().is_ok());
+    }
+
     #[test]
     fn debug_hides_proxy_credentials() {
         let identity = Identity::new("a")
@@ -244,17 +288,6 @@ mod tests {
         assert!(debug.contains("proxy.test:8080"), "{debug}");
         assert!(!debug.contains("secret"), "{debug}");
         assert_eq!(identity.proxy().unwrap().host(), Some("proxy.test"));
-    }
-
-    #[test]
-    fn weak_references_outlive_their_identity() {
-        let identity = Identity::new("a");
-        let weak = identity.downgrade();
-        assert!(weak.is_alive() && weak.refers_to(&identity));
-        assert!(!weak.refers_to(&Identity::new("a")));
-        drop(identity);
-        assert!(!weak.is_alive());
-        assert!(weak.upgrade().is_none());
     }
 
     #[test]

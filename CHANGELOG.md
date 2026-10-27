@@ -10,6 +10,12 @@ and this project adheres to
 
 ### Added
 
+- `spire`: the `user-agents` feature (included in `full`), backed by uagent
+  0.1. `Identity::with_profile` supplies browser navigation headers below
+  identity and request overrides; `spire::identity` re-exports `Profile`,
+  `UserAgents`, `Browser` and `Platform`. Real browser backends refuse these
+  profiles before opening a session.
+
 - `spire`: the `Links` extractor: the links of a page a visitor can follow,
   `<a>` and `<area>`, resolved against its `<base href>` and final URI as a
   browser resolves them, each with its `rel` values, text and kind. Filters
