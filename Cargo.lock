@@ -68,7 +68,7 @@ checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
 
 [[package]]
 name = "api-endpoints"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "serde",
  "spire",
@@ -161,7 +161,7 @@ checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
 name = "basic-usage"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "spire",
  "tokio",
@@ -277,7 +277,7 @@ dependencies = [
 
 [[package]]
 name = "chrome-webdriver"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "spire",
  "tokio",
@@ -2330,7 +2330,7 @@ dependencies = [
 
 [[package]]
 name = "rust-blog"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "serde",
  "spire",
@@ -2714,7 +2714,7 @@ dependencies = [
 
 [[package]]
 name = "spire"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bytes",
  "criterion",
@@ -2741,7 +2741,7 @@ dependencies = [
 
 [[package]]
 name = "spire-core"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bytes",
  "criterion",
@@ -2762,7 +2762,7 @@ dependencies = [
 
 [[package]]
 name = "spire-macros"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2771,7 +2771,7 @@ dependencies = [
 
 [[package]]
 name = "spire-redb"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "criterion",
  "redb",
@@ -2784,7 +2784,7 @@ dependencies = [
 
 [[package]]
 name = "spire-reqwest"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bytes",
  "reqwest",
@@ -2794,7 +2794,7 @@ dependencies = [
 
 [[package]]
 name = "spire-thirtyfour"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base64",
  "bytes",
