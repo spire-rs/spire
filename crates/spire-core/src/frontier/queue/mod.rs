@@ -3,7 +3,7 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use http::Uri;
+use ::http::Uri;
 use url::Url;
 
 mod link;
@@ -11,10 +11,11 @@ mod link;
 pub use link::Link;
 use link::Target;
 
+use crate::crawler::Depth;
 use crate::frontier::dynamic::DynFrontier;
 use crate::frontier::seed::Seed;
 use crate::frontier::{Admission, Frontier};
-use crate::request::{Depth, Request, RequestExt};
+use crate::http::{Request, RequestExt};
 use crate::sync::lock;
 use crate::{Error, Result};
 
@@ -188,8 +189,8 @@ impl fmt::Debug for Queue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crawler::Tag;
     use crate::frontier::{FrontierExt, InMemFrontier, Pop};
-    use crate::request::Tag;
 
     async fn drain(frontier: &InMemFrontier) -> Vec<(String, Option<String>, u32)> {
         let mut popped = Vec::new();

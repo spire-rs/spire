@@ -28,8 +28,8 @@ or refused as a duplicate, too deep, outside the crawl's scope, or not an
 `http(s)` link. Fragments are
 dropped, and `follow_all` follows several links at once.
 
-The `FollowLinks` handler does this for a whole page: every link, or those
-matching a CSS selector, with the tag to give them, and without
+The `FollowLinks` handler does this for a whole page: visible or unknown
+links, or those matching a CSS selector, with the tag to give them, and without
 `rel="nofollow"` ones with `skip_nofollow`, see [Routing](routing.md).
 
 `Link::with_priority` sets how soon a link is crawled, on a frontier that
@@ -65,6 +65,8 @@ async fn page(links: Links, queue: Queue) -> Result<()> {
 }
 ```
 
+- `visible()` leaves out hidden links and keeps unknown ones; see
+  [Hidden links](html.md#hidden-links) for HTTP and browser checks.
 - `followable()` leaves out `rel="nofollow"` links, `same_host()` links to
   other hosts, subdomains included, `with_rel(value)` keeps those with a
   `rel` value, and `of_kind` those from `<a>` or `<area>`.
@@ -74,6 +76,9 @@ async fn page(links: Links, queue: Queue) -> Result<()> {
   browser tab's `snapshot` after interacting with it.
 - Links that are not `http(s)` URLs, such as `mailto:` or `javascript:`, are
   left out, and fragments are dropped.
+
+For hidden entry points and expanding URL branches, see
+[Avoiding traps](avoiding-traps.md).
 
 ## Where links resolve
 

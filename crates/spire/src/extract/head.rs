@@ -1,7 +1,7 @@
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::extract::FromContext;
-use crate::request::http::{HeaderMap, StatusCode, Uri};
-use crate::response::ResponseExt;
+use crate::http::ResponseExt;
+use crate::http::http::{HeaderMap, StatusCode, Uri};
 use crate::{Context, Error, Result};
 
 /// Extracts the head of the response: its status, headers, and the URI it
@@ -14,7 +14,7 @@ use crate::{Context, Error, Result};
 ///
 /// ```
 /// use spire::extract::Head;
-/// use spire::request::http::header::LAST_MODIFIED;
+/// use spire::http::http::header::LAST_MODIFIED;
 ///
 /// async fn page(head: Head) {
 ///     println!("{} from {}", head.status, head.uri);
@@ -37,7 +37,7 @@ pub struct Head {
 
 impl<C, S> FromContext<C, S> for Head
 where
-    C: Client,
+    C: Session,
     S: Sync,
 {
     type Rejection = Error;
@@ -60,9 +60,9 @@ where
 mod tests {
     use super::*;
     use crate::frontier::seed::Seed;
-    use crate::request::http::HeaderValue;
-    use crate::request::http::header::ETAG;
-    use crate::testing::{MockClient, MockPage, MockSite};
+    use crate::http::http::HeaderValue;
+    use crate::http::http::header::ETAG;
+    use crate::testing::{MockPage, MockSession, MockSite};
     use crate::worker::{Outcome, from_fn};
 
     #[tokio::test]
@@ -75,7 +75,7 @@ mod tests {
             )
             .page("https://example.com/new", page);
 
-        let worker = from_fn(|cx: Context<MockClient>| async move {
+        let worker = from_fn(|cx: Context<MockSession>| async move {
             let head = Head::from_context(&cx, &()).await?;
             assert_eq!(head.status, StatusCode::OK);
             assert_eq!(head.headers[ETAG], "\"v1\"");

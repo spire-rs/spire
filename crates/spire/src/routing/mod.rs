@@ -12,8 +12,9 @@ use futures::future::BoxFuture;
 mod path;
 
 use self::path::PathPattern;
+use crate::crawler::{Tag, Tags};
 use crate::handler::Handler;
-use crate::request::{RequestExt, Tag, Tags};
+use crate::http::RequestExt;
 use crate::worker::{Outcome, Worker};
 use crate::{Context, Error, TRACING_TARGET};
 
@@ -168,7 +169,7 @@ impl<C, S> Router<C, S> {
     ///
     /// ```
     /// use spire::Router;
-    /// # use spire::request::{Tag, Tags};
+    /// # use spire::crawler::{Tag, Tags};
     /// # #[derive(Clone, Copy)]
     /// # enum Page { List, Item }
     /// # impl From<Page> for Tag {

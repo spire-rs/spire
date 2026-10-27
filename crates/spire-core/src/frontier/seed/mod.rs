@@ -3,9 +3,9 @@
 
 use std::sync::LazyLock;
 
+use ::http::header::IntoHeaderName;
+use ::http::{HeaderMap, HeaderValue, Method, Uri};
 use bytes::Bytes;
-use http::header::IntoHeaderName;
-use http::{HeaderMap, HeaderValue, Method, Uri};
 
 mod fingerprint;
 mod normalize;
@@ -14,7 +14,8 @@ mod repr;
 
 pub use fingerprint::Fingerprint;
 
-use crate::request::{Attempt, Depth, Request, RequestMeta, Tag};
+use crate::crawler::{Attempt, Depth, Tag};
+use crate::http::{Request, RequestMeta};
 use crate::{Error, Result};
 
 /// A request waiting in the frontier.
@@ -111,7 +112,7 @@ impl Seed {
 
     /// Sends the request as the identity named `name`, e.g. a logged-in
     /// account, rather than one the crawl picks; see
-    /// [`Crawler::with_identities`](crate::Crawler::with_identities).
+    /// [`Crawler::with_identities`](crate::crawler::Crawler::with_identities).
     #[must_use]
     pub fn with_identity(mut self, name: impl Into<Box<str>>) -> Self {
         self.extras_mut().identity = Some(name.into());
@@ -279,7 +280,7 @@ impl TryFrom<Uri> for Seed {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::RequestExt;
+    use crate::http::RequestExt;
 
     fn fingerprint(uri: &str) -> Fingerprint {
         Seed::get(uri).unwrap().fingerprint()

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::hash::{BuildHasher, RandomState};
 use std::sync::Mutex;
 
-use http::StatusCode;
+use ::http::StatusCode;
 use tokio::time::Instant;
 
 use super::Identity;

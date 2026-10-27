@@ -6,11 +6,11 @@
 //! the pool closed is quit synchronously, which blocks.
 
 use spire_core::ErrorKind;
-use spire_core::backend::{Backend, Client, StatusPolicy};
+use spire_core::backend::{Backend, Session, StatusPolicy};
 use spire_core::frontier::seed::Seed;
-use spire_core::http::header::{CONTENT_TYPE, HeaderValue};
-use spire_core::http::{Method, StatusCode};
-use spire_core::request::Request;
+use spire_core::http::Request;
+use spire_core::http::http::header::{CONTENT_TYPE, HeaderValue};
+use spire_core::http::http::{Method, StatusCode};
 use spire_thirtyfour::{ThirtyfourBackend, ThirtyfourBuilder};
 
 fn builder() -> Option<ThirtyfourBuilder> {
@@ -43,7 +43,7 @@ async fn reports_real_statuses_and_follows_redirects() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(response.headers()[CONTENT_TYPE], "text/html; charset=utf-8");
-    let final_uri = spire_core::response::ResponseExt::final_uri(&response);
+    let final_uri = spire_core::http::ResponseExt::final_uri(&response);
     assert_eq!(final_uri.unwrap(), "https://httpbin.org/get");
     drop(session);
 
@@ -79,8 +79,8 @@ async fn sends_methods_headers_and_bodies() {
         .with_body("probe=1");
 
     let session = backend.connect().await.unwrap();
-    session.fetch(&post.into_request()).await.unwrap();
-    let body = String::from_utf8(session.body().await.unwrap().to_vec()).unwrap();
+    let response = session.fetch(&post.into_request()).await.unwrap();
+    let body = String::from_utf8_lossy(response.body());
     assert!(body.contains(r#""probe": "1""#), "{body}");
     assert!(body.contains(r#""X-Spire": "bidi""#), "{body}");
     drop(session);
@@ -122,22 +122,23 @@ async fn isolates_requests_unless_state_is_kept() {
 }
 
 #[tokio::test]
-async fn reads_the_page_as_currently_rendered() {
+async fn keeps_the_response_snapshot_while_the_live_document_changes() {
     let Some(builder) = builder() else { return };
     let backend = builder.build().unwrap();
 
     let session = backend.connect().await.unwrap();
-    session
+    let response = session
         .fetch(&get("https://httpbin.org/html"))
         .await
         .unwrap();
-    let loaded = String::from_utf8(session.body().await.unwrap().to_vec()).unwrap();
+    let loaded = String::from_utf8_lossy(response.body());
     assert!(loaded.contains("Moby-Dick"), "{loaded}");
 
-    // Changes made after loading show in the body, without navigating again.
+    // The fetched response stays fixed; explicitly read the live document.
     let script = "document.body.innerHTML = '<p>changed</p>'";
     session.execute(script, Vec::new()).await.unwrap();
-    let changed = String::from_utf8(session.body().await.unwrap().to_vec()).unwrap();
+    let changed = session.page_source().await.unwrap();
+    assert_eq!(String::from_utf8_lossy(response.body()), loaded);
     assert!(changed.contains("<p>changed</p>"), "{changed}");
     drop(session);
 

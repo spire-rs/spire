@@ -9,7 +9,7 @@ use spire::backend::ReqwestBackend;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::html::Html;
 use spire::frontier::seed::Seed;
-use spire::request::http::Uri;
+use spire::http::http::Uri;
 use spire::{Crawler, Result, Router};
 
 #[derive(Debug)]

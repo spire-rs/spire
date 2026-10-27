@@ -17,7 +17,7 @@ use std::time::Duration;
 use spire::backend::ReqwestBackend;
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
-use spire::request::{Revisit, Tags};
+use spire::crawler::{Revisit, Tags};
 use spire::{Crawler, Result, Router};
 
 #[derive(Debug, Clone, Copy, Tags, Revisit)]

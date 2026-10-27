@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use http::{HeaderName, HeaderValue};
+use ::http::{HeaderName, HeaderValue};
 
 use super::{Middleware, Next};
 use crate::context::Context;
@@ -16,8 +16,8 @@ use crate::worker::Outcome;
 /// # Examples
 ///
 /// ```
-/// use spire_core::http::HeaderValue;
-/// use spire_core::http::header::{ACCEPT_LANGUAGE, FROM};
+/// use spire_core::http::http::HeaderValue;
+/// use spire_core::http::http::header::{ACCEPT_LANGUAGE, FROM};
 /// use spire_core::worker::middleware::SetHeader;
 ///
 /// let language = SetHeader::new(ACCEPT_LANGUAGE, HeaderValue::from_static("en"));

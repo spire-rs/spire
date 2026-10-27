@@ -3,14 +3,14 @@ use derive_more::{Deref, DerefMut};
 use encoding_rs::{Encoding, UTF_8};
 use serde::de::DeserializeOwned;
 
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::extract::FromContext;
-use crate::request::http::HeaderMap;
-use crate::request::http::header::CONTENT_TYPE;
+use crate::http::http::HeaderMap;
+use crate::http::http::header::CONTENT_TYPE;
 use crate::{Context, Error, Result};
 
 /// Returns the response's headers and body, fetching the request if needed.
-async fn fetch_body<C: Client>(cx: &Context<C>) -> Result<(HeaderMap, Bytes)> {
+async fn fetch_body<C: Session>(cx: &Context<C>) -> Result<(HeaderMap, Bytes)> {
     let headers = cx.response().await?.headers().clone();
     Ok((headers, cx.body().await?))
 }
@@ -45,7 +45,7 @@ pub struct Body(pub Bytes);
 
 impl<C, S> FromContext<C, S> for Body
 where
-    C: Client,
+    C: Session,
     S: Sync,
 {
     type Rejection = Error;
@@ -63,7 +63,7 @@ pub struct Text(pub String);
 
 impl<C, S> FromContext<C, S> for Text
 where
-    C: Client,
+    C: Session,
     S: Sync,
 {
     type Rejection = Error;
@@ -80,7 +80,7 @@ pub struct Json<T>(pub T);
 
 impl<C, S, T> FromContext<C, S> for Json<T>
 where
-    C: Client,
+    C: Session,
     S: Sync,
     T: DeserializeOwned,
 {
@@ -97,7 +97,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::http::HeaderValue;
+    use crate::http::http::HeaderValue;
 
     fn headers(content_type: &'static str) -> HeaderMap {
         let mut headers = HeaderMap::new();

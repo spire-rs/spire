@@ -7,15 +7,15 @@
 //! one proxy is not sent through another.
 //!
 //! [`Identities`] are defined once, on the
-//! [`Crawler`](crate::Crawler::with_identities), which picks one for every
+//! [`Crawler`](crate::crawler::Crawler::with_identities), which picks one for every
 //! request, applies its headers, and connects as it, see
 //! [`Backend::connect_as`](crate::backend::Backend::connect_as). Identities that
 //! keep failing are set aside, or replaced by new ones.
 //!
 //! ```
 //! use spire_core::Result;
-//! use spire_core::http::HeaderValue;
-//! use spire_core::http::header::USER_AGENT;
+//! use spire_core::http::http::HeaderValue;
+//! use spire_core::http::http::header::USER_AGENT;
 //! use spire_core::identity::{Identities, Identity};
 //!
 //! # fn main() -> Result<()> {
@@ -39,16 +39,17 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use http::header::IntoHeaderName;
-use http::{HeaderMap, HeaderValue, Uri};
+use ::http::header::IntoHeaderName;
+use ::http::{HeaderMap, HeaderValue, Uri};
 #[cfg(feature = "user-agents")]
 #[cfg_attr(docsrs, doc(cfg(feature = "user-agents")))]
+#[doc(inline)]
 pub use uagent::{Browser, Platform, Profile, UserAgents};
 
 pub use self::identities::Identities;
 pub(crate) use self::pool::{Health, IdentityPool};
 pub use self::weak::WeakIdentity;
-use crate::request::{Request, RequestMeta};
+use crate::http::{Request, RequestMeta};
 use crate::{Error, Result};
 
 /// Who a request appears to come from: a name, an optional proxy, and the
@@ -195,7 +196,7 @@ impl Identity {
 
     /// Sends `request` as this identity: with its headers, unless the
     /// request sets them, and recorded for
-    /// [`RequestExt::identity`](crate::request::RequestExt::identity).
+    /// [`RequestExt::identity`](crate::http::RequestExt::identity).
     pub(crate) fn apply(&self, request: &mut Request) {
         let headers = request.headers_mut();
         for (name, value) in self.headers() {
@@ -208,7 +209,7 @@ impl Identity {
             for header in profile.headers() {
                 if !headers.contains_key(header.name) {
                     // uagent generates validated names and values from its captures.
-                    let name = http::HeaderName::from_static(header.name);
+                    let name = ::http::HeaderName::from_static(header.name);
                     let value = HeaderValue::from_str(&header.value)
                         .expect("uagent profile headers are valid HTTP headers");
                     headers.insert(name, value);
@@ -256,7 +257,7 @@ impl Hash for Identity {
 
 #[cfg(test)]
 mod tests {
-    use http::header::USER_AGENT;
+    use ::http::header::USER_AGENT;
 
     use super::*;
 

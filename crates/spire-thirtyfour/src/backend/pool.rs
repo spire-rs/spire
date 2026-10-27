@@ -16,8 +16,8 @@ use spire_core::{Error, Result};
 use thirtyfour::error::WebDriverResult;
 use thirtyfour::{Capabilities, WebDriver};
 
+use super::profiles::Profiles;
 use crate::error::from_webdriver;
-use crate::profiles::Profiles;
 
 /// Where sessions are started.
 #[derive(Clone)]

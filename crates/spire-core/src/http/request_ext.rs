@@ -1,15 +1,13 @@
 //! Requests and their crawl metadata.
 
-mod meta;
-
 use bytes::Bytes;
-pub(crate) use meta::RequestMeta;
-pub use meta::{Attempt, Depth, Revisit, Tag, Tags};
 
+use super::meta::RequestMeta;
+use crate::crawler::{Attempt, Depth, Tag};
 use crate::identity::Identity;
 
 /// An HTTP request, with its body in memory.
-pub type Request<B = Bytes> = http::Request<B>;
+pub type Request<B = Bytes> = ::http::Request<B>;
 
 /// Reads crawl metadata from a [`Request`].
 ///
@@ -20,7 +18,8 @@ pub type Request<B = Bytes> = http::Request<B>;
 ///
 /// ```
 /// use spire_core::frontier::seed::Seed;
-/// use spire_core::request::{RequestExt, Tag};
+/// use spire_core::http::RequestExt;
+/// use spire_core::crawler::Tag;
 ///
 /// let request = Seed::get("https://example.com/")?.with_tag("page").into_request();
 /// assert_eq!(request.tag(), Some(&Tag::from("page")));
@@ -43,7 +42,7 @@ pub trait RequestExt {
     fn identity(&self) -> Option<&Identity>;
 }
 
-impl<B> RequestExt for http::Request<B> {
+impl<B> RequestExt for ::http::Request<B> {
     fn tag(&self) -> Option<&Tag> {
         self.extensions().get::<RequestMeta>()?.tag.as_ref()
     }

@@ -2718,6 +2718,7 @@ version = "0.6.0"
 dependencies = [
  "bytes",
  "criterion",
+ "cssparser",
  "derive_more",
  "encoding_rs",
  "flate2",

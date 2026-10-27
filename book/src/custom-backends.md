@@ -4,30 +4,30 @@ A backend fetches pages. `ReqwestBackend` and `ThirtyfourBackend` are two; any
 other source of pages, such as a local mirror, an API with its own client,
 or a service that renders pages for you, is a backend of your own.
 
-## Backend and Client
+## Backend and Session
 
-A `Backend` is shared by the whole crawl and hands out a `Client` per
+A `Backend` is shared by the whole crawl and hands out a `Session` per
 request, from `connect`: an HTTP client can hand out a handle on one shared
 pool, a browser backend a session from its pool. The client then serves its
 one request:
 
-- `fetch(&request)` performs the request and returns the response's head:
-  its status and headers. It may keep the body for later.
-- `body()` returns the body, after `fetch`: the bytes received, or a
-  browser page as currently rendered.
+- `fetch(&request)` performs the request and returns a complete
+  `Response<Bytes>`: status, headers, final URI and body together.
+- `document()` optionally exposes a live `Document` capability. HTTP
+  sessions use the default `None`; browser sessions can expose DOM
+  observations through this separate trait.
 
-Both are called through the request's `Context`, at most once for `fetch`:
-the first extractor that needs the response fetches it, and every other
-extractor shares it.
+`Context` caches the first successful fetch, including the body. A failed
+fetch can be tried again. Later extractors share the same response snapshot;
+queries through `Document` observe the live page separately.
 
 ```rust,no_run
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use bytes::Bytes;
-use spire::backend::{Backend, Client};
-use spire::request::Request;
-use spire::response::Response;
+use spire::backend::{Backend, Session};
+use spire::http::{Request, Response};
 use spire::{Crawler, Error, ErrorKind, Result, Router};
 
 /// Serves pages from a directory, e.g. a site mirrored to disk.
@@ -36,25 +36,23 @@ struct Mirror {
     root: Arc<PathBuf>,
 }
 
-/// A request to a [`Mirror`], keeping the page it read.
+/// A session that reads pages from a [`Mirror`].
 struct MirrorPage {
     root: Arc<PathBuf>,
-    body: Mutex<Option<Bytes>>,
 }
 
 impl Backend for Mirror {
-    type Client = MirrorPage;
+    type Session = MirrorPage;
 
     async fn connect(&self) -> Result<MirrorPage> {
         Ok(MirrorPage {
             root: Arc::clone(&self.root),
-            body: Mutex::new(None),
         })
     }
 }
 
-impl Client for MirrorPage {
-    async fn fetch(&self, request: &Request) -> Result<Response<()>> {
+impl Session for MirrorPage {
+    async fn fetch(&self, request: &Request) -> Result<Response> {
         let path = self.root.join(request.uri().path().trim_start_matches('/'));
         let body = tokio::fs::read(&path).await.map_err(|error| {
             // Not retried: the file will still be missing.
@@ -62,14 +60,10 @@ impl Client for MirrorPage {
                 .with_message(format!("no page at {}", path.display()))
                 .with_source(error)
         })?;
-        *self.body.lock().unwrap() = Some(Bytes::from(body));
-        Ok(Response::new(()))
+        Ok(Response::new(Bytes::from(body)))
     }
 
-    async fn body(&self) -> Result<Bytes> {
-        let body = self.body.lock().unwrap().clone();
-        body.ok_or_else(|| Error::worker("the page was not fetched yet"))
-    }
+
 }
 # async fn page() {}
 

@@ -33,7 +33,7 @@ default = ["html", "rustls-tls"]
 full = ["user-agents", "html", "markdown", "macros", "robots", "sitemap", "serde", "json", "csv", "redb", "reqwest", "thirtyfour", "rustls-tls"]
 
 # The `Html` and `Element` extractors and the `Select` trait
-html = ["dep:scraper", "dep:url"]
+html = ["dep:scraper", "dep:url", "dep:cssparser"]
 # The `Markdown` extractor: a page's main content as Markdown
 markdown = ["html", "dep:html-to-markdown-rs"]
 # `#[derive(Select)]` for declarative extraction with CSS selectors
@@ -84,6 +84,7 @@ serde_json = { workspace = true, features = [] }
 serde_urlencoded = { workspace = true, features = [] }
 
 # Markup
+cssparser = { workspace = true, optional = true, features = [] }
 scraper = { workspace = true, optional = true, features = [] }
 url = { workspace = true, optional = true, features = [] }
 html-to-markdown-rs = { workspace = true, optional = true, features = [] }
@@ -107,7 +108,7 @@ criterion = { workspace = true, features = [] }
 
 # Testing
 spire-core = { workspace = true, features = ["testing"] }
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "test-util"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "test-util", "net", "io-util"] }
 flate2 = { workspace = true, features = [] }
 
 [[bench]]

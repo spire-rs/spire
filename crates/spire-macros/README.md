@@ -66,12 +66,12 @@ async fn handler(Element(products): Element<Vec<Product>>) {
 
 ### `Tags`
 
-Derives `spire::request::Tags` for an enum of unit variants, so tags are
+Derives `spire::crawler::Tags` for an enum of unit variants, so tags are
 checked by the compiler:
 
 ```rust,ignore
 use spire::Router;
-use spire::request::Tags;
+use spire::crawler::Tags;
 
 #[derive(Debug, Clone, Copy, Tags)]
 enum Page {
@@ -121,6 +121,11 @@ async fn page(State(db): State<Db>) {}
   one out.
 - The struct must have named fields and no generic parameters.
 
+## Feature flags
+
+This crate has no feature flags. Enable `macros` on `spire` to use its
+`Select`, `FromRef`, `Tags` and `Revisit` derives through the public API.
+
 ## Usage
 
 This crate is typically not used directly. Instead, enable the `macros` feature
@@ -132,7 +137,7 @@ spire = { version = "0.6.0", features = ["macros"] }
 ```
 
 The derives are then available as `spire::extract::html::Select` and
-`spire::request::Tags`, next to the traits of the same names.
+`spire::crawler::Tags`, next to the traits of the same names.
 
 ## License
 

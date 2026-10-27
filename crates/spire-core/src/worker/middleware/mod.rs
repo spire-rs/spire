@@ -15,11 +15,12 @@
 //! use std::time::Duration;
 //!
 //! use spire_core::backend::Noop;
-//! use spire_core::http::HeaderValue;
-//! use spire_core::http::header::USER_AGENT;
+//! use spire_core::http::http::HeaderValue;
+//! use spire_core::http::http::header::USER_AGENT;
 //! use spire_core::worker::middleware::{self, Next, SetHeader};
 //! use spire_core::worker::{Outcome, WorkerExt, from_fn};
-//! use spire_core::{Context, Crawler, Result};
+//! use spire_core::crawler::Crawler;
+//! use spire_core::{Context, Result};
 //!
 //! /// Retries pages that answer with a captcha instead of content.
 //! async fn captcha(cx: Context<Noop>, next: Next<Noop>) -> Result<Outcome> {

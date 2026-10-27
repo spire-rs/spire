@@ -89,7 +89,7 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
 
     let ident = &input.ident;
     Ok(quote! {
-        impl ::spire::request::Revisit for #ident {
+        impl ::spire::crawler::Revisit for #ident {
             fn interval(self) -> ::core::option::Option<::core::time::Duration> {
                 match self {
                     #(#arms,)*

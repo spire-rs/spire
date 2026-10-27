@@ -8,6 +8,7 @@ mod filter;
 mod retry;
 mod revisit;
 mod score;
+mod traps;
 
 pub use backoff::TagBackoff;
 pub use dedup::Dedup;
@@ -16,3 +17,4 @@ pub use filter::{AllowedHosts, Filter};
 pub use retry::{Retry, RetryPolicy};
 pub use revisit::Revisits;
 pub use score::Scored;
+pub use traps::{AvoidTraps, TrapPolicy};

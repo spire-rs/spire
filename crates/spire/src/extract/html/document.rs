@@ -5,7 +5,7 @@ use derive_more::{Deref, DerefMut};
 use scraper::{ElementRef, Selector};
 
 use super::select::{Select, private, select_in};
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::extract::FromContext;
 use crate::extract::body::Text;
 use crate::{Context, Error, Result};
@@ -81,7 +81,7 @@ impl fmt::Debug for Html {
 
 impl<C, S> FromContext<C, S> for Html
 where
-    C: Client,
+    C: Session,
     S: Sync,
 {
     type Rejection = Error;

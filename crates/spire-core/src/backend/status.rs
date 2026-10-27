@@ -1,13 +1,12 @@
 use std::time::{Duration, SystemTime};
 
-use http::header::RETRY_AFTER;
-use http::{HeaderMap, StatusCode};
+use ::http::header::RETRY_AFTER;
+use ::http::{HeaderMap, StatusCode};
 
-use crate::response::{Response, ResponseExt};
+use crate::http::{Response, ResponseExt};
 use crate::{Error, ErrorKind, Result};
 
-/// How a backend treats error statuses, e.g. `ReqwestBackend` from
-/// `spire-reqwest` or `ThirtyfourBackend` from `spire-thirtyfour`.
+/// How a backend treats error statuses.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StatusPolicy {
@@ -84,7 +83,7 @@ fn retry_after(headers: &HeaderMap) -> Option<Duration> {
 
 #[cfg(test)]
 mod tests {
-    use http::{HeaderValue, Uri};
+    use ::http::{HeaderValue, Uri};
 
     use super::*;
 

@@ -3,8 +3,8 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use spire::backend::Noop;
 use spire::frontier::seed::Seed;
-use spire::request::http::HeaderValue;
-use spire::request::http::header::USER_AGENT;
+use spire::http::http::HeaderValue;
+use spire::http::http::header::USER_AGENT;
 use spire::worker::middleware::SetHeader;
 use spire::worker::{Worker, WorkerExt, from_fn};
 use spire::{Context, Crawler, Router};

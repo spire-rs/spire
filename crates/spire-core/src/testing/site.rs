@@ -2,15 +2,14 @@ use std::collections::{HashMap, HashSet};
 use std::future::{Future, ready};
 use std::sync::{Arc, Mutex};
 
+use ::http::{HeaderMap, StatusCode, Uri};
 use bytes::Bytes;
-use http::{HeaderMap, StatusCode, Uri};
 
 use super::{MockPage, Visit};
-use crate::backend::{Backend, Client, StatusPolicy};
+use crate::backend::{Backend, Session, StatusPolicy};
 use crate::frontier::seed::Seed;
+use crate::http::{Request, Response, ResponseExt};
 use crate::identity::Identity;
-use crate::request::Request;
-use crate::response::{Response, ResponseExt};
 use crate::sync::lock;
 use crate::{Error, Result};
 
@@ -29,7 +28,7 @@ const MAX_REDIRECTS: usize = 10;
 /// # Examples
 ///
 /// ```
-/// use spire_core::Crawler;
+/// use spire_core::crawler::Crawler;
 /// use spire_core::frontier::seed::Seed;
 /// use spire_core::testing::{MockPage, MockSite};
 /// use spire_core::worker::from_fn;
@@ -154,8 +153,8 @@ impl MockSite {
 /// `headers`, as a server answering `304 Not Modified` decides: an
 /// `If-None-Match` naming the page's `ETag`, or an `If-Modified-Since` equal
 /// to its `Last-Modified`.
-fn not_modified(request: &Request, headers: &http::HeaderMap) -> bool {
-    use http::header::{ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED};
+fn not_modified(request: &Request, headers: &::http::HeaderMap) -> bool {
+    use ::http::header::{ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED};
 
     let asked = request.headers();
     if let (Some(etag), Some(none_match)) = (headers.get(ETAG), asked.get(IF_NONE_MATCH)) {
@@ -182,40 +181,41 @@ pub(super) fn parse(uri: &str) -> Uri {
 }
 
 impl Backend for MockSite {
-    type Client = MockClient;
+    type Session = MockSession;
 
-    fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send {
-        ready(Ok(self.client(None)))
+    fn connect(&self) -> impl Future<Output = Result<Self::Session>> + Send {
+        ready(Ok(self.session(None)))
     }
 
     /// Records each request's identity, see [`MockSite::sent`], and refuses
     /// those [unreachable](MockSite::unreachable_through). Proxies are
     /// accepted, as nothing is sent through them.
-    fn connect_as(&self, identity: &Identity) -> impl Future<Output = Result<Self::Client>> + Send {
-        ready(Ok(self.client(Some(identity.clone()))))
+    fn connect_as(
+        &self,
+        identity: &Identity,
+    ) -> impl Future<Output = Result<Self::Session>> + Send {
+        ready(Ok(self.session(Some(identity.clone()))))
     }
 }
 
 impl MockSite {
-    fn client(&self, identity: Option<Identity>) -> MockClient {
-        MockClient {
+    fn session(&self, identity: Option<Identity>) -> MockSession {
+        MockSession {
             site: self.clone(),
             identity,
-            body: Mutex::new(None),
         }
     }
 }
 
-/// The [`Client`] of a [`MockSite`], for one request.
+/// The [`Session`] of a [`MockSite`], for one request.
 #[derive(Debug)]
-pub struct MockClient {
+pub struct MockSession {
     site: MockSite,
     identity: Option<Identity>,
-    body: Mutex<Option<Bytes>>,
 }
 
-impl MockClient {
-    async fn serve(&self, request: &Request) -> Result<Response<()>> {
+impl MockSession {
+    async fn serve(&self, request: &Request) -> Result<Response> {
         let identity = self
             .identity
             .as_ref()
@@ -246,18 +246,12 @@ impl MockClient {
 
         // As the real backends, an error status is rejected with no body.
         let head = self.site.status_policy.check(head)?;
-        *lock(&self.body) = Some(if unchanged { Bytes::new() } else { page.body });
-        Ok(head)
+        Ok(head.map(|()| if unchanged { Bytes::new() } else { page.body }))
     }
 }
 
-impl Client for MockClient {
-    fn fetch(&self, request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
+impl Session for MockSession {
+    fn fetch(&self, request: &Request) -> impl Future<Output = Result<Response>> + Send {
         self.serve(request)
-    }
-
-    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
-        let body = lock(&self.body).clone();
-        ready(body.ok_or_else(|| Error::worker("the request was not fetched yet")))
     }
 }

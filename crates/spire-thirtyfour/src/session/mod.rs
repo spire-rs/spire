@@ -1,3 +1,6 @@
+mod document;
+mod navigation;
+
 use std::fmt;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -5,27 +8,29 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use deadpool::managed::Object;
-use spire_core::backend::{Client, StatusPolicy};
-use spire_core::http::header::{
+use futures::future::BoxFuture;
+use spire_core::backend::document::{Document, DocumentLinks};
+use spire_core::backend::{Session, StatusPolicy};
+use spire_core::http::http::header::{
     CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, HeaderValue, TRANSFER_ENCODING,
 };
-use spire_core::request::Request;
-use spire_core::response::{Response, ResponseExt};
+use spire_core::http::{Request, Response, ResponseExt};
 use spire_core::{Error, Result};
 use thirtyfour::WebDriver;
 use thirtyfour::bidi::{BiDi, BrowsingContextId};
 
+use self::navigation::{Overrides, navigate};
+use crate::backend::pool::Sessions;
 use crate::error::from_webdriver;
-use crate::navigate::{Overrides, navigate};
-use crate::pool::Sessions;
 
 /// A pooled WebDriver session, handed out for one request.
 ///
 /// Each request gets a tab of its own, in a fresh browser profile unless the
 /// backend keeps session state, so cookies and storage do not leak between
-/// requests. [`fetch`](Client::fetch) navigates the tab to the request URI,
-/// and [`body`](Client::body) returns the page as currently rendered, so it
-/// reflects whatever scripts and interaction changed since it loaded.
+/// requests. [`fetch`](Session::fetch) navigates the tab to the request URI,
+/// returning a complete response with a fixed HTML snapshot. Later changes
+/// are read through [`page_source`](Self::page_source) or the live
+/// [`Document`](spire_core::backend::document::Document) capability.
 /// Through [`Deref`], the session also exposes the full [`WebDriver`] API,
 /// pointed at the request's tab; it returns to the pool when dropped.
 ///
@@ -109,7 +114,7 @@ impl fmt::Debug for ThirtyfourSession {
     }
 }
 
-impl Client for ThirtyfourSession {
+impl Session for ThirtyfourSession {
     /// Navigates the tab to the request URI, sent with its method, headers
     /// and body, and returns the head of the response the page ended on
     /// after redirects, checked against the backend's [`StatusPolicy`].
@@ -117,7 +122,7 @@ impl Client for ThirtyfourSession {
     /// The head has the page's status and headers, but the body is the
     /// rendered document serialized as HTML, so its content type is always
     /// `text/html; charset=utf-8`, whatever the server sent.
-    async fn fetch(&self, request: &Request) -> Result<Response<()>> {
+    async fn fetch(&self, request: &Request) -> Result<Response> {
         let overrides = Overrides {
             method: request.method().clone(),
             headers: request.headers().clone(),
@@ -143,14 +148,24 @@ impl Client for ThirtyfourSession {
         headers.insert(CONTENT_TYPE, content_type);
         head.set_final_uri(navigation.uri().clone());
         self.navigated.store(true, Ordering::Release);
-        self.status_policy.check(head)
+        let head = self.status_policy.check(head)?;
+        let body = Bytes::from(self.page_source().await?);
+        Ok(head.map(|()| body))
     }
 
-    /// Returns the page as currently rendered.
-    async fn body(&self) -> Result<Bytes> {
-        if !self.navigated.load(Ordering::Acquire) {
-            return Err(Error::worker("the request was not fetched yet"));
-        }
-        Ok(Bytes::from(self.page_source().await?))
+    /// Returns the live DOM capability, separate from the response snapshot.
+    fn document(&self) -> Option<&dyn Document> {
+        Some(self)
+    }
+}
+
+impl Document for ThirtyfourSession {
+    fn links<'a>(&'a self, selector: Option<&'a str>) -> BoxFuture<'a, Result<DocumentLinks>> {
+        Box::pin(async move {
+            if !self.navigated.load(Ordering::Acquire) {
+                return Err(Error::worker("the request was not fetched yet"));
+            }
+            self::document::capture(self, selector).await
+        })
     }
 }

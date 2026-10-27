@@ -44,6 +44,11 @@ benchmark on macOS, pushing and popping a seed takes about 0.6 ms with batched
 syncs and about 11 ms with `sync_always`, twenty times slower; run
 `make bench ARGS=redb` to measure your own machine.
 
+## Feature flags
+
+This crate has no feature flags. Enable `redb` on `spire` to use its
+re-exports, or depend on `spire-redb` directly.
+
 ## Usage
 
 ```rust,no_run
@@ -51,7 +56,8 @@ use spire_core::backend::Noop;
 use spire_core::frontier::FrontierExt;
 use spire_core::frontier::seed::Seed;
 use spire_core::worker::from_fn;
-use spire_core::{Context, Crawler};
+use spire_core::crawler::Crawler;
+use spire_core::Context;
 use spire_redb::RedbStore;
 
 async fn example() -> spire_core::Result<()> {

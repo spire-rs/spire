@@ -1,15 +1,13 @@
 //! Responses and their crawl metadata.
 
-mod meta;
-
+use ::http::Uri;
 use bytes::Bytes;
-use http::Uri;
 
-pub(crate) use self::meta::ResponseMeta;
+use super::meta::ResponseMeta;
 
-/// An HTTP response, with its body in memory, or without one: a client
-/// returns the head, `Response<()>`, and its body separately.
-pub type Response<B = Bytes> = http::Response<B>;
+/// An HTTP response with its body in memory by default. Sessions return
+/// complete responses; helpers may use another body type, such as `()`.
+pub type Response<B = Bytes> = ::http::Response<B>;
 
 /// Reads and writes crawl metadata on a [`Response`].
 pub trait ResponseExt {
@@ -23,7 +21,7 @@ pub trait ResponseExt {
     fn set_final_uri(&mut self, uri: Uri);
 }
 
-impl<B> ResponseExt for http::Response<B> {
+impl<B> ResponseExt for ::http::Response<B> {
     fn final_uri(&self) -> Option<&Uri> {
         self.extensions().get::<ResponseMeta>()?.final_uri.as_ref()
     }

@@ -2,11 +2,12 @@ use std::any::type_name;
 use std::convert::Infallible;
 use std::future::{Future, ready};
 
+use crate::crawler::{Attempt, Depth, Tag, Tags};
 use crate::dataset::Data;
 use crate::extract::FromContext;
 use crate::frontier::queue::Queue;
-use crate::request::http::Uri;
-use crate::request::{Attempt, Depth, RequestExt, Tag, Tags};
+use crate::http::RequestExt;
+use crate::http::http::Uri;
 use crate::{Context, Error, Result};
 
 impl<C, S> FromContext<C, S> for Uri

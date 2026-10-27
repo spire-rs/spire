@@ -59,7 +59,7 @@ use spire::extract::html::Select;
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::handler::{Collect, FollowLinks};
-use spire::request::Tags;
+use spire::crawler::Tags;
 use spire::{Crawler, Result, Router};
 
 /// The kinds of page the crawl visits, routed by tag.
@@ -116,6 +116,34 @@ serving several variants takes `page: Page` as an argument. A URL is fetched
 once whatever its tag. Error statuses become failures: `5xx` and `429` are
 retried, honouring `Retry-After`.
 
+## Feature flags
+
+Defaults are `html` and `rustls-tls`; choose an HTTP or browser backend
+explicitly. `full` enables every feature below except `native-tls` and
+`testing`. Backend-specific options are enabled on their own crates.
+
+| Feature | Enables |
+|---|---|
+| `html` (default) | `Html`, `Element`, `Links`, `Meta`, `JsonLd`, `Select`, `Collect` and `FollowLinks` |
+| `markdown` | The `Markdown` extractor; also enables `html` |
+| `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
+| `reqwest` | `ReqwestBackend` and the reqwest re-export |
+| `thirtyfour` | `ThirtyfourBackend`, `Tab` and the thirtyfour re-export |
+| `user-agents` | Browser profiles and matching navigation headers for identities |
+| `robots` | Obeying robots.txt with `Crawler::with_robots` |
+| `sitemap` | The `Sitemap` extractor and `FollowSitemap` handler |
+| `serde` | Serializable seeds, fingerprints and Bloom snapshots |
+| `json` | `JsonlDataset`; also enables `serde` |
+| `csv` | `CsvDataset`; also enables `serde` |
+| `redb` | Crash-safe frontier, seen set and datasets through `RedbStore` |
+| `rustls-tls` (default) | Rustls TLS for enabled backends |
+| `native-tls` | Platform-native TLS for enabled backends |
+| `testing` | Offline testing with `MockSite`, `MockPage`, `MockSession` and `Visit` |
+| `full` | Every feature except `native-tls` and `testing` |
+
+See [Installation](https://spire-rs.github.io/spire/installation.html) for
+backend-specific compression, proxy, cookie and driver-management options.
+
 ## Guide
 
 [The Spire Book](https://spire-rs.github.io/spire) explains every part of a crawl:
@@ -128,8 +156,9 @@ retried, honouring `Retry-After`.
   [state](https://spire-rs.github.io/spire/state.html),
   [HTML](https://spire-rs.github.io/spire/html.html), and [storing results](https://spire-rs.github.io/spire/datasets.html)
 - **Discovering pages**: [following links](https://spire-rs.github.io/spire/links.html),
-  [best-first crawling](https://spire-rs.github.io/spire/best-first.html), and
-  [sitemaps](https://spire-rs.github.io/spire/sitemaps.html)
+  [best-first crawling](https://spire-rs.github.io/spire/best-first.html),
+  [sitemaps](https://spire-rs.github.io/spire/sitemaps.html), and
+  [avoiding traps](https://spire-rs.github.io/spire/avoiding-traps.html)
 - **Fetching**: [HTTP](https://spire-rs.github.io/spire/http.html), [browsers](https://spire-rs.github.io/spire/browsers.html),
   [middleware](https://spire-rs.github.io/spire/middleware.html), and
   [identities](https://spire-rs.github.io/spire/identities.html)

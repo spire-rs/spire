@@ -8,7 +8,7 @@ use std::convert::Infallible;
 use std::fmt;
 use std::time::Duration;
 
-use http::{StatusCode, Uri};
+use ::http::{StatusCode, Uri};
 
 /// A result whose error defaults to [`Error`].
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -216,14 +216,14 @@ impl From<Infallible> for Error {
     }
 }
 
-impl From<http::Error> for Error {
-    fn from(error: http::Error) -> Self {
+impl From<::http::Error> for Error {
+    fn from(error: ::http::Error) -> Self {
         Self::invalid("invalid request").with_source(error)
     }
 }
 
-impl From<http::uri::InvalidUri> for Error {
-    fn from(error: http::uri::InvalidUri) -> Self {
+impl From<::http::uri::InvalidUri> for Error {
+    fn from(error: ::http::uri::InvalidUri) -> Self {
         Self::invalid("invalid uri").with_source(error)
     }
 }

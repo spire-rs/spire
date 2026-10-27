@@ -7,13 +7,13 @@
 //! each page once.
 
 use spire::backend::ReqwestBackend;
+use spire::crawler::Tags;
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::html::{Element, Links, Select};
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
-use spire::request::Tags;
-use spire::request::http::Uri;
+use spire::http::http::Uri;
 use spire::{Crawler, Result, Router};
 use tracing_subscriber::EnvFilter;
 

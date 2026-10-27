@@ -5,9 +5,9 @@ use std::marker::PhantomData;
 use tokio::time::Instant;
 
 use crate::Result;
+use crate::crawler::Revisit;
 use crate::frontier::seed::Seed;
 use crate::frontier::{Ack, Admission, Frontier, Pop, Report, Schedule};
-use crate::request::Revisit;
 
 /// Crawls pages again on a schedule, see
 /// [`FrontierExt::revisit`](crate::frontier::FrontierExt::revisit).
@@ -101,9 +101,9 @@ mod tests {
     use tokio::time::advance;
 
     use super::*;
+    use crate::crawler::{Tag, Tags};
     use crate::frontier::test_util::{pop_path, seed};
     use crate::frontier::{FrontierExt, InMemFrontier};
-    use crate::request::{Tag, Tags};
 
     #[derive(Debug, Clone, Copy)]
     enum Page {
@@ -172,7 +172,7 @@ mod tests {
             panic!("expected the revisit");
         };
         assert_eq!(revisit.uri().path(), "/list");
-        assert_eq!(revisit.attempt(), crate::request::Attempt::FIRST);
+        assert_eq!(revisit.attempt(), crate::crawler::Attempt::FIRST);
 
         // A failure schedules it again too: the page may come back.
         frontier.report(Report::Failed(revisit)).await.unwrap();

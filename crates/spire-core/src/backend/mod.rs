@@ -1,41 +1,40 @@
-//! Backends and the clients they hand out.
+//! Backends and the sessions they hand out.
 //!
-//! A [`Backend`] is shared by the whole crawl and hands out one [`Client`]
+//! A [`Backend`] is shared by the whole crawl and hands out one [`Session`]
 //! per request: an HTTP client, a pooled browser session, or anything else
 //! that turns a [`Request`] into a [`Response`].
 
+pub mod document;
 mod noop;
 mod status;
 
 use std::future::Future;
 
-use bytes::Bytes;
 pub use noop::Noop;
 pub use status::StatusPolicy;
 
 use crate::Result;
+use crate::http::{Request, Response};
 use crate::identity::Identity;
-use crate::request::Request;
-use crate::response::Response;
 
-/// Hands out a [`Client`] for every request of a crawl.
+/// Hands out a [`Session`] for every request of a crawl.
 pub trait Backend: Send + Sync + 'static {
-    /// The client used to fetch a single request.
-    type Client: Client;
+    /// The session used to fetch a single request.
+    type Session: Session;
 
-    /// Returns a client for the next request, sent directly, from the
+    /// Returns a session for the next request, sent directly, from the
     /// crawler itself, with the backend's own cookies and sessions.
     ///
     /// # Errors
     ///
-    /// Returns an error if no client can be created, e.g. when a pool is
+    /// Returns an error if no session can be created, e.g. when a pool is
     /// exhausted or a browser fails to start.
-    fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send;
+    fn connect(&self) -> impl Future<Output = Result<Self::Session>> + Send;
 
-    /// Returns a client for the next request, which goes out as `identity`,
+    /// Returns a session for the next request, which goes out as `identity`,
     /// for a crawl with [identities](crate::identity).
     ///
-    /// The client must send its request through the identity's
+    /// The session must send its request through the identity's
     /// [proxy](Identity::proxy), and keep each identity's cookies and
     /// session state apart from every other's, so that one identity always
     /// looks like one visitor. The identity's [headers](Identity::headers)
@@ -50,9 +49,12 @@ pub trait Backend: Send + Sync + 'static {
     /// # Errors
     ///
     /// Returns an [`Invalid`](crate::ErrorKind::Invalid) error if the
-    /// identity's proxy is not supported, or an error if no client can be
+    /// identity's proxy is not supported, or an error if no session can be
     /// created.
-    fn connect_as(&self, identity: &Identity) -> impl Future<Output = Result<Self::Client>> + Send {
+    fn connect_as(
+        &self,
+        identity: &Identity,
+    ) -> impl Future<Output = Result<Self::Session>> + Send {
         let supported = identity.require_no_proxy();
         async move {
             supported?;
@@ -61,27 +63,28 @@ pub trait Backend: Send + Sync + 'static {
     }
 }
 
-/// Loads the page of the one [`Request`] it is handed out for.
+/// Fetches one request using a backend's resources.
 ///
-/// [`fetch`](Self::fetch) sends the request, or navigates to it, and returns
-/// the response's head: its status, headers and final URI.
-/// [`body`](Self::body) then returns the page's content: the bytes received
-/// for an HTTP client, or the page as currently rendered for a browser.
-/// [`Context`](crate::Context) fetches once and keeps the head; a failed
-/// fetch may be tried again.
-pub trait Client: Send + Sync + 'static {
-    /// Sends `request`, or navigates to it, returning the response's head.
+/// A successful fetch returns a complete response with an immutable `Bytes`
+/// body. HTTP sessions return the received bytes; browser sessions return
+/// an HTML snapshot captured after navigation. A live browser document is
+/// a separate optional capability, accessed through [`Self::document`].
+/// [`Context`](crate::Context) caches the first successful response.
+pub trait Session: Send + Sync + 'static {
+    /// Fetches `request`, returning its status, headers, final URI and body.
     ///
     /// # Errors
     ///
-    /// Returns an error if the request cannot be sent or the transfer fails.
-    fn fetch(&self, request: &Request) -> impl Future<Output = Result<Response<()>>> + Send;
+    /// Returns an error if fetching, status checking or reading the body fails.
+    fn fetch(&self, request: &Request) -> impl Future<Output = Result<Response>> + Send;
 
-    /// Returns the content of the fetched page.
+    /// Returns the live document capability, if this session has a DOM.
     ///
-    /// # Errors
-    ///
-    /// Returns an error if nothing was fetched yet or the content cannot be
-    /// read.
-    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send;
+    /// This reports support, not navigation state. Operations on the
+    /// document may fail before a page is fetched. Fetch through the
+    /// context before querying it; capture failures must not silently
+    /// fall back to parsing the response snapshot.
+    fn document(&self) -> Option<&dyn document::Document> {
+        None
+    }
 }

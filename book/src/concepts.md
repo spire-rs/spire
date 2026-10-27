@@ -7,7 +7,7 @@ A crawl moves *seeds* from a *frontier*, through a *backend* and a
             ┌──────────┐  pop   ┌─────────┐ connect ┌─────────┐
   seeds ──▶ │ Frontier │ ─────▶ │ Crawler │ ──────▶ │ Backend │
             └──────────┘        └─────────┘         └─────────┘
-                 ▲                   │ Context          │ Client
+                 ▲                   │ Context          │ Session
           follow │                   ▼                  │
                  │      ┌──────────────────────────┐    │
                  └───── │ Worker: Router, handlers │ ◀──┘ fetch

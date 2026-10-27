@@ -36,7 +36,7 @@ pub fn derive_from_ref(input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Derives `spire::request::Revisit` for an enum of unit variants: a
+/// Derives `spire::crawler::Revisit` for an enum of unit variants: a
 /// variant with `#[revisit("1d")]` is crawled again that long after, one
 /// without is crawled once.
 ///
@@ -51,9 +51,9 @@ pub fn derive_revisit(input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Derives `spire::request::Tags` for an enum of unit variants.
+/// Derives `spire::crawler::Tags` for an enum of unit variants.
 ///
-/// See the documentation of `spire::request::Tags` for the attributes.
+/// See the documentation of `spire::crawler::Tags` for the attributes.
 #[proc_macro_derive(Tags, attributes(tag))]
 pub fn derive_tags(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

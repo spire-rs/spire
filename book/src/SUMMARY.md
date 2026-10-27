@@ -21,6 +21,7 @@
 - [Following links](links.md)
 - [Best-first crawling](best-first.md)
 - [Sitemaps](sitemaps.md)
+- [Avoiding traps](avoiding-traps.md)
 
 # Fetching
 

@@ -201,18 +201,18 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
 
     let ident = &input.ident;
     Ok(quote! {
-        impl ::core::convert::From<#ident> for ::spire::request::Tag {
+        impl ::core::convert::From<#ident> for ::spire::crawler::Tag {
             fn from(tag: #ident) -> Self {
-                ::spire::request::Tag::from_static(match tag {
+                ::spire::crawler::Tag::from_static(match tag {
                     #(#ident::#variants => #names,)*
                 })
             }
         }
 
-        impl ::spire::request::Tags for #ident {
+        impl ::spire::crawler::Tags for #ident {
             const ALL: &'static [Self] = &[#(Self::#variants),*];
 
-            fn from_tag(tag: &::spire::request::Tag) -> ::core::option::Option<Self> {
+            fn from_tag(tag: &::spire::crawler::Tag) -> ::core::option::Option<Self> {
                 match tag.as_str() {
                     #(#names => ::core::option::Option::Some(Self::#variants),)*
                     _ => ::core::option::Option::None,

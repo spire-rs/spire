@@ -1,14 +1,13 @@
 use std::time::Duration;
 
-use http::header::{CONTENT_TYPE, RETRY_AFTER};
-use http::{HeaderValue, StatusCode};
+use ::http::header::{CONTENT_TYPE, RETRY_AFTER};
+use ::http::{HeaderValue, StatusCode};
 
 use super::{MockPage, MockSite};
-use crate::backend::{Backend, Client, StatusPolicy};
+use crate::backend::{Backend, Session, StatusPolicy};
 use crate::dataset::InMemDataset;
 use crate::frontier::seed::Seed;
-use crate::request::Request;
-use crate::response::ResponseExt;
+use crate::http::{Request, ResponseExt};
 use crate::worker::{Outcome, from_fn};
 use crate::{Context, ErrorKind, Result};
 
@@ -28,8 +27,34 @@ async fn serves_pages_and_records_requests() {
     assert_eq!(head.status(), StatusCode::OK);
     assert_eq!(head.headers()[CONTENT_TYPE], "text/html; charset=utf-8");
     assert_eq!(head.final_uri().unwrap(), "https://example.com/");
-    assert_eq!(client.body().await.unwrap(), "<p>Home</p>");
+    assert_eq!(head.body(), "<p>Home</p>");
     assert_eq!(site.clone().requests(), ["https://example.com/"]);
+}
+
+#[tokio::test]
+async fn responses_own_their_bodies_across_later_fetches_and_failures() {
+    let site = MockSite::new()
+        .page("https://example.com/one", MockPage::text("one"))
+        .page("https://example.com/two", MockPage::text("two"));
+    let session = site.connect().await.unwrap();
+    let first = session
+        .fetch(&request("https://example.com/one"))
+        .await
+        .unwrap();
+    let second = session
+        .fetch(&request("https://example.com/two"))
+        .await
+        .unwrap();
+    assert!(
+        session
+            .fetch(&request("https://example.com/missing"))
+            .await
+            .is_err()
+    );
+    assert_eq!(first.body(), "one");
+    assert_eq!(second.body(), "two");
+    assert_eq!(first.final_uri().unwrap(), "https://example.com/one");
+    assert_eq!(second.final_uri().unwrap(), "https://example.com/two");
 }
 
 #[tokio::test]
@@ -55,7 +80,7 @@ async fn follows_redirects() {
         .await
         .unwrap();
     assert_eq!(head.final_uri().unwrap(), "https://example.com/c");
-    assert_eq!(client.body().await.unwrap(), "c");
+    assert_eq!(head.body(), "c");
 
     let error = client
         .fetch(&request("https://example.com/loop"))
@@ -78,10 +103,6 @@ async fn error_statuses_follow_the_status_policy() {
         .unwrap_err();
     assert_eq!(missing.kind(), ErrorKind::Rejected);
     assert_eq!(missing.status(), Some(StatusCode::NOT_FOUND));
-    assert!(
-        client.body().await.is_err(),
-        "no body before a fetch succeeds"
-    );
 
     let busy = client
         .fetch(&request("https://example.com/busy"))
@@ -102,7 +123,7 @@ async fn error_statuses_follow_the_status_policy() {
     assert_eq!(head.status(), StatusCode::NOT_FOUND);
 }
 
-async fn page(cx: Context<super::MockClient>) -> Result<()> {
+async fn page(cx: Context<super::MockSession>) -> Result<()> {
     let body = cx.body().await?;
     cx.dataset::<String>()?
         .write(String::from_utf8_lossy(&body).into_owned())

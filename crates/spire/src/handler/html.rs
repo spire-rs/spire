@@ -4,20 +4,18 @@ use std::sync::Arc;
 
 use scraper::Selector;
 
-use crate::backend::Client;
+use crate::backend::Session;
+use crate::crawler::Tag;
 use crate::extract::FromContext;
 use crate::extract::html::{Element, Html, Links, PageLink, Select};
 use crate::frontier::queue::Link;
 use crate::handler::Handler;
-use crate::request::Tag;
-use crate::request::http::Uri;
-use crate::response::ResponseExt;
 use crate::worker::{IntoOutcome, Outcome};
 use crate::{Context, TRACING_TARGET};
 
 /// A handler that follows the links of a page, queueing them with a tag.
 ///
-/// By default it follows every `<a href>`; [`select`](Self::select)
+/// By default it follows visible `<a href>` and `<area href>` links; [`select`](Self::select)
 /// narrows it to the elements matching a CSS selector, e.g. a pagination
 /// link. Which links are crawled is still up to the frontier: its scope,
 /// deduplication and depth limits apply. Combine it with other handlers in a
@@ -37,6 +35,7 @@ pub struct FollowLinks {
     tag: Tag,
     selector: Option<(Arc<str>, Selector)>,
     skip_nofollow: bool,
+    include_hidden: bool,
     page_scorer: Option<Arc<PageScorer>>,
     link_scorer: Option<Arc<LinkScorer>>,
 }
@@ -48,12 +47,13 @@ type PageScorer = dyn Fn(&Html) -> i32 + Send + Sync;
 type LinkScorer = dyn Fn(&PageLink) -> i32 + Send + Sync;
 
 impl FollowLinks {
-    /// Follows every link of the page, queueing it with `tag`.
+    /// Follows visible and unknown links of the page, queueing them with `tag`.
     pub fn new(tag: impl Into<Tag>) -> Self {
         Self {
             tag: tag.into(),
             selector: None,
             skip_nofollow: false,
+            include_hidden: false,
             page_scorer: None,
             link_scorer: None,
         }
@@ -68,6 +68,14 @@ impl FollowLinks {
         let selector = Selector::parse(css)
             .unwrap_or_else(|error| panic!("invalid CSS selector `{css}`: {error}"));
         self.selector = Some((css.into(), selector));
+        self
+    }
+
+    /// Includes hidden links too. By default, [`Links::visible`] leaves
+    /// them out, using a DOM client's rendered observations or an HTML-only
+    /// estimate for clients without a DOM. Unknown links are always kept.
+    pub const fn include_hidden(mut self) -> Self {
+        self.include_hidden = true;
         self
     }
 
@@ -128,10 +136,11 @@ impl FollowLinks {
 
     /// Every link to follow, resolved against the page served from `uri`,
     /// as a browser does.
-    fn links(&self, page: &Html, uri: &Uri) -> Vec<Link> {
-        let links = match &self.selector {
-            Some((_, selector)) => Links::from_elements(page, uri, page.0.select(selector)),
-            None => page.links(uri),
+    fn links(&self, links: Links, page_score: i32) -> Vec<Link> {
+        let links = if self.include_hidden {
+            links
+        } else {
+            links.visible()
         };
         let links = if self.skip_nofollow {
             links.followable()
@@ -140,7 +149,6 @@ impl FollowLinks {
         };
 
         let scored = self.page_scorer.is_some() || self.link_scorer.is_some();
-        let page_score = self.page_scorer.as_ref().map_or(0, |scorer| scorer(page));
         links
             .into_iter()
             .map(|link| {
@@ -162,6 +170,7 @@ impl fmt::Debug for FollowLinks {
             .field("tag", &self.tag)
             .field("selector", &self.selector.as_ref().map(|(css, _)| css))
             .field("skip_nofollow", &self.skip_nofollow)
+            .field("include_hidden", &self.include_hidden)
             .field("score_page", &self.page_scorer.is_some())
             .field("score_links", &self.link_scorer.is_some())
             .finish()
@@ -170,15 +179,23 @@ impl fmt::Debug for FollowLinks {
 
 impl<C, S> Handler<C, FollowLinks, S> for FollowLinks
 where
-    C: Client,
+    C: Session,
     S: Send + Sync + 'static,
 {
     async fn call(&self, cx: &Context<C>, state: &S) -> Outcome {
         let follow = async {
-            let html = Html::from_context(cx, state).await?;
-            let response = cx.response().await?;
-            let uri = response.final_uri().unwrap_or_else(|| cx.request().uri());
-            let links = self.links(&html, uri);
+            let page_score = if let Some(scorer) = &self.page_scorer {
+                let html = Html::from_context(cx, state).await?;
+                scorer(&html)
+            } else {
+                0
+            };
+            let selector = self
+                .selector
+                .as_ref()
+                .map(|(css, selector)| (css.as_ref(), selector));
+            let links = Links::read(cx, state, selector).await?;
+            let links = self.links(links, page_score);
             let queued = cx.queue().follow_all(links).await?;
             tracing::debug!(target: TRACING_TARGET, queued, tag = %self.tag, "followed links");
             Ok::<_, crate::Error>(())
@@ -249,7 +266,7 @@ impl<T> fmt::Debug for Collect<T> {
 
 impl<C, S, T> Handler<C, Collect<T>, S> for Collect<T>
 where
-    C: Client,
+    C: Session,
     S: Send + Sync + 'static,
     T: Select + Send + 'static,
 {

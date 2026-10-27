@@ -51,7 +51,7 @@ impl Visit {
     ///
     /// Each run is a new request: running twice fetches twice, and adds to
     /// the same queue and datasets.
-    pub async fn run<W: Worker<<MockSite as Backend>::Client>>(&self, worker: &W) -> Outcome {
+    pub async fn run<W: Worker<<MockSite as Backend>::Session>>(&self, worker: &W) -> Outcome {
         let client = match self.site.connect().await {
             Ok(client) => client,
             Err(error) => return Outcome::Fail(error),

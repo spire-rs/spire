@@ -4,6 +4,7 @@ mod concurrency;
 mod connector;
 mod delay;
 mod hosts;
+mod meta;
 #[cfg(feature = "robots")]
 mod robots;
 mod run;
@@ -18,6 +19,7 @@ use std::time::Duration;
 
 pub use concurrency::HostConcurrency;
 pub use delay::HostDelay;
+pub use meta::{Attempt, Depth, Revisit, Tag, Tags};
 #[cfg(feature = "robots")]
 #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
 pub use robots::Robots;
@@ -68,7 +70,8 @@ const DEFAULT_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 /// use spire_core::frontier::seed::Seed;
 /// use spire_core::frontier::{FrontierExt, InMemFrontier};
 /// use spire_core::worker::from_fn;
-/// use spire_core::{Context, Crawler, Result};
+/// use spire_core::crawler::Crawler;
+/// use spire_core::{Context, Result};
 ///
 /// async fn handle(cx: Context<Noop>) -> Result<()> {
 ///     cx.queue().follow("https://example.com/next").await?;
@@ -137,7 +140,7 @@ impl<B, W> Crawler<B, W> {
     pub fn new(backend: B, worker: W) -> Self
     where
         B: Backend,
-        W: Worker<B::Client>,
+        W: Worker<B::Session>,
     {
         let frontier = InMemFrontier::fifo().retry_with(RetryPolicy::default());
         let settings = Settings {
@@ -256,7 +259,8 @@ impl<B, W> Crawler<B, W> {
     /// use spire_core::backend::Noop;
     /// use spire_core::crawler::Robots;
     /// use spire_core::worker::from_fn;
-    /// use spire_core::{Context, Crawler};
+    /// use spire_core::crawler::Crawler;
+    /// use spire_core::Context;
     ///
     /// let worker = from_fn(|_: Context<Noop>| async {});
     /// let crawler = Crawler::new(Noop, worker).with_robots("MyBot");
@@ -301,7 +305,8 @@ impl<B, W> Crawler<B, W> {
     /// use spire_core::backend::Noop;
     /// use spire_core::identity::{Identities, Identity};
     /// use spire_core::worker::from_fn;
-    /// use spire_core::{Context, Crawler};
+    /// use spire_core::crawler::Crawler;
+    /// use spire_core::Context;
     ///
     /// let identities = Identities::new([Identity::new("a"), Identity::new("b")]);
     /// let worker = from_fn(|_: Context<Noop>| async {});

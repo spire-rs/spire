@@ -1,7 +1,7 @@
 use derive_more::{Deref, DerefMut};
 use scraper::ElementRef;
 
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::extract::FromContext;
 use crate::extract::html::Html;
 use crate::{Context, Error, Result};
@@ -94,7 +94,7 @@ pub struct Element<T>(pub T);
 
 impl<C, S, T> FromContext<C, S> for Element<T>
 where
-    C: Client,
+    C: Session,
     S: Sync,
     T: Select + Send,
 {

@@ -76,8 +76,8 @@ depend on the server can be tested too:
 ```rust
 use std::time::Duration;
 
-use spire::request::http::header::{ETAG, RETRY_AFTER};
-use spire::request::http::{HeaderValue, StatusCode};
+use spire::http::http::header::{ETAG, RETRY_AFTER};
+use spire::http::http::{HeaderValue, StatusCode};
 use spire::testing::{MockPage, MockSite};
 
 let site = MockSite::new()

@@ -5,27 +5,26 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
+use ::http::StatusCode;
 use bytes::Bytes;
-use http::StatusCode;
 use tokio::sync::OnceCell;
 use tokio::time::Instant;
 
 use crate::Result;
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::dataset::{Data, Dataset, Datasets};
 use crate::frontier::InMemFrontier;
 use crate::frontier::queue::Queue;
-use crate::request::Request;
-use crate::response::{Response, ResponseExt};
+use crate::http::{Request, Response, ResponseExt};
 
 /// A request being crawled, with everything needed to handle it.
 ///
-/// It holds the [`Request`], a client to fetch it with, a [`Queue`] to add
+/// It holds the [`Request`], a session to fetch it with, a [`Queue`] to add
 /// the links it leads to, and the crawl's datasets. Handlers borrow it, so
 /// several of them can handle one request: the request is fetched once, by
 /// the first [`response`](Self::response) or [`body`](Self::body), and the
-/// response's head is kept. The body is always read from the client, so a
-/// browser page reads as currently rendered.
+/// complete response is kept. Its body is a fixed snapshot, including for
+/// browser sessions; live document operations go through the session.
 ///
 /// The crawler learns how the fetch went, its time and status, from the task
 /// the request runs on. Fetching after moving the context to another task,
@@ -33,10 +32,10 @@ use crate::response::{Response, ResponseExt};
 /// [`Stats::unchanged`](crate::crawler::Stats::unchanged) do not see it.
 pub struct Context<C> {
     request: Request,
-    client: C,
+    session: C,
     queue: Queue,
     datasets: Arc<Datasets>,
-    response: OnceCell<Response<()>>,
+    response: OnceCell<Response>,
 }
 
 /// How a request's fetch went: how long it took, and the response's status.
@@ -62,20 +61,20 @@ impl<C> Context<C> {
     /// [`with_queue`](Self::with_queue) and
     /// [`with_dataset`](Self::with_dataset).
     #[must_use]
-    pub fn new(request: Request, client: C) -> Self {
+    pub fn new(request: Request, session: C) -> Self {
         let queue = Queue::new(InMemFrontier::fifo()).child_of(&request);
-        Self::from_parts(request, client, queue, Arc::default())
+        Self::from_parts(request, session, queue, Arc::default())
     }
 
     pub(crate) fn from_parts(
         request: Request,
-        client: C,
+        session: C,
         queue: Queue,
         datasets: Arc<Datasets>,
     ) -> Self {
         Self {
             request,
-            client,
+            session,
             queue,
             datasets,
             response: OnceCell::new(),
@@ -111,10 +110,10 @@ impl<C> Context<C> {
         &mut self.request
     }
 
-    /// Returns the client.
+    /// Returns the session, including any live document capability.
     #[must_use]
-    pub const fn client(&self) -> &C {
-        &self.client
+    pub const fn session(&self) -> &C {
+        &self.session
     }
 
     /// Returns the queue for the links this request leads to.
@@ -133,29 +132,29 @@ impl<C> Context<C> {
         self.datasets.get()
     }
 
-    /// Returns the response's head, fetching the request on the first call.
+    /// Returns the complete response, fetching the request on the first call.
     ///
-    /// Later calls return the same head without fetching again. A failed
+    /// Later calls return the same response without fetching again. A failed
     /// fetch is not kept: the next call tries again. Once fetched, links
     /// followed through the queue, including clones taken earlier, resolve
     /// against the URI the response was served from.
     ///
     /// # Errors
     ///
-    /// Returns an error if the client fails to fetch the request.
-    pub async fn response(&self) -> Result<&Response<()>>
+    /// Returns an error if the session fails to fetch the request.
+    pub async fn response(&self) -> Result<&Response>
     where
-        C: Client,
+        C: Session,
     {
         self.response
             .get_or_try_init(|| async {
                 let started = Instant::now();
-                let response = self.client.fetch(&self.request).await;
+                let response = self.session.fetch(&self.request).await;
                 // Outside a crawl, e.g. in a test, there is no scope to
                 // record into.
                 let fetch = Fetch {
                     latency: Some(started.elapsed()),
-                    status: response.as_ref().ok().map(http::Response::status),
+                    status: response.as_ref().ok().map(::http::Response::status),
                 };
                 let _ = FETCH.try_with(|cell| cell.set(fetch));
                 let response = response?;
@@ -167,18 +166,18 @@ impl<C> Context<C> {
             .await
     }
 
-    /// Returns the response's body, fetching the request first if needed:
-    /// the bytes received, or a browser page as currently rendered.
+    /// Returns a cheap clone of the cached response body, fetching first
+    /// if needed. Browser sessions also return a fixed HTML snapshot;
+    /// use the session's document capability for live observations.
     ///
     /// # Errors
     ///
-    /// Returns an error if the request cannot be fetched or its body read.
+    /// Returns an error if the request cannot be fetched.
     pub async fn body(&self) -> Result<Bytes>
     where
-        C: Client,
+        C: Session,
     {
-        self.response().await?;
-        self.client.body().await
+        Ok(self.response().await?.body().clone())
     }
 }
 
@@ -200,9 +199,10 @@ mod tests {
 
     use super::*;
     use crate::backend::Noop;
+    use crate::crawler::Depth;
     use crate::dataset::InMemDataset;
     use crate::frontier::seed::Seed;
-    use crate::request::{Depth, RequestExt};
+    use crate::http::RequestExt;
 
     #[tokio::test]
     async fn standalone_context() {
@@ -228,24 +228,21 @@ mod tests {
         body: std::sync::Mutex<&'static str>,
     }
 
-    impl Client for Counting {
-        fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
+    impl Session for Counting {
+        fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response>> + Send {
             let fetch = self.fetches.fetch_add(1, Ordering::SeqCst);
             std::future::ready(if fetch < self.fail {
                 Err(crate::Error::new(crate::ErrorKind::Http))
             } else {
-                Ok(Response::new(()))
+                Ok(Response::new(Bytes::from_static(
+                    self.body.lock().unwrap().as_bytes(),
+                )))
             })
-        }
-
-        fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
-            let body = *self.body.lock().unwrap();
-            std::future::ready(Ok(Bytes::from_static(body.as_bytes())))
         }
     }
 
     #[tokio::test]
-    async fn fetches_once_and_reads_the_current_body() {
+    async fn fetches_once_and_keeps_a_snapshot_of_the_body() {
         let request = Seed::get("https://example.com/").unwrap().into_request();
         let client = Counting {
             fetches: AtomicUsize::new(0),
@@ -257,9 +254,10 @@ mod tests {
         // A failed fetch is tried again; a successful one is kept.
         assert!(cx.response().await.is_err());
         assert_eq!(cx.body().await.unwrap(), "loaded");
-        *cx.client().body.lock().unwrap() = "clicked";
-        assert_eq!(cx.body().await.unwrap(), "clicked");
+        *cx.session().body.lock().unwrap() = "clicked";
+        assert_eq!(cx.body().await.unwrap(), "loaded");
+        assert_eq!(cx.response().await.unwrap().body(), "loaded");
         assert!(cx.response().await.unwrap().status().is_success());
-        assert_eq!(cx.client().fetches.load(Ordering::SeqCst), 2);
+        assert_eq!(cx.session().fetches.load(Ordering::SeqCst), 2);
     }
 }

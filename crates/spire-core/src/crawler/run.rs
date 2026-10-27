@@ -6,7 +6,7 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use http::StatusCode;
+use ::http::StatusCode;
 use tokio::task::{Id, JoinError, JoinSet};
 use tokio::time::{Instant, sleep_until, timeout};
 use tracing::Instrument;
@@ -18,12 +18,11 @@ use crate::crawler::connector::Connector;
 use crate::crawler::hosts::{Admit, Hosts};
 #[cfg(feature = "robots")]
 use crate::crawler::robots::{BackendSource, RobotsCache, RobotsSource, Verdict};
-use crate::crawler::{Crawler, Live, Stats};
+use crate::crawler::{Crawler, Live, Stats, Tag};
 use crate::frontier::queue::Queue;
 use crate::frontier::seed::Seed;
 use crate::frontier::{Ack, Pop, Report};
 use crate::identity::{Health, Identity};
-use crate::request::Tag;
 use crate::sync::lock;
 use crate::worker::{Outcome, Scope, Worker};
 use crate::{Error, ErrorKind, Result, TRACING_TARGET};
@@ -268,7 +267,7 @@ impl<B: Backend> Run<B> {
 impl<B, W> Crawler<B, W>
 where
     B: Backend,
-    W: Worker<B::Client>,
+    W: Worker<B::Session>,
 {
     /// Crawls until the frontier is empty and no request is in flight, a
     /// worker returns [`Outcome::Stop`], the budget is spent, or the run is

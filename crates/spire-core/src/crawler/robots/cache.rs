@@ -4,7 +4,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 
-use http::Uri;
+use ::http::Uri;
 use robotxt::Robots as Rules;
 use tokio::time::Instant;
 
@@ -248,7 +248,7 @@ impl RobotsCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::Tag;
+    use crate::crawler::Tag;
     use crate::{Error, ErrorKind};
 
     fn seed(uri: &str) -> Seed {

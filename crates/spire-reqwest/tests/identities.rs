@@ -7,15 +7,15 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use spire_core::crawler::Stats;
+use spire_core::crawler::{Crawler, Stats};
 use spire_core::frontier::facade::RetryPolicy;
 use spire_core::frontier::seed::Seed;
 use spire_core::frontier::{FrontierExt, InMemFrontier};
-use spire_core::http::HeaderValue;
-use spire_core::http::header::USER_AGENT;
+use spire_core::http::http::HeaderValue;
+use spire_core::http::http::header::USER_AGENT;
 use spire_core::identity::{Identities, Identity};
 use spire_core::worker::from_fn;
-use spire_core::{Context, Crawler, Error};
+use spire_core::{Context, Error};
 use spire_reqwest::{ReqwestBackend, ReqwestSession};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;

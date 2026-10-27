@@ -2,13 +2,13 @@ use std::sync::LazyLock;
 
 use html_to_markdown_rs::{ConversionOptions, PreprocessingOptions};
 use scraper::Selector;
-use spire_core::response::ResponseExt;
+use spire_core::http::ResponseExt;
 
 use super::text::{HIDDEN, MAIN};
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::extract::FromContext;
 use crate::extract::html::Html;
-use crate::request::http::Uri;
+use crate::http::http::Uri;
 use crate::{Context, Error, Result};
 
 /// A page's `<base href>`, which relative links resolve against.
@@ -34,7 +34,7 @@ pub struct Markdown(pub String);
 
 impl<C, S> FromContext<C, S> for Markdown
 where
-    C: Client,
+    C: Session,
     S: Sync,
 {
     type Rejection = Error;

@@ -13,14 +13,14 @@ middleware added last runs first:
 use std::time::Duration;
 
 use spire::backend::ReqwestBackend;
-use spire::request::http::HeaderValue;
-use spire::request::http::header::USER_AGENT;
+use spire::http::http::HeaderValue;
+use spire::http::http::header::USER_AGENT;
 use spire::worker::middleware::{self, Next, SetHeader};
 use spire::worker::{Outcome, WorkerExt};
 use spire::{Context, Crawler, Result, Router};
 
 /// Retries pages answering with a captcha, before any handler runs.
-async fn captcha<C: spire::backend::Client>(cx: Context<C>, next: Next<C>) -> Result<Outcome> {
+async fn captcha<C: spire::backend::Session>(cx: Context<C>, next: Next<C>) -> Result<Outcome> {
     if cx.response().await?.headers().contains_key("x-captcha") {
         return Ok(Outcome::Retry { after: Some(Duration::from_secs(60)) });
     }

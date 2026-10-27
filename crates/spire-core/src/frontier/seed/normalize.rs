@@ -2,7 +2,7 @@
 
 use std::fmt::Write as _;
 
-use http::Uri;
+use ::http::Uri;
 use url::Url;
 
 /// Query parameters that only track where a visitor came from.

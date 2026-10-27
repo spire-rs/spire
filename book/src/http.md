@@ -7,8 +7,7 @@ connection pool.
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::ReqwestBackend;
-use spire::backend::reqwest::Client;
+use spire::backend::{ReqwestBackend, reqwest};
 
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 // reqwest's defaults:
@@ -16,7 +15,7 @@ let backend = ReqwestBackend::default();
 
 // Or a configuration of your own, e.g. with a user agent and a timeout.
 let backend = ReqwestBackend::from_builder(|| {
-    Client::builder()
+    reqwest::Client::builder()
         .user_agent("MyBot/1.0 (+https://example.com/bot)")
         .timeout(Duration::from_secs(30))
 })?;

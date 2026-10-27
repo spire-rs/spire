@@ -97,8 +97,8 @@ impl Score for ShallowFirst {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crawler::Depth;
     use crate::frontier::test_util::seed;
-    use crate::request::Depth;
 
     #[test]
     fn keywords_count_case_insensitively_in_path_and_query() {

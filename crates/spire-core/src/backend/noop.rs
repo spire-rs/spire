@@ -1,11 +1,8 @@
 use std::future::{Future, ready};
 
-use bytes::Bytes;
-
 use crate::Result;
-use crate::backend::{Backend, Client};
-use crate::request::Request;
-use crate::response::Response;
+use crate::backend::{Backend, Session};
+use crate::http::{Request, Response};
 
 /// A backend whose client answers every request with an empty `200 OK`.
 ///
@@ -15,19 +12,15 @@ use crate::response::Response;
 pub struct Noop;
 
 impl Backend for Noop {
-    type Client = Self;
+    type Session = Self;
 
-    fn connect(&self) -> impl Future<Output = Result<Self::Client>> + Send {
+    fn connect(&self) -> impl Future<Output = Result<Self::Session>> + Send {
         ready(Ok(Self))
     }
 }
 
-impl Client for Noop {
-    fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response<()>>> + Send {
+impl Session for Noop {
+    fn fetch(&self, _request: &Request) -> impl Future<Output = Result<Response>> + Send {
         ready(Ok(Response::default()))
-    }
-
-    fn body(&self) -> impl Future<Output = Result<Bytes>> + Send {
-        ready(Ok(Bytes::new()))
     }
 }

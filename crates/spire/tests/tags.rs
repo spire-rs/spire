@@ -3,8 +3,8 @@
 #![cfg(feature = "macros")]
 
 use spire::backend::Noop;
+use spire::crawler::{Tag, Tags};
 use spire::frontier::seed::Seed;
-use spire::request::{Tag, Tags};
 use spire::worker::{Outcome, Worker};
 use spire::{Context, Router};
 
@@ -111,7 +111,7 @@ async fn extracts_the_variant() {
     assert!(matches!(router.handle(context(None)).await, Outcome::Stop));
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Tags, spire::request::Revisit)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Tags, spire::crawler::Revisit)]
 enum Fresh {
     #[revisit("1h30m")]
     Listing,
@@ -124,7 +124,7 @@ enum Fresh {
 fn revisit_intervals_come_from_the_attributes() {
     use std::time::Duration;
 
-    use spire::request::Revisit;
+    use spire::crawler::Revisit;
 
     assert_eq!(Fresh::Listing.interval(), Some(Duration::from_mins(90)));
     assert_eq!(Fresh::Product.interval(), Some(Duration::from_hours(24)));

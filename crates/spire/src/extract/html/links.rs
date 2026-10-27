@@ -1,14 +1,14 @@
 use std::sync::LazyLock;
 
 use scraper::{ElementRef, Selector};
-use spire_core::response::ResponseExt;
+use spire_core::http::ResponseExt;
 use url::Url;
 
-use crate::backend::Client;
+use crate::backend::Session;
 use crate::extract::FromContext;
 use crate::extract::html::Html;
 use crate::frontier::queue::Link;
-use crate::request::http::Uri;
+use crate::http::http::Uri;
 use crate::{Context, Error, Result};
 
 /// The links a visitor can follow: `<a href>` and `<area href>`.
@@ -19,15 +19,7 @@ static LINKS: LazyLock<Selector> =
 static BASE: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("base[href]").expect("valid selector"));
 
-/// The element a [`PageLink`] comes from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LinkKind {
-    /// An `<a href>`.
-    Anchor,
-    /// An `<area href>` of an image map.
-    Area,
-}
+pub use spire_core::backend::document::{LinkKind, Visibility};
 
 /// A link of a page, see [`Links`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +30,7 @@ pub struct PageLink {
     rel: Vec<String>,
     text: String,
     kind: LinkKind,
+    visibility: Visibility,
 }
 
 impl PageLink {
@@ -72,6 +65,13 @@ impl PageLink {
     #[must_use]
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// Returns the observed visibility. Browser captures use computed
+    /// styles and layout; HTML-only checks return `Hidden` or `Unknown`.
+    #[must_use]
+    pub const fn visibility(&self) -> Visibility {
+        self.visibility
     }
 
     /// Returns the element the link comes from.
@@ -122,6 +122,53 @@ pub struct Links {
 }
 
 impl Links {
+    /// Reads current links, using a rendered capture when the client has
+    /// a DOM, or HTML attributes and inline styles otherwise.
+    pub(crate) async fn read<C: Session, S: Sync>(
+        cx: &Context<C>,
+        state: &S,
+        selector: Option<(&str, &Selector)>,
+    ) -> Result<Self> {
+        cx.response().await?;
+        if let Some(document) = cx.session().document() {
+            let snapshot = document.links(selector.map(|(css, _)| css)).await?;
+            let base = Url::parse(&snapshot.base_uri).ok();
+            let resolver = Resolver { base };
+            let links = snapshot
+                .links
+                .into_iter()
+                .filter_map(|link| {
+                    Some(PageLink {
+                        uri: resolver.resolve(&link.href)?,
+                        href: link.href,
+                        rel: link
+                            .rel
+                            .into_iter()
+                            .map(|rel| rel.to_ascii_lowercase())
+                            .collect(),
+                        text: link.text.split_whitespace().collect::<Vec<_>>().join(" "),
+                        kind: link.kind,
+                        visibility: link.visibility,
+                    })
+                })
+                .collect();
+            return Ok(Self::new(&snapshot.uri, links));
+        }
+        let html = Html::from_context(cx, state).await?;
+        let response = cx.response().await?;
+        let page = response.final_uri().unwrap_or_else(|| cx.request().uri());
+        match selector {
+            Some((_, selector)) => {
+                let elements = html
+                    .0
+                    .select(&LINKS)
+                    .filter(|element| selector.matches(element));
+                Ok(Self::from_elements(&html, page, elements))
+            }
+            None => Ok(html.links(page)),
+        }
+    }
+
     /// Returns the links inside the elements matching `css`, e.g. a page's
     /// navigation or its article, resolved against the page served from
     /// `page`.
@@ -155,6 +202,19 @@ impl Links {
             host: page.host().map(str::to_ascii_lowercase),
             links,
         }
+    }
+
+    /// Keeps links not hidden by attributes or inline styles on themselves
+    /// or an ancestor: `hidden`, `display:none`, `visibility:hidden`,
+    /// `aria-hidden="true"` paired with `tabindex="-1"`, clipped zero-sized
+    /// boxes, or absolute/fixed positioning at least 1000px off-screen.
+    ///
+    /// Unknown links are kept. As an extractor on a DOM client, visibility
+    /// comes from the browser's computed styles and layout. HTML parsed by
+    /// hand and HTTP clients only estimate it, without stylesheets or layout.
+    #[must_use]
+    pub fn visible(self) -> Self {
+        self.retain(|link| link.visibility != Visibility::Hidden)
     }
 
     /// Keeps the links a crawler may follow: those without `rel="nofollow"`.
@@ -226,19 +286,13 @@ impl<'a> IntoIterator for &'a Links {
 
 impl<C, S> FromContext<C, S> for Links
 where
-    C: Client,
+    C: Session,
     S: Sync,
 {
     type Rejection = Error;
 
     async fn from_context(cx: &Context<C>, state: &S) -> Result<Self> {
-        let html = Html::from_context(cx, state).await?;
-        let response = cx.response().await?;
-        let page = response
-            .final_uri()
-            .unwrap_or_else(|| cx.request().uri())
-            .clone();
-        Ok(html.links(&page))
+        Self::read(cx, state, None).await
     }
 }
 
@@ -291,7 +345,7 @@ impl Resolver {
         };
         let text = match kind {
             LinkKind::Area => value.attr("alt").unwrap_or_default().to_owned(),
-            LinkKind::Anchor => element.text().collect(),
+            _ => element.text().collect(),
         };
         Some(PageLink {
             uri: self.resolve(href)?,
@@ -304,6 +358,7 @@ impl Resolver {
                 .collect(),
             text: text.split_whitespace().collect::<Vec<_>>().join(" "),
             kind,
+            visibility: super::visibility::visibility(element),
         })
     }
 }
