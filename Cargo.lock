@@ -2726,6 +2726,7 @@ dependencies = [
  "spire-thirtyfour",
  "tokio",
  "tracing",
+ "url",
 ]
 
 [[package]]

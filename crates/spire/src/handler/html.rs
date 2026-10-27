@@ -2,14 +2,16 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use scraper::{ElementRef, Selector};
+use scraper::Selector;
 
 use crate::backend::Client;
 use crate::extract::FromContext;
-use crate::extract::html::{Element, Html, Select};
+use crate::extract::html::{Element, Html, Links, PageLink, Select};
 use crate::frontier::queue::Link;
 use crate::handler::Handler;
 use crate::request::Tag;
+use crate::request::http::Uri;
+use crate::response::ResponseExt;
 use crate::worker::{IntoOutcome, Outcome};
 use crate::{Context, TRACING_TARGET};
 
@@ -34,6 +36,7 @@ use crate::{Context, TRACING_TARGET};
 pub struct FollowLinks {
     tag: Tag,
     selector: Option<(Arc<str>, Selector)>,
+    skip_nofollow: bool,
     page_scorer: Option<Arc<PageScorer>>,
     link_scorer: Option<Arc<LinkScorer>>,
 }
@@ -41,8 +44,8 @@ pub struct FollowLinks {
 /// Scores a page, for every link found on it.
 type PageScorer = dyn Fn(&Html) -> i32 + Send + Sync;
 
-/// Scores a link from its element.
-type LinkScorer = dyn Fn(ElementRef<'_>) -> i32 + Send + Sync;
+/// Scores a link from its URI, `rel` and text.
+type LinkScorer = dyn Fn(&PageLink) -> i32 + Send + Sync;
 
 impl FollowLinks {
     /// Follows every link of the page, queueing it with `tag`.
@@ -50,6 +53,7 @@ impl FollowLinks {
         Self {
             tag: tag.into(),
             selector: None,
+            skip_nofollow: false,
             page_scorer: None,
             link_scorer: None,
         }
@@ -64,6 +68,13 @@ impl FollowLinks {
         let selector = Selector::parse(css)
             .unwrap_or_else(|error| panic!("invalid CSS selector `{css}`: {error}"));
         self.selector = Some((css.into(), selector));
+        self
+    }
+
+    /// Leaves out links with `rel="nofollow"`, which a site marks as not
+    /// to be followed.
+    pub const fn skip_nofollow(mut self) -> Self {
+        self.skip_nofollow = true;
         self
     }
 
@@ -91,9 +102,9 @@ impl FollowLinks {
         self
     }
 
-    /// Adds `scorer`'s score of every link's element, e.g. by its anchor
-    /// text, to the link's priority, so a frontier that orders by priority
-    /// crawls the most promising links first.
+    /// Adds `scorer`'s score of every link, e.g. by its text or `rel`, to
+    /// the link's priority, so a frontier that orders by priority crawls the
+    /// most promising links first.
     ///
     /// It adds to [`score_page`](Self::score_page), and a
     /// [scoring](crate::frontier::FrontierExt::score) frontier adds its own
@@ -105,40 +116,43 @@ impl FollowLinks {
     ///
     /// let keywords = Keywords::new(["laptop", "review"]);
     /// let follow = FollowLinks::new("page")
-    ///     .score_links(move |link| keywords.matches(&link.text().collect::<String>()));
+    ///     .score_links(move |link| keywords.matches(link.text()));
     /// ```
     pub fn score_links<F>(mut self, scorer: F) -> Self
     where
-        F: Fn(ElementRef<'_>) -> i32 + Send + Sync + 'static,
+        F: Fn(&PageLink) -> i32 + Send + Sync + 'static,
     {
         self.link_scorer = Some(Arc::new(scorer));
         self
     }
 
-    /// Every link to follow, with its `href` as written in the page.
-    fn links(&self, page: &Html) -> Vec<Link> {
+    /// Every link to follow, resolved against the page served from `uri`,
+    /// as a browser does.
+    fn links(&self, page: &Html, uri: &Uri) -> Vec<Link> {
+        let links = match &self.selector {
+            Some((_, selector)) => Links::from_elements(page, uri, page.0.select(selector)),
+            None => page.links(uri),
+        };
+        let links = if self.skip_nofollow {
+            links.followable()
+        } else {
+            links
+        };
+
         let scored = self.page_scorer.is_some() || self.link_scorer.is_some();
         let page_score = self.page_scorer.as_ref().map_or(0, |scorer| scorer(page));
-        let link = |(href, element): (&str, ElementRef<'_>)| {
-            let link = Link::from(href).with_tag(self.tag.clone());
-            if !scored {
-                return link;
-            }
-            let link_score = self
-                .link_scorer
-                .as_ref()
-                .map_or(0, |scorer| scorer(element));
-            link.with_priority(page_score.saturating_add(link_score))
-        };
-        match &self.selector {
-            Some((_, selector)) => page
-                .0
-                .select(selector)
-                .filter_map(|element| Some((element.value().attr("href")?, element)))
-                .map(link)
-                .collect(),
-            None => page.anchors().map(link).collect(),
-        }
+        links
+            .into_iter()
+            .map(|link| {
+                let score = self.link_scorer.as_ref().map_or(0, |scorer| scorer(&link));
+                let followed = Link::from(link).with_tag(self.tag.clone());
+                if scored {
+                    followed.with_priority(page_score.saturating_add(score))
+                } else {
+                    followed
+                }
+            })
+            .collect()
     }
 }
 
@@ -147,6 +161,7 @@ impl fmt::Debug for FollowLinks {
         f.debug_struct("FollowLinks")
             .field("tag", &self.tag)
             .field("selector", &self.selector.as_ref().map(|(css, _)| css))
+            .field("skip_nofollow", &self.skip_nofollow)
             .field("score_page", &self.page_scorer.is_some())
             .field("score_links", &self.link_scorer.is_some())
             .finish()
@@ -160,7 +175,10 @@ where
 {
     async fn call(&self, cx: &Context<C>, state: &S) -> Outcome {
         let follow = async {
-            let links = self.links(&Html::from_context(cx, state).await?);
+            let html = Html::from_context(cx, state).await?;
+            let response = cx.response().await?;
+            let uri = response.final_uri().unwrap_or_else(|| cx.request().uri());
+            let links = self.links(&html, uri);
             let queued = cx.queue().follow_all(links).await?;
             tracing::debug!(target: TRACING_TARGET, queued, tag = %self.tag, "followed links");
             Ok::<_, crate::Error>(())

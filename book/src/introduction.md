@@ -8,14 +8,14 @@ once there is nothing left to do.
 
 ```rust,no_run
 use spire::backend::HttpClient;
-use spire::extract::html::Html;
+use spire::extract::html::{Html, Links};
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
 use spire::{Crawler, Result, Router};
 
-async fn page(html: Html, queue: Queue) -> Result<()> {
+async fn page(html: Html, links: Links, queue: Queue) -> Result<()> {
     println!("{}", html.title().unwrap_or_default());
-    queue.follow_all(html.links()).await?;
+    queue.follow_all(links).await?;
     Ok(())
 }
 

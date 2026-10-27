@@ -25,12 +25,9 @@ static TITLE: LazyLock<Selector> =
 ///
 /// ```
 /// use spire::extract::html::Html;
-/// use spire::frontier::queue::Queue;
 ///
-/// async fn handler(queue: Queue, page: Html) -> spire::Result<()> {
+/// async fn handler(page: Html) {
 ///     println!("{:?}", page.title());
-///     queue.follow_all(page.links()).await?;
-///     Ok(())
 /// }
 /// ```
 #[derive(Clone, Deref, DerefMut)]
@@ -49,18 +46,12 @@ impl Html {
         self.0.select(&TITLE).next().map(private::text)
     }
 
-    /// Returns the `href` of every link, as written in the page.
-    ///
-    /// Pass them to [`Queue::follow_all`](crate::frontier::queue::Queue::follow_all),
-    /// which resolves relative links.
-    #[must_use]
-    pub fn links(&self) -> Vec<String> {
-        self.anchors().map(|(href, _)| href.to_owned()).collect()
-    }
-
-    /// Returns every link with its element, in document order: the `href`
-    /// as written in the page, and the `<a>` element, e.g. to score the
-    /// link by its text with [`Link::with_priority`](crate::frontier::queue::Link::with_priority).
+    /// Returns every `<a href>` with its element, in document order: the
+    /// `href` as written in the page, and the element, e.g. to score a link
+    /// by the markup around it with
+    /// [`Link::with_priority`](crate::frontier::queue::Link::with_priority).
+    /// [`links`](Self::links) gives them resolved, with their `rel` and
+    /// text.
     pub fn anchors(&self) -> impl Iterator<Item = (&str, ElementRef<'_>)> {
         self.0
             .select(&LINKS)
@@ -165,7 +156,6 @@ mod tests {
     fn document_helpers() {
         let html = Html::parse(PAGE);
         assert_eq!(html.title().as_deref(), Some("Shop"));
-        assert_eq!(html.links(), ["/lamp", "/chair"]);
     }
 
     #[test]

@@ -123,8 +123,7 @@ fn served(site: &MockSite) -> Vec<String> {
 #[tokio::test]
 async fn follows_scored_links_best_first() {
     let keywords = Keywords::new(["laptop", "review"]);
-    let follow = FollowLinks::new("post")
-        .score_links(move |link| keywords.matches(&link.text().collect::<String>()));
+    let follow = FollowLinks::new("post").score_links(move |link| keywords.matches(link.text()));
     let router = Router::new().route("front", follow).route("post", fetch);
     let blog = blog();
     let crawler = Crawler::new(blog.clone(), router)
@@ -146,7 +145,7 @@ async fn page_scores_add_to_link_scores() {
                 0
             }
         })
-        .score_links(|link| i32::from(link.text().any(|text| text.contains("laptop"))));
+        .score_links(|link| i32::from(link.text().contains("laptop")));
     let frontier = Arc::new(InMemFrontier::priority());
     let crawler = Crawler::new(blog(), Router::new().route("front", follow))
         .with_max_requests(1)
@@ -197,4 +196,29 @@ async fn scoring_frontier_crawls_best_first() {
         served(&site),
         ["/", "/laptops/reviews", "/laptops", "/about"]
     );
+}
+
+#[tokio::test]
+async fn follows_links_against_the_base_element_skipping_nofollow() {
+    let front = r#"<html><head><base href="/docs/"></head><body>
+        <a href="intro">Intro</a>
+        <a href="private" rel="nofollow">Private</a>
+        <a href="mailto:me@example.com">Mail</a>
+    </body></html>"#;
+    let site = MockSite::new()
+        .page("https://docs.test/old/", MockPage::html(front))
+        .page("https://docs.test/docs/intro", MockPage::html(""))
+        .page("https://docs.test/docs/private", MockPage::html(""));
+    let router = Router::new()
+        .route("front", FollowLinks::new("page").skip_nofollow())
+        .route("page", fetch);
+    let crawler = Crawler::new(site.clone(), router).with_seed(
+        Seed::get("https://docs.test/old/")
+            .unwrap()
+            .with_tag("front"),
+    );
+
+    let stats = crawler.run().await.unwrap();
+    assert_eq!(stats.failed, 0, "{stats:?}");
+    assert_eq!(served(&site), ["/old/", "/docs/intro"]);
 }

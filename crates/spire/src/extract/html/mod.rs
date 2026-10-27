@@ -3,25 +3,25 @@
 //! `Markdown` with the `markdown` feature, and the
 //! [scraper](https://docs.rs/scraper) parser behind them.
 //!
-//! [`Html`] wraps a scraper [`Document`], to walk a page's tree directly
-//! when its methods are not enough; the rest of scraper's API, such as
-//! [`ElementRef`], [`Selector`] and [`Node`], is re-exported here at the
-//! version spire uses. scraper's own `Element`, an element's raw data, is
-//! at [`node::Element`].
+//! [`Html`] wraps a scraper document, to walk a page's tree directly when
+//! its methods are not enough: [`scraper`] is re-exported here at the
+//! version spire uses, e.g. for its `Selector` and `ElementRef`.
 
 mod document;
+mod links;
 #[cfg(feature = "markdown")]
 mod markdown;
 mod meta;
 pub(crate) mod select;
 mod text;
 
-pub use scraper::{Html as Document, *};
+pub use scraper;
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 pub use spire_macros::Select;
 
 pub use self::document::Html;
+pub use self::links::{LinkKind, Links, PageLink};
 #[cfg(feature = "markdown")]
 #[cfg_attr(docsrs, doc(cfg(feature = "markdown")))]
 pub use self::markdown::{Markdown, MarkdownOptions};

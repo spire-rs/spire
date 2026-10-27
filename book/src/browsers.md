@@ -10,18 +10,19 @@ again, including what the interaction changed:
 ```rust,no_run
 use spire::backend::BrowserBackend;
 use spire::backend::thirtyfour::By;
-use spire::extract::Tab;
+use spire::extract::{Head, Tab};
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
 use spire::{Crawler, Result, Router};
 
-async fn rendered(queue: Queue, tab: Tab) -> Result<()> {
+async fn rendered(head: Head, queue: Queue, tab: Tab) -> Result<()> {
     if let Ok(more) = tab.find(By::Css("button.more")).await {
         let _ = more.click().await;
     }
+    // The page as it is after the click.
     let page = tab.snapshot().await?;
-    println!("{:?} at {:?}", page.title(), tab.current_url().await);
-    queue.follow_all(page.links()).await?;
+    println!("{:?} at {}", page.title(), head.uri);
+    queue.follow_all(page.links(&head.uri)).await?;
     Ok(())
 }
 

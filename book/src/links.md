@@ -29,21 +29,63 @@ or refused as a duplicate, too deep, outside the crawl's scope, or not an
 dropped, and `follow_all` follows several links at once.
 
 The `FollowLinks` handler does this for a whole page: every link, or those
-matching a CSS selector, with the tag to give them, see
-[Routing](routing.md).
+matching a CSS selector, with the tag to give them, and without
+`rel="nofollow"` ones with `skip_nofollow`, see [Routing](routing.md).
 
 `Link::with_priority` sets how soon a link is crawled, on a frontier that
 orders by priority, and `FollowLinks` scores the links it follows with
 `score_page` and `score_links`:
 see [Best-first crawling](best-first.md).
 
+## The links of a page
+
+The `Links` extractor, with the `html` feature, gives the links a visitor
+can follow, `<a>` and `<area>`, already resolved, each with its `rel` values
+and the text it shows. Filters narrow them, and they queue as they are:
+
+```rust
+use spire::Result;
+use spire::extract::html::Links;
+use spire::frontier::queue::{Link, Queue};
+
+async fn page(links: Links, queue: Queue) -> Result<()> {
+    for link in &links {
+        println!("{} {:?} {}", link.uri(), link.rel(), link.text());
+    }
+    // The next page of a listing, on this site, if the site marks it.
+    let next = links.clone().followable().same_host().with_rel("next");
+    queue.follow_all(next).await?;
+    // Every other link, tagged by its text.
+    let products = links
+        .into_iter()
+        .filter(|link| link.text().contains("lamp"))
+        .map(|link| Link::from(link).with_tag("product"));
+    queue.follow_all(products).await?;
+    Ok(())
+}
+```
+
+- `followable()` leaves out `rel="nofollow"` links, `same_host()` links to
+  other hosts, subdomains included, `with_rel(value)` keeps those with a
+  `rel` value, and `of_kind` those from `<a>` or `<area>`.
+- `Links::within(&html, &uri, "article")` reads only the links inside
+  matching elements, e.g. an article without its navigation.
+- `Html::links(&uri)` does the same for a page parsed by hand, e.g. a
+  browser tab's `snapshot` after interacting with it.
+- Links that are not `http(s)` URLs, such as `mailto:` or `javascript:`, are
+  left out, and fragments are dropped.
+
 ## Where links resolve
 
-A relative link resolves against the page it was found on. When the request
-was redirected, that is the URI the page was served from: a link `a` on a
-page requested as `/old/` and redirected to `/new/` becomes `/new/a`.
-`Head::uri`, or `ResponseExt::final_uri` on a response, gives that URI. A
-link is one level deeper than its page, which `max_depth` limits.
+A relative link resolves against the page it was found on, as a browser
+resolves it: against the page's `<base href>`, if it has one, itself
+resolved against the URI the page was served from. When the request was
+redirected, that is the final URI: a link `a` on a page requested as `/old/`
+and redirected to `/new/` becomes `/new/a`. `Head::uri`, or
+`ResponseExt::final_uri` on a response, gives that URI. `Links` and
+`FollowLinks` resolve this way; a relative `href` passed to `Queue::follow`
+resolves against the final URI alone. A link is one level deeper than its
+page, which `max_depth` limits.
 
 ## Queueing from outside a handler
 

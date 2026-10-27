@@ -33,7 +33,7 @@ default = ["html", "rustls-tls"]
 full = ["html", "markdown", "macros", "robots", "sitemap", "serde", "json", "csv", "redb", "reqwest", "thirtyfour", "rustls-tls"]
 
 # The `Html` and `Element` extractors and the `Select` trait
-html = ["dep:scraper"]
+html = ["dep:scraper", "dep:url"]
 # The `Markdown` extractor: a page's main content as Markdown
 markdown = ["html", "dep:html-to-markdown-rs"]
 # `#[derive(Select)]` for declarative extraction with CSS selectors
@@ -83,6 +83,7 @@ serde_urlencoded = { workspace = true, features = [] }
 
 # Markup
 scraper = { workspace = true, optional = true, features = [] }
+url = { workspace = true, optional = true, features = [] }
 html-to-markdown-rs = { workspace = true, optional = true, features = [] }
 encoding_rs = { workspace = true, features = [] }
 

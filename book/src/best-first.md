@@ -30,8 +30,8 @@ let frontier = InMemFrontier::priority()
 
 A handler has the page a link was found on. `FollowLinks` scores the links
 it follows: `score_page` scores the page once, for every link on it, and
-`score_links` scores each link from its element, e.g. its anchor text. The
-two add up:
+`score_links` scores each link from its URI, text and `rel`. The two add
+up:
 
 ```rust
 use spire::frontier::score::Keywords;
@@ -44,7 +44,7 @@ let follow = FollowLinks::new("page")
     // Links on relevant pages first...
     .score_page(move |page| 10 * page_keywords.matches(&page.title().unwrap_or_default()))
     // ...then by their own text.
-    .score_links(move |link| keywords.matches(&link.text().collect::<String>()));
+    .score_links(move |link| keywords.matches(link.text()));
 ```
 
 ## Scoring in your own handler

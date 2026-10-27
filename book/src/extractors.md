@@ -18,6 +18,7 @@ the others share it.
 | `Text` | The body as text |
 | `Json<T>` | The body deserialized as JSON |
 | `html::Html` | The body parsed as HTML (`html` feature), see [HTML](html.md) |
+| `html::Links` | The page's links, resolved, with their `rel` and text (`html` feature), see [Following links](links.md#the-links-of-a-page) |
 | `html::Element<T>` | A `T: Select` extracted from the HTML (`html` feature) |
 | `html::Meta` | The page's title, description, canonical URL, language, robots, Open Graph and Twitter fields (`html` feature) |
 | `html::JsonLd<T>` | The page's JSON-LD structured data (`html` feature) |
