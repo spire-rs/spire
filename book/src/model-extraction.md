@@ -56,6 +56,27 @@ Register an `InMemDataset<Product>` or another dataset with the crawler
 when using this handler. Put the configured `Agent` in router state;
 `FromRef` can select it from a larger application state too.
 
+When the handler only stores the extracted records, use `AgentCollect<T>`
+instead of writing it yourself:
+
+```rust
+use spire::agent::Agent;
+use spire::handler::AgentCollect;
+use spire::Router;
+# use spire::backend::Noop;
+
+# fn router(agent: Agent) {
+let router: Router<Noop, Agent> = Router::with_state(agent)
+    .route("names", AgentCollect::<String>::new());
+# let _ = router;
+# }
+```
+
+It extracts `Vec<T>` and writes each item to the registered `T` dataset,
+just as `Collect<T>` does for HTML selection. Empty results write nothing;
+extraction and budget errors propagate unchanged. Use your own handler
+when items need validation or transformation before storing.
+
 Use `Vec<T>` for zero or more records and `Option<T>` when a record may be
 absent. Empty arrays and `null` are valid answers for those types. Missing
 required data, malformed JSON and schema violations fail extraction.

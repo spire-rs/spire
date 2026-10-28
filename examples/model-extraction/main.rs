@@ -6,11 +6,10 @@
 use spire::agent::cache::MemoryCache;
 use spire::agent::schemars::JsonSchema;
 use spire::agent::serde::Deserialize;
-use spire::agent::{
-    Agent, Budget, CompletionRequest, CompletionResponse, Extract, Provider, Usage,
-};
-use spire::dataset::{Data, InMemDataset};
+use spire::agent::{Agent, Budget, CompletionRequest, CompletionResponse, Provider, Usage};
+use spire::dataset::InMemDataset;
 use spire::frontier::seed::Seed;
+use spire::handler::AgentCollect;
 use spire::testing::{MockPage, MockSite};
 use spire::{Crawler, Result, Router};
 
@@ -42,13 +41,6 @@ impl Provider for Scripted {
     }
 }
 
-async fn products(data: Data<Product>, Extract(products): Extract<Vec<Product>>) -> Result<()> {
-    for product in products {
-        data.write(product).await?;
-    }
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let agent = Agent::new(Scripted)
@@ -59,7 +51,8 @@ async fn main() -> Result<()> {
         "https://shop.test/products",
         MockPage::html("<h1>Products</h1><p>Desk lamp: €29</p>"),
     );
-    let router = Router::with_state(agent.clone()).route("products", products);
+    let router =
+        Router::with_state(agent.clone()).route("products", AgentCollect::<Product>::new());
     let crawler = Crawler::new(site, router)
         .with_dataset(InMemDataset::<Product>::new())
         .with_seed(Seed::get("https://shop.test/products")?.with_tag("products"));

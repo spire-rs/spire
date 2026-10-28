@@ -138,6 +138,9 @@ let router: Router<Noop> = Router::new().route("listing", (
   with `.skip_nofollow()`.
 - **`Collect::<T>::new()`** extracts every `T: Select` on the page and
   writes them to the dataset for `T`.
+- **`AgentCollect::<T>::new()`**, with the `agent` feature, extracts a
+  `Vec<T>` with a model and writes the items to the dataset for `T`. See
+  [Model extraction](model-extraction.md).
 - **`FollowSitemap::new(tag)`**, with the `sitemap` feature, follows a
   sitemap. See [Sitemaps](sitemaps.md).
 

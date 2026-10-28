@@ -14,6 +14,7 @@ and this project adheres to
   shared usage accounting, token and cost budgets, concurrency limits, and
   optional in-memory or redb answer caches. `spire` exposes the crate and
   `Extract<T>` through its `agent` feature.
+- `spire`: `AgentCollect<T>`, a handler that stores model-extracted records.
 - `spire-core`: `Outcome::Fatal`, stopping a crawl and returning its error.
 - `spire-redb`: public transaction callbacks for store extensions. The
   agent cache shares `RedbStore` and its durability policy.
