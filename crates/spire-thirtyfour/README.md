@@ -87,13 +87,8 @@ let builder = ThirtyfourBackend::builder()
     .capabilities(DesiredCapabilities::firefox());
 ```
 
-## Features
-
-- **`rustls-tls`** (default): TLS to the WebDriver server through rustls.
-- **`native-tls`**: TLS through the platform's native library.
-- **`manager`**: `ThirtyfourBuilder::managed` downloads, caches and spawns the
-  driver for the browser in the capabilities. The browser itself must be
-  installed.
+See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#browser-backend)
+page for configuration.
 
 ## Requirements
 

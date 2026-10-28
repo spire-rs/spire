@@ -64,19 +64,8 @@ limit. A budget requiring unknown token counts fails closed. Use `Vec<T>` or
 `Option<T>` when data may be absent. Schema validation checks structure,
 not whether a model's statements are true.
 
-### Features
-
-No features are enabled by default:
-
-| Feature | Enables |
-|---|---|
-| `rig` | The `Rig` adapter for Rig completion models |
-| `redb` | `RedbCache` and the `RedbStore` implementation of `AgentStoreExt` |
-| `testing` | `testing::Script`, a reusable offline provider |
-
-Enable `rig` directly on this crate when using its adapter. The facade's
-`agent + redb` features enable persistent answer caching together, and
-`agent + testing` enable the scripted provider.
+See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#ai-driven-crawling)
+page for configuration.
 
 ### Offline testing
 

@@ -52,27 +52,8 @@ in the main `spire` crate and refer to the
 spire = { version = "0.8.0", features = ["reqwest"] }
 ```
 
-### Features
-
-TLS through rustls, HTTP/2 and system proxies are on by default. Everything else is opt-in:
-
-```toml
-[dependencies]
-spire-reqwest = { version = "0.8.0", features = ["gzip", "brotli", "cookies"] }
-
-# Native TLS instead of rustls
-spire-reqwest = { version = "0.8.0", default-features = false, features = ["native-tls", "http2"] }
-```
-
-| Feature | Enables |
-|---|---|
-| `rustls-tls` (default), `native-tls` | TLS implementation |
-| `http2` (default) | HTTP/2 negotiation |
-| `system-proxy` (default) | Proxies from the environment and system settings |
-| `gzip`, `brotli`, `zstd`, `deflate` | Transparent response decompression |
-| `cookies` | A cookie store shared by the whole crawl, or one per identity |
-| `socks` | SOCKS5 proxies |
-| `hickory-dns` | DNS through hickory instead of the system resolver |
+See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#http-backend)
+page for configuration.
 
 For advanced usage and custom configurations, see the
 [API documentation](https://docs.rs/spire-reqwest).

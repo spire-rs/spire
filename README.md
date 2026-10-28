@@ -83,6 +83,7 @@ async fn main() -> Result<()> {
     let crawler = Crawler::new(ReqwestBackend::default(), router)
         .with_frontier(frontier)
         .with_seed(Seed::get("https://example.com/")?);
+
     crawler.run().await?;
     Ok(())
 }

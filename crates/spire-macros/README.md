@@ -121,10 +121,8 @@ async fn page(State(db): State<Db>) {}
   one out.
 - The struct must have named fields and no generic parameters.
 
-## Feature flags
-
-This crate has no feature flags. Enable `macros` on `spire` to use its
-`Select`, `FromRef`, `Tags` and `Revisit` derives through the public API.
+See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#spire-facade)
+page for configuration.
 
 ## Usage
 
