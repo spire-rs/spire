@@ -388,7 +388,7 @@ async fn requests_share_progress_through_the_registry_handle() {
             .unwrap()
             .push(registry.get::<String>().unwrap().progress().items);
         registry
-            .prepare(&vec!["accepted".to_owned()], &uri.to_string())
+            .prepare(&vec!["accepted".to_owned()], &uri)
             .unwrap()
             .unwrap()
             .accept();
@@ -407,4 +407,37 @@ async fn requests_share_progress_through_the_registry_handle() {
     assert_eq!(*observations.lock().unwrap(), [0, 1]);
     assert_eq!(progress.progress().items, 2);
     assert_eq!(progress.stop_reason(), Some(StopReason::TargetItems));
+}
+
+#[tokio::test]
+async fn follower_skips_canonical_self_links_before_rating_but_keeps_pagination() {
+    use spire::agent::{ProviderResponse, Usage};
+    use spire::testing::{MockPage, MockSite, Script};
+    use spire::worker::Outcome;
+
+    let site = MockSite::new().page(
+        "https://shop.test/?utm_medium=seed",
+        MockPage::html("<a href='/'>Self</a><a href='/?utm_source=copy'>Tracked self</a><a href='/?fbclid=copy#top'>Another self</a><a href='/#section'>Fragment</a><a href='/?page=2'>Next page</a>"),
+    );
+    let provider = Script::from_fn(|request| {
+        let input: spire::agent::serde_json::Value =
+            spire::agent::serde_json::from_str(&request.input).unwrap();
+        let links = input["links"].as_array().unwrap();
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0]["url"], "https://shop.test/?page=2");
+        Ok(ProviderResponse {
+            text: r#"{"scores":[100]}"#.into(),
+            usage: Usage::tokens(10, 5),
+        })
+    });
+    let router = Router::new()
+        .fallback(FollowRelevantLinks::new("page"))
+        .with_objective(Objective::<()>::new("discover pages"));
+    let visit = site
+        .visit(Seed::get("https://shop.test/?utm_medium=seed").unwrap())
+        .with_extension(Agent::new(provider.clone()));
+    assert!(matches!(visit.run(&router).await, Outcome::Continue));
+    assert_eq!(provider.calls(), 1);
+    assert_eq!(visit.queued().len(), 1);
+    assert_eq!(visit.queued()[0].uri(), "https://shop.test/?page=2");
 }

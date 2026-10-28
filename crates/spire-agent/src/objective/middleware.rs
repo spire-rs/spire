@@ -94,7 +94,7 @@ where
         if self.registry.is_finished() {
             return Outcome::Stop;
         }
-        let source = cx.request().uri().to_string();
+        let source = cx.request().uri().clone();
         let active = self
             .registry
             .entries()

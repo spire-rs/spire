@@ -29,6 +29,6 @@ pub use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
 pub use crate::handler::{AgentCollect, FollowRelevantLinks};
 #[cfg(feature = "html")]
 pub use crate::handler::{Collect, FollowLinks};
-pub use crate::http::{RequestExt as _, ResponseExt as _};
+pub use crate::http::{RequestExt as _, ResponseExt as _, UriExt as _};
 pub use crate::worker::{IntoOutcome, Outcome, WorkerExt};
 pub use crate::{Context, Crawler, Error, ErrorKind, Result, Router};

@@ -7,7 +7,7 @@ use crate::crawler::Tag;
 use crate::extract::FromContext;
 use crate::extract::html::Links;
 use crate::frontier::queue::Link;
-use crate::frontier::seed::Seed;
+use crate::http::UriExt;
 use crate::worker::{IntoOutcome, Outcome};
 use crate::{Context, Error};
 
@@ -77,20 +77,14 @@ where
         } else {
             links
         };
-        let mut destinations = std::collections::HashSet::new();
+        // Self-links are already seen, including tracking and fragment aliases.
+        let mut destinations = std::collections::HashSet::from([cx.request().uri().canonical()]);
         let mut candidates = Vec::new();
         for link in links
             .iter()
             .filter(|link| !self.skip_nofollow || !link.has_rel("nofollow"))
         {
-            if link.uri() == cx.request().uri() {
-                continue;
-            }
-            let seed = match Seed::get(link.uri().to_string()) {
-                Ok(seed) => seed,
-                Err(error) => return error.into_outcome(),
-            };
-            if destinations.insert(seed.canonical_uri()) {
+            if destinations.insert(link.uri().canonical()) {
                 candidates.push(Candidate {
                     url: link.uri().to_string(),
                     text: link.text().into(),

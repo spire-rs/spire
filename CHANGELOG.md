@@ -10,21 +10,74 @@ and this project adheres to
 
 ### Added
 
-- `spire-agent::objective`: objective configuration and a running controller
-  owning the agent, explicit progress, batched ratings, completion checks
-  and the `until` frontier.
-- `spire`: `FollowRelevant`, discovering visible links toward an objective.
-- `spire-core`: `Admission::Stopped` for frontiers that no longer accept work.
-- An offline objective crawl example and an AI-driven crawling book section.
-- `spire-agent`: `testing::Script`, a reusable provider with queued,
-  request-dependent and asynchronous replies, plus request capture.
+- `spire-agent::objective`: typed `Objective<T>` goals registered on workers
+  with `ObjectiveExt::with_objective`. Middleware supplies the shared
+  `ObjectiveRegistry`, tracks independent progress and reports each goal's
+  `StopReason`. `StopPolicy` selects whether all or any objectives
+  must finish; ordinary work exhaustion leaves unmet goals available to
+  continue with more seeds.
+- `spire`: `FollowRelevantLinks`, rating visible links against active
+  objectives and queueing each destination with its highest accepted score.
+  `AgentCollect<T>` automatically reports successful writes to the matching
+  objective.
+- `spire_core::http::UriExt::canonical` (also available through the facade),
+  sharing URI normalization across seeds, fingerprints and objective links.
+- `spire-core`: `with_extension` on `Crawler`, `Context` and `Visit`.
+  `spire::extract::Extension<T>` retrieves crawler or middleware services
+  independently of application router state.
+- `spire-agent`: `AgentCrawlerExt::with_agent`, configuring model services on
+  a crawler without occupying router state.
+- `spire-agent`: the `testing` feature and `testing::Script`, a reusable
+  provider with queued, request-dependent and asynchronous replies, plus
+  request capture. The facade exposes it as `spire::testing::Script` when
+  both `agent` and `testing` are enabled.
+- `spire`: the `agent-rig` feature, also included in `full`, enables the Rig
+  adapter and upstream crate re-export through the facade.
+- Conversion from `spire_agent::Error` to `spire_core::Error` (also exposed
+  as `spire::Error`), preserving the agent error as its source.
+- An offline multi-objective crawl example and an AI-driven crawling book
+  section covering extraction, providers, resources and objectives.
 
 ### Changed
 
+- **Breaking:** `spire-agent` budgets now cap input and output tokens
+  independently through `Budget::new(input, output)`. Use `input_tokens`
+  and `output_tokens` on the default budget to cap only one direction;
+  `Budget::tokens` is removed. Unknown usage blocks calls only when that
+  direction is capped. Provider-reported cost remains usage metadata.
+- **Breaking:** renamed `CompletionRequest` and `CompletionResponse` to
+  `ProviderRequest` and `ProviderResponse`.
+- **Breaking:** moved `spire_agent::Extract<T>` from the agent crate to
+  `spire::extract::AgentExtract<T>`. Agent-backed handler extraction now
+  obtains its agent through request extensions configured by `with_agent`,
+  instead of router state and `FromRef`.
+- **Breaking:** renamed `spire::extract::Tab` to `ThirtyfourTab`, identifying
+  the backend-specific browser API it exposes.
+- **Breaking:** the facade exposes `Data<T>` through `spire::extract::Data`
+  instead of `spire::dataset::Data`. Its core location remains
+  `spire_core::dataset::Data`.
+- **Breaking:** renamed `spire-agent`'s `MemoryCache` to `InMemCache` and the
+  core frontier result `Pop` to `NextSeed`; `Frontier::pop()` is unchanged.
+- **Breaking:** `spire_agent::rig` now re-exports the upstream Rig crate
+  directly, replacing `spire_agent::rig::rig`. Use `spire_agent::Rig` for the
+  adapter instead of `spire_agent::rig::Rig`; the facade exposes both through
+  its `agent-rig` feature.
 - Moved the root README example index to `examples/README.md` and linked
-  to the book for feature flags.
-- `spire-agent`: renamed `MemoryCache` to `InMemCache` for consistent naming.
-- `spire-core`: renamed the frontier result `Pop` to `NextSeed`.
+  to the book for feature flags. Shortened rustdoc index summaries and
+  expanded their separate descriptions.
+
+### Removed
+
+- **Breaking:** `Pricing`, `Agent::with_pricing` and `Budget::max_cost`.
+  Fallback pricing and monetary budget limits are removed.
+- **Breaking:** the public `dataset::READ_BATCH` constant in core and the
+  facade; `Data::read_all` keeps its internal default batch size.
+
+### Fixed
+
+- `spire::backend` now re-exports `ReqwestSession` alongside `ReqwestBackend`.
+- Unknown token usage remains tracked when changing budgets through agent
+  clones, preventing later caps from treating unreported usage as zero.
 
 ## [0.8.0] - 2026-10-28
 

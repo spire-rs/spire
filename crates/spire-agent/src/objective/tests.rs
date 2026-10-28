@@ -23,7 +23,7 @@ fn link(path: &str) -> Candidate {
 fn accept(registry: &ObjectiveRegistry, items: impl IntoIterator<Item = String>) {
     let items = items.into_iter().collect::<Vec<_>>();
     registry
-        .prepare(&items, "https://shop.test/pricing")
+        .prepare(&items, &"https://shop.test/pricing".parse().unwrap())
         .unwrap()
         .unwrap()
         .accept();
@@ -52,7 +52,7 @@ async fn concurrent_pages_share_canonical_ratings_and_do_not_rate_visited_pages_
     assert_eq!(provider.calls(), 1);
     registry
         .page_done(
-            "https://shop.test/pricing",
+            &"https://shop.test/pricing".parse().unwrap(),
             &[std::any::TypeId::of::<String>()],
         )
         .await

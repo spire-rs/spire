@@ -1,9 +1,39 @@
-//! URL normalization for deduplication.
+//! URI normalization for crawling and deduplication.
 
 use std::fmt::Write as _;
 
 use ::http::Uri;
 use url::Url;
+
+/// Crawl-aware normalization of HTTP URIs.
+pub trait UriExt {
+    /// Returns this URI's canonical form for crawling and deduplication.
+    ///
+    /// - scheme and host lowercase, default ports removed, `.` and `..` segments
+    ///   resolved, and an empty path made `/`;
+    /// - percent-escapes uppercase, and escaped unreserved characters decoded;
+    /// - query parameters sorted, empty queries and tracking parameters such as
+    ///   `utm_*` or `fbclid` removed;
+    /// - the fragment removed.
+    ///
+    /// URIs that cannot be parsed as URLs are returned unchanged.
+    ///
+    /// ```
+    /// use spire_core::http::{UriExt, http::Uri};
+    ///
+    /// let uri: Uri = "https://Example.com:443/a?b=2&utm_source=mail&a=1".parse()?;
+    /// assert_eq!(uri.canonical(), "https://example.com/a?a=1&b=2");
+    /// # Ok::<_, spire_core::http::http::uri::InvalidUri>(())
+    /// ```
+    #[must_use]
+    fn canonical(&self) -> String;
+}
+
+impl UriExt for Uri {
+    fn canonical(&self) -> String {
+        canonical(self)
+    }
+}
 
 /// Query parameters that only track where a visitor came from.
 const TRACKING: &[&str] = &[
@@ -16,18 +46,10 @@ fn is_tracking(key: &str) -> bool {
     key.starts_with("utm_") || TRACKING.contains(&key.as_str())
 }
 
-/// Returns the canonical form of `uri`, which URIs naming the same resource
-/// share:
-///
-/// - scheme and host lowercase, default ports removed, `.` and `..` segments
-///   resolved, and an empty path made `/`;
-/// - percent-escapes uppercase, and escaped unreserved characters decoded;
-/// - query parameters sorted, empty queries and tracking parameters such as
-///   `utm_*` or `fbclid` removed;
-/// - the fragment removed.
-pub(crate) fn canonical(uri: &Uri) -> String {
-    let Ok(mut url) = Url::parse(&uri.to_string()) else {
-        return uri.to_string();
+fn canonical(uri: &Uri) -> String {
+    let text = uri.to_string();
+    let Ok(mut url) = Url::parse(&text) else {
+        return text;
     };
     url.set_fragment(None);
 
@@ -84,7 +106,13 @@ mod tests {
     use super::*;
 
     fn canon(uri: &str) -> String {
-        canonical(&uri.parse().unwrap())
+        uri.parse::<Uri>().unwrap().canonical()
+    }
+
+    #[test]
+    fn relative_uris_remain_unchanged() {
+        let uri: Uri = "/a?utm_source=test".parse().unwrap();
+        assert_eq!(uri.canonical(), "/a?utm_source=test");
     }
 
     #[test]

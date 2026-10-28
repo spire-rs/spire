@@ -6,6 +6,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
+use spire_core::http::UriExt;
+use spire_core::http::http::Uri;
 use tokio::sync::Mutex as AsyncMutex;
 
 use super::{Objective, Settings};
@@ -222,7 +224,7 @@ impl ObjectiveRegistry {
     ///
     /// # Errors
     /// Returns serialization or invalid source URL errors before any writes.
-    pub fn prepare(&self, batch: &dyn Any, source: &str) -> Result<Option<PreparedEvidence>> {
+    pub fn prepare(&self, batch: &dyn Any, source: &Uri) -> Result<Option<PreparedEvidence>> {
         self.inner
             .entries
             .iter()
@@ -239,7 +241,7 @@ impl ObjectiveRegistry {
             .transpose()
     }
 
-    pub(super) async fn page_done(&self, source: &str, active: &[TypeId]) -> Result<()> {
+    pub(super) async fn page_done(&self, source: &Uri, active: &[TypeId]) -> Result<()> {
         let source = canonical(source)?;
         for entry in &self.inner.entries {
             if !active.contains(&entry.id) {
@@ -329,8 +331,11 @@ impl<T> Clone for ObjectiveStatus<T> {
     }
 }
 
-pub(super) fn canonical(url: &str) -> Result<String> {
-    spire_core::frontier::seed::Seed::get(url)
-        .map(|seed| seed.canonical_uri())
-        .map_err(|error| Error::Configuration(error.to_string()))
+pub(super) fn canonical(uri: &Uri) -> Result<String> {
+    if uri.scheme().is_none() || uri.authority().is_none() {
+        return Err(Error::Configuration(format!(
+            "objective URI `{uri}` is not absolute"
+        )));
+    }
+    Ok(uri.canonical())
 }

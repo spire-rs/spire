@@ -93,7 +93,7 @@ where
             Err(outcome) => return outcome,
         };
         let evidence = match objectives
-            .map(|registry| registry.prepare(&items, &cx.request().uri().to_string()))
+            .map(|registry| registry.prepare(&items, cx.request().uri()))
             .transpose()
         {
             Ok(evidence) => evidence.flatten(),

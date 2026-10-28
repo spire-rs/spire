@@ -1,6 +1,7 @@
 use futures::future::try_join_all;
 use schemars::JsonSchema;
 use serde::Deserialize;
+use spire_core::http::http::Uri;
 
 use super::registry::{Entry, canonical, lock};
 use super::{Candidate, ObjectiveRegistry, StopReason};
@@ -58,7 +59,13 @@ impl Entry {
         }
         let keys = candidates
             .iter()
-            .map(|candidate| canonical(&candidate.url))
+            .map(|candidate| {
+                let uri = candidate
+                    .url
+                    .parse::<Uri>()
+                    .map_err(|error| Error::Configuration(error.to_string()))?;
+                canonical(&uri)
+            })
             .collect::<Result<Vec<_>>>()?;
         let mut ratings = self.ratings.lock().await;
         let mut unknown = Vec::new();
