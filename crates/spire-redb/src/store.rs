@@ -223,8 +223,15 @@ impl RedbStore {
         &self.inner.path
     }
 
-    /// Runs `f` in a write transaction off the async runtime and commits it.
-    pub(crate) async fn write<T, F>(&self, f: F) -> Result<T>
+    /// Runs an extension's write transaction off the async runtime and
+    /// commits it using this store's durability policy. Use a namespaced
+    /// table name and leave the store's built-in tables untouched.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Frontier`](ErrorKind::Frontier) error if the transaction,
+    /// callback or commit fails. A failed callback is not committed.
+    pub async fn write<T, F>(&self, f: F) -> Result<T>
     where
         T: Send + 'static,
         F: FnOnce(&WriteTransaction) -> Result<T, redb::Error> + Send + 'static,
@@ -242,11 +249,14 @@ impl RedbStore {
         .map_err(join_error)?
     }
 
-    /// Runs `f` in a read transaction on the calling thread.
-    pub(crate) fn read<T>(
-        &self,
-        f: impl FnOnce(&ReadTransaction) -> Result<T, redb::Error>,
-    ) -> Result<T> {
+    /// Runs an extension's read transaction on the calling thread. Async
+    /// extensions can dispatch this to a blocking pool for large reads.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`Frontier`](ErrorKind::Frontier) error if the transaction
+    /// cannot be opened or the callback fails.
+    pub fn read<T>(&self, f: impl FnOnce(&ReadTransaction) -> Result<T, redb::Error>) -> Result<T> {
         let txn = self.inner.db.begin_read().map_err(storage_error)?;
         f(&txn).map_err(storage_error)
     }

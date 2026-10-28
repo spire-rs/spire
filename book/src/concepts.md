@@ -23,23 +23,23 @@ A crawl moves *seeds* from a *frontier*, through a *backend* and a
   right before fetching.
 - **The frontier** holds the seeds. It decides their order, and *facades*
   on top of it add deduplication, depth limits, retries and backoff. See
-  [The frontier](frontier.md).
+  [Seeds and the frontier](frontier.md).
 - **The crawler** pops seeds and runs up to `with_concurrency` of them at
   once, within the limits of each host. See
   [Limits and politeness](politeness.md).
-- **A backend** hands out a client for each request. `ReqwestBackend` fetches
+- **A backend** hands out a session for each request. `ReqwestBackend` fetches
   over HTTP, and `ThirtyfourBackend` loads the page in a browser. See
   [Browsers](browsers.md).
 - **The worker** handles each request. It is usually a `Router`, which
-  picks handlers by the request's tag. See [Routing](routing.md).
+  picks handlers by the request's tag. See [Routing and handlers](routing.md).
 - **Datasets** store what the handlers extract, one per item type. See
   [Storing results](datasets.md).
 
 ## One request, step by step
 
 1. The crawler pops a seed, and waits if its host is busy.
-2. The backend hands out a client, and the crawler builds a `Context`:
-   the request, the client, a queue for new links, and the datasets.
+2. The backend hands out a session, and the crawler builds a `Context`:
+   the request, the session, a queue for new links, and the datasets.
 3. Middleware, if any, runs first. See
    [Middleware](middleware.md).
 4. The router picks a handler by the tag, or by the URL's path for an
@@ -55,12 +55,9 @@ The crawl ends when the frontier is empty and no request is in flight, when
 a handler returns `Outcome::Stop`, when a limit is reached, or when it is
 shut down.
 
-## Outcomes
-
-A handler returns anything that converts into an `Outcome`: `()` and
-`Ok(())` mean the request is done, and an error fails it. Outcomes also
-retry a request, pause or skip a tag, or stop the crawl: see
-[Errors and retries](errors.md).
+Handlers report success, failure or scheduling decisions through an
+`Outcome`. See [Errors and retries](errors.md) for their meanings and how
+failures affect the crawl.
 
 ## `spire` and `spire-core`
 

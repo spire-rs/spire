@@ -1,4 +1,4 @@
-# Routing
+# Routing and handlers
 
 A `Router` picks the handler for each request. It is the crawl's worker:
 
@@ -145,3 +145,6 @@ let router: Router<Noop> = Router::new().route("listing", (
 
 `Router::with_state` shares a value with every handler, which takes it, or
 a part of it, with the `State` extractor: see [State](state.md).
+
+For a complete handler test without a network, see
+[Testing handlers](testing.md).
