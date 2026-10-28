@@ -10,7 +10,7 @@ use crate::{Result, Usage};
 ///
 /// The schema constrains the complete JSON answer.
 #[derive(Debug, Clone, Serialize)]
-pub struct CompletionRequest {
+pub struct ProviderRequest {
     /// System instructions, separate from untrusted input.
     pub system: String,
     /// The page or other text to extract from.
@@ -23,7 +23,7 @@ pub struct CompletionRequest {
 
 /// A model answer and its reported usage.
 #[derive(Debug, Clone)]
-pub struct CompletionResponse {
+pub struct ProviderResponse {
     /// The answer text, without Markdown fences or tool-call wrappers.
     pub text: String,
     /// The reported usage, including cost when known.
@@ -41,16 +41,16 @@ pub trait Provider: Send + Sync + 'static {
     /// Returns an error if the provider cannot produce an answer.
     fn complete(
         &self,
-        request: CompletionRequest,
-    ) -> impl Future<Output = Result<CompletionResponse>> + Send;
+        request: ProviderRequest,
+    ) -> impl Future<Output = Result<ProviderResponse>> + Send;
 }
 
 pub(crate) trait Service: Send + Sync {
-    fn call(&self, request: CompletionRequest) -> BoxFuture<'_, Result<CompletionResponse>>;
+    fn call(&self, request: ProviderRequest) -> BoxFuture<'_, Result<ProviderResponse>>;
 }
 
 impl<P: Provider> Service for P {
-    fn call(&self, request: CompletionRequest) -> BoxFuture<'_, Result<CompletionResponse>> {
+    fn call(&self, request: ProviderRequest) -> BoxFuture<'_, Result<ProviderResponse>> {
         Box::pin(self.complete(request))
     }
 }

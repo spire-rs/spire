@@ -1,4 +1,6 @@
-//! Sitemaps: the [`Sitemap`] extractor, and the records it holds from the
+//! Sitemap extraction and parsed records.
+//!
+//! The [`Sitemap`] extractor holds records from the
 //! [sitemapo](https://docs.rs/sitemapo) parser.
 //!
 //! A [`Record`] is an [`Entry`] for a page, with its image, video, news and

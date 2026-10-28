@@ -13,7 +13,7 @@ pub struct Usage {
 }
 
 impl Usage {
-    /// Creates known input/output usage, with no price yet.
+    /// Creates reported input/output usage without a provider cost.
     #[must_use]
     pub const fn tokens(input: u64, output: u64) -> Self {
         Self {
@@ -43,7 +43,7 @@ pub struct UsageTotals {
     pub input_tokens: u64,
     /// Known output tokens.
     pub output_tokens: u64,
-    /// Known costs in USD, including configured fallback pricing.
+    /// Known provider-reported costs in USD.
     pub cost_usd: f64,
     /// Calls whose complete input/output token counts were unavailable.
     pub unmetered_calls: u64,

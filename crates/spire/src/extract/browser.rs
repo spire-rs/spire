@@ -12,10 +12,11 @@ use crate::extract::html::Html;
 use crate::http::http::{HeaderMap, StatusCode};
 use crate::{Context, Error, Result};
 
-/// Navigates the browser to the request URI, if no extractor did yet, and
-/// hands over the browser, to interact with the page.
+/// The request's Thirtyfour browser tab for live page interaction.
 ///
-/// Through [`Deref`], `Tab` exposes the full [`WebDriver`] API, pointed at
+/// Navigates to the request URI if no earlier extractor did.
+///
+/// Through [`Deref`], `ThirtyfourTab` exposes the full [`WebDriver`] API, pointed at
 /// the request's tab, to query and interact with the live page.
 /// [`snapshot`](Self::snapshot) parses a copy of the page as currently
 /// rendered, including what scripts and interaction changed since it
@@ -31,10 +32,10 @@ use crate::{Context, Error, Result};
 /// # #[cfg(feature = "html")]
 /// # mod example {
 /// use spire::backend::thirtyfour::By;
-/// use spire::extract::{Head, Tab};
+/// use spire::extract::{Head, ThirtyfourTab};
 /// use spire::frontier::queue::Queue;
 ///
-/// async fn handler(head: Head, queue: Queue, tab: Tab) -> spire::Result<()> {
+/// async fn handler(head: Head, queue: Queue, tab: ThirtyfourTab) -> spire::Result<()> {
 ///     if let Ok(more) = tab.find(By::Css("button.more")).await {
 ///         let _ = more.click().await;
 ///     }
@@ -45,13 +46,13 @@ use crate::{Context, Error, Result};
 /// }
 /// # }
 /// ```
-pub struct Tab {
+pub struct ThirtyfourTab {
     driver: WebDriver,
     status: StatusCode,
     headers: HeaderMap,
 }
 
-impl Tab {
+impl ThirtyfourTab {
     /// Returns the status of the page's response.
     #[must_use]
     pub const fn status(&self) -> StatusCode {
@@ -89,7 +90,7 @@ impl Tab {
     }
 }
 
-impl Deref for Tab {
+impl Deref for ThirtyfourTab {
     type Target = WebDriver;
 
     fn deref(&self) -> &Self::Target {
@@ -97,15 +98,15 @@ impl Deref for Tab {
     }
 }
 
-impl fmt::Debug for Tab {
+impl fmt::Debug for ThirtyfourTab {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Tab")
+        f.debug_struct("ThirtyfourTab")
             .field("status", &self.status)
             .finish_non_exhaustive()
     }
 }
 
-impl<S: Sync> FromContext<ThirtyfourSession, S> for Tab {
+impl<S: Sync> FromContext<ThirtyfourSession, S> for ThirtyfourTab {
     type Rejection = Error;
 
     async fn from_context(cx: &Context<ThirtyfourSession>, _: &S) -> Result<Self> {

@@ -5,7 +5,7 @@ use rig::completion::{CompletionRequest as RigRequest, FinishReason};
 use rig::message::AssistantContent;
 use rig::operation::Completion as RigCompletion;
 
-use crate::{CompletionRequest, CompletionResponse, Error, Provider, Result, Usage};
+use crate::{Error, Provider, ProviderRequest, ProviderResponse, Result, Usage};
 
 /// A Rig completion model exposed as a Spire provider.
 ///
@@ -39,7 +39,7 @@ impl Rig {
 }
 
 impl Provider for Rig {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse> {
+    async fn complete(&self, request: ProviderRequest) -> Result<ProviderResponse> {
         let system = match &request.schema {
             Some(schema) => format!(
                 "{}\n\nRespond with JSON matching this schema:\n{schema}",
@@ -80,7 +80,7 @@ impl Provider for Rig {
         };
         let reported = response.usage;
         let cost = reported.cost;
-        Ok(CompletionResponse {
+        Ok(ProviderResponse {
             text,
             usage: Usage {
                 input_tokens: reported.input_tokens,

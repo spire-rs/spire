@@ -2,9 +2,9 @@
 #![cfg(all(feature = "agent", feature = "testing"))]
 
 use spire::agent::cache::InMemCache;
-use spire::agent::{Agent, AgentCrawlerExt, Budget, CompletionResponse, Extract, Usage};
-use spire::dataset::{Data, InMemDataset};
-use spire::extract::State;
+use spire::agent::{Agent, AgentCrawlerExt, Budget, ProviderResponse, Usage};
+use spire::dataset::InMemDataset;
+use spire::extract::{AgentExtract, Data, State};
 use spire::frontier::seed::Seed;
 use spire::handler::AgentCollect;
 use spire::http::http::{StatusCode, Uri};
@@ -15,7 +15,7 @@ fn script(text: &'static str) -> Script {
     Script::from_fn(move |request| {
         assert!(request.input.contains("Lamp"));
         assert!(!request.input.contains("Navigation"));
-        Ok(CompletionResponse {
+        Ok(ProviderResponse {
             text: text.into(),
             usage: Usage::tokens(10, 5).with_cost(0.0),
         })
@@ -31,7 +31,7 @@ async fn app_state(State(app): State<App>) {
     assert_eq!(app.prefix, "products");
 }
 
-async fn collect(data: Data<String>, Extract(items): Extract<Vec<String>>) -> Result<()> {
+async fn collect(data: Data<String>, AgentExtract(items): AgentExtract<Vec<String>>) -> Result<()> {
     for item in items {
         data.write(item).await?;
     }
@@ -73,7 +73,7 @@ async fn extracts_markdown_with_independent_app_state_and_reuses_cached_answers(
 #[tokio::test]
 async fn exhausted_budget_returns_crawl_error_without_calling_provider() {
     let provider = script(r#"{"result":["Lamp"]}"#);
-    let agent = Agent::new(provider.clone()).with_budget(Budget::tokens(0));
+    let agent = Agent::new(provider.clone()).with_budget(Budget::new(0, 0));
     let site = MockSite::new().page("https://shop.test/", MockPage::html("<h1>Lamp</h1>"));
     let error = Crawler::new(site, Router::new().fallback(AgentCollect::<String>::new()))
         .with_agent(agent.clone())

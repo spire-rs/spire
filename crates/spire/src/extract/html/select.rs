@@ -86,9 +86,11 @@ impl<T: Select> Select for Vec<T> {
     }
 }
 
-/// Extracts a `T` from the response body, see [`Select`] and
-/// [`Html::select`]: `Element<T>` for the first match, `Element<Option<T>>`
-/// if it may be missing, and `Element<Vec<T>>` for every match.
+/// Extracts typed data from selected HTML elements.
+///
+/// Use `Element<T>` for the first match, `Element<Option<T>>` if it may be
+/// missing, and `Element<Vec<T>>` for every match. See [`Select`] and
+/// [`Html::select`].
 #[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Element<T>(pub T);
 

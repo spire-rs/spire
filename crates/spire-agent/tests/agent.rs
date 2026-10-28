@@ -6,11 +6,11 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use spire_agent::cache::{Cache, InMemCache};
 use spire_agent::testing::Script;
-use spire_agent::{Agent, Budget, CompletionRequest, CompletionResponse, Error, Pricing, Usage};
+use spire_agent::{Agent, Budget, Error, ProviderRequest, ProviderResponse, Usage};
 use tokio::sync::Notify;
 
 fn script(answers: &[(&str, Usage)]) -> Script {
-    Script::new(answers.iter().map(|(text, usage)| CompletionResponse {
+    Script::new(answers.iter().map(|(text, usage)| ProviderResponse {
         text: (*text).into(),
         usage: *usage,
     }))
@@ -22,8 +22,8 @@ struct Plan {
     price: String,
 }
 
-fn request(input: &str) -> CompletionRequest {
-    CompletionRequest {
+fn request(input: &str) -> ProviderRequest {
+    ProviderRequest {
         system: "answer a question".into(),
         input: input.into(),
         schema: None,
@@ -76,41 +76,52 @@ async fn validates_extraction_empty_results_and_shared_usage() {
 }
 
 #[tokio::test]
-async fn token_and_cost_limits_stop_new_calls() {
-    for budget in [Budget::tokens(5), Budget::default().max_cost(0.5)] {
-        let provider = script(&[("answer", Usage::tokens(3, 2).with_cost(0.5))]);
+async fn input_and_output_caps_independently_stop_new_calls() {
+    for (budget, reason) in [
+        (Budget::default().input_tokens(3), "input tokens"),
+        (Budget::default().output_tokens(2), "output tokens"),
+        (Budget::new(3, 20), "input tokens"),
+        (Budget::new(30, 2), "output tokens"),
+    ] {
+        let provider = script(&[("answer", Usage::tokens(3, 2))]);
         let agent = Agent::new(provider.clone()).with_budget(budget);
         agent.complete(request("one")).await.unwrap();
-        assert!(matches!(
-            agent.complete(request("two")).await,
-            Err(Error::Budget(_))
-        ));
+        assert!(
+            matches!(agent.complete(request("two")).await, Err(Error::Budget(found)) if found == reason)
+        );
         assert_eq!(provider.calls(), 1);
     }
-    let provider = script(&[]);
-    assert!(matches!(
-        Agent::new(provider.clone())
-            .with_budget(Budget::tokens(0))
-            .complete(request("x"))
-            .await,
-        Err(Error::Budget(_))
-    ));
-    assert_eq!(provider.calls(), 0);
+    for budget in [
+        Budget::default().input_tokens(0),
+        Budget::default().output_tokens(0),
+    ] {
+        let provider = script(&[]);
+        assert!(matches!(
+            Agent::new(provider.clone())
+                .with_budget(budget)
+                .complete(request("x"))
+                .await,
+            Err(Error::Budget(_))
+        ));
+        assert_eq!(provider.calls(), 0);
+    }
 }
 
 #[tokio::test]
-async fn prices_fallbacks_but_provider_cost_wins_and_unknown_usage_fails_closed() {
-    let provider = script(&[
-        ("one", Usage::tokens(1_000_000, 500_000)),
-        ("two", Usage::tokens(1, 1).with_cost(0.25)),
-    ]);
-    let agent = Agent::new(provider).with_pricing(Pricing::new(2.0, 4.0).unwrap());
-    agent.complete(request("one")).await.unwrap();
-    agent.complete(request("two")).await.unwrap();
-    assert!((agent.usage().cost_usd - 4.25).abs() < 1e-12);
+async fn only_usage_required_by_a_capped_direction_must_be_known() {
+    let missing_input = Usage {
+        input_tokens: None,
+        output_tokens: Some(1),
+        cost_usd: None,
+    };
+    let missing_output = Usage {
+        input_tokens: Some(2),
+        output_tokens: None,
+        cost_usd: None,
+    };
     for (usage, budget) in [
-        (Usage::tokens(2, 1), Budget::default().max_cost(1.0)),
-        (Usage::default().with_cost(0.1), Budget::tokens(10)),
+        (missing_input, Budget::default().input_tokens(10)),
+        (missing_output, Budget::default().output_tokens(10)),
     ] {
         let provider = script(&[("one", usage)]);
         let agent = Agent::new(provider.clone()).with_budget(budget);
@@ -123,25 +134,66 @@ async fn prices_fallbacks_but_provider_cost_wins_and_unknown_usage_fails_closed(
             Err(Error::Configuration(_))
         ));
         assert_eq!(provider.calls(), 1);
-        assert_eq!(agent.usage().calls, 1);
     }
+    for (usage, budget) in [
+        (missing_input, Budget::default().output_tokens(10)),
+        (missing_output, Budget::default().input_tokens(10)),
+    ] {
+        let provider = script(&[("one", usage), ("two", usage)]);
+        let agent = Agent::new(provider.clone()).with_budget(budget);
+        agent.complete(request("one")).await.unwrap();
+        agent.complete(request("two")).await.unwrap();
+        assert_eq!(provider.calls(), 2);
+    }
+
+    // Changing a clone's budget cannot make previously unknown usage known.
+    let provider = script(&[("one", missing_input), ("two", missing_input)]);
+    let agent = Agent::new(provider.clone());
+    agent.complete(request("one")).await.unwrap();
+    assert!(matches!(
+        agent
+            .clone()
+            .with_budget(Budget::default().input_tokens(10))
+            .complete(request("two"))
+            .await,
+        Err(Error::Configuration(_))
+    ));
+    agent
+        .with_budget(Budget::default().output_tokens(10))
+        .complete(request("two"))
+        .await
+        .unwrap();
+    assert_eq!(provider.calls(), 2);
 }
 
 #[tokio::test]
-async fn rejects_invalid_limits_and_provider_costs() {
-    assert!(Pricing::new(-1.0, 0.0).is_err());
-    assert!(Pricing::new(f64::NAN, 1.0).is_err());
+async fn costs_are_provider_reported_information_not_budget_limits() {
+    let provider = script(&[
+        ("one", Usage::tokens(1_000_000, 500_000)),
+        ("two", Usage::tokens(1, 1).with_cost(0.25)),
+    ]);
+    let agent = Agent::new(provider).with_budget(Budget::new(2_000_000, 1_000_000));
+    agent.complete(request("one")).await.unwrap();
+    agent.complete(request("two")).await.unwrap();
+    assert!((agent.usage().cost_usd - 0.25).abs() < 1e-12);
+    assert_eq!(agent.usage().unpriced_calls, 1);
+}
+
+#[tokio::test]
+async fn rejects_zero_per_call_output_limits_and_invalid_reported_costs() {
     let provider = script(&[]);
-    let agent = Agent::new(provider.clone()).with_budget(Budget::default().max_cost(f64::INFINITY));
-    assert!(agent.complete(request("x")).await.is_err());
+    let agent = Agent::new(provider.clone()).with_max_tokens(0);
+    assert!(agent.extract::<String>("x").await.is_err());
     assert_eq!(provider.calls(), 0);
-    let provider = script(&[("x", Usage::tokens(1, 1).with_cost(f64::NAN))]);
-    let agent = Agent::new(provider);
-    assert!(matches!(
-        agent.complete(request("x")).await,
-        Err(Error::Configuration(_))
-    ));
-    assert!(agent.usage().cost_usd.is_finite());
+    for cost in [f64::NAN, f64::INFINITY, -1.0] {
+        let provider = script(&[("x", Usage::tokens(1, 1).with_cost(cost))]);
+        let agent = Agent::new(provider);
+        assert!(matches!(
+            agent.complete(request("x")).await,
+            Err(Error::Configuration(_))
+        ));
+        assert!(agent.usage().cost_usd.is_finite());
+    }
 }
 
 #[tokio::test]
@@ -212,7 +264,7 @@ fn waiting(entered: Arc<Notify>, release: Arc<Notify>) -> Script {
         async move {
             entered.notify_one();
             release.notified().await;
-            Ok(CompletionResponse {
+            Ok(ProviderResponse {
                 text: "answer".into(),
                 usage: Usage::tokens(2, 1).with_cost(0.1),
             })
@@ -228,7 +280,7 @@ async fn queued_calls_recheck_budgets_and_identical_requests_have_single_flight(
         let provider = waiting(entered.clone(), release.clone());
         let mut agent = Agent::new(provider.clone())
             .with_concurrency(1)
-            .with_budget(Budget::tokens(3));
+            .with_budget(Budget::new(2, 1));
         if cached {
             agent = agent.with_cache(InMemCache::default(), "model");
         }
@@ -258,7 +310,7 @@ async fn cancellation_releases_gate_and_marks_budget_accounting_unknown() {
     let provider = waiting(entered.clone(), release);
     let agent = Agent::new(provider.clone())
         .with_concurrency(1)
-        .with_budget(Budget::tokens(100));
+        .with_budget(Budget::new(100, 100));
     let pending = {
         let agent = agent.clone();
         tokio::spawn(async move { agent.complete(request("page")).await })

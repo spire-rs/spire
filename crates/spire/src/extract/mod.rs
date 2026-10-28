@@ -13,7 +13,8 @@
 //! - HTML, with the `html` feature, in [`html`]: the parsed [`Html`],
 //!   [`Element`]s extracted with [`Select`], [`Meta`] and [`JsonLd`].
 //! - Sitemaps, with the `sitemap` feature, in [`sitemap`]; and a browser
-//!   [`Tab`] with the `thirtyfour` feature.
+//!   [`ThirtyfourTab`] with the `thirtyfour` feature.
+//! - Model selection, with the `agent` feature: `AgentExtract<T>`.
 //! - Application state: [`State`]; crawler and middleware services: [`Extension`].
 //!
 //! Wrapping an extractor in `Option` or `Result` makes it infallible.
@@ -28,7 +29,6 @@
 //! [`Depth`]: crate::crawler::Depth
 //! [`Attempt`]: crate::crawler::Attempt
 //! [`Queue`]: crate::frontier::queue::Queue
-//! [`Data`]: crate::dataset::Data
 
 #[cfg(feature = "agent")]
 mod agent;
@@ -50,13 +50,18 @@ mod state;
 use std::convert::Infallible;
 use std::future::Future;
 
+#[cfg(feature = "agent")]
+#[cfg_attr(docsrs, doc(cfg(feature = "agent")))]
+pub use agent::AgentExtract;
 pub use body::{Body, Json, Text};
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
-pub use browser::Tab;
+pub use browser::ThirtyfourTab;
 pub use extension::Extension;
 pub use head::Head;
 pub use query::Query;
+#[doc(inline)]
+pub use spire_core::dataset::Data;
 #[cfg(feature = "macros")]
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 pub use spire_macros::FromRef;

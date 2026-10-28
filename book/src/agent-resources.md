@@ -4,34 +4,37 @@ Model calls share budgets, usage and caches through `Agent` clones.
 
 ## Budgets and usage
 
-Configure the agent before registering it with `.with_agent(agent)`. Clones share usage,
-concurrency limits and pending identical cache requests.
+Configure the agent before registering it with `.with_agent(agent)`. Clones
+share usage, concurrency limits and pending identical cache requests.
 
 ```rust
-use spire::agent::{Agent, Budget, Pricing};
+use spire::agent::{Agent, Budget};
 
 # fn configure(agent: Agent) -> spire::agent::Result<Agent> {
 let agent = agent
-    .with_budget(Budget::tokens(100_000).max_cost(2.0))
-    .with_pricing(Pricing::new(0.15, 0.60)?)
+    .with_budget(Budget::new(100_000, 20_000))
     .with_concurrency(2)
     .with_max_tokens(2048);
 # Ok(agent)
 # }
 ```
 
-Prices are USD per million input and output tokens. Reported provider cost
-takes precedence over fallback pricing. `agent.usage()` reports calls,
-known tokens and costs, cache hits, and calls with unknown usage or cost.
-Failed or invalid answers still consume reported usage.
+`Budget::new(input, output)` caps aggregate input and output tokens separately.
+Use `Budget::default().input_tokens(max)` or `.output_tokens(max)` to cap just
+one direction. `with_max_tokens` is the per-call output limit, independent of
+these aggregate limits.
 
-Budgets check settled usage before admitting a call. Already-running
-calls can cross a limit, so these are admission limits rather than a hard
-spending guarantee. A reached budget stops the crawl and returns an error.
-If usage needed for a budget is missing, further calls stop rather than
-assuming they were free. Cancelled calls also leave their usage unknown.
-Provider and answer failures fail the page; providers control their own
-retries.
+`agent.usage()` reports known input/output totals, provider-reported costs,
+cache hits and calls with unknown metrics. There is no inferred pricing or
+monetary budget. Failed or invalid answers still consume reported usage.
+
+Budgets check settled usage before admitting a call. Already-running calls
+can cross either cap; subsequent calls stop once either cap is reached.
+Only a capped direction requires known usage for that direction. Missing
+output usage does not prevent enforcing an input-only cap, and vice versa.
+Cancelled calls leave both token directions unknown, preventing further
+budgeted calls. A reached budget stops the crawl and returns an error.
+Provider and answer failures fail the page; providers control their retries.
 
 ## Answer caches
 

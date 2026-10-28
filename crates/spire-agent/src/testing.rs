@@ -7,18 +7,18 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use futures::future::BoxFuture;
 
-use crate::{CompletionRequest, CompletionResponse, Error, Provider, Result};
+use crate::{Error, Provider, ProviderRequest, ProviderResponse, Result};
 
 type Handler =
-    dyn Fn(CompletionRequest) -> BoxFuture<'static, Result<CompletionResponse>> + Send + Sync;
+    dyn Fn(ProviderRequest) -> BoxFuture<'static, Result<ProviderResponse>> + Send + Sync;
 
 enum Replies {
-    Queue(Mutex<VecDeque<CompletionResponse>>),
+    Queue(Mutex<VecDeque<ProviderResponse>>),
     Handler(Box<Handler>),
 }
 
 struct State {
-    requests: Mutex<Vec<CompletionRequest>>,
+    requests: Mutex<Vec<ProviderRequest>>,
     replies: Replies,
 }
 
@@ -44,7 +44,7 @@ impl Script {
     /// Calling after the queue is exhausted returns a provider error; it never
     /// repeats an answer implicitly.
     #[must_use]
-    pub fn new(responses: impl IntoIterator<Item = CompletionResponse>) -> Self {
+    pub fn new(responses: impl IntoIterator<Item = ProviderResponse>) -> Self {
         Self {
             state: Arc::new(State {
                 requests: Mutex::default(),
@@ -58,7 +58,7 @@ impl Script {
     /// An error can be returned to simulate a provider failure.
     #[must_use]
     pub fn from_fn(
-        handler: impl Fn(&CompletionRequest) -> Result<CompletionResponse> + Send + Sync + 'static,
+        handler: impl Fn(&ProviderRequest) -> Result<ProviderResponse> + Send + Sync + 'static,
     ) -> Self {
         Self::from_async_fn(move |request| ready(handler(&request)))
     }
@@ -70,8 +70,8 @@ impl Script {
     #[must_use]
     pub fn from_async_fn<F, Fut>(handler: F) -> Self
     where
-        F: Fn(CompletionRequest) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<CompletionResponse>> + Send + 'static,
+        F: Fn(ProviderRequest) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<ProviderResponse>> + Send + 'static,
     {
         Self {
             state: Arc::new(State {
@@ -84,7 +84,7 @@ impl Script {
     /// Returns requests in arrival order, including calls whose callback failed
     /// or was cancelled.
     #[must_use]
-    pub fn requests(&self) -> Vec<CompletionRequest> {
+    pub fn requests(&self) -> Vec<ProviderRequest> {
         lock(&self.state.requests).clone()
     }
 
@@ -113,8 +113,8 @@ impl fmt::Debug for Script {
 impl Provider for Script {
     fn complete(
         &self,
-        request: CompletionRequest,
-    ) -> impl Future<Output = Result<CompletionResponse>> + Send {
+        request: ProviderRequest,
+    ) -> impl Future<Output = Result<ProviderResponse>> + Send {
         match &self.state.replies {
             Replies::Queue(queue) => {
                 // Capture and select the response under the same ordering lock.
@@ -124,7 +124,7 @@ impl Provider for Script {
                     Error::provider(std::io::Error::other("scripted provider has no response"))
                 });
                 drop(requests);
-                Box::pin(ready(response)) as BoxFuture<'static, Result<CompletionResponse>>
+                Box::pin(ready(response)) as BoxFuture<'static, Result<ProviderResponse>>
             }
             Replies::Handler(handler) => {
                 lock(&self.state.requests).push(request.clone());
@@ -139,8 +139,8 @@ mod tests {
     use super::*;
     use crate::Usage;
 
-    fn request(input: &str) -> CompletionRequest {
-        CompletionRequest {
+    fn request(input: &str) -> ProviderRequest {
+        ProviderRequest {
             system: "test".into(),
             input: input.into(),
             schema: None,
@@ -150,7 +150,7 @@ mod tests {
 
     #[tokio::test]
     async fn clones_share_responses_and_capture_failed_calls() {
-        let provider = Script::new([CompletionResponse {
+        let provider = Script::new([ProviderResponse {
             text: "one".into(),
             usage: Usage::tokens(2, 1),
         }]);
@@ -194,7 +194,7 @@ mod tests {
     fn concurrent_queued_responses_match_captured_request_order() {
         const THREADS: usize = 16;
         const CALLS: usize = 32;
-        let provider = Script::new((0..THREADS * CALLS).map(|index| CompletionResponse {
+        let provider = Script::new((0..THREADS * CALLS).map(|index| ProviderResponse {
             text: index.to_string(),
             usage: Usage::tokens(0, 0),
         }));

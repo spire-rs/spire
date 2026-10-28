@@ -5,8 +5,8 @@ real model or supply deterministic answers for offline tests.
 
 ## Provider contract
 
-Implement `Provider::complete` to translate a `CompletionRequest` into one
-model call and return a `CompletionResponse`. Forward the system
+Implement `Provider::complete` to translate a `ProviderRequest` into one
+model call and return a `ProviderResponse`. Forward the system
 instructions, input, schema and output limit. Report actual input/output
 tokens and cost when available; leave unknown values as `None`. Providers
 own retries and rate limits and should report usage for the whole call.
@@ -20,7 +20,7 @@ cargo run -p model-extraction
 ```
 
 Enable `agent` and `testing` to use `Script` in your own tests. It can
-return a queue of `CompletionResponse`s, answer from a synchronous or
+return a queue of `ProviderResponse`s, answer from a synchronous or
 asynchronous callback, and capture requests for assertions.
 
 For Rig models, enable `agent-rig` on the facade:
@@ -46,11 +46,11 @@ provider. Fixed responses are useful for handler tests:
 
 ```rust
 use spire::testing::Script;
-use spire::agent::{Agent, CompletionResponse, Usage};
+use spire::agent::{Agent, ProviderResponse, Usage};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> spire::agent::Result<()> {
-    let provider = Script::new([CompletionResponse {
+    let provider = Script::new([ProviderResponse {
         text: r#"{"result":["Basic"]}"#.into(),
         usage: Usage::tokens(10, 5).with_cost(0.0),
     }]);

@@ -1,80 +1,76 @@
-use crate::{Error, Result, Usage};
+use crate::{Error, Result, UsageTotals};
 
-/// Token and cost limits for model calls.
+/// Aggregate input and output token limits for model calls.
 ///
-/// Limits use settled provider usage. Already-running calls can cross a limit;
-/// no new calls start once it has been reached.
+/// The default has no limits. Caps use settled provider usage; in-flight
+/// calls may cross them, and no new calls start once either cap is reached.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Budget {
-    pub(crate) tokens: Option<u64>,
-    pub(crate) cost: Option<f64>,
+    pub(crate) input_tokens: Option<u64>,
+    pub(crate) output_tokens: Option<u64>,
 }
 
 impl Budget {
-    /// Caps total reported input plus output tokens.
+    /// Caps aggregate input and output tokens independently.
     #[must_use]
-    pub const fn tokens(max: u64) -> Self {
+    pub const fn new(input_tokens: u64, output_tokens: u64) -> Self {
         Self {
-            tokens: Some(max),
-            cost: None,
+            input_tokens: Some(input_tokens),
+            output_tokens: Some(output_tokens),
         }
     }
 
-    /// Also caps reported or fallback-priced cost, in USD.
-    ///
-    /// Non-finite or negative values fail before any provider call.
+    /// Sets only the aggregate input cap, preserving the output cap.
     #[must_use]
-    pub const fn max_cost(mut self, usd: f64) -> Self {
-        self.cost = Some(usd);
+    pub const fn input_tokens(mut self, max: u64) -> Self {
+        self.input_tokens = Some(max);
         self
     }
 
-    pub(crate) fn validate(self) -> Result<()> {
-        if self.cost.is_some_and(|usd| !usd.is_finite() || usd < 0.0) {
-            return Err(Error::Configuration(
-                "cost budget must be finite and nonnegative".into(),
-            ));
+    /// Sets only the aggregate output cap, preserving the input cap.
+    #[must_use]
+    pub const fn output_tokens(mut self, max: u64) -> Self {
+        self.output_tokens = Some(max);
+        self
+    }
+
+    pub(crate) fn check(
+        self,
+        usage: &UsageTotals,
+        unknown_input: bool,
+        unknown_output: bool,
+    ) -> Result<()> {
+        for (limit, consumed, unknown, direction, reason) in [
+            (
+                self.input_tokens,
+                usage.input_tokens,
+                unknown_input,
+                "input",
+                "input tokens",
+            ),
+            (
+                self.output_tokens,
+                usage.output_tokens,
+                unknown_output,
+                "output",
+                "output tokens",
+            ),
+        ] {
+            if let Some(max) = limit {
+                if unknown {
+                    return Err(Error::Configuration(format!(
+                        "{direction} token budget requires reported {direction} usage"
+                    )));
+                }
+                if consumed >= max {
+                    return Err(Error::Budget(reason));
+                }
+            }
         }
         Ok(())
     }
-}
 
-/// Fallback USD prices per million input and output tokens.
-///
-/// Provider costs always take precedence. Zero prices explicitly permit free
-/// local models.
-#[derive(Debug, Clone, Copy)]
-pub struct Pricing {
-    input: f64,
-    output: f64,
-}
-
-impl Pricing {
-    /// Sets fallback prices per million tokens.
-    ///
-    /// # Errors
-    ///
-    /// Rejects non-finite or negative prices.
-    pub fn new(input: f64, output: f64) -> Result<Self> {
-        if [input, output]
-            .iter()
-            .any(|price| !price.is_finite() || *price < 0.0)
-        {
-            return Err(Error::Configuration(
-                "prices must be finite and nonnegative".into(),
-            ));
-        }
-        Ok(Self { input, output })
-    }
-
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "USD token pricing uses floating-point provider prices"
-    )]
-    pub(crate) fn cost(self, usage: Usage) -> Option<f64> {
-        Some(
-            (usage.input_tokens? as f64 * self.input + usage.output_tokens? as f64 * self.output)
-                / 1_000_000.0,
-        )
+    pub(crate) const fn is_limited(self) -> bool {
+        self.input_tokens.is_some() || self.output_tokens.is_some()
     }
 }

@@ -94,10 +94,11 @@ impl From<&PageLink> for Link {
     }
 }
 
-/// The links of a page a visitor can follow, `<a>` and `<area>`, resolved
-/// against the page as a browser does: against its `<base href>`, if it has
-/// one, and the URI it was served from. Links that are not `http(s)` URLs,
-/// such as `mailto:`, are left out.
+/// A page's navigable links, resolved to absolute HTTP(S) URLs.
+///
+/// Reads `<a>` and `<area>` links, resolving them against the page's
+/// `<base href>`, if present, and the URI it was served from. Links that are
+/// not HTTP(S) URLs, such as `mailto:`, are left out.
 ///
 /// As an extractor, it reads the page's links in document order; the
 /// filters narrow them, and it converts into links to

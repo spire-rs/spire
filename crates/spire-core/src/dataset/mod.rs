@@ -31,7 +31,10 @@ mod registry;
 
 use std::future::Future;
 
-pub use data::{Data, READ_BATCH};
+/// Default batch size used by `Data::read_all`.
+const READ_BATCH: usize = 1024;
+
+pub use data::Data;
 #[cfg(feature = "csv")]
 #[cfg_attr(docsrs, doc(cfg(feature = "csv")))]
 pub use file::CsvDataset;

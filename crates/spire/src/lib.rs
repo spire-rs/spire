@@ -17,8 +17,8 @@ pub mod agent {
     #[doc(no_inline)]
     pub use spire_agent::rig;
     pub use spire_agent::{
-        Agent, AgentCrawlerExt, Budget, CompletionRequest, CompletionResponse, Error, Extract,
-        Pricing, Provider, Result, Usage, UsageTotals, cache, schemars, serde, serde_json,
+        Agent, AgentCrawlerExt, Budget, Error, Provider, ProviderRequest, ProviderResponse, Result,
+        Usage, UsageTotals, cache, objective, schemars, serde, serde_json,
     };
 }
 
@@ -81,7 +81,7 @@ pub mod dataset {
     #[cfg(feature = "json")]
     #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     pub use spire_core::dataset::JsonlDataset;
-    pub use spire_core::dataset::{Data, Dataset, InMemDataset, READ_BATCH};
+    pub use spire_core::dataset::{Dataset, InMemDataset};
 }
 
 /// The frontier: requests waiting to be crawled.
@@ -166,6 +166,7 @@ mod book {
         ModelExtraction: "model-extraction.md",
         AgentProviders: "agent-providers.md",
         AgentResources: "agent-resources.md",
+        Objectives: "objectives.md",
         Datasets: "datasets.md",
         Links: "links.md",
         BestFirst: "best-first.md",

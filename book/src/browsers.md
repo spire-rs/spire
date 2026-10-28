@@ -4,18 +4,18 @@
 real status and headers, any request method, and a fresh browser profile per
 request. The page is loaded once, by the first extractor that needs it, and
 body extractors such as `Html` read the snapshot captured by the fetch.
-`Tab` is the request's tab, to interact with the page; `tab.snapshot()` then parses it
+`ThirtyfourTab` is the request's tab, to interact with the page; `tab.snapshot()` then parses it
 again, including what the interaction changed:
 
 ```rust,no_run
 use spire::backend::ThirtyfourBackend;
 use spire::backend::thirtyfour::By;
-use spire::extract::{Head, Tab};
+use spire::extract::{Head, ThirtyfourTab};
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;
 use spire::{Crawler, Result, Router};
 
-async fn rendered(head: Head, queue: Queue, tab: Tab) -> Result<()> {
+async fn rendered(head: Head, queue: Queue, tab: ThirtyfourTab) -> Result<()> {
     if let Ok(more) = tab.find(By::Css("button.more")).await {
         let _ = more.click().await;
     }

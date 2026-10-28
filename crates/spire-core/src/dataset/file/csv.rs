@@ -9,8 +9,9 @@ use super::FileSink;
 use crate::dataset::Dataset;
 use crate::{Error, ErrorKind, Result};
 
-/// A write-only [`Dataset`] that appends every item to a CSV file as one
-/// row, with a header row of the item's field names.
+/// A write-only [`Dataset`] backed by a CSV file.
+///
+/// Appends each item as one row, with a header row of its field names.
 ///
 /// Items must be flat: structs or tuples of strings, numbers, booleans and
 /// `Option`s of them, as the [csv](https://docs.rs/csv) crate serializes

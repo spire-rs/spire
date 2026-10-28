@@ -1,6 +1,6 @@
 use serde::de::DeserializeOwned;
+use spire_agent::Agent;
 use spire_agent::schemars::JsonSchema;
-use spire_agent::{Agent, Extract};
 
 use crate::Context;
 use crate::backend::Session;
@@ -8,7 +8,30 @@ use crate::extract::html::Markdown;
 use crate::extract::{Extension, FromContext};
 use crate::worker::{IntoOutcome, Outcome};
 
-impl<C, S, T> FromContext<C, S> for Extract<T>
+/// Selects typed records from page text through the configured model agent.
+///
+/// The page is converted to Markdown before extraction. Register the agent
+/// with [`with_agent`](spire_agent::AgentCrawlerExt::with_agent). Use `Vec<T>`
+/// for zero or more records, or `Option<T>` when a record may be absent.
+///
+/// ```
+/// use spire::agent::schemars::JsonSchema;
+/// use spire::agent::serde::Deserialize;
+/// use spire::extract::AgentExtract;
+///
+/// #[derive(Deserialize, JsonSchema)]
+/// #[serde(crate = "spire::agent::serde")]
+/// #[schemars(crate = "spire::agent::schemars")]
+/// struct Product { name: String }
+///
+/// async fn products(AgentExtract(products): AgentExtract<Vec<Product>>) {
+///     for product in products { println!("{}", product.name); }
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentExtract<T>(pub T);
+
+impl<C, S, T> FromContext<C, S> for AgentExtract<T>
 where
     C: Session,
     S: Sync,

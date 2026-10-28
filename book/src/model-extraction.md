@@ -1,6 +1,6 @@
 # Model extraction
 
-With the `agent` feature, `Extract<T>` converts a page to Markdown and asks
+With the `agent` feature, `AgentExtract<T>` converts a page to Markdown and asks
 a model for data matching `T`'s JSON Schema. Use it when information is
 spread across prose or the page layout varies. CSS selectors remain useful
 for predictable markup and need no model calls.
@@ -24,8 +24,8 @@ and returns the inner value. Providers must return that complete object.
 ```rust
 use spire::agent::schemars::JsonSchema;
 use spire::agent::serde::Deserialize;
-use spire::agent::{Agent, AgentCrawlerExt, Extract};
-use spire::dataset::Data;
+use spire::agent::{Agent, AgentCrawlerExt};
+use spire::extract::{AgentExtract, Data};
 use spire::{Crawler, Result, Router};
 # use spire::backend::Noop;
 
@@ -39,7 +39,7 @@ struct Product {
     price: String,
 }
 
-async fn products(data: Data<Product>, Extract(products): Extract<Vec<Product>>) -> Result<()> {
+async fn products(data: Data<Product>, AgentExtract(products): AgentExtract<Vec<Product>>) -> Result<()> {
     for product in products {
         data.write(product).await?;
     }
@@ -89,4 +89,5 @@ are true. Check important facts against the source.
 ## Next steps
 
 Choose a [model provider](agent-providers.md), configure
-[budgets and caches](agent-resources.md).
+[budgets and caches](agent-resources.md), or add
+[objective middleware](objectives.md) for relevant discovery and stopping.

@@ -88,7 +88,7 @@ No features are enabled by default.
 
 ## AI-driven crawling
 
-`agent` enables model extraction. Provider integrations are
+`agent` enables model extraction and [objective middleware](objectives.md). Provider integrations are
 configured on `spire-agent`; see [Model providers](agent-providers.md).
 The facade's `redb` feature also enables answer caching when `agent` is
 present. See [Model budgets and caches](agent-resources.md) for setup.

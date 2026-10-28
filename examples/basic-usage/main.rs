@@ -8,7 +8,8 @@
 
 use spire::backend::ReqwestBackend;
 use spire::crawler::Tags;
-use spire::dataset::{Data, InMemDataset};
+use spire::dataset::InMemDataset;
+use spire::extract::Data;
 use spire::extract::html::{Element, Links, Select};
 use spire::frontier::queue::Queue;
 use spire::frontier::seed::Seed;

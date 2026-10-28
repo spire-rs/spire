@@ -25,12 +25,14 @@ providers independent of the facade's router and HTML extractors.
 
 - **`Provider`** makes one completion call, returning an answer and its usage.
   Providers own retries, rate limits and transport timeouts.
-- **`Agent`** shares token and cost accounting, budgets and a model-call
+- **`objective::Objective<T>`** configures typed goals through worker
+  middleware, with independent progress and shared link discovery.
+- **`Agent`** shares token usage and provider cost accounting, budgets and a model-call
   concurrency limit. Structured answers are validated against JSON Schema.
 
 
 The `agent` feature on `spire` re-exports this crate as `spire::agent` and
-adds `Extract<T>` and `AgentCollect<T>` to ordinary crawls.
+adds `AgentExtract<T>`, `AgentCollect<T>` and `FollowRelevantLinks` to ordinary crawls.
 
 ## Usage
 
@@ -49,7 +51,7 @@ use spire_agent::{Agent, Budget, Provider, Result};
 
 # async fn example(provider: impl Provider) -> Result<()> {
 let agent = Agent::new(provider)
-    .with_budget(Budget::tokens(100_000).max_cost(2.0))
+    .with_budget(Budget::new(100_000, 20_000))
     .with_concurrency(2);
 let names: Vec<String> = agent.extract("Our plans are Basic and Pro.").await?;
 println!("{names:?}: {:?}", agent.usage());
@@ -85,10 +87,10 @@ control completion timing:
 ```rust
 # #[cfg(feature = "testing")] {
 use spire_agent::testing::Script;
-use spire_agent::{Agent, CompletionResponse, Usage};
+use spire_agent::{Agent, ProviderResponse, Usage};
 
 # async fn example() -> spire_agent::Result<()> {
-let provider = Script::new([CompletionResponse {
+let provider = Script::new([ProviderResponse {
     text: r#"{"result":["Basic"]}"#.into(),
     usage: Usage::tokens(10, 5).with_cost(0.0),
 }]);
@@ -104,7 +106,8 @@ assert_eq!(provider.calls(), 1);
 ## Examples
 
 Run `cargo run -p model-extraction` for typed extraction with a scripted
-provider, without a network or API key.
+provider, without a network or API key. `cargo run -p objective-crawl`
+demonstrates multiple goals on the same router.
 
 See the book pages on [Model extraction](https://spire-rs.github.io/spire/model-extraction.html),
 [Providers](https://spire-rs.github.io/spire/agent-providers.html),

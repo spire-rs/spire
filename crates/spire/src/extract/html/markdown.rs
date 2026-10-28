@@ -15,8 +15,9 @@ use crate::{Context, Error, Result};
 static BASE: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("base[href]").expect("valid selector"));
 
-/// The page's main content as Markdown, with its links and images resolved
-/// against the URI the page was served from.
+/// The page's main content as Markdown.
+///
+/// Links and images are resolved against the URI the page was served from.
 ///
 /// As an extractor, it converts with the default [`MarkdownOptions`] and
 /// the response's final URI as the base; [`from_html`](Self::from_html)

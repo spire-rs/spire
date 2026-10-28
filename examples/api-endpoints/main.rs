@@ -8,8 +8,8 @@
 use serde::Deserialize;
 use spire::backend::ReqwestBackend;
 use spire::crawler::Tags;
-use spire::dataset::{Data, InMemDataset};
-use spire::extract::Json;
+use spire::dataset::InMemDataset;
+use spire::extract::{Data, Json};
 use spire::frontier::queue::{Link, Queue};
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};

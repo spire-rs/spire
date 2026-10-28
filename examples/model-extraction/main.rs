@@ -27,7 +27,7 @@ struct Product {
 #[tokio::main]
 async fn main() -> Result<()> {
     let agent = Agent::new(fixtures::script())
-        .with_budget(Budget::tokens(10_000).max_cost(1.0))
+        .with_budget(Budget::new(10_000, 2_000))
         .with_concurrency(1)
         .with_cache(InMemCache::default(), "scripted-products/v1");
     let router = Router::new().route("products", AgentCollect::<Product>::new());

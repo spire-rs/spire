@@ -129,7 +129,7 @@ explicitly. `full` enables every feature below except `native-tls` and
 | `markdown` | The `Markdown` extractor; also enables `html` |
 | `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
 | `reqwest` | `ReqwestBackend` and the reqwest re-export |
-| `thirtyfour` | `ThirtyfourBackend`, `Tab` and the thirtyfour re-export |
+| `thirtyfour` | `ThirtyfourBackend`, `ThirtyfourTab` and the thirtyfour re-export |
 | `user-agents` | Browser profiles and matching navigation headers for identities |
 | `robots` | Obeying robots.txt with `Crawler::with_robots` |
 | `sitemap` | The `Sitemap` extractor and `FollowSitemap` handler |
