@@ -3,7 +3,6 @@
 [![Build Status][action-badge]][action-url]
 [![Crate Docs][docs-badge]][docs-url]
 [![Crate Version][crates-badge]][crates-url]
-[![Crate Coverage][coverage-badge]][coverage-url]
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
 
@@ -13,8 +12,6 @@
 [crates-url]: https://crates.io/crates/spire-core
 [docs-badge]: https://img.shields.io/docsrs/spire-core?logo=Docs.rs&style=flat-square
 [docs-url]: http://docs.rs/spire-core
-[coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
-[coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
 The crawl engine behind [`spire`](https://crates.io/crates/spire): the
 crawler, its frontier, backends, workers and datasets.
@@ -38,18 +35,8 @@ serializable, so a stopped crawl's frontier and seen set can be snapshotted
 and restored. `JsonlDataset` and `CsvDataset`, with the `json` and `csv`
 features, write results to files.
 
-## Feature flags
-
-No features are enabled by default.
-
-| Feature | Enables |
-|---|---|
-| `robots` | Fetching and obeying robots.txt with `Crawler::with_robots` |
-| `serde` | Serialization of `Seed`, `Fingerprint` and `BloomSnapshot` |
-| `json` | `JsonlDataset`, writing JSON Lines; also enables `serde` |
-| `csv` | `CsvDataset`, writing CSV; also enables `serde` |
-| `testing` | `MockSite`, `MockPage`, `MockSession` and `Visit` for offline tests |
-| `user-agents` | `Identity::with_profile` and the uagent `Profile`, `UserAgents`, `Browser` and `Platform` re-exports |
+See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#using-spire-core-directly)
+page for configuration.
 
 Most users depend on `spire`, which adds a router, handlers and extractors on
 top of this crate. Depend on `spire-core` directly to implement a backend, a

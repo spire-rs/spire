@@ -3,7 +3,6 @@
 [![Build Status][action-badge]][action-url]
 [![Crate Docs][docs-badge]][docs-url]
 [![Crate Version][crates-badge]][crates-url]
-[![Crate Coverage][coverage-badge]][coverage-url]
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
 
@@ -13,8 +12,6 @@
 [crates-url]: https://crates.io/crates/spire-macros
 [docs-badge]: https://img.shields.io/docsrs/spire-macros?logo=Docs.rs&style=flat-square
 [docs-url]: http://docs.rs/spire-macros
-[coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
-[coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
 Procedural macros for the spire web scraping framework.
 
@@ -121,10 +118,8 @@ async fn page(State(db): State<Db>) {}
   one out.
 - The struct must have named fields and no generic parameters.
 
-## Feature flags
-
-This crate has no feature flags. Enable `macros` on `spire` to use its
-`Select`, `FromRef`, `Tags` and `Revisit` derives through the public API.
+See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#spire-facade)
+page for configuration.
 
 ## Usage
 

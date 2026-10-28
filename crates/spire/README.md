@@ -3,7 +3,6 @@
 [![Build Status][action-badge]][action-url]
 [![Crate Docs][docs-badge]][docs-url]
 [![Crate Version][crates-badge]][crates-url]
-[![Crate Coverage][coverage-badge]][coverage-url]
 [![Book][book-badge]][book-url]
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
@@ -14,8 +13,6 @@
 [crates-url]: https://crates.io/crates/spire
 [docs-badge]: https://img.shields.io/docsrs/spire?logo=Docs.rs&style=flat-square
 [docs-url]: http://docs.rs/spire
-[coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
-[coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 [book-badge]: https://img.shields.io/badge/book-guide-blue?logo=mdbook&style=flat-square
 [book-url]: https://spire-rs.github.io/spire
 
@@ -46,7 +43,7 @@ The flexible crawler and scraper framework for Rust, built on
 spire = { version = "0.8.0", features = ["reqwest", "macros"] }
 ```
 
-See the book for [every feature flag](https://spire-rs.github.io/spire/installation.html).
+See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html) page for configuration.
 
 ## Quick Start
 
@@ -115,35 +112,6 @@ fallback. `require` fails at startup if a variant has no route, and a handler
 serving several variants takes `page: Page` as an argument. A URL is fetched
 once whatever its tag. Error statuses become failures: `5xx` and `429` are
 retried, honouring `Retry-After`.
-
-## Feature flags
-
-Defaults are `html` and `rustls-tls`; choose an HTTP or browser backend
-explicitly. `full` enables every feature below except `native-tls` and
-`testing`. Backend-specific options are enabled on their own crates.
-
-| Feature | Enables |
-|---|---|
-| `html` (default) | `Html`, `Element`, `Links`, `Meta`, `JsonLd`, `Select`, `Collect` and `FollowLinks` |
-| `agent` | Typed model extraction; also enables `markdown` |
-| `markdown` | The `Markdown` extractor; also enables `html` |
-| `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
-| `reqwest` | `ReqwestBackend` and the reqwest re-export |
-| `thirtyfour` | `ThirtyfourBackend`, `ThirtyfourTab` and the thirtyfour re-export |
-| `user-agents` | Browser profiles and matching navigation headers for identities |
-| `robots` | Obeying robots.txt with `Crawler::with_robots` |
-| `sitemap` | The `Sitemap` extractor and `FollowSitemap` handler |
-| `serde` | Serializable seeds, fingerprints and Bloom snapshots |
-| `json` | `JsonlDataset`; also enables `serde` |
-| `csv` | `CsvDataset`; also enables `serde` |
-| `redb` | Crash-safe frontier, seen set and datasets through `RedbStore`; persistent answer caching with `agent` |
-| `rustls-tls` (default) | Rustls TLS for enabled backends |
-| `native-tls` | Platform-native TLS for enabled backends |
-| `testing` | Offline tests with `MockSite` and `Visit`; `testing::Script` when `agent` is enabled |
-| `full` | Every feature except `native-tls` and `testing` |
-
-See [Installation](https://spire-rs.github.io/spire/installation.html) for
-backend-specific compression, proxy, cookie and driver-management options.
 
 ## Guide
 

@@ -3,7 +3,6 @@
 [![Build Status][action-badge]][action-url]
 [![Crate Docs][docs-badge]][docs-url]
 [![Crate Version][crates-badge]][crates-url]
-[![Crate Coverage][coverage-badge]][coverage-url]
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
 
@@ -13,8 +12,6 @@
 [crates-url]: https://crates.io/crates/spire-agent
 [docs-badge]: https://img.shields.io/docsrs/spire-agent?logo=Docs.rs&style=flat-square
 [docs-url]: http://docs.rs/spire-agent
-[coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
-[coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
 Provider-independent model extraction for Spire.
 
@@ -64,19 +61,8 @@ limit. A budget requiring unknown token counts fails closed. Use `Vec<T>` or
 `Option<T>` when data may be absent. Schema validation checks structure,
 not whether a model's statements are true.
 
-### Features
-
-No features are enabled by default:
-
-| Feature | Enables |
-|---|---|
-| `rig` | The `Rig` adapter for Rig completion models |
-| `redb` | `RedbCache` and the `RedbStore` implementation of `AgentStoreExt` |
-| `testing` | `testing::Script`, a reusable offline provider |
-
-Enable `rig` directly on this crate when using its adapter. The facade's
-`agent + redb` features enable persistent answer caching together, and
-`agent + testing` enable the scripted provider.
+See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#ai-driven-crawling)
+page for configuration.
 
 ### Offline testing
 

@@ -20,7 +20,7 @@ HTTP crawl, start with the dependency setup in [Installation](installation.md).
 | `serde` | Serializable seeds for snapshots |
 | `json` | `JsonlDataset` |
 | `csv` | `CsvDataset` |
-| `redb` | `RedbStore`, a crash-safe frontier, seen set and datasets on disk; persistent answer caching with `agent` |
+| `redb` | `RedbStore`, a crash-safe frontier, seen set and datasets on disk; `RedbCache` with `agent` |
 | `rustls-tls` (default), `native-tls` | TLS for the enabled backends |
 | `testing` | `MockSite`, `MockPage`, `MockSession` and `Visit`; also `testing::Script` with `agent` |
 | `full` | Everything except `native-tls` and `testing` |
@@ -28,8 +28,12 @@ HTTP crawl, start with the dependency setup in [Installation](installation.md).
 No backend is enabled by default. Enable `testing` in your dev-dependencies only; see [Testing handlers](testing.md).
 
 `full` enables all the facade features above except `native-tls` and
-`testing`, including persistent answer caching. Rig integration and browser
-driver management have their own flags below.
+`testing`, including Rig integration and the `RedbCache` backend. Browser
+driver management has its own flag below.
+
+`spire-macros` and `spire-redb` have no feature flags of their own. Enable
+`macros` or `redb` on the facade to use their re-exports, or depend on those
+crates directly.
 
 ## HTTP backend
 
@@ -43,6 +47,7 @@ spire-reqwest = { version = "0.8", features = ["gzip", "brotli", "cookies"] }
 
 | Feature | Enables |
 |---|---|
+| `rustls-tls` (default), `native-tls` | TLS implementation |
 | `http2` (default) | HTTP/2 negotiation |
 | `system-proxy` (default) | Proxies from the environment and system settings |
 | `gzip`, `brotli`, `zstd`, `deflate` | Transparent response decompression |
@@ -90,5 +95,18 @@ No features are enabled by default.
 
 `agent` enables model extraction and [objective middleware](objectives.md). Provider integrations are
 configured on `spire-agent`; see [Model providers](agent-providers.md).
-The facade's `redb` feature also enables answer caching when `agent` is
-present. See [Model budgets and caches](agent-resources.md) for setup.
+See [Model budgets and caches](agent-resources.md) for cache setup.
+
+No features are enabled by default on `spire-agent`:
+
+| Feature | Enables |
+|---|---|
+| `rig` | The `Rig` adapter and upstream Rig crate re-export |
+| `redb` | `RedbCache` and the `RedbStore` implementation of `AgentStoreExt` |
+| `testing` | `testing::Script`, an offline provider |
+
+Enable `agent-rig` on the facade or `rig` directly on `spire-agent` for Rig
+integration. With `agent` and `redb`, `RedbCache` and
+`AgentStoreExt::agent_cache()` are available. A cache is used only when attached
+with `Agent::with_cache`. With `agent` and `testing`, `spire::testing::Script`
+is available.
