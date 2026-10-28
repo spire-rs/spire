@@ -30,6 +30,8 @@
 //! [`Queue`]: crate::frontier::queue::Queue
 //! [`Data`]: crate::dataset::Data
 
+#[cfg(feature = "agent")]
+mod agent;
 mod body;
 #[cfg(feature = "thirtyfour")]
 mod browser;

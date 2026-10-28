@@ -1,7 +1,7 @@
 # Following links
 
 Pages lead to other pages. A handler queues the links it wants crawled, and
-the frontier decides whether to take them: see [The frontier](frontier.md).
+the frontier decides whether to take them: see [Seeds and the frontier](frontier.md).
 
 `Queue` adds requests to the crawl. Links resolve against the page they were
 found on, after redirects, and are one level deeper than it:
@@ -30,7 +30,7 @@ dropped, and `follow_all` follows several links at once.
 
 The `FollowLinks` handler does this for a whole page: visible or unknown
 links, or those matching a CSS selector, with the tag to give them, and without
-`rel="nofollow"` ones with `skip_nofollow`, see [Routing](routing.md).
+`rel="nofollow"` ones with `skip_nofollow`, see [Routing and handlers](routing.md).
 
 `Link::with_priority` sets how soon a link is crawled, on a frontier that
 orders by priority, and `FollowLinks` scores the links it follows with

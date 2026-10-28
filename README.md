@@ -100,6 +100,7 @@ explicitly. `full` enables every feature below except `native-tls` and
 | Feature | Enables |
 |---|---|
 | `html` (default) | `Html`, `Element`, `Links`, `Meta`, `JsonLd`, `Select`, `Collect` and `FollowLinks` |
+| `agent` | Typed model extraction with `Extract<T>`; also enables `markdown` |
 | `markdown` | The `Markdown` extractor; also enables `html` |
 | `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
 | `reqwest` | `ReqwestBackend` and the reqwest re-export |
@@ -110,7 +111,7 @@ explicitly. `full` enables every feature below except `native-tls` and
 | `serde` | Serializable seeds, fingerprints and Bloom snapshots |
 | `json` | `JsonlDataset`; also enables `serde` |
 | `csv` | `CsvDataset`; also enables `serde` |
-| `redb` | Crash-safe frontier, seen set and datasets through `RedbStore` |
+| `redb` | Crash-safe frontier, seen set and datasets through `RedbStore`; persistent answer caching with `agent` |
 | `rustls-tls` (default) | Rustls TLS for enabled backends |
 | `native-tls` | Platform-native TLS for enabled backends |
 | `testing` | Offline testing with `MockSite`, `MockPage`, `MockSession` and `Visit` |

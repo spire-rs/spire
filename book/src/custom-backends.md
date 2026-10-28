@@ -84,5 +84,5 @@ crawler.run().await?;
   so they fail the request as over HTTP, with `Retry-After` delays.
 - **Record redirects** with `ResponseExt::set_final_uri`, so links resolve
   against the page's real URI.
-- **Test it** with handlers, as [Testing](testing.md) does with `MockSite`,
+- **Test it** with handlers, as [Testing handlers](testing.md) does with `MockSite`,
   itself a backend serving pages from memory.

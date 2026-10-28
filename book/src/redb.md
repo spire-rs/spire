@@ -1,4 +1,4 @@
-# Crash safety with redb
+# Persistence with redb
 
 With the `redb` feature, a `RedbStore` keeps a whole crawl in one file on
 disk: its queue, the URLs it has seen, what it scraped, the validators of the
@@ -38,8 +38,8 @@ crawler.run().await?;
 
 | From the store | Holds | See |
 |---|---|---|
-| `frontier()` | Queued seeds, by priority then insertion order, and scheduled revisits | [The frontier](frontier.md), [Recrawls](recrawls.md) |
-| `seen()` | Every fingerprint seen, exact, on disk | [The frontier](frontier.md) |
+| `frontier()` | Queued seeds, by priority then insertion order, and scheduled revisits | [Seeds and the frontier](frontier.md), [Recrawls](recrawls.md) |
+| `seen()` | Every fingerprint seen, exact, on disk | [Seeds and the frontier](frontier.md) |
 | `dataset::<T>(name)` | Items of type `T`, a table per name | [Storing results](datasets.md) |
 | `validators()` | Pages' `ETag` and `Last-Modified` | [Recrawls](recrawls.md) |
 

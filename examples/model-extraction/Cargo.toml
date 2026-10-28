@@ -1,0 +1,22 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "model-extraction"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+publish = false
+description = "Model extraction with a scripted provider and no network"
+
+[[bin]]
+name = "model-extraction"
+path = "main.rs"
+
+[dependencies]
+# Async runtime and Spire framework
+spire = { workspace = true, features = ["agent", "testing"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
+[lints]
+workspace = true

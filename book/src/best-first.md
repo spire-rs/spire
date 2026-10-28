@@ -3,7 +3,7 @@
 A focused crawl reaches the pages most likely to matter first, by giving
 every link a priority: a score. It needs a frontier that orders by
 priority, `InMemFrontier::priority()` or a redb store's, see
-[The frontier](frontier.md). Scores come from the URL, in the frontier, and
+[Seeds and the frontier](frontier.md). Scores come from the URL, in the frontier, and
 from the page, in the handler, and add up.
 
 ## Scoring by URL

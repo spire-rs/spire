@@ -5,6 +5,7 @@ resolver = "3"
 members = [
     "./crates/spire",
     "./crates/spire-core",
+    "./crates/spire-agent",
     "./crates/spire-macros",
     "./crates/spire-redb",
     "./crates/spire-reqwest",
@@ -15,6 +16,7 @@ members = [
 default-members = [
     "./crates/spire",
     "./crates/spire-core",
+    "./crates/spire-agent",
     "./crates/spire-macros",
     "./crates/spire-redb",
     "./crates/spire-reqwest",
@@ -50,6 +52,7 @@ allow_attributes_without_reason = "deny"
 # See for more details: https://github.com/rust-lang/cargo/issues/11329
 
 # Internal crates
+spire-agent = { path = "./crates/spire-agent", version = "0.7.0" }
 spire = { path = "./crates/spire", version = "0.7.0" }
 spire-core = { path = "./crates/spire-core", version = "0.7.0" }
 spire-macros = { path = "./crates/spire-macros", version = "0.7.0" }
@@ -119,3 +122,9 @@ criterion = { version = "0.8", features = ["async_tokio", "html_reports"] }
 
 # Compile-fail tests
 trybuild = { version = "1.0", features = [] }
+
+# Model extraction
+schemars = { version = "1.2", features = ["derive"] }
+jsonschema = { version = "0.60", default-features = false }
+sha2 = { version = "0.10" }
+rig = { package = "rig-core", version = "0.44", default-features = false, features = ["reqwest", "rustls"] }

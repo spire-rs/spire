@@ -1,5 +1,7 @@
 //! Handlers: async functions of extractors that handle a request.
 
+#[cfg(feature = "agent")]
+mod agent;
 #[cfg(feature = "html")]
 mod html;
 #[cfg(feature = "sitemap")]
@@ -7,6 +9,9 @@ mod sitemap;
 
 use std::future::Future;
 
+#[cfg(feature = "agent")]
+#[cfg_attr(docsrs, doc(cfg(feature = "agent")))]
+pub use agent::AgentCollect;
 #[cfg(feature = "html")]
 #[cfg_attr(docsrs, doc(cfg(feature = "html")))]
 pub use html::{Collect, FollowLinks};

@@ -12,6 +12,20 @@ and this project adheres to
 
 - `spire`: compile-fail tests for the errors of `#[derive(Select)]` and
   `#[derive(Tags)]`, run with trybuild on the CI toolchain.
+- `spire-agent`: provider-independent typed model extraction, a Rig adapter,
+  shared usage accounting, token and cost budgets, concurrency limits, and
+  optional in-memory or redb answer caches. `spire` exposes the crate and
+  `Extract<T>` through its `agent` feature.
+- `spire`: `AgentCollect<T>`, a handler that stores model-extracted records.
+- `spire-core`: `Outcome::Fatal`, stopping a crawl and returning its error.
+- `spire-redb`: public transaction callbacks for store extensions. The
+  agent cache shares `RedbStore` and its durability policy.
+- An offline model extraction example and book chapter.
+
+### Changed
+
+- Reorganized the book by handlers, extraction, discovery, fetching and
+  reliability; moved detailed feature flags into a reference page.
 
 ## [0.7.0] - 2026-10-27
 

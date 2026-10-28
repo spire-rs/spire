@@ -16,6 +16,7 @@ A handler returns anything that converts into an `Outcome`: `()` and
 | `Backoff { scope, duration }` | Pause every request with this tag, then try this one again |
 | `Abort(scope)` | Skip every further request with this tag |
 | `Stop` | Stop the crawl: requests in flight finish, nothing new starts |
+| `Fatal(error)` | Stop the crawl and return the error after draining requests in flight |
 | `Fail(error)` | The request failed: retried if the error is retryable |
 
 Helpers build the common ones: `Outcome::retry()`,
