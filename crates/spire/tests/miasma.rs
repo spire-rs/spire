@@ -20,6 +20,7 @@ use tokio::task::JoinHandle;
 #[derive(Default)]
 struct Site {
     robots: AtomicBool,
+    objective: AtomicBool,
     hidden: AtomicBool,
     requests: Mutex<Vec<String>>,
 }
@@ -114,6 +115,7 @@ async fn serve(mut stream: TcpStream, site: Arc<Site>, port: u16) {
             .as_bytes()
             .to_vec(),
         ),
+        "/pricing" => (200, b"<main>Basic: $9</main>".to_vec()),
         "/poison" => (200, b"Synthetic test content from a local source.".to_vec()),
         "/" => {
             let hidden = if site.hidden.load(Ordering::Relaxed) {
@@ -121,9 +123,14 @@ async fn serve(mut stream: TcpStream, site: Arc<Site>, port: u16) {
             } else {
                 ""
             };
+            let pricing = if site.objective.load(Ordering::Relaxed) {
+                "<a href='/pricing'>Plan prices</a>"
+            } else {
+                ""
+            };
             (
                 200,
-                format!(r#"<a href="/naughty-bots/" {hidden}>Test link</a>"#).into_bytes(),
+                format!(r#"<a href="/naughty-bots/" {hidden}>Test link</a>{pricing}"#).into_bytes(),
             )
         }
         path if path.starts_with("/naughty-bots/") => {
@@ -189,5 +196,99 @@ async fn avoids_a_real_miasma_instance_with_robots_hidden_and_visible_links() {
             assert!(hits > 0 && hits <= 8, "{hits} trap requests");
             assert!(frontier.refused() > 0);
         }
+    }
+}
+
+#[cfg(all(feature = "agent", feature = "testing"))]
+#[tokio::test]
+#[ignore = "requires MIASMA_BIN; launches a local Miasma instance and proxy"]
+async fn reaches_a_pricing_objective_without_collecting_miasma_trap_content() {
+    use spire::agent::objective::{AgentFrontierExt, Finished, Objective};
+    use spire::agent::serde_json::{Value, json};
+    use spire::agent::testing::Script;
+    use spire::agent::{Agent, CompletionResponse, Usage};
+    use spire::dataset::InMemDataset;
+    use spire::handler::{AgentCollect, FollowRelevant};
+
+    fn script() -> Script {
+        Script::from_fn(|request| {
+            let text = if request.system.starts_with("Rate each link") {
+                let input: Value = spire::agent::serde_json::from_str(&request.input).unwrap();
+                let scores = input["links"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|link| {
+                        if link["url"].as_str().unwrap().contains("/pricing") {
+                            100
+                        } else {
+                            0
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                json!({"scores":scores}).to_string()
+            } else if request.system.starts_with("Judge whether") {
+                r#"{"met":true}"#.into()
+            } else if request.input.contains("Basic: $9") {
+                r#"{"result":["Basic: $9"]}"#.into()
+            } else {
+                r#"{"result":[]}"#.into()
+            };
+            Ok(CompletionResponse {
+                text,
+                usage: Usage::tokens(10, 5).with_cost(0.0),
+            })
+        })
+    }
+
+    let instance = Instance::start().await;
+    instance.site.objective.store(true, Ordering::Relaxed);
+    for hidden in [true, false] {
+        instance.site.hidden.store(hidden, Ordering::Relaxed);
+        instance.site.requests.lock().unwrap().clear();
+        let config = Objective::new("find plan prices")
+            .done_when("Basic has a price")
+            .check_every(1)
+            .stall_after(5);
+        let objective = config.start(Agent::new(script()));
+        let backend =
+            ReqwestBackend::from_builder(|| reqwest::Client::builder().no_proxy()).unwrap();
+        let router = Router::with_state(objective.clone()).fallback((
+            AgentCollect::<String>::new().report_to(&objective),
+            FollowRelevant::new("page").same_host(),
+        ));
+        let crawler = Crawler::new(backend, router)
+            .with_frontier(
+                InMemFrontier::priority()
+                    .dedup()
+                    .avoid_traps()
+                    .until(&objective),
+            )
+            .with_dataset(InMemDataset::<String>::new())
+            .with_concurrency(1)
+            .with_time_limit(Duration::from_secs(10))
+            .with_request_timeout(Duration::from_secs(3))
+            .with_seed(Seed::get(&instance.base).unwrap());
+        let stats = objective.run(&crawler).await.unwrap();
+        assert_eq!(stats.failed, 0, "{stats:?}");
+        assert_eq!(objective.finished(), Some(Finished::Met));
+        assert_eq!(
+            crawler
+                .dataset::<String>()
+                .unwrap()
+                .read_all()
+                .await
+                .unwrap(),
+            ["Basic: $9"]
+        );
+        assert!(
+            !instance
+                .site
+                .requests
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|path| path.starts_with("/naughty-bots/") || path == "/poison")
+        );
     }
 }

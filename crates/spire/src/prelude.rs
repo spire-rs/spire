@@ -20,7 +20,7 @@ pub use crate::frontier::queue::{Link, Queue};
 pub use crate::frontier::seed::Seed;
 pub use crate::frontier::{Admission, Frontier, FrontierExt, InMemFrontier};
 #[cfg(feature = "agent")]
-pub use crate::handler::AgentCollect;
+pub use crate::handler::{AgentCollect, FollowRelevant};
 #[cfg(feature = "html")]
 pub use crate::handler::{Collect, FollowLinks};
 pub use crate::http::{RequestExt as _, ResponseExt as _};

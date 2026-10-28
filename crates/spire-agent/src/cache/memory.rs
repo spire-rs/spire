@@ -8,7 +8,7 @@ use crate::Result;
 
 /// A bounded FIFO answer cache. Zero capacity disables storage.
 #[derive(Debug)]
-pub struct MemoryCache {
+pub struct InMemCache {
     capacity: usize,
     entries: Mutex<Entries>,
 }
@@ -19,7 +19,7 @@ struct Entries {
     order: VecDeque<String>,
 }
 
-impl MemoryCache {
+impl InMemCache {
     /// Holds at most `capacity` answers, evicting oldest entries first.
     #[must_use]
     pub fn new(capacity: usize) -> Self {
@@ -30,13 +30,13 @@ impl MemoryCache {
     }
 }
 
-impl Default for MemoryCache {
+impl Default for InMemCache {
     fn default() -> Self {
         Self::new(1024)
     }
 }
 
-impl Cache for MemoryCache {
+impl Cache for InMemCache {
     fn get<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Result<Option<String>>> {
         Box::pin(async move {
             Ok(self

@@ -6,10 +6,14 @@ mod agent;
 mod budget;
 pub mod cache;
 mod error;
+pub mod objective;
 mod provider;
 #[cfg(feature = "rig")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rig")))]
 pub mod rig;
+#[cfg(feature = "testing")]
+#[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
+pub mod testing;
 mod usage;
 
 pub use agent::Agent;

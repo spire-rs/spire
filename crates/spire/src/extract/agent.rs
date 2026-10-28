@@ -29,3 +29,9 @@ where
             .map_err(IntoOutcome::into_outcome)
     }
 }
+
+impl FromRef<spire_agent::objective::ObjectiveRun> for Agent {
+    fn from_ref(run: &spire_agent::objective::ObjectiveRun) -> Self {
+        run.agent().clone()
+    }
+}

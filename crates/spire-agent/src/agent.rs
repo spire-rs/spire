@@ -127,6 +127,10 @@ impl Agent {
         self
     }
 
+    pub(crate) const fn output_limit(&self) -> u64 {
+        self.max_tokens
+    }
+
     /// Returns shared usage so far, including failed/cancelled attempts.
     #[must_use]
     pub fn usage(&self) -> UsageTotals {

@@ -2146,6 +2146,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "objective-crawl"
+version = "0.8.0"
+dependencies = [
+ "spire",
+ "tokio",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3361,10 +3369,12 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "spire-agent",
  "spire-core",
  "spire-redb",
  "thiserror",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -3847,6 +3857,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "libc",
  "pin-project-lite",
  "tokio",

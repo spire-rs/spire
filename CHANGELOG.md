@@ -8,6 +8,24 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `spire-agent::objective`: objective configuration and a running controller
+  owning the agent, explicit progress, batched ratings, completion checks
+  and the `until` frontier.
+- `spire`: `FollowRelevant`, discovering visible links toward an objective.
+- `spire-core`: `Admission::Stopped` for frontiers that no longer accept work.
+- An offline objective crawl example and an AI-driven crawling book section.
+- `spire-agent`: `testing::Script`, a reusable provider with queued,
+  request-dependent and asynchronous replies, plus request capture.
+
+### Changed
+
+- Moved the root README example index to `examples/README.md` and linked
+  to the book for feature flags.
+- `spire-agent`: renamed `MemoryCache` to `InMemCache` for consistent naming.
+- `spire-core`: renamed the frontier result `Pop` to `NextSeed`.
+
 ## [0.8.0] - 2026-10-28
 
 ### Added

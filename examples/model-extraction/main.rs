@@ -3,10 +3,11 @@
 //! The scripted provider demonstrates the provider contract; replace it
 //! with a real provider to perform model extraction.
 
-use spire::agent::cache::MemoryCache;
+use spire::agent::cache::InMemCache;
 use spire::agent::schemars::JsonSchema;
 use spire::agent::serde::Deserialize;
-use spire::agent::{Agent, Budget, CompletionRequest, CompletionResponse, Provider, Usage};
+use spire::agent::testing::Script;
+use spire::agent::{Agent, Budget, CompletionResponse, Usage};
 use spire::dataset::InMemDataset;
 use spire::frontier::seed::Seed;
 use spire::handler::AgentCollect;
@@ -23,30 +24,16 @@ struct Product {
     price: String,
 }
 
-struct Scripted;
-
-impl Provider for Scripted {
-    fn complete(
-        &self,
-        request: CompletionRequest,
-    ) -> impl Future<Output = spire::agent::Result<CompletionResponse>> + Send {
-        // A real provider sends these fields to its model API, then returns
-        // the answer and actual usage. This fixture serves only this page.
-        assert!(request.input.contains("Desk lamp"));
-        assert!(request.schema.is_some());
-        std::future::ready(Ok(CompletionResponse {
-            text: r#"{"result":[{"name":"Desk lamp","price":"€29"}]}"#.into(),
-            usage: Usage::tokens(120, 25).with_cost(0.0),
-        }))
-    }
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    let agent = Agent::new(Scripted)
+    let provider = Script::new([CompletionResponse {
+        text: r#"{"result":[{"name":"Desk lamp","price":"€29"}]}"#.into(),
+        usage: Usage::tokens(120, 25).with_cost(0.0),
+    }]);
+    let agent = Agent::new(provider)
         .with_budget(Budget::tokens(10_000).max_cost(1.0))
         .with_concurrency(1)
-        .with_cache(MemoryCache::default(), "scripted-products/v1");
+        .with_cache(InMemCache::default(), "scripted-products/v1");
     let site = MockSite::new().page(
         "https://shop.test/products",
         MockPage::html("<h1>Products</h1><p>Desk lamp: €29</p>"),

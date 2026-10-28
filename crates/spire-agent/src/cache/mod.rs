@@ -7,7 +7,7 @@ mod memory;
 mod persistent;
 
 use futures::future::BoxFuture;
-pub use memory::MemoryCache;
+pub use memory::InMemCache;
 #[cfg(feature = "redb")]
 #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
 pub use persistent::RedbCache;

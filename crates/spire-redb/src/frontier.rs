@@ -5,7 +5,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use redb::ReadableTable;
 use spire_core::Result;
 use spire_core::frontier::seed::Seed;
-use spire_core::frontier::{Ack, Admission, Frontier, Pop, Report, Schedule};
+use spire_core::frontier::{Ack, Admission, Frontier, NextSeed, Report, Schedule};
 use tokio::time::Instant;
 
 use crate::codec;
@@ -73,7 +73,7 @@ impl Frontier for RedbFrontier {
     /// Hands out a due scheduled seed first, then the queue. It does not
     /// wait for scheduled seeds that are not due yet; see
     /// [`Schedule::next_due`].
-    async fn pop(&self) -> Result<Pop> {
+    async fn pop(&self) -> Result<NextSeed> {
         let now = unix_millis(SystemTime::now());
         let popped = self
             .store
@@ -109,7 +109,7 @@ impl Frontier for RedbFrontier {
             })
             .await?;
 
-        Ok(popped.map_or(Pop::Empty, Pop::Ready))
+        Ok(popped.map_or(NextSeed::Empty, NextSeed::Ready))
     }
 
     async fn report(&self, report: Report) -> Result<Ack> {
@@ -228,8 +228,8 @@ pub(crate) mod tests {
 
     async fn pop_path(frontier: &RedbFrontier) -> Option<String> {
         match frontier.pop().await.unwrap() {
-            Pop::Ready(seed) => Some(seed.uri().path().trim_start_matches('/').to_owned()),
-            Pop::Wait(_) | Pop::Empty => None,
+            NextSeed::Ready(seed) => Some(seed.uri().path().trim_start_matches('/').to_owned()),
+            NextSeed::Wait(_) | NextSeed::Empty => None,
         }
     }
 
@@ -261,7 +261,7 @@ pub(crate) mod tests {
             for name in ["done", "in-flight", "queued", "cancelled"] {
                 frontier.push(seed(name).with_tag(name)).await.unwrap();
             }
-            let Pop::Ready(done) = frontier.pop().await.unwrap() else {
+            let NextSeed::Ready(done) = frontier.pop().await.unwrap() else {
                 panic!()
             };
             frontier.report(Report::Done(done)).await.unwrap();
@@ -269,7 +269,7 @@ pub(crate) mod tests {
             // the crawl crashed mid-request.
             assert_eq!(pop_path(&frontier).await.as_deref(), Some("in-flight"));
             assert_eq!(pop_path(&frontier).await.as_deref(), Some("queued"));
-            let Pop::Ready(cancelled) = frontier.pop().await.unwrap() else {
+            let NextSeed::Ready(cancelled) = frontier.pop().await.unwrap() else {
                 panic!()
             };
             frontier.report(Report::Cancelled(cancelled)).await.unwrap();
@@ -278,7 +278,7 @@ pub(crate) mod tests {
         let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
         assert_eq!(frontier.in_flight().unwrap(), 0);
         let mut left = Vec::new();
-        while let Pop::Ready(seed) = frontier.pop().await.unwrap() {
+        while let NextSeed::Ready(seed) = frontier.pop().await.unwrap() {
             left.push(seed.tag().map(ToString::to_string).unwrap());
         }
         left.sort();
@@ -290,7 +290,7 @@ pub(crate) mod tests {
         let path = TempPath::new();
         let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
         frontier.push(seed("a")).await.unwrap();
-        let Pop::Ready(popped) = frontier.pop().await.unwrap() else {
+        let NextSeed::Ready(popped) = frontier.pop().await.unwrap() else {
             panic!()
         };
 
@@ -328,7 +328,7 @@ pub(crate) mod tests {
         // The due revisit first, then the queue; the other is not waited
         // for, but reported as due in two hours.
         let mut popped = Vec::new();
-        while let Pop::Ready(seed) = frontier.pop().await.unwrap() {
+        while let NextSeed::Ready(seed) = frontier.pop().await.unwrap() {
             popped.push(seed.uri().path().to_owned());
         }
         assert_eq!(popped, ["/due", "/queued"]);

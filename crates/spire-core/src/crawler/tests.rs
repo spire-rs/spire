@@ -303,7 +303,7 @@ mod limits {
     use std::sync::Mutex;
 
     use super::*;
-    use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
+    use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
     use crate::sync::lock;
 
     fn host_seed(host: &str, path: &str) -> Seed {
@@ -324,7 +324,7 @@ mod limits {
             self.inner.push(seed)
         }
 
-        fn pop(&self) -> impl Future<Output = crate::Result<Pop>> + Send {
+        fn pop(&self) -> impl Future<Output = crate::Result<NextSeed>> + Send {
             let pops = self.pops.fetch_add(1, Ordering::SeqCst);
             if self.fail_after.is_some_and(|after| pops >= after) {
                 return futures::future::Either::Left(ready(Err(Error::new(ErrorKind::Frontier))));

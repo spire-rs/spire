@@ -190,11 +190,11 @@ impl fmt::Debug for Queue {
 mod tests {
     use super::*;
     use crate::crawler::Tag;
-    use crate::frontier::{FrontierExt, InMemFrontier, Pop};
+    use crate::frontier::{FrontierExt, InMemFrontier, NextSeed};
 
     async fn drain(frontier: &InMemFrontier) -> Vec<(String, Option<String>, u32)> {
         let mut popped = Vec::new();
-        while let Pop::Ready(seed) = Frontier::pop(frontier).await.unwrap() {
+        while let NextSeed::Ready(seed) = Frontier::pop(frontier).await.unwrap() {
             let tag = seed.tag().map(Tag::to_string);
             popped.push((seed.uri().to_string(), tag, seed.depth().get()));
         }

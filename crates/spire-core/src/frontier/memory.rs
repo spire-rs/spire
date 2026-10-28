@@ -10,7 +10,7 @@ use tokio::time::Instant;
 
 use crate::Result;
 use crate::frontier::seed::{Fingerprint, Seed};
-use crate::frontier::{Ack, Admission, Frontier, Pop, Report, Schedule};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report, Schedule};
 use crate::sync::lock;
 
 /// An in-memory [`Frontier`] that crawls in insertion, reverse or priority
@@ -194,19 +194,19 @@ impl Frontier for InMemFrontier {
     }
 
     /// Hands out a due scheduled seed first, then the queue.
-    fn pop(&self) -> impl Future<Output = Result<Pop>> + Send {
+    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
         let due = lock(&self.scheduled)
             .as_mut()
             .and_then(|scheduled| scheduled.pop_due(Instant::now()));
         if let Some(seed) = due {
-            return ready(Ok(Pop::Ready(seed)));
+            return ready(Ok(NextSeed::Ready(seed)));
         }
         let seed = match &mut *lock(&self.seeds) {
             Store::Fifo(seeds) => seeds.pop_front(),
             Store::Lifo(seeds) => seeds.pop_back(),
             Store::Priority(seeds, _) => seeds.pop().map(|prioritized| prioritized.seed),
         };
-        ready(Ok(seed.map_or(Pop::Empty, Pop::Ready)))
+        ready(Ok(seed.map_or(NextSeed::Empty, NextSeed::Ready)))
     }
 
     /// Re-queues seeds the crawl stopped before finishing, so a
@@ -294,7 +294,7 @@ mod tests {
         assert_eq!(pop_path(&fifo).await.as_deref(), Some("a"));
         assert_eq!(pop_path(&lifo).await.as_deref(), Some("b"));
         assert_eq!(pop_path(&fifo).await.as_deref(), Some("b"));
-        assert!(matches!(fifo.pop().await.unwrap(), Pop::Empty));
+        assert!(matches!(fifo.pop().await.unwrap(), NextSeed::Empty));
     }
 
     #[tokio::test]
