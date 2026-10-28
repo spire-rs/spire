@@ -551,6 +551,7 @@ where
         // pick one fails the request like any other.
         let connector = run.connector.clone();
         let mut request = seed.clone().into_request();
+        request.extensions_mut().extend(self.extensions.clone());
         let identity = connector.identify(&seed, &mut request);
         let used = identity.as_ref().ok().cloned().flatten();
 

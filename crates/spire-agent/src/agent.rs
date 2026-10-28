@@ -19,7 +19,7 @@ const INSTRUCTIONS: &str = "Extract only information explicitly supported by the
 
 /// A cloneable model handle with shared budgets, usage and concurrency.
 ///
-/// Configure before cloning into router state. Clones share accounting, the
+/// Configure before registering it on a crawler. Clones share accounting, the
 /// concurrency gate and cache flights. Builder methods change the returned
 /// handle's configuration.
 #[derive(Clone)]
@@ -135,10 +135,6 @@ impl Agent {
     pub fn with_cache(mut self, cache: impl Cache, namespace: impl Into<String>) -> Self {
         self.cache = Some((Arc::new(cache), namespace.into()));
         self
-    }
-
-    pub(crate) const fn output_limit(&self) -> u64 {
-        self.max_tokens
     }
 
     /// Returns shared usage so far, including failed/cancelled attempts.

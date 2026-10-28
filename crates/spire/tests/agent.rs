@@ -1,13 +1,13 @@
-//! Model extraction through Markdown, router state and crawl outcomes.
+//! Model extraction through Markdown, crawler services and crawl outcomes.
 #![cfg(all(feature = "agent", feature = "testing"))]
 
 use spire::agent::cache::InMemCache;
-use spire::agent::{Agent, Budget, CompletionResponse, Extract, Usage};
+use spire::agent::{Agent, AgentCrawlerExt, Budget, CompletionResponse, Extract, Usage};
 use spire::dataset::{Data, InMemDataset};
-use spire::extract::FromRef;
+use spire::extract::State;
 use spire::frontier::seed::Seed;
 use spire::handler::AgentCollect;
-use spire::http::http::StatusCode;
+use spire::http::http::{StatusCode, Uri};
 use spire::testing::{MockPage, MockSite, Script};
 use spire::{Crawler, Result, Router};
 
@@ -24,13 +24,11 @@ fn script(text: &'static str) -> Script {
 
 #[derive(Clone)]
 struct App {
-    agent: Agent,
+    prefix: String,
 }
 
-impl FromRef<App> for Agent {
-    fn from_ref(state: &App) -> Self {
-        state.agent.clone()
-    }
+async fn app_state(State(app): State<App>) {
+    assert_eq!(app.prefix, "products");
 }
 
 async fn collect(data: Data<String>, Extract(items): Extract<Vec<String>>) -> Result<()> {
@@ -41,7 +39,7 @@ async fn collect(data: Data<String>, Extract(items): Extract<Vec<String>>) -> Re
 }
 
 #[tokio::test]
-async fn extracts_markdown_through_substate_and_reuses_cached_answers() {
+async fn extracts_markdown_with_independent_app_state_and_reuses_cached_answers() {
     let provider = script(r#"{"result":["Lamp"]}"#);
     let agent = Agent::new(provider.clone()).with_cache(InMemCache::default(), "scripted/v1");
     let site = MockSite::new().page(
@@ -49,10 +47,11 @@ async fn extracts_markdown_through_substate_and_reuses_cached_answers() {
         MockPage::html("<nav>Navigation</nav><main><h1>Lamp</h1></main>"),
     );
     let router = Router::with_state(App {
-        agent: agent.clone(),
+        prefix: "products".into(),
     })
-    .fallback(AgentCollect::<String>::new());
+    .fallback((app_state, AgentCollect::<String>::new()));
     let crawler = Crawler::new(site, router)
+        .with_agent(agent.clone())
         .with_dataset(InMemDataset::<String>::new())
         .with_seed(Seed::get("https://shop.test/").unwrap())
         .with_seed(Seed::get("https://shop.test/").unwrap());
@@ -76,15 +75,13 @@ async fn exhausted_budget_returns_crawl_error_without_calling_provider() {
     let provider = script(r#"{"result":["Lamp"]}"#);
     let agent = Agent::new(provider.clone()).with_budget(Budget::tokens(0));
     let site = MockSite::new().page("https://shop.test/", MockPage::html("<h1>Lamp</h1>"));
-    let error = Crawler::new(
-        site,
-        Router::with_state(agent).fallback(AgentCollect::<String>::new()),
-    )
-    .with_dataset(InMemDataset::<String>::new())
-    .with_seed(Seed::get("https://shop.test/").unwrap())
-    .run()
-    .await
-    .unwrap_err();
+    let error = Crawler::new(site, Router::new().fallback(AgentCollect::<String>::new()))
+        .with_agent(agent.clone())
+        .with_dataset(InMemDataset::<String>::new())
+        .with_seed(Seed::get("https://shop.test/").unwrap())
+        .run()
+        .await
+        .unwrap_err();
     assert!(error.to_string().contains("budget exhausted"), "{error}");
     assert_eq!(provider.calls(), 0);
 }
@@ -96,15 +93,14 @@ async fn rejected_http_response_never_calls_the_model() {
         "https://shop.test/",
         MockPage::status(StatusCode::NOT_FOUND),
     );
-    let stats = Crawler::new(
-        site,
-        Router::with_state(Agent::new(provider.clone())).fallback(collect),
-    )
-    .with_dataset(InMemDataset::<String>::new())
-    .with_seed(Seed::get("https://shop.test/").unwrap())
-    .run()
-    .await
-    .unwrap();
+    let agent = Agent::new(provider.clone());
+    let stats = Crawler::new(site, Router::new().fallback(collect))
+        .with_agent(agent.clone())
+        .with_dataset(InMemDataset::<String>::new())
+        .with_seed(Seed::get("https://shop.test/").unwrap())
+        .run()
+        .await
+        .unwrap();
     assert_eq!(stats.failed, 1);
     assert_eq!(provider.calls(), 0);
 }
@@ -114,8 +110,9 @@ async fn agent_collect_accepts_empty_results_and_requires_dataset_before_dispatc
     let site = MockSite::new().page("https://shop.test/", MockPage::html("<h1>Lamp</h1>"));
     let provider = script(r#"{"result":[]}"#);
     let agent = Agent::new(provider.clone());
-    let router = Router::with_state(agent.clone()).fallback(AgentCollect::<String>::new());
+    let router = Router::new().fallback(AgentCollect::<String>::new());
     let crawler = Crawler::new(site.clone(), router)
+        .with_agent(agent.clone())
         .with_dataset(InMemDataset::<String>::new())
         .with_seed(Seed::get("https://shop.test/").unwrap());
     let stats = crawler.run().await.unwrap();
@@ -131,14 +128,27 @@ async fn agent_collect_accepts_empty_results_and_requires_dataset_before_dispatc
     );
     assert_eq!(provider.calls(), 1);
 
-    let stats = Crawler::new(
-        site,
-        Router::with_state(agent).fallback(AgentCollect::<String>::new()),
-    )
-    .with_seed(Seed::get("https://shop.test/").unwrap())
-    .run()
-    .await
-    .unwrap();
+    let stats = Crawler::new(site, Router::new().fallback(AgentCollect::<String>::new()))
+        .with_agent(agent)
+        .with_seed(Seed::get("https://shop.test/").unwrap())
+        .run()
+        .await
+        .unwrap();
     assert_eq!(stats.failed, 1);
     assert_eq!(provider.calls(), 1);
+}
+
+#[tokio::test]
+async fn missing_agent_fails_extraction_before_fetching() {
+    let site = MockSite::new().page("https://shop.test/", MockPage::html("<h1>Lamp</h1>"));
+    let router = Router::new().fallback(collect);
+    let visit = site
+        .visit(Seed::get("https://shop.test/").unwrap())
+        .with_dataset(InMemDataset::<String>::new());
+    let spire::worker::Outcome::Fail(error) = visit.run(&router).await else {
+        panic!("missing agent should fail the handler");
+    };
+    assert!(error.to_string().contains("missing request extension"));
+    assert!(error.to_string().contains("Agent"));
+    assert_eq!(site.requests(), Vec::<Uri>::new());
 }

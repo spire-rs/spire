@@ -8,7 +8,7 @@ HTTP crawl, start with the dependency setup in [Installation](installation.md).
 | Feature | Enables |
 |---|---|
 | `html` (default) | HTML extractors including `Html` and `Links`, the `Select` trait, `Collect` and `FollowLinks` |
-| `agent` | Model extraction and objective-based crawling; also enables `markdown` |
+| `agent` | Model extraction; also enables `markdown` |
 | `agent-rig` | Rig model adapter and the upstream Rig crate; enables `agent` |
 | `markdown` | The `Markdown` extractor; also enables `html` |
 | `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
@@ -88,7 +88,7 @@ No features are enabled by default.
 
 ## AI-driven crawling
 
-`agent` enables model extraction and objectives. Provider integrations are
+`agent` enables model extraction. Provider integrations are
 configured on `spire-agent`; see [Model providers](agent-providers.md).
 The facade's `redb` feature also enables answer caching when `agent` is
 present. See [Model budgets and caches](agent-resources.md) for setup.

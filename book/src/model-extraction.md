@@ -10,7 +10,7 @@ for predictable markup and need no model calls.
 spire = { version = "0.8.0", features = ["agent", "reqwest"] }
 ```
 
-The facade re-exports the separate `spire-agent` crate as `spire::agent`.
+The facade exposes the separate `spire-agent` crate through `spire::agent`.
 That crate accepts text directly and does not depend on the facade's HTML
 extractors.
 
@@ -24,9 +24,9 @@ and returns the inner value. Providers must return that complete object.
 ```rust
 use spire::agent::schemars::JsonSchema;
 use spire::agent::serde::Deserialize;
-use spire::agent::{Agent, Extract};
+use spire::agent::{Agent, AgentCrawlerExt, Extract};
 use spire::dataset::Data;
-use spire::{Result, Router};
+use spire::{Crawler, Result, Router};
 # use spire::backend::Noop;
 
 #[derive(Deserialize, JsonSchema)]
@@ -47,28 +47,31 @@ async fn products(data: Data<Product>, Extract(products): Extract<Vec<Product>>)
 }
 
 # fn router(agent: Agent) {
-let router: Router<Noop, Agent> = Router::with_state(agent).route("products", products);
-# let _ = router;
+let router = Router::new().route("products", products);
+let crawler = Crawler::new(Noop, router).with_agent(agent);
+# let _ = crawler;
 # }
 ```
 
 Register an `InMemDataset<Product>` or another dataset with the crawler
-when using this handler. Put the configured `Agent` in router state;
-`FromRef` can select it from a larger application state too.
+when using this handler. Supply the configured agent with `.with_agent(agent)`;
+router state remains available for your own `State<AppState>`. Agent extraction
+looks up the request extension before fetching the page and fails if no agent
+is registered.
 
 When the handler only stores the extracted records, use `AgentCollect<T>`
 instead of writing it yourself:
 
 ```rust
-use spire::agent::Agent;
+use spire::agent::{Agent, AgentCrawlerExt};
 use spire::handler::AgentCollect;
-use spire::Router;
+use spire::{Crawler, Router};
 # use spire::backend::Noop;
 
 # fn router(agent: Agent) {
-let router: Router<Noop, Agent> = Router::with_state(agent)
-    .route("names", AgentCollect::<String>::new());
-# let _ = router;
+let router = Router::new().route("names", AgentCollect::<String>::new());
+let crawler = Crawler::new(Noop, router).with_agent(agent);
+# let _ = crawler;
 # }
 ```
 
@@ -86,5 +89,4 @@ are true. Check important facts against the source.
 ## Next steps
 
 Choose a [model provider](agent-providers.md), configure
-[budgets and caches](agent-resources.md), or combine extraction with
-[objective-based discovery](objectives.md).
+[budgets and caches](agent-resources.md).

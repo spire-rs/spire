@@ -24,6 +24,7 @@ pub struct Visit {
     seed: Seed,
     frontier: Arc<InMemFrontier>,
     datasets: Arc<Datasets>,
+    extensions: http::Extensions,
 }
 
 impl Visit {
@@ -33,7 +34,15 @@ impl Visit {
             seed,
             frontier: Arc::new(InMemFrontier::fifo()),
             datasets: Arc::default(),
+            extensions: http::Extensions::new(),
         }
+    }
+
+    /// Adds a service to each visited request, replacing the same type.
+    #[must_use]
+    pub fn with_extension<T: Clone + Send + Sync + 'static>(mut self, value: T) -> Self {
+        self.extensions.insert(value);
+        self
     }
 
     /// Registers `dataset` for items of type `T`.
@@ -56,7 +65,8 @@ impl Visit {
             Ok(client) => client,
             Err(error) => return Outcome::Fail(error),
         };
-        let request = self.seed.clone().into_request();
+        let mut request = self.seed.clone().into_request();
+        request.extensions_mut().extend(self.extensions.clone());
         let queue = Queue::new(Arc::clone(&self.frontier)).child_of(&request);
         let cx = Context::from_parts(request, client, queue, Arc::clone(&self.datasets));
         worker.handle(cx).await

@@ -14,7 +14,7 @@
 //!   [`Element`]s extracted with [`Select`], [`Meta`] and [`JsonLd`].
 //! - Sitemaps, with the `sitemap` feature, in [`sitemap`]; and a browser
 //!   [`Tab`] with the `thirtyfour` feature.
-//! - Everything else: [`State`].
+//! - Application state: [`State`]; crawler and middleware services: [`Extension`].
 //!
 //! Wrapping an extractor in `Option` or `Result` makes it infallible.
 //!
@@ -36,6 +36,7 @@ mod body;
 #[cfg(feature = "thirtyfour")]
 mod browser;
 pub(crate) mod context;
+mod extension;
 mod head;
 #[cfg(feature = "html")]
 #[cfg_attr(docsrs, doc(cfg(feature = "html")))]
@@ -53,6 +54,7 @@ pub use body::{Body, Json, Text};
 #[cfg(feature = "thirtyfour")]
 #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
 pub use browser::Tab;
+pub use extension::Extension;
 pub use head::Head;
 pub use query::Query;
 #[cfg(feature = "macros")]

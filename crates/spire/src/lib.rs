@@ -17,8 +17,8 @@ pub mod agent {
     #[doc(no_inline)]
     pub use spire_agent::rig;
     pub use spire_agent::{
-        Agent, Budget, CompletionRequest, CompletionResponse, Error, Extract, Pricing, Provider,
-        Result, Usage, UsageTotals, cache, objective, schemars, serde, serde_json,
+        Agent, AgentCrawlerExt, Budget, CompletionRequest, CompletionResponse, Error, Extract,
+        Pricing, Provider, Result, Usage, UsageTotals, cache, schemars, serde, serde_json,
     };
 }
 
@@ -169,7 +169,6 @@ mod book {
         Datasets: "datasets.md",
         Links: "links.md",
         BestFirst: "best-first.md",
-        Objectives: "objectives.md",
         Sitemaps: "sitemaps.md",
         AvoidingTraps: "avoiding-traps.md",
         Http: "http.md",

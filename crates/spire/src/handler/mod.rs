@@ -4,8 +4,6 @@
 mod agent;
 #[cfg(feature = "html")]
 mod html;
-#[cfg(feature = "agent")]
-mod relevant;
 #[cfg(feature = "sitemap")]
 mod sitemap;
 
@@ -17,9 +15,6 @@ pub use agent::AgentCollect;
 #[cfg(feature = "html")]
 #[cfg_attr(docsrs, doc(cfg(feature = "html")))]
 pub use html::{Collect, FollowLinks};
-#[cfg(feature = "agent")]
-#[cfg_attr(docsrs, doc(cfg(feature = "agent")))]
-pub use relevant::FollowRelevant;
 #[cfg(feature = "sitemap")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sitemap")))]
 pub use sitemap::FollowSitemap;

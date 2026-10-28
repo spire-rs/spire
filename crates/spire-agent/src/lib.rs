@@ -5,8 +5,8 @@
 mod agent;
 mod budget;
 pub mod cache;
+mod crawler;
 mod error;
-pub mod objective;
 mod provider;
 #[cfg(feature = "rig")]
 mod rig_provider;
@@ -17,6 +17,7 @@ mod usage;
 
 pub use agent::Agent;
 pub use budget::{Budget, Pricing};
+pub use crawler::AgentCrawlerExt;
 pub use error::{Error, Result};
 pub use provider::{CompletionRequest, CompletionResponse, Provider};
 #[cfg(feature = "rig")]

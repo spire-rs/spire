@@ -125,7 +125,7 @@ explicitly. `full` enables every feature below except `native-tls` and
 | Feature | Enables |
 |---|---|
 | `html` (default) | `Html`, `Element`, `Links`, `Meta`, `JsonLd`, `Select`, `Collect` and `FollowLinks` |
-| `agent` | Typed model extraction and objective-based crawling; also enables `markdown` |
+| `agent` | Typed model extraction; also enables `markdown` |
 | `markdown` | The `Markdown` extractor; also enables `html` |
 | `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
 | `reqwest` | `ReqwestBackend` and the reqwest re-export |

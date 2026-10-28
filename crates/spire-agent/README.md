@@ -16,7 +16,7 @@
 [coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
 [coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
-Provider-independent model extraction and objective-based crawling for Spire.
+Provider-independent model extraction for Spire.
 
 ## Overview
 
@@ -27,13 +27,10 @@ providers independent of the facade's router and HTML extractors.
   Providers own retries, rate limits and transport timeouts.
 - **`Agent`** shares token and cost accounting, budgets and a model-call
   concurrency limit. Structured answers are validated against JSON Schema.
-- **`objective::Objective`** configures a goal; `ObjectiveRun` owns its
-  model agent, explicit progress reports, batched ratings and crawl lifecycle.
-- **`InMemCache`** and optional **`RedbCache`** reuse validated answers for
-  unchanged content, instructions and schemas.
+
 
 The `agent` feature on `spire` re-exports this crate as `spire::agent` and
-adds `Extract<T>`, `AgentCollect<T>` and `FollowRelevant` to ordinary crawls.
+adds `Extract<T>` and `AgentCollect<T>` to ordinary crawls.
 
 ## Usage
 
@@ -106,12 +103,10 @@ assert_eq!(provider.calls(), 1);
 
 ## Examples
 
-Run `cargo run -p model-extraction` for typed extraction, or
-`cargo run -p objective-crawl` for discovery and stopping toward a goal.
-Both use scripted providers and need no network or API key.
+Run `cargo run -p model-extraction` for typed extraction with a scripted
+provider, without a network or API key.
 
 See the book pages on [Model extraction](https://spire-rs.github.io/spire/model-extraction.html),
 [Providers](https://spire-rs.github.io/spire/agent-providers.html),
-[Budgets and caches](https://spire-rs.github.io/spire/agent-resources.html), and
-[Crawling toward an objective](https://spire-rs.github.io/spire/objectives.html)
+and [Budgets and caches](https://spire-rs.github.io/spire/agent-resources.html)
 in the book, or the [API documentation](https://docs.rs/spire-agent).

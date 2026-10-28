@@ -173,8 +173,6 @@ pub enum Admission {
     Queued,
     /// The seed was refused because an identical one was seen before.
     Duplicate,
-    /// The frontier stopped accepting work.
-    Stopped,
     /// The seed was refused because it is deeper than allowed.
     TooDeep,
     /// The link was skipped because it is not an `http(s)` URL.

@@ -25,7 +25,6 @@
 - [Model extraction](model-extraction.md)
 - [Model providers](agent-providers.md)
 - [Model budgets and caches](agent-resources.md)
-- [Crawling toward an objective](objectives.md)
 
 # Controlling discovery
 

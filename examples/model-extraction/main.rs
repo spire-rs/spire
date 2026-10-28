@@ -3,14 +3,15 @@
 //! The scripted provider demonstrates the provider contract; replace it
 //! with a real provider to perform model extraction.
 
+mod fixtures;
+
 use spire::agent::cache::InMemCache;
 use spire::agent::schemars::JsonSchema;
 use spire::agent::serde::Deserialize;
-use spire::agent::{Agent, Budget, CompletionResponse, Usage};
+use spire::agent::{Agent, AgentCrawlerExt, Budget};
 use spire::dataset::InMemDataset;
 use spire::frontier::seed::Seed;
 use spire::handler::AgentCollect;
-use spire::testing::{MockPage, MockSite, Script};
 use spire::{Crawler, Result, Router};
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -25,21 +26,13 @@ struct Product {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let provider = Script::new([CompletionResponse {
-        text: r#"{"result":[{"name":"Desk lamp","price":"€29"}]}"#.into(),
-        usage: Usage::tokens(120, 25).with_cost(0.0),
-    }]);
-    let agent = Agent::new(provider)
+    let agent = Agent::new(fixtures::script())
         .with_budget(Budget::tokens(10_000).max_cost(1.0))
         .with_concurrency(1)
         .with_cache(InMemCache::default(), "scripted-products/v1");
-    let site = MockSite::new().page(
-        "https://shop.test/products",
-        MockPage::html("<h1>Products</h1><p>Desk lamp: €29</p>"),
-    );
-    let router =
-        Router::with_state(agent.clone()).route("products", AgentCollect::<Product>::new());
-    let crawler = Crawler::new(site, router)
+    let router = Router::new().route("products", AgentCollect::<Product>::new());
+    let crawler = Crawler::new(fixtures::site(), router)
+        .with_agent(agent.clone())
         .with_dataset(InMemDataset::<Product>::new())
         .with_seed(Seed::get("https://shop.test/products")?.with_tag("products"));
     crawler.run().await?;

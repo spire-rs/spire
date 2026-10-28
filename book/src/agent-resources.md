@@ -1,12 +1,10 @@
 # Model budgets and caches
 
-Model calls share resources through `Agent` clones. Objective runs own a
-configured agent and use the same accounting for ratings and completion
-checks as for extraction through that agent.
+Model calls share budgets, usage and caches through `Agent` clones.
 
 ## Budgets and usage
 
-Configure the agent before cloning it into state. Clones share usage,
+Configure the agent before registering it with `.with_agent(agent)`. Clones share usage,
 concurrency limits and pending identical cache requests.
 
 ```rust
