@@ -20,10 +20,11 @@ handler, and extract structured data, built on tokio.
 
 A crawl flows through three parts: the **frontier** queues the requests to make
 and decides what is new, the **crawler** fetches them concurrently through a
-**backend** (HTTP or a browser) while keeping to per-host limits and
-robots.txt, and the **router** hands each response to a handler. Handlers are
-async functions whose arguments are extractors: parsed HTML, typed JSON, the
-queue for links to follow, or a dataset to store results in.
+**backend** (reqwest for HTTP or thirtyfour for a browser) while keeping to
+per-host limits and robots.txt, and the **router** hands each response to a
+handler. Handlers are async functions whose arguments are extractors: parsed
+HTML, typed JSON, the queue for links to follow, or a dataset to store results
+in.
 
 > [!WARNING]
 > **Active development. API not stable.** Public APIs and on-disk formats may
@@ -34,7 +35,7 @@ queue for links to follow, or a dataset to store results in.
 
 - **HTTP and browser backends**: reqwest for plain HTTP, thirtyfour to drive real browsers over WebDriver.
 - **Typed routing**: route by tags, checked by the compiler with `#[derive(Tags)]`, or by URL path patterns.
-- **Extractors**: parse HTML into structs with `#[derive(Select)]`, deserialize JSON, or drive the browser with `Tab`.
+- **Extractors**: parse HTML into structs with `#[derive(Select)]`, deserialize JSON, or drive the browser with `ThirtyfourTab`.
 - **Polite crawling**: per-host concurrency and delays, robots.txt per RFC 9309, retries with `Retry-After` and backoff.
 - **Sitemaps**: follow XML and text sitemaps and indexes, gzipped or not, found through robots.txt or seeded directly.
 - **Frontiers**: deduplication with URL normalization, depth limits, host filters, priorities, and a Bloom filter for huge crawls.
