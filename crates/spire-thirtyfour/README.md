@@ -3,7 +3,6 @@
 [![Build Status][action-badge]][action-url]
 [![Crate Docs][docs-badge]][docs-url]
 [![Crate Version][crates-badge]][crates-url]
-[![Crate Coverage][coverage-badge]][coverage-url]
 
 **Check out other `spire` projects [here](https://github.com/spire-rs).**
 
@@ -13,8 +12,6 @@
 [crates-url]: https://crates.io/crates/spire-thirtyfour
 [docs-badge]: https://img.shields.io/docsrs/spire-thirtyfour?logo=Docs.rs&style=flat-square
 [docs-url]: http://docs.rs/spire-thirtyfour
-[coverage-badge]: https://img.shields.io/codecov/c/github/spire-rs/spire?logo=codecov&logoColor=white&style=flat-square
-[coverage-url]: https://app.codecov.io/gh/spire-rs/spire
 
 Browser automation backend for Spire, built on
 [thirtyfour](https://github.com/stevepryde/thirtyfour) and WebDriver BiDi.
