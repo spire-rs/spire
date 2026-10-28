@@ -34,8 +34,8 @@ use spire_core::backend::Backend;
 #[cfg(any(test, feature = "testing"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 pub mod testing {
-    #[cfg(feature = "agent")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "agent")))]
+    #[cfg(all(feature = "agent", feature = "testing"))]
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "agent", feature = "testing"))))]
     pub use spire_agent::testing::Script;
     pub use spire_core::testing::{MockPage, MockSession, MockSite, Sent, Visit};
 }
@@ -49,7 +49,7 @@ pub mod backend {
     pub use spire_core::backend::*;
     #[cfg(feature = "reqwest")]
     #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-    pub use spire_reqwest::{ReqwestBackend, reqwest};
+    pub use spire_reqwest::{ReqwestBackend, ReqwestSession, reqwest};
     #[cfg(feature = "thirtyfour")]
     #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
     pub use spire_thirtyfour::{
