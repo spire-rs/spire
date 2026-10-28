@@ -1,4 +1,4 @@
-# Testing
+# Testing handlers
 
 With the `testing` feature, `MockSite` serves fixed pages by URL, so
 handlers can be tested without a network. Enable it for tests only:

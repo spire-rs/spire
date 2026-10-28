@@ -81,17 +81,65 @@ and inside scope filters so out-of-scope links are rejected first.
 
 An archive can be deep and large; product IDs can look random. These
 patterns alone do not prove that a branch is a trap. `TrapPolicy` lets you
-raise budgets or disable individual checks for a known site. See the
-[frontier's trap policy](frontier.md#avoiding-traps) for defaults, prefix
-rules and configuration examples.
+raise budgets or disable individual checks for a known site:
 
-Budget exhaustion returns `Admission::PrefixBudgetExceeded`; suspicious
-path patterns return `Admission::SuspectedTrap`. A blocked prefix refuses
-further candidates and skips queued seeds, while in-flight requests may
-finish. `refused()` counts both kinds of refusal separately from crawler
-request totals. Tracing reports which prefix was blocked and why.
+```rust
+use std::sync::Arc;
+use spire::frontier::{FrontierExt, InMemFrontier};
+use spire::frontier::facade::TrapPolicy;
 
-Trap state is in memory and resets when the facade is recreated. These
-checks bound crawling; they do not inspect generated text or establish
-whether collected content is trustworthy. Keep ordinary request and time
-[budgets](politeness.md#budgets) as an overall bound too.
+let policy = TrapPolicy::default()
+    .with_max_urls(10_000)
+    .with_max_fanout(1_000)
+    .with_max_random_urls(usize::MAX); // This site's paths contain opaque IDs.
+let traps = Arc::new(InMemFrontier::fifo()
+    .dedup()
+    .retry(3)
+    .avoid_traps_with(policy));
+let frontier = traps.clone().allow_hosts(["example.com"]);
+// Keep the inner handle to inspect refusals after handing frontier to the crawler.
+assert_eq!(traps.refused(), 0);
+```
+
+A prefix is an origin and first nonempty path segment:
+`https://example.com/archive/` is independent of `/products/`, other
+hosts, ports and schemes. Opaque first segments share the origin's root
+prefix so changing that segment cannot bypass the opaque-URL budget.
+Defaults are:
+
+| Check | Limit | Refusal |
+|---|---:|---|
+| Distinct request fingerprints offered per prefix | 4,096 | `PrefixBudgetExceeded` |
+| Candidates under the same directory | 256 | `PrefixBudgetExceeded` |
+| Nonempty segments in a URL path | 32 | `PrefixBudgetExceeded` |
+| Occurrences of the same segment in one path | 4 | `SuspectedTrap` |
+| URLs with opaque-looking segments per prefix | 8 | `SuspectedTrap` |
+
+Opaque-looking means at least 16 ASCII alphanumeric characters, mixing
+letters and digits, with at least eight distinct characters. Real IDs can
+match. Adjust `TrapPolicy` for the site's structure; use `usize::MAX` to
+disable a check. Date archives and ordinary pagination are not opaque, but
+can still reach explicit budgets. Fan-out is estimated from URL
+directories, not the number of links found on one page. Different query
+variants share the same directory budget. These are candidate budgets:
+inner facades may subsequently refuse a candidate, and it still counts;
+offering the same request fingerprint again does not count twice.
+
+Crossing a limit blocks that prefix for the facade's lifetime. Further
+pushes return its refusal reason. Already-queued seeds from it are skipped
+when popped and reported inwards as `Report::Skipped`; in-flight requests
+can finish. Other prefixes continue. `AvoidTraps::refused()` counts refused
+pushes and skipped queued seeds, separately from crawler request totals.
+Tracing logs identify the blocked prefix and the reason.
+
+Place this facade outside retry/revisit facades to check what they pop,
+and inside scope filters to avoid tracking out-of-scope candidates. Keep
+`dedup()` too: the facade's observations do not replace deduplication.
+Counters and blocked-prefix state are in memory and reset when the facade
+is recreated. Snapshots omit known blocked seeds but do not persist the
+heuristic state; pending seeds in persistent storage are skipped when
+popped after their prefix becomes blocked.
+
+These checks bound crawling; they do not inspect generated text or
+establish whether collected content is trustworthy. Keep ordinary request
+and time [budgets](politeness.md#budgets) as an overall bound too.

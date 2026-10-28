@@ -118,7 +118,9 @@ pub(super) fn signal(outcome: &Outcome) -> Signal {
         {
             Signal::Throttled
         }
-        Outcome::Fail(_) | Outcome::Retry { .. } | Outcome::Backoff { .. } => Signal::Failed,
+        Outcome::Fail(_) | Outcome::Fatal(_) | Outcome::Retry { .. } | Outcome::Backoff { .. } => {
+            Signal::Failed
+        }
         Outcome::Continue | Outcome::Abort(_) | Outcome::Stop => Signal::Ok,
     }
 }
@@ -174,12 +176,12 @@ impl<B: Backend> Run<B> {
         self.grace = grace.map(|grace| Instant::now() + grace);
     }
 
-    /// Stops the run because the frontier failed; the error is returned once
+    /// Stops the run after a fatal failure; the error is returned once
     /// in-flight requests are drained.
     fn fail(&mut self, error: Error, grace: Option<Duration>) {
-        tracing::error!(target: TRACING_TARGET, %error, "frontier failed");
+        tracing::error!(target: TRACING_TARGET, %error, "crawl failed");
         self.error.get_or_insert(error);
-        self.stop("frontier failed", grace);
+        self.stop("crawl failed", grace);
     }
 
     fn is_aborted(&self, seed: &Seed) -> bool {
@@ -669,6 +671,11 @@ where
             }
             Outcome::Retry { after } => Report::Retry { seed, after },
             Outcome::Backoff { scope, duration } => self.backoff(run, seed, scope, duration).await,
+            Outcome::Fatal(error) => {
+                self.tally(|stats| stats.failed += 1);
+                run.fail(error.with_uri(uri.clone()), self.settings.shutdown_grace);
+                Report::Failed(seed)
+            }
             Outcome::Fail(error) => {
                 let error = match error.uri() {
                     Some(_) => error,
@@ -754,5 +761,6 @@ const fn label(outcome: &Outcome) -> &'static str {
         Outcome::Abort(_) => "abort",
         Outcome::Stop => "stop",
         Outcome::Fail(_) => "fail",
+        Outcome::Fatal(_) => "fatal",
     }
 }

@@ -8,39 +8,47 @@
 - [Your first crawl](first-crawl.md)
 - [How a crawl works](concepts.md)
 
-# Handling pages
+# Writing handlers
 
-- [Routing](routing.md)
+- [Routing and handlers](routing.md)
 - [Extractors](extractors.md)
 - [State](state.md)
+- [Testing handlers](testing.md)
+
+# Extracting data
+
 - [HTML](html.md)
+- [Model extraction](model-extraction.md)
 - [Storing results](datasets.md)
 
-# Discovering pages
+# Controlling discovery
 
+- [Seeds and the frontier](frontier.md)
 - [Following links](links.md)
-- [Best-first crawling](best-first.md)
 - [Sitemaps](sitemaps.md)
+- [Best-first crawling](best-first.md)
 - [Avoiding traps](avoiding-traps.md)
 
-# Fetching
+# Fetching pages
 
 - [HTTP](http.md)
 - [Browsers](browsers.md)
-- [Middleware](middleware.md)
 - [Identities](identities.md)
+- [Middleware](middleware.md)
 
-# Running a crawl
+# Running reliably
 
-- [The frontier](frontier.md)
-- [Errors and retries](errors.md)
 - [Limits and politeness](politeness.md)
+- [Errors and retries](errors.md)
 - [Recrawls](recrawls.md)
-- [Crash safety with redb](redb.md)
+- [Persistence with redb](redb.md)
 - [Logs and statistics](observability.md)
 
-# Extending spire
+# Extending Spire
 
-- [Testing](testing.md)
 - [Custom backends](custom-backends.md)
 - [Custom storage](custom-storage.md)
+
+# Reference
+
+- [Feature flags](features.md)

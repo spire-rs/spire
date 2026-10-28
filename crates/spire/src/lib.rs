@@ -5,6 +5,12 @@
 // `ReadmeDoctests`.
 #![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
 
+/// Model providers, extraction, budgets and caches.
+#[cfg(feature = "agent")]
+#[cfg_attr(docsrs, doc(cfg(feature = "agent")))]
+#[doc(inline)]
+pub use spire_agent as agent;
+
 pub mod extract;
 pub mod handler;
 mod routing;
@@ -133,12 +139,14 @@ mod book {
     chapters! {
         Introduction: "introduction.md",
         Installation: "installation.md",
+        Features: "features.md",
         FirstCrawl: "first-crawl.md",
         Concepts: "concepts.md",
         Routing: "routing.md",
         Extractors: "extractors.md",
         State: "state.md",
         Html: "html.md",
+        ModelExtraction: "model-extraction.md",
         Datasets: "datasets.md",
         Links: "links.md",
         BestFirst: "best-first.md",

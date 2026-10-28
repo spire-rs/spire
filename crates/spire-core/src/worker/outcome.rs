@@ -33,6 +33,9 @@ pub enum Outcome {
     /// The request failed. Retryable errors are tried again, others are
     /// recorded as failures.
     Fail(Error),
+    /// Fail the crawl, returning the error after in-flight requests drain.
+    /// No new work starts, and this failure is not retried.
+    Fatal(Error),
 }
 
 impl Outcome {

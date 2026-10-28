@@ -1,4 +1,4 @@
-# The frontier
+# Seeds and the frontier
 
 The frontier holds the seeds waiting to be crawled. It decides their order,
 and *facades* on top of it decide which seeds are let in and what happens
@@ -43,7 +43,7 @@ tracking parameters such as `utm_source`, so
   in the order queued.
 
 A redb store's frontier orders by priority too, see
-[Crash safety with redb](redb.md).
+[Persistence with redb](redb.md).
 
 Priorities can be scored for every link, so the crawl reaches the pages
 that matter first: see [Best-first crawling](best-first.md).
@@ -104,7 +104,7 @@ warning once.
 ## Stopping and resuming
 
 A redb store keeps the frontier and the seen set across runs, crashes
-included: see [Crash safety with redb](redb.md).
+included: see [Persistence with redb](redb.md).
 
 Without it, a stopped crawl's state can be saved and restored by hand.
 `Crawler::snapshot` copies the seeds the frontier still holds, including
@@ -143,63 +143,6 @@ next.run().await?;
 
 ## Avoiding traps
 
-An opt-in `avoid_traps()` facade bounds expanding URL branches. For how it
-works alongside hidden-link filtering, see [Avoiding traps](avoiding-traps.md).
-This section describes its policy and admission behavior.
-
-```rust
-use std::sync::Arc;
-use spire::frontier::{FrontierExt, InMemFrontier};
-use spire::frontier::facade::TrapPolicy;
-
-let policy = TrapPolicy::default()
-    .with_max_urls(10_000)
-    .with_max_fanout(1_000)
-    .with_max_random_urls(usize::MAX); // This site's paths contain opaque IDs.
-let traps = Arc::new(InMemFrontier::fifo()
-    .dedup()
-    .retry(3)
-    .avoid_traps_with(policy));
-let frontier = traps.clone().allow_hosts(["example.com"]);
-// Keep the inner handle to inspect refusals after handing frontier to the crawler.
-assert_eq!(traps.refused(), 0);
-```
-
-A prefix is an origin and first nonempty path segment:
-`https://example.com/archive/` is independent of `/products/`, other
-hosts, ports and schemes. Opaque first segments share the origin's root
-prefix so changing that segment cannot bypass the opaque-URL budget.
-Defaults are:
-
-| Check | Limit | Refusal |
-|---|---:|---|
-| Distinct request fingerprints offered per prefix | 4,096 | `PrefixBudgetExceeded` |
-| Candidates under the same directory | 256 | `PrefixBudgetExceeded` |
-| Nonempty segments in a URL path | 32 | `PrefixBudgetExceeded` |
-| Occurrences of the same segment in one path | 4 | `SuspectedTrap` |
-| URLs with opaque-looking segments per prefix | 8 | `SuspectedTrap` |
-
-Opaque-looking means at least 16 ASCII alphanumeric characters, mixing
-letters and digits, with at least eight distinct characters. Real IDs can
-match. Adjust `TrapPolicy` for the site's structure; use `usize::MAX` to
-disable a check. Date archives and ordinary pagination are not opaque, but
-can still reach explicit budgets. Fan-out is estimated from URL
-directories, not the number of links found on one page. Different query
-variants share the same directory budget. These are candidate budgets:
-inner facades may subsequently refuse a candidate, and it still counts;
-offering the same request fingerprint again does not count twice.
-
-Crossing a limit blocks that prefix for the facade's lifetime. Further
-pushes return its refusal reason. Already-queued seeds from it are skipped
-when popped and reported inwards as `Report::Skipped`; in-flight requests
-can finish. Other prefixes continue. `AvoidTraps::refused()` counts refused
-pushes and skipped queued seeds, separately from crawler request totals.
-Tracing logs identify the blocked prefix and the reason.
-
-Place this facade outside retry/revisit facades to check what they pop,
-and inside scope filters to avoid tracking out-of-scope candidates. Keep
-`dedup()` too: the facade's observations do not replace deduplication.
-Counters and blocked-prefix state are in memory and reset when the facade
-is recreated. Snapshots omit known blocked seeds but do not persist the
-heuristic state; pending seeds in persistent storage are skipped when
-popped after their prefix becomes blocked.
+The `avoid_traps()` facade bounds expanding URL branches. See
+[Avoiding traps](avoiding-traps.md) for configuration, default limits and
+how it works alongside hidden-link filtering.

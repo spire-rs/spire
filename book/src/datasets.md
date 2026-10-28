@@ -107,7 +107,7 @@ a page's rows twice.
 With the `redb` feature, `store.dataset::<T>(name)` keeps items of type `T`
 in a table of the crawl's own redb file, as JSON, for types that implement
 both `Serialize` and `Deserialize`. Items survive a crash with the rest of
-the crawl: see [Crash safety with redb](redb.md).
+the crawl: see [Persistence with redb](redb.md).
 
 ## Reading in batches
 

@@ -1,5 +1,9 @@
 # HTML
 
+Use HTML extraction when the page has predictable elements or structured
+metadata. For information spread across prose, see
+[Model extraction](model-extraction.md).
+
 The `html` feature, on by default, parses pages with
 [scraper](https://docs.rs/scraper). Everything for HTML is in
 `spire::extract::html`: the `Html` extractor and its methods, extraction with

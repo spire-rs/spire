@@ -1,0 +1,62 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "spire-agent"
+description = "Provider-independent model extraction, budgets and caching for Spire"
+readme = "./README.md"
+keywords = ["crawler", "scraper", "llm", "extraction"]
+categories = ["asynchronous", "web-programming"]
+
+version = { workspace = true }
+rust-version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+
+authors = { workspace = true }
+repository = { workspace = true }
+documentation = { workspace = true }
+
+[lib]
+bench = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+# Default feature set (none for provider-independent extraction)
+default = []
+# Rig completion models as providers
+rig = ["dep:rig"]
+# Answer caching in the crawl's RedbStore
+redb = ["dep:spire-redb"]
+
+[dependencies]
+# Internal crates
+spire-core = { workspace = true, features = [] }
+spire-redb = { workspace = true, optional = true, features = [] }
+
+# Async runtime
+futures = { workspace = true, features = [] }
+tokio = { workspace = true, features = ["sync", "rt"] }
+
+# Structured answers and validation
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = [] }
+schemars = { workspace = true, features = [] }
+jsonschema = { workspace = true, features = [] }
+
+# Model provider adapter
+rig = { workspace = true, optional = true, features = [] }
+
+# Errors and stable cache keys
+thiserror = { workspace = true, features = [] }
+sha2 = { workspace = true, features = [] }
+
+[dev-dependencies]
+# Testing
+tokio = { workspace = true, features = ["rt", "macros", "time", "test-util"] }
+
+[lints]
+workspace = true
