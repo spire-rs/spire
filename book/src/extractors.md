@@ -24,7 +24,7 @@ the others share it.
 | `html::JsonLd<T>` | The page's JSON-LD structured data (`html` feature) |
 | `html::Markdown` | The page's main content as Markdown (`markdown` feature), see [HTML](html.md#markdown) |
 | `sitemap::Sitemap` | The body parsed as a sitemap (`sitemap` feature), see [Sitemaps](sitemaps.md) |
-| `Tab` | The browser's tab, to interact with the page (`thirtyfour` feature), see [Browsers](browsers.md) |
+| `ThirtyfourTab` | The browser's tab, to interact with the page (`thirtyfour` feature), see [Browsers](browsers.md) |
 
 Wrapping an extractor in `Option` or `Result` makes it infallible: the
 handler runs with `None` or the error instead of failing the request.

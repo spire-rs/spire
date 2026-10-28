@@ -149,7 +149,8 @@ async fn rejected_extractors_fail_and_optional_ones_do_not() {
 #[tokio::test]
 #[cfg(feature = "html")]
 async fn crawls_and_resolves_links_after_redirects() {
-    use crate::dataset::{Data, InMemDataset};
+    use crate::dataset::InMemDataset;
+    use crate::extract::Data;
     use crate::extract::html::{Html, Links};
     use crate::frontier::queue::Queue;
     use crate::http::http::Uri;

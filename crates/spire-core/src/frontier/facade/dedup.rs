@@ -4,7 +4,7 @@ use std::future::Future;
 use crate::Result;
 use crate::frontier::seed::Seed;
 use crate::frontier::seen::{InMemSeen, SeenSet};
-use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
 
 /// A facade that refuses seeds seen before, see [`Seed::fingerprint`].
 ///
@@ -38,7 +38,7 @@ impl<F: Frontier, S: SeenSet> Frontier for Dedup<F, S> {
         }
     }
 
-    fn pop(&self) -> impl Future<Output = Result<Pop>> + Send {
+    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
         self.inner.pop()
     }
 

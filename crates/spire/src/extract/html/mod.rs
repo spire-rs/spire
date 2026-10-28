@@ -1,7 +1,9 @@
-//! HTML: the [`Html`] extractor and its methods, extraction with [`Select`]
-//! and [`Element`], a page's [`Meta`] and [`JsonLd`], its main content as
-//! `Markdown` with the `markdown` feature, and the
-//! [scraper](https://docs.rs/scraper) parser behind them.
+//! HTML extraction, typed selection and page metadata.
+//!
+//! Extract documents with [`Html`], typed data with [`Select`] and
+//! [`Element`], and metadata with [`Meta`] and [`JsonLd`]. The `markdown`
+//! feature provides `Markdown` for a page's main content. Parsing uses
+//! [scraper](https://docs.rs/scraper).
 //!
 //! [`Html`] wraps a scraper document, to walk a page's tree directly when
 //! its methods are not enough: [`scraper`] is re-exported here at the

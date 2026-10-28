@@ -303,7 +303,7 @@ mod limits {
     use std::sync::Mutex;
 
     use super::*;
-    use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
+    use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
     use crate::sync::lock;
 
     fn host_seed(host: &str, path: &str) -> Seed {
@@ -324,7 +324,7 @@ mod limits {
             self.inner.push(seed)
         }
 
-        fn pop(&self) -> impl Future<Output = crate::Result<Pop>> + Send {
+        fn pop(&self) -> impl Future<Output = crate::Result<NextSeed>> + Send {
             let pops = self.pops.fetch_add(1, Ordering::SeqCst);
             if self.fail_after.is_some_and(|after| pops >= after) {
                 return futures::future::Either::Left(ready(Err(Error::new(ErrorKind::Frontier))));
@@ -1251,4 +1251,37 @@ mod identities {
         );
         assert_eq!(sent[0].headers[USER_AGENT], "Bot/id-0");
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn crawler_extensions_reach_followed_and_retried_requests_without_leaking_overrides() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let observed = calls.clone();
+    let worker = from_fn(move |mut cx: Context<Noop>| {
+        let observed = observed.clone();
+        async move {
+            assert_eq!(cx.request().extensions().get::<usize>(), Some(&7));
+            assert!(Arc::ptr_eq(
+                cx.request().extensions().get::<Arc<AtomicUsize>>().unwrap(),
+                &observed,
+            ));
+            observed.fetch_add(1, Ordering::SeqCst);
+            cx.request_mut().extensions_mut().insert(99_usize);
+            if path(&cx) == "root" {
+                cx.queue().follow("/child").await.unwrap();
+            } else if cx.request().attempt().get() == 0 {
+                return Outcome::retry_after(Duration::ZERO);
+            }
+            Outcome::Continue
+        }
+    });
+    let crawler = Crawler::new(Noop, worker)
+        .with_extension(1_usize)
+        .with_extension(7_usize)
+        .with_extension(calls.clone())
+        .with_seed(seed("root"));
+    let stats = crawler.run().await.unwrap();
+    assert_eq!(stats.requests, 3);
+    assert_eq!(stats.failed, 0);
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
 }

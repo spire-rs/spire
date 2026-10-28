@@ -1,16 +1,17 @@
 //! Rig completion models as Spire providers.
 
-pub use ::rig;
 use rig::DynModel;
 use rig::completion::{CompletionRequest as RigRequest, FinishReason};
 use rig::message::AssistantContent;
 use rig::operation::Completion as RigCompletion;
 
-use crate::{CompletionRequest, CompletionResponse, Error, Provider, Result, Usage};
+use crate::{Error, Provider, ProviderRequest, ProviderResponse, Result, Usage};
 
-/// Wraps any Rig completion model. Schemas are included in system
-/// instructions by default; opt into native schemas for models supporting
-/// them. Responses are always validated by the agent before caching.
+/// A Rig completion model exposed as a Spire provider.
+///
+/// Schemas are included in system instructions by default; opt into native
+/// schemas for models supporting them. Responses are always validated by the
+/// agent before caching.
 #[derive(Clone)]
 pub struct Rig {
     model: DynModel<RigCompletion>,
@@ -28,6 +29,7 @@ impl Rig {
     }
 
     /// Also forwards the schema as Rig's native structured-output schema.
+    ///
     /// Enable this only when the selected provider/model supports it.
     #[must_use]
     pub const fn with_native_schema(mut self) -> Self {
@@ -37,7 +39,7 @@ impl Rig {
 }
 
 impl Provider for Rig {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse> {
+    async fn complete(&self, request: ProviderRequest) -> Result<ProviderResponse> {
         let system = match &request.schema {
             Some(schema) => format!(
                 "{}\n\nRespond with JSON matching this schema:\n{schema}",
@@ -61,7 +63,7 @@ impl Provider for Rig {
             || response
                 .finish_reason()
                 .is_some_and(|reason| !matches!(reason, FinishReason::Stop));
-        // Preserve paid usage even on refusals/truncation: the agent accounts
+        // Preserve token usage even on refusals/truncation: the agent accounts
         // it first, then rejects the empty answer without caching it.
         let text = if known_bad {
             String::new()
@@ -77,13 +79,11 @@ impl Provider for Rig {
                 .join("")
         };
         let reported = response.usage;
-        let cost = reported.cost;
-        Ok(CompletionResponse {
+        Ok(ProviderResponse {
             text,
             usage: Usage {
                 input_tokens: reported.input_tokens,
                 output_tokens: reported.output_tokens,
-                cost_usd: cost.map(|cost| cost.total),
             },
         })
     }

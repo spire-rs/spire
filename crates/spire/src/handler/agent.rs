@@ -1,33 +1,40 @@
 use std::fmt;
 use std::marker::PhantomData;
 
+use spire_agent::objective::ObjectiveRegistry;
 use spire_agent::schemars::JsonSchema;
 use spire_agent::serde::de::DeserializeOwned;
-use spire_agent::{Agent, Extract};
 
 use super::Handler;
 use crate::backend::Session;
-use crate::extract::{FromContext, FromRef};
+use crate::extract::{AgentExtract, FromContext};
 use crate::worker::{IntoOutcome, Outcome};
 use crate::{Context, TRACING_TARGET};
 
-/// A handler that extracts `Vec<T>` from a page with a model and stores the
-/// items in the `T` dataset. Empty answers write nothing.
+/// Collects model-extracted records into a dataset.
 ///
-/// Put an [`Agent`] in router state, directly or through [`FromRef`], and
-/// register the dataset on the crawler. Extraction, budget and dataset
-/// errors propagate as they do in a handler using [`Extract`] and
-/// [`Data`](crate::dataset::Data).
+/// Extracts `Vec<T>` and stores each item. Empty answers write nothing.
+/// Objective middleware automatically accepts successfully stored records
+/// for a matching `Objective<T>`; ordinary collection needs no objective.
+///
+/// Register an [`Agent`](spire_agent::Agent) with [`with_agent`](spire_agent::AgentCrawlerExt::with_agent)
+/// and the dataset on the crawler. Extraction, budget and dataset
+/// errors propagate as they do in a handler using [`AgentExtract`] and
+/// [`Data`](crate::extract::Data).
 ///
 /// ```
-/// use spire::agent::Agent;
+/// use spire::agent::{Agent, AgentCrawlerExt};
+/// use spire::backend::Noop;
+/// use spire::dataset::InMemDataset;
 /// use spire::handler::AgentCollect;
-/// use spire::Router;
+/// use spire::{Crawler, Router};
 ///
-/// # fn router(agent: Agent) {
-/// let router: Router<spire::backend::Noop, Agent> = Router::with_state(agent)
-///     .route("names", AgentCollect::<String>::new());
-/// # let _ = router;
+/// # fn crawler(agent: Agent) {
+/// let router = Router::new().route("names", AgentCollect::<String>::new());
+/// let crawler = Crawler::new(Noop, router)
+///     .with_agent(agent)
+///     .with_dataset(InMemDataset::<String>::new());
+/// # let _ = crawler;
 /// # }
 /// ```
 #[must_use]
@@ -52,7 +59,9 @@ impl<T> Default for AgentCollect<T> {
 
 impl<T> Clone for AgentCollect<T> {
     fn clone(&self) -> Self {
-        Self::new()
+        Self {
+            marker: PhantomData,
+        }
     }
 }
 
@@ -68,21 +77,34 @@ impl<C, S, T> Handler<C, AgentCollect<T>, S> for AgentCollect<T>
 where
     C: Session,
     S: Send + Sync + 'static,
-    Agent: FromRef<S>,
     T: DeserializeOwned + JsonSchema + Send + 'static,
 {
     async fn call(&self, cx: &Context<C>, state: &S) -> Outcome {
+        let objectives = cx.request().extensions().get::<ObjectiveRegistry>();
+        if objectives.is_some_and(|registry| registry.is_finished() || registry.completed::<T>()) {
+            return Outcome::Continue;
+        }
         let data = match cx.dataset::<T>() {
             Ok(data) => data,
             Err(error) => return error.into_outcome(),
         };
-        let Extract(items) = match Extract::<Vec<T>>::from_context(cx, state).await {
+        let AgentExtract(items) = match AgentExtract::<Vec<T>>::from_context(cx, state).await {
             Ok(items) => items,
             Err(outcome) => return outcome,
+        };
+        let evidence = match objectives
+            .map(|registry| registry.prepare(&items, cx.request().uri()))
+            .transpose()
+        {
+            Ok(evidence) => evidence.flatten(),
+            Err(error) => return error.into_outcome(),
         };
         let collected = items.len();
         if let Err(error) = data.write_all(items).await {
             return error.into_outcome();
+        }
+        if let Some(evidence) = evidence {
+            evidence.accept();
         }
         tracing::debug!(target: TRACING_TARGET, collected, "collected model-extracted items");
         Outcome::Continue

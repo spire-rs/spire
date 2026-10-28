@@ -91,48 +91,9 @@ async fn main() -> Result<()> {
 [The Spire Book](https://spire-rs.github.io/spire) is the guide: handling pages, discovering
 them, fetching over HTTP or with a browser, running and resuming a crawl, and extending spire.
 
-## Feature flags
-
-Defaults are `html` and `rustls-tls`; choose an HTTP or browser backend
-explicitly. `full` enables every feature below except `native-tls` and
-`testing`. Backend-specific options are enabled on their own crates.
-
-| Feature | Enables |
-|---|---|
-| `html` (default) | `Html`, `Element`, `Links`, `Meta`, `JsonLd`, `Select`, `Collect` and `FollowLinks` |
-| `agent` | Typed model extraction with `Extract<T>`; also enables `markdown` |
-| `markdown` | The `Markdown` extractor; also enables `html` |
-| `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
-| `reqwest` | `ReqwestBackend` and the reqwest re-export |
-| `thirtyfour` | `ThirtyfourBackend`, `Tab` and the thirtyfour re-export |
-| `user-agents` | Browser profiles and matching navigation headers for identities |
-| `robots` | Obeying robots.txt with `Crawler::with_robots` |
-| `sitemap` | The `Sitemap` extractor and `FollowSitemap` handler |
-| `serde` | Serializable seeds, fingerprints and Bloom snapshots |
-| `json` | `JsonlDataset`; also enables `serde` |
-| `csv` | `CsvDataset`; also enables `serde` |
-| `redb` | Crash-safe frontier, seen set and datasets through `RedbStore`; persistent answer caching with `agent` |
-| `rustls-tls` (default) | Rustls TLS for enabled backends |
-| `native-tls` | Platform-native TLS for enabled backends |
-| `testing` | Offline testing with `MockSite`, `MockPage`, `MockSession` and `Visit` |
-| `full` | Every feature except `native-tls` and `testing` |
-
-See [Installation](https://spire-rs.github.io/spire/installation.html) for
-backend-specific compression, proxy, cookie and driver-management options.
-
-## Examples
-
-Each example in [`examples/`](examples/) is a small crawl, documented at the
-top of its `main.rs`; most run against [httpbin.org](https://httpbin.org):
-
-| Command | What it shows |
-| --- | --- |
-| `cargo run -p basic-usage` | Tags, path routes, link following and `#[derive(Select)]` |
-| `cargo run -p api-endpoints` | Typed JSON responses and following API pagination |
-| `cargo run -p chrome-webdriver` | Browser automation with `Tab`; needs `chromedriver --port=4444` |
-| `cargo run -p rust-blog` | A tour of every feature: crawls the Rust blog through robots.txt, its sitemap and links into JSON Lines, resumable with redb |
-
-`RUST_LOG=spire_core=debug` logs every request with its outcome and duration.
+See the book's [Installation](https://spire-rs.github.io/spire/installation.html)
+and [Feature flags](https://spire-rs.github.io/spire/features.html) pages for
+configuration, or [examples/](examples/README.md) for runnable crawls.
 
 ## Contributing
 

@@ -7,7 +7,7 @@ use tokio::time::Instant;
 use crate::Result;
 use crate::crawler::Revisit;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, Pop, Report, Schedule};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report, Schedule};
 
 /// Crawls pages again on a schedule, see
 /// [`FrontierExt::revisit`](crate::frontier::FrontierExt::revisit).
@@ -55,9 +55,13 @@ impl<F: Schedule, T: Revisit> Frontier for Revisits<F, T> {
         self.inner.push(seed)
     }
 
-    async fn pop(&self) -> Result<Pop> {
+    async fn pop(&self) -> Result<NextSeed> {
         match self.inner.pop().await? {
-            Pop::Empty => Ok(self.inner.next_due().await?.map_or(Pop::Empty, Pop::Wait)),
+            NextSeed::Empty => Ok(self
+                .inner
+                .next_due()
+                .await?
+                .map_or(NextSeed::Empty, NextSeed::Wait)),
             next => Ok(next),
         }
     }
@@ -160,7 +164,7 @@ mod tests {
         // Only the listing is scheduled: nothing is ready, so the frontier
         // waits for it.
         assert_eq!(frontier.size_hint(), Some(0));
-        let Pop::Wait(at) = frontier.pop().await.unwrap() else {
+        let NextSeed::Wait(at) = frontier.pop().await.unwrap() else {
             panic!("expected a wait for the revisit");
         };
         assert_eq!(at - Instant::now(), Duration::from_mins(1));
@@ -168,7 +172,7 @@ mod tests {
         // Due, it is handed out on its first attempt again, past the
         // deduplication that saw it already.
         advance(Duration::from_mins(1)).await;
-        let Pop::Ready(revisit) = frontier.pop().await.unwrap() else {
+        let NextSeed::Ready(revisit) = frontier.pop().await.unwrap() else {
             panic!("expected the revisit");
         };
         assert_eq!(revisit.uri().path(), "/list");
@@ -176,7 +180,7 @@ mod tests {
 
         // A failure schedules it again too: the page may come back.
         frontier.report(Report::Failed(revisit)).await.unwrap();
-        assert!(matches!(frontier.pop().await.unwrap(), Pop::Wait(_)));
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Wait(_)));
     }
 
     #[tokio::test(start_paused = true)]
@@ -193,10 +197,10 @@ mod tests {
         // The last schedule wins: reported at 2 s, it is due at 62 s, so
         // still waiting at 61 s.
         advance(Duration::from_secs(58)).await;
-        assert!(matches!(frontier.pop().await.unwrap(), Pop::Wait(_)));
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Wait(_)));
         advance(Duration::from_secs(1)).await;
-        assert!(matches!(frontier.pop().await.unwrap(), Pop::Ready(_)));
-        assert!(matches!(frontier.pop().await.unwrap(), Pop::Empty));
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Ready(_)));
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
     }
 
     #[tokio::test(start_paused = true)]
@@ -208,7 +212,7 @@ mod tests {
 
         // Without `Revisits`, a crawl over it ends once nothing is queued.
         assert_eq!(pop_path(&storage).await.as_deref(), Some("now"));
-        assert!(matches!(storage.pop().await.unwrap(), Pop::Empty));
+        assert!(matches!(storage.pop().await.unwrap(), NextSeed::Empty));
         assert_eq!(storage.next_due().await.unwrap(), Some(due));
     }
 }

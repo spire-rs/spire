@@ -1,6 +1,6 @@
 //! Browser automation: rendering pages in Chrome over WebDriver.
 //!
-//! `Tab` navigates the browser and hands the handler the request's tab;
+//! `ThirtyfourTab` navigates the browser and hands the handler the request's tab;
 //! the page is parsed with `tab.snapshot()` once the handler is done
 //! interacting, so it includes whatever scripts rendered. Links are followed as with any other
 //! backend.
@@ -15,8 +15,8 @@
 
 use spire::backend::ThirtyfourBackend;
 use spire::crawler::Tags;
-use spire::dataset::{Data, InMemDataset};
-use spire::extract::Tab;
+use spire::dataset::InMemDataset;
+use spire::extract::{Data, ThirtyfourTab};
 use spire::frontier::queue::{Link, Queue};
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
@@ -38,7 +38,7 @@ struct Rendered {
 }
 
 /// Reads the rendered page and follows its links.
-async fn rendered(queue: Queue, data: Data<Rendered>, tab: Tab) -> Result<()> {
+async fn rendered(queue: Queue, data: Data<Rendered>, tab: ThirtyfourTab) -> Result<()> {
     let title = tab
         .title()
         .await

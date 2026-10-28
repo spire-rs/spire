@@ -8,7 +8,8 @@ HTTP crawl, start with the dependency setup in [Installation](installation.md).
 | Feature | Enables |
 |---|---|
 | `html` (default) | HTML extractors including `Html` and `Links`, the `Select` trait, `Collect` and `FollowLinks` |
-| `agent` | Model extraction through `Extract<T>`; also enables `markdown` |
+| `agent` | Model extraction; also enables `markdown` |
+| `agent-rig` | Rig model adapter and the upstream Rig crate; enables `agent` |
 | `markdown` | The `Markdown` extractor; also enables `html` |
 | `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
 | `reqwest` | `ReqwestBackend`, the HTTP backend |
@@ -21,7 +22,7 @@ HTTP crawl, start with the dependency setup in [Installation](installation.md).
 | `csv` | `CsvDataset` |
 | `redb` | `RedbStore`, a crash-safe frontier, seen set and datasets on disk; persistent answer caching with `agent` |
 | `rustls-tls` (default), `native-tls` | TLS for the enabled backends |
-| `testing` | `MockSite`, `MockPage`, `MockSession` and `Visit`, for offline tests |
+| `testing` | `MockSite`, `MockPage`, `MockSession` and `Visit`; also `testing::Script` with `agent` |
 | `full` | Everything except `native-tls` and `testing` |
 
 No backend is enabled by default. Enable `testing` in your dev-dependencies only; see [Testing handlers](testing.md).
@@ -85,19 +86,9 @@ No features are enabled by default.
 | `testing` | `MockSite`, `MockPage`, `MockSession` and `Visit` for offline tests |
 | `user-agents` | `Identity::with_profile` and the uagent `Profile`, `UserAgents`, `Browser` and `Platform` re-exports |
 
-## Model extraction
+## AI-driven crawling
 
-Enable `agent` for model extraction. To use Rig models, also enable `rig`
-on `spire-agent`:
-
-```toml
-[dependencies]
-spire = { version = "0.8", features = ["agent", "redb", "reqwest"] }
-spire-agent = { version = "0.8", features = ["rig"] }
-```
-
-The facade's `redb` feature also enables persistent answer caching when
-`agent` is enabled. It does not enable model extraction on its own.
-`full` includes `agent` and `redb`; enable Rig separately as above.
-See [Model extraction](model-extraction.md) for provider configuration and
-cache usage.
+`agent` enables model extraction and [objective middleware](objectives.md). Provider integrations are
+configured on `spire-agent`; see [Model providers](agent-providers.md).
+The facade's `redb` feature also enables answer caching when `agent` is
+present. See [Model budgets and caches](agent-resources.md) for setup.

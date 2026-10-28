@@ -21,7 +21,7 @@ use crate::crawler::robots::{BackendSource, RobotsCache, RobotsSource, Verdict};
 use crate::crawler::{Crawler, Live, Stats, Tag};
 use crate::frontier::queue::Queue;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Pop, Report};
+use crate::frontier::{Ack, NextSeed, Report};
 use crate::identity::{Health, Identity};
 use crate::sync::lock;
 use crate::worker::{Outcome, Scope, Worker};
@@ -427,12 +427,12 @@ where
             }
 
             match self.frontier.pop().await {
-                Ok(Pop::Ready(seed)) => self.admit(run, seed).await,
-                Ok(Pop::Wait(at)) => {
+                Ok(NextSeed::Ready(seed)) => self.admit(run, seed).await,
+                Ok(NextSeed::Wait(at)) => {
                     wait = wait.min(Some(at)).or(Some(at));
                     break;
                 }
-                Ok(Pop::Empty) => break,
+                Ok(NextSeed::Empty) => break,
                 Err(error) => {
                     run.fail(error, settings.shutdown_grace);
                     return None;
@@ -551,6 +551,7 @@ where
         // pick one fails the request like any other.
         let connector = run.connector.clone();
         let mut request = seed.clone().into_request();
+        request.extensions_mut().extend(self.extensions.clone());
         let identity = connector.identify(&seed, &mut request);
         let used = identity.as_ref().ok().cloned().flatten();
 

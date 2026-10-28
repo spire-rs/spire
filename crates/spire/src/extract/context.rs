@@ -3,8 +3,7 @@ use std::convert::Infallible;
 use std::future::{Future, ready};
 
 use crate::crawler::{Attempt, Depth, Tag, Tags};
-use crate::dataset::Data;
-use crate::extract::FromContext;
+use crate::extract::{Data, FromContext};
 use crate::frontier::queue::Queue;
 use crate::http::RequestExt;
 use crate::http::http::Uri;

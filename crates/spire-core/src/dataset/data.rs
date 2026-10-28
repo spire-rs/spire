@@ -6,10 +6,7 @@ use futures::future::BoxFuture;
 use futures::{FutureExt, Stream, stream};
 
 use crate::Result;
-use crate::dataset::Dataset;
-
-/// How many items [`Data::read_all`] takes at once.
-pub const READ_BATCH: usize = 1024;
+use crate::dataset::{Dataset, READ_BATCH};
 
 /// A cloneable, type-erased handle to a [`Dataset`].
 pub struct Data<T> {
@@ -65,8 +62,7 @@ impl<T: Send + 'static> Data<T> {
         self.inner.read_batch(max).await
     }
 
-    /// Takes every item until the dataset is empty, in batches of
-    /// [`READ_BATCH`] items.
+    /// Takes every item until the dataset is empty, in batches of 1024 items.
     ///
     /// # Errors
     ///

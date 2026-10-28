@@ -74,3 +74,34 @@ let state = AppState {
 };
 let router: Router<Noop, AppState> = Router::with_state(state).route("page", page);
 ```
+
+## Crawler services
+
+`Crawler::with_extension` registers a service independently of router state.
+A handler obtains it with `Extension<T>`, which looks up the concrete type
+in the request's HTTP extensions:
+
+```rust
+use spire::backend::Noop;
+use spire::extract::{Extension, State};
+use spire::{Crawler, Router};
+
+async fn page(State(prefix): State<String>, Extension(limit): Extension<usize>) {
+    println!("{prefix}: {limit}");
+}
+
+let router = Router::with_state(String::from("items")).fallback(page);
+let crawler = Crawler::new(Noop, router).with_extension(10_usize);
+# let _ = crawler;
+```
+
+Services are scoped to that crawler. Each request, including retries and
+followed links, receives cloned values; use `Arc<T>` for shared services.
+Registering the same type again replaces its value. Middleware can override
+an extension for one request without changing the crawler's registration.
+
+Missing extensions produce handler errors at runtime. Use
+`Option<Extension<T>>` when a service is optional. Prefer `State<T>` for
+application dependencies that should be checked through handler type bounds.
+With the `agent` feature, `.with_agent(agent)` registers the agent through
+this same mechanism without occupying your router state.

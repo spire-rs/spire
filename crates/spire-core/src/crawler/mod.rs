@@ -103,6 +103,7 @@ pub struct Crawler<B, W> {
     worker: Arc<W>,
     frontier: Arc<dyn DynFrontier>,
     datasets: Arc<Datasets>,
+    extensions: http::Extensions,
     seeds: Mutex<Vec<Seed>>,
     settings: Settings,
     shutdown: CancellationToken,
@@ -160,11 +161,23 @@ impl<B, W> Crawler<B, W> {
             worker: Arc::new(worker),
             frontier: Arc::new(frontier),
             datasets: Arc::default(),
+            extensions: http::Extensions::new(),
             seeds: Mutex::default(),
             settings,
             shutdown: CancellationToken::new(),
             live: Arc::default(),
         }
+    }
+
+    /// Adds a shared service to every request handled by this crawler.
+    ///
+    /// A later registration of the same type replaces the previous value.
+    /// Values are cloned for each request; use `Arc<T>` for shared ownership.
+    /// Middleware can replace a value on an individual request.
+    #[must_use]
+    pub fn with_extension<T: Clone + Send + Sync + 'static>(mut self, value: T) -> Self {
+        self.extensions.insert(value);
+        self
     }
 
     /// Replaces the frontier.

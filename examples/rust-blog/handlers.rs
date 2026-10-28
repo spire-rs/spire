@@ -7,9 +7,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use serde::Serialize;
 use spire::Result;
 use spire::crawler::Depth;
-use spire::dataset::Data;
 use spire::extract::html::Element;
-use spire::extract::{FromRef, State};
+use spire::extract::{Data, FromRef, State};
 use spire::http::http::Uri;
 
 use crate::pages::{Article, Page};

@@ -1,0 +1,22 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "objective-crawl"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+publish = false
+description = "Multiple objectives with scripted responses and offline pages"
+
+[[bin]]
+name = "objective-crawl"
+path = "main.rs"
+
+[dependencies]
+# Async runtime and Spire framework
+spire = { workspace = true, features = ["agent", "testing"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
+[lints]
+workspace = true

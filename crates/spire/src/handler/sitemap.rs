@@ -11,9 +11,10 @@ use crate::http::RequestExt;
 use crate::worker::{IntoOutcome, Outcome};
 use crate::{Context, Result, TRACING_TARGET};
 
-/// A handler that follows a sitemap: every page is queued with the `pages`
-/// tag, and every sitemap of an index with the tag of the sitemap itself, so
-/// indexes of any depth are followed.
+/// Queues pages and nested sitemaps from a sitemap.
+///
+/// Pages receive the configured `pages` tag. Sitemaps in an index keep the
+/// sitemap's own tag, so indexes of any depth are followed.
 ///
 /// Route it like any handler, by tag, by path or as the fallback; seed
 /// sitemaps yourself, or let [`Robots::with_sitemaps`] find them. A sitemap's

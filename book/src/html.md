@@ -65,7 +65,7 @@ does not scroll or modify the document. Image-map geometry and unsupported
 clip shapes remain `Unknown`; checks do not establish whether another
 element covers a link, and do not traverse frames or shadow roots.
 
-`Html::parse`, `Html::links`, `Links::within` and `Tab::snapshot()` operate on
+`Html::parse`, `Html::links`, `Links::within` and `ThirtyfourTab::snapshot()` operate on
 serialized HTML, so their visibility remains an HTML-only estimate even
 when that HTML came from a browser. Use the `Links` extractor for rendered
 observations. Each extraction observes the current DOM; it is not a live

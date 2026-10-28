@@ -6,7 +6,8 @@ extractor:
 
 ```rust,no_run
 use spire::backend::ReqwestBackend;
-use spire::dataset::{Data, InMemDataset};
+use spire::dataset::{InMemDataset};
+use spire::extract::Data;
 use spire::extract::html::Html;
 use spire::frontier::seed::Seed;
 use spire::http::http::Uri;
@@ -119,7 +120,7 @@ one batch, which the file and redb datasets store all at once or not at all.
 
 ```rust,no_run
 use futures::TryStreamExt;
-use spire::dataset::Data;
+use spire::extract::Data;
 # struct Product;
 
 # async fn export(products: Data<Product>) -> spire::Result<()> {

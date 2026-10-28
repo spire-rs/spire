@@ -125,11 +125,11 @@ explicitly. `full` enables every feature below except `native-tls` and
 | Feature | Enables |
 |---|---|
 | `html` (default) | `Html`, `Element`, `Links`, `Meta`, `JsonLd`, `Select`, `Collect` and `FollowLinks` |
-| `agent` | Typed model extraction with `Extract<T>`; also enables `markdown` |
+| `agent` | Typed model extraction; also enables `markdown` |
 | `markdown` | The `Markdown` extractor; also enables `html` |
 | `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
 | `reqwest` | `ReqwestBackend` and the reqwest re-export |
-| `thirtyfour` | `ThirtyfourBackend`, `Tab` and the thirtyfour re-export |
+| `thirtyfour` | `ThirtyfourBackend`, `ThirtyfourTab` and the thirtyfour re-export |
 | `user-agents` | Browser profiles and matching navigation headers for identities |
 | `robots` | Obeying robots.txt with `Crawler::with_robots` |
 | `sitemap` | The `Sitemap` extractor and `FollowSitemap` handler |
@@ -139,7 +139,7 @@ explicitly. `full` enables every feature below except `native-tls` and
 | `redb` | Crash-safe frontier, seen set and datasets through `RedbStore`; persistent answer caching with `agent` |
 | `rustls-tls` (default) | Rustls TLS for enabled backends |
 | `native-tls` | Platform-native TLS for enabled backends |
-| `testing` | Offline testing with `MockSite`, `MockPage`, `MockSession` and `Visit` |
+| `testing` | Offline tests with `MockSite` and `Visit`; `testing::Script` when `agent` is enabled |
 | `full` | Every feature except `native-tls` and `testing` |
 
 See [Installation](https://spire-rs.github.io/spire/installation.html) for

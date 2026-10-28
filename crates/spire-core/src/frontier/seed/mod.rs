@@ -8,14 +8,13 @@ use ::http::{HeaderMap, HeaderValue, Method, Uri};
 use bytes::Bytes;
 
 mod fingerprint;
-mod normalize;
 #[cfg(feature = "serde")]
 mod repr;
 
 pub use fingerprint::Fingerprint;
 
 use crate::crawler::{Attempt, Depth, Tag};
-use crate::http::{Request, RequestMeta};
+use crate::http::{Request, RequestMeta, UriExt};
 use crate::{Error, Result};
 
 /// A request waiting in the frontier.
@@ -200,7 +199,7 @@ impl Seed {
     /// resource share; see [`fingerprint`](Self::fingerprint).
     #[must_use]
     pub fn canonical_uri(&self) -> String {
-        normalize::canonical(&self.uri)
+        self.uri.canonical()
     }
 
     /// Returns a fingerprint that identifies the request regardless of its
@@ -238,11 +237,7 @@ impl Seed {
 /// The fingerprint of a request with `method`, `uri` and `body`, as
 /// [`Seed::fingerprint`] computes it, e.g. for a request built from a seed.
 pub(crate) fn fingerprint(method: &Method, uri: &Uri, body: &[u8]) -> Fingerprint {
-    Fingerprint::of(&[
-        method.as_str().as_bytes(),
-        normalize::canonical(uri).as_bytes(),
-        body,
-    ])
+    Fingerprint::of(&[method.as_str().as_bytes(), uri.canonical().as_bytes(), body])
 }
 
 /// The rarely set parts of a [`Seed`].

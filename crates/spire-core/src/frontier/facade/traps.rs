@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use ::http::Uri;
 
 use crate::frontier::seed::{Fingerprint, Seed};
-use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
 use crate::sync::lock;
 use crate::{Result, TRACING_TARGET};
 
@@ -194,10 +194,10 @@ impl<F: Frontier> Frontier for AvoidTraps<F> {
         self.inner.push(seed).await
     }
 
-    async fn pop(&self) -> Result<Pop> {
+    async fn pop(&self) -> Result<NextSeed> {
         loop {
             match self.inner.pop().await? {
-                Pop::Ready(seed) if self.refusal(&seed).is_some() => {
+                NextSeed::Ready(seed) if self.refusal(&seed).is_some() => {
                     self.count_refusal(&seed);
                     self.inner.report(Report::Skipped(seed)).await?;
                 }
@@ -275,11 +275,11 @@ mod tests {
             Admission::PrefixBudgetExceeded
         );
         assert_eq!(frontier.snapshot().unwrap().len(), 1);
-        let Pop::Ready(safe) = frontier.pop().await.unwrap() else {
+        let NextSeed::Ready(safe) = frontier.pop().await.unwrap() else {
             panic!("safe seed remains");
         };
         assert_eq!(safe.uri().path(), "/safe/a");
-        assert!(matches!(frontier.pop().await.unwrap(), Pop::Empty));
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
         assert_eq!(frontier.refused(), 4);
     }
 
@@ -353,8 +353,8 @@ mod tests {
         stored.push(seed("/pit/a")).await.unwrap();
         stored.push(seed("/pit/b")).await.unwrap();
         let frontier = stored.avoid_traps_with(TrapPolicy::default().with_max_urls(1));
-        assert!(matches!(frontier.pop().await.unwrap(), Pop::Ready(_)));
-        assert!(matches!(frontier.pop().await.unwrap(), Pop::Empty));
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Ready(_)));
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
         assert_eq!(frontier.refused(), 1);
     }
 
@@ -364,7 +364,7 @@ mod tests {
             .retry(1)
             .avoid_traps_with(TrapPolicy::default().with_max_urls(1));
         frontier.push(seed("/pit/a")).await.unwrap();
-        let Pop::Ready(retried) = frontier.pop().await.unwrap() else {
+        let NextSeed::Ready(retried) = frontier.pop().await.unwrap() else {
             panic!("seed");
         };
         frontier
@@ -379,7 +379,7 @@ mod tests {
             Admission::PrefixBudgetExceeded
         );
         tokio::time::advance(std::time::Duration::from_secs(2)).await;
-        assert!(matches!(frontier.pop().await.unwrap(), Pop::Empty));
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
         assert_eq!(frontier.refused(), 2);
     }
 

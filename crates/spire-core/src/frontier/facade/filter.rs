@@ -3,7 +3,7 @@ use std::future::Future;
 
 use crate::Result;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, Pop, Report};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
 
 /// A facade that refuses seeds a predicate rejects, see
 /// [`FrontierExt::filter`](crate::frontier::FrontierExt::filter).
@@ -40,7 +40,7 @@ where
         }
     }
 
-    fn pop(&self) -> impl Future<Output = Result<Pop>> + Send {
+    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
         self.inner.pop()
     }
 

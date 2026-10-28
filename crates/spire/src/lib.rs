@@ -8,8 +8,19 @@
 /// Model providers, extraction, budgets and caches.
 #[cfg(feature = "agent")]
 #[cfg_attr(docsrs, doc(cfg(feature = "agent")))]
-#[doc(inline)]
-pub use spire_agent as agent;
+pub mod agent {
+    #[cfg(feature = "agent-rig")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "agent-rig")))]
+    pub use spire_agent::Rig;
+    #[cfg(feature = "agent-rig")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "agent-rig")))]
+    #[doc(no_inline)]
+    pub use spire_agent::rig;
+    pub use spire_agent::{
+        Agent, AgentCrawlerExt, Budget, Error, Provider, ProviderRequest, ProviderResponse, Result,
+        Usage, UsageTotals, cache, objective, schemars, serde, serde_json,
+    };
+}
 
 pub mod extract;
 pub mod handler;
@@ -19,9 +30,15 @@ mod routing;
 pub mod prelude;
 
 use spire_core::backend::Backend;
+/// Offline helpers for testing handlers, crawls and model providers.
 #[cfg(any(test, feature = "testing"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
-pub use spire_core::testing;
+pub mod testing {
+    #[cfg(all(feature = "agent", feature = "testing"))]
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "agent", feature = "testing"))))]
+    pub use spire_agent::testing::Script;
+    pub use spire_core::testing::{MockPage, MockSession, MockSite, Sent, Visit};
+}
 pub use spire_core::{Context, Error, ErrorKind, Result, worker};
 
 pub use crate::routing::Router;
@@ -32,7 +49,7 @@ pub mod backend {
     pub use spire_core::backend::*;
     #[cfg(feature = "reqwest")]
     #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-    pub use spire_reqwest::{ReqwestBackend, reqwest};
+    pub use spire_reqwest::{ReqwestBackend, ReqwestSession, reqwest};
     #[cfg(feature = "thirtyfour")]
     #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
     pub use spire_thirtyfour::{
@@ -64,7 +81,7 @@ pub mod dataset {
     #[cfg(feature = "json")]
     #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     pub use spire_core::dataset::JsonlDataset;
-    pub use spire_core::dataset::{Data, Dataset, InMemDataset, READ_BATCH};
+    pub use spire_core::dataset::{Dataset, InMemDataset};
 }
 
 /// The frontier: requests waiting to be crawled.
@@ -147,6 +164,9 @@ mod book {
         State: "state.md",
         Html: "html.md",
         ModelExtraction: "model-extraction.md",
+        AgentProviders: "agent-providers.md",
+        AgentResources: "agent-resources.md",
+        Objectives: "objectives.md",
         Datasets: "datasets.md",
         Links: "links.md",
         BestFirst: "best-first.md",

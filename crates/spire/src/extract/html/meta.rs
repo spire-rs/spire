@@ -148,12 +148,11 @@ where
     }
 }
 
-/// Extracts the page's JSON-LD structured data: every node that
-/// deserializes as `T`.
+/// Extracts typed nodes from the page's JSON-LD structured data.
 ///
-/// Many product, article and event pages describe themselves with
-/// [schema.org](https://schema.org) data in
-/// `<script type="application/ld+json">` blocks. Every block is read, an
+/// Returns every node that deserializes as `T`. Many product, article and
+/// event pages describe themselves with [schema.org](https://schema.org) data
+/// in `<script type="application/ld+json">` blocks. Every block is read, an
 /// array or `@graph` counting as its nodes, and blocks that are not valid
 /// JSON are skipped. Deserialize into an enum tagged by `@type` to keep
 /// only the types you want. With an [`Html`] at hand, [`Html::json_ld`]

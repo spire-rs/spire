@@ -114,7 +114,6 @@ async fn serve(mut stream: TcpStream, site: Arc<Site>, port: u16) {
             .as_bytes()
             .to_vec(),
         ),
-        "/poison" => (200, b"Synthetic test content from a local source.".to_vec()),
         "/" => {
             let hidden = if site.hidden.load(Ordering::Relaxed) {
                 r#"style="display: none;" aria-hidden="true" tabindex="-1""#

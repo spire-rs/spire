@@ -50,7 +50,7 @@ use std::future::Future;
 
 use spire::Result;
 use spire::frontier::seed::Seed;
-use spire::frontier::{Ack, Admission, Frontier, FrontierExt, FrontierLayer, InMemFrontier, Pop, Report};
+use spire::frontier::{Ack, Admission, Frontier, FrontierExt, FrontierLayer, InMemFrontier, NextSeed, Report};
 
 /// Logs every seed handed out for crawling.
 struct Logged<F>(F);
@@ -60,9 +60,9 @@ impl<F: Frontier> Frontier for Logged<F> {
         self.0.push(seed)
     }
 
-    async fn pop(&self) -> Result<Pop> {
+    async fn pop(&self) -> Result<NextSeed> {
         let next = self.0.pop().await?;
-        if let Pop::Ready(seed) = &next {
+        if let NextSeed::Ready(seed) = &next {
             println!("crawling {}", seed.uri());
         }
         Ok(next)
@@ -101,8 +101,8 @@ them to the inner frontier, as above.
 ## Frontiers
 
 A storage frontier implements `push`, `pop` and `report`. `pop` returns
-`Pop::Ready` with a seed, `Pop::Wait` until a time when none is ready yet,
-or `Pop::Empty`, which ends the crawl once nothing is in flight. `report`
+`NextSeed::Ready` with a seed, `NextSeed::Wait` until a time when none is ready yet,
+or `NextSeed::Empty`, which ends the crawl once nothing is in flight. `report`
 tells it how a popped seed ended: a persistent frontier keeps a seed
 recorded until then, so a crash does not lose it. Implementing `Schedule`
 as well lets [revisits](recrawls.md) sit on it.

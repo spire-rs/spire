@@ -99,6 +99,13 @@ impl<C> Context<C> {
         self
     }
 
+    /// Adds a service to this request, replacing any value of the same type.
+    #[must_use]
+    pub fn with_extension<T: Clone + Send + Sync + 'static>(mut self, value: T) -> Self {
+        self.request.extensions_mut().insert(value);
+        self
+    }
+
     /// Returns the request.
     #[must_use]
     pub const fn request(&self) -> &Request {

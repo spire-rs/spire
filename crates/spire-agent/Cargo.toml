@@ -27,6 +27,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 # Default feature set (none for provider-independent extraction)
 default = []
+# Scripted providers for offline tests and examples
+testing = []
 # Rig completion models as providers
 rig = ["dep:rig"]
 # Answer caching in the crawl's RedbStore
@@ -39,7 +41,7 @@ spire-redb = { workspace = true, optional = true, features = [] }
 
 # Async runtime
 futures = { workspace = true, features = [] }
-tokio = { workspace = true, features = ["sync", "rt"] }
+tokio = { workspace = true, features = ["sync", "rt", "time", "macros"] }
 
 # Structured answers and validation
 serde = { workspace = true, features = ["derive"] }
@@ -55,6 +57,9 @@ thiserror = { workspace = true, features = [] }
 sha2 = { workspace = true, features = [] }
 
 [dev-dependencies]
+# Enable test utilities for this crate
+spire-agent = { workspace = true, features = ["testing"] }
+
 # Testing
 tokio = { workspace = true, features = ["rt", "macros", "time", "test-util"] }
 

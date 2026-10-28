@@ -18,8 +18,14 @@
 # Extracting data
 
 - [HTML](html.md)
-- [Model extraction](model-extraction.md)
 - [Storing results](datasets.md)
+
+# AI-driven crawling
+
+- [Model extraction](model-extraction.md)
+- [Model providers](agent-providers.md)
+- [Model budgets and caches](agent-resources.md)
+- [Objective middleware](objectives.md)
 
 # Controlling discovery
 
