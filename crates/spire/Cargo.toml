@@ -114,6 +114,7 @@ criterion = { workspace = true, features = [] }
 spire-core = { workspace = true, features = ["testing"] }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "test-util", "net", "io-util"] }
 flate2 = { workspace = true, features = [] }
+trybuild = { workspace = true, features = [] }
 
 [[bench]]
 name = "routing"

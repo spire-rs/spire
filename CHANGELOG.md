@@ -10,6 +10,8 @@ and this project adheres to
 
 ### Added
 
+- `spire`: compile-fail tests for the errors of `#[derive(Select)]` and
+  `#[derive(Tags)]`, run with trybuild on the CI toolchain.
 - `spire-agent`: provider-independent typed model extraction, a Rig adapter,
   shared usage accounting, token and cost budgets, concurrency limits, and
   optional in-memory or redb answer caches. `spire` exposes the crate and

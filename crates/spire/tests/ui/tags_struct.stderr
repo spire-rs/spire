@@ -1,0 +1,5 @@
+error: `Tags` can only be derived for enums
+ --> tests/ui/tags_struct.rs:4:1
+  |
+4 | struct Page;
+  | ^^^^^^

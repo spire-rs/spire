@@ -1,0 +1,5 @@
+error: expected `attr = "..."`
+ --> tests/ui/select_unknown_key.rs:5:19
+  |
+5 |     #[select("a", href = "url")]
+  |                   ^^^^

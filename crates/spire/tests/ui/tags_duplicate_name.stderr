@@ -1,0 +1,5 @@
+error: `HTTPPage` and `HttpPage` are both tagged `http_page`
+ --> tests/ui/tags_duplicate_name.rs:6:5
+  |
+6 |     HttpPage,
+  |     ^^^^^^^^

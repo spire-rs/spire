@@ -1,0 +1,5 @@
+error: expected `rename_all = "..."`
+ --> tests/ui/tags_wrong_key.rs:4:7
+  |
+4 | #[tag(rename = "page")]
+  |       ^^^^^^

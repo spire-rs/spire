@@ -1,0 +1,5 @@
+error: expected `=`
+ --> tests/ui/tags_malformed_attr.rs:5:17
+  |
+5 |     #[tag(rename)]
+  |                 ^
