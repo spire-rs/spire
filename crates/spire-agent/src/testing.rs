@@ -22,9 +22,10 @@ struct State {
     replies: Replies,
 }
 
-/// A provider that records requests and returns scripted answers, without
-/// a model or network. Clones share their response queue and request log.
-/// See [`Self::from_fn`] for request-dependent replies, and
+/// A provider that records requests and returns scripted answers.
+///
+/// No model or network is used. Clones share their response queue and request
+/// log. See [`Self::from_fn`] for request-dependent replies, and
 /// [`Self::from_async_fn`] for latency and cancellation tests.
 #[derive(Clone)]
 pub struct Script {
@@ -38,8 +39,10 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Script {
-    /// Returns responses in order. Calling after the queue is exhausted
-    /// returns a provider error; it never repeats an answer implicitly.
+    /// Returns responses in order.
+    ///
+    /// Calling after the queue is exhausted returns a provider error; it never
+    /// repeats an answer implicitly.
     #[must_use]
     pub fn new(responses: impl IntoIterator<Item = CompletionResponse>) -> Self {
         Self {
@@ -50,8 +53,9 @@ impl Script {
         }
     }
 
-    /// Creates replies synchronously from each request. An error can be
-    /// returned to simulate a provider failure.
+    /// Creates replies synchronously from each request.
+    ///
+    /// An error can be returned to simulate a provider failure.
     #[must_use]
     pub fn from_fn(
         handler: impl Fn(&CompletionRequest) -> Result<CompletionResponse> + Send + Sync + 'static,
@@ -59,8 +63,10 @@ impl Script {
         Self::from_async_fn(move |request| ready(handler(&request)))
     }
 
-    /// Creates replies asynchronously. No internal lock is held while the
-    /// callback runs, so calls can complete in a different order to arrival.
+    /// Creates replies asynchronously.
+    ///
+    /// No internal lock is held while the callback runs, so calls can complete
+    /// in a different order to arrival.
     #[must_use]
     pub fn from_async_fn<F, Fut>(handler: F) -> Self
     where
@@ -75,14 +81,15 @@ impl Script {
         }
     }
 
-    /// Returns requests in arrival order, including calls whose callback
-    /// failed or was cancelled.
+    /// Returns requests in arrival order, including calls whose callback failed
+    /// or was cancelled.
     #[must_use]
     pub fn requests(&self) -> Vec<CompletionRequest> {
         lock(&self.state.requests).clone()
     }
 
-    /// Returns the number of provider calls received, excluding agent cache hits.
+    /// Returns the number of provider calls received, excluding agent cache
+    /// hits.
     #[must_use]
     pub fn calls(&self) -> usize {
         lock(&self.state.requests).len()
@@ -108,15 +115,21 @@ impl Provider for Script {
         &self,
         request: CompletionRequest,
     ) -> impl Future<Output = Result<CompletionResponse>> + Send {
-        lock(&self.state.requests).push(request.clone());
         match &self.state.replies {
             Replies::Queue(queue) => {
+                // Capture and select the response under the same ordering lock.
+                let mut requests = lock(&self.state.requests);
+                requests.push(request);
                 let response = lock(queue).pop_front().ok_or_else(|| {
                     Error::provider(std::io::Error::other("scripted provider has no response"))
                 });
+                drop(requests);
                 Box::pin(ready(response)) as BoxFuture<'static, Result<CompletionResponse>>
             }
-            Replies::Handler(handler) => handler(request),
+            Replies::Handler(handler) => {
+                lock(&self.state.requests).push(request.clone());
+                handler(request)
+            }
         }
     }
 }
@@ -175,5 +188,45 @@ mod tests {
             Err(Error::Budget("scripted failure"))
         ));
         assert_eq!(provider.calls(), 1);
+    }
+
+    #[test]
+    fn concurrent_queued_responses_match_captured_request_order() {
+        const THREADS: usize = 16;
+        const CALLS: usize = 32;
+        let provider = Script::new((0..THREADS * CALLS).map(|index| CompletionResponse {
+            text: index.to_string(),
+            usage: Usage::tokens(0, 0),
+        }));
+        let barrier = std::sync::Barrier::new(THREADS);
+        let replies = std::thread::scope(|scope| {
+            let tasks = (0..THREADS)
+                .map(|thread| {
+                    let provider = &provider;
+                    let barrier = &barrier;
+                    scope.spawn(move || {
+                        barrier.wait();
+                        (0..CALLS)
+                            .map(|call| {
+                                let input = format!("{thread}:{call}");
+                                let response =
+                                    futures::executor::block_on(provider.complete(request(&input)))
+                                        .unwrap();
+                                (input, response.text)
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect::<Vec<_>>();
+            tasks
+                .into_iter()
+                .flat_map(|task| task.join().unwrap())
+                .collect::<std::collections::HashMap<_, _>>()
+        });
+        let requests = provider.requests();
+        assert_eq!(requests.len(), THREADS * CALLS);
+        for (index, request) in requests.iter().enumerate() {
+            assert_eq!(replies[&request.input], index.to_string());
+        }
     }
 }

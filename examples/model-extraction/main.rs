@@ -6,12 +6,11 @@
 use spire::agent::cache::InMemCache;
 use spire::agent::schemars::JsonSchema;
 use spire::agent::serde::Deserialize;
-use spire::agent::testing::Script;
 use spire::agent::{Agent, Budget, CompletionResponse, Usage};
 use spire::dataset::InMemDataset;
 use spire::frontier::seed::Seed;
 use spire::handler::AgentCollect;
-use spire::testing::{MockPage, MockSite};
+use spire::testing::{MockPage, MockSite, Script};
 use spire::{Crawler, Result, Router};
 
 #[derive(Debug, Deserialize, JsonSchema)]

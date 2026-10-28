@@ -205,10 +205,10 @@ async fn avoids_a_real_miasma_instance_with_robots_hidden_and_visible_links() {
 async fn reaches_a_pricing_objective_without_collecting_miasma_trap_content() {
     use spire::agent::objective::{AgentFrontierExt, Finished, Objective};
     use spire::agent::serde_json::{Value, json};
-    use spire::agent::testing::Script;
     use spire::agent::{Agent, CompletionResponse, Usage};
     use spire::dataset::InMemDataset;
     use spire::handler::{AgentCollect, FollowRelevant};
+    use spire::testing::Script;
 
     fn script() -> Script {
         Script::from_fn(|request| {

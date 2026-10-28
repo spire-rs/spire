@@ -4,13 +4,16 @@ use spire_core::frontier::{Ack, Admission, Frontier, NextSeed, Report};
 use super::run::Phase;
 use super::{ObjectiveRun, lock};
 
-/// Adds objective-based termination to a frontier. Keep this outside
-/// retry, revisit and scope facades so it observes every pop and report.
-/// Drive the crawler with [`ObjectiveRun::run`] for shutdown wiring and
-/// final completion checks; the frontier itself makes no model calls.
+/// Adds objective-based termination to a frontier.
+///
+/// Keep this outside retry, revisit and scope facades so it observes every pop
+/// and report. Drive the crawler with [`ObjectiveRun::run`] for shutdown wiring
+/// and final completion checks; the frontier itself makes no model calls.
 pub trait AgentFrontierExt: Frontier + Sized {
-    /// Stops admitting work when `objective` finishes. In-flight work drains;
-    /// queued and cancelled persistent seeds remain available for another run.
+    /// Stops admitting work when `objective` finishes.
+    ///
+    /// In-flight work drains; queued and cancelled persistent seeds remain
+    /// available for another run.
     fn until(self, objective: &ObjectiveRun) -> Until<Self> {
         lock(&objective.shared.state).attached = true;
         Until {
@@ -22,7 +25,9 @@ pub trait AgentFrontierExt: Frontier + Sized {
 
 impl<F: Frontier> AgentFrontierExt for F {}
 
-/// An objective-aware frontier, see [`AgentFrontierExt::until`].
+/// An objective-aware frontier.
+///
+/// See [`AgentFrontierExt::until`].
 #[derive(Debug, Clone)]
 pub struct Until<F> {
     inner: F,

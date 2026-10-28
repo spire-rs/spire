@@ -10,10 +10,12 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 pub use frontier::{AgentFrontierExt, Until};
-pub use rating::{Candidate, RelevanceScore};
+pub use rating::Candidate;
 pub use run::{Finished, ObjectiveRun, Progress};
 
 use crate::Agent;
+
+type Scorer = dyn Fn(&Candidate) -> Option<i32> + Send + Sync;
 
 #[derive(Clone)]
 struct Settings {
@@ -27,11 +29,13 @@ struct Settings {
     threshold: u8,
     batch_size: usize,
     delay: Duration,
-    scorer: Option<Arc<dyn RelevanceScore>>,
+    scorer: Option<Arc<Scorer>>,
 }
 
-/// Configuration for one goal. Clones are independent configurations;
-/// call [`Self::start`] to create a shared running objective with an agent.
+/// Configuration for an objective-driven crawl.
+///
+/// Clones are independent configurations; call [`Self::start`] to create a
+/// shared running objective with an agent.
 #[derive(Clone)]
 pub struct Objective {
     settings: Settings,
@@ -44,8 +48,10 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Objective {
-    /// Creates an objective with a 50/100 relevance threshold, 256 links per
-    /// rating call and a 10ms batching delay. No target or stall limit is set.
+    /// Creates an objective configuration.
+    ///
+    /// Defaults to a 50/100 relevance threshold, 256 links per rating call and
+    /// a 10ms batching delay. No target or stall limit is set.
     #[must_use]
     pub fn new(goal: impl Into<String>) -> Self {
         Self {
@@ -85,7 +91,9 @@ impl Objective {
         self
     }
 
-    /// Stops after finding this many items. Zero stops before crawling.
+    /// Stops after finding this many items.
+    ///
+    /// Zero stops before crawling.
     #[must_use]
     pub fn target_items(mut self, count: u64) -> Self {
         self.settings.items = Some(count);
@@ -99,16 +107,20 @@ impl Objective {
         self
     }
 
-    /// Stops after this many completed pages without new relevant pages or
-    /// items. Zero stops immediately; failed pages also advance this window.
+    /// Sets the limit on completed pages without progress.
+    ///
+    /// Progress means new relevant pages or items. Zero stops immediately;
+    /// failed pages also advance this window.
     #[must_use]
     pub fn stall_after(mut self, count: u64) -> Self {
         self.settings.stall = Some(count);
         self
     }
 
-    /// Minimum completed pages between model completion judgments, clamped
-    /// to at least one. Exhaustion triggers a final changed-evidence check.
+    /// Minimum completed pages between model completion judgments, clamped to
+    /// at least one.
+    ///
+    /// Exhaustion triggers a final changed-evidence check.
     #[must_use]
     pub fn check_every(mut self, pages: u64) -> Self {
         self.settings.check_every = pages.max(1);
@@ -136,15 +148,21 @@ impl Objective {
         self
     }
 
-    /// Settles clear link decisions locally. `None` asks the model; a score
-    /// in 0..=100 settles the link without a model call.
+    /// Settles clear link decisions locally.
+    ///
+    /// `None` asks the model; `Some(score)` settles the link without a model
+    /// call. Scores are clamped to 0..=100; zero rejects the link.
     #[must_use]
-    pub fn score_with(mut self, scorer: impl RelevanceScore) -> Self {
+    pub fn score_with(
+        mut self,
+        scorer: impl Fn(&Candidate) -> Option<i32> + Send + Sync + 'static,
+    ) -> Self {
         self.settings.scorer = Some(Arc::new(scorer));
         self
     }
 
     /// Freezes these settings and owns the fully configured model agent.
+    ///
     /// Each call creates independent progress, ratings and termination state.
     #[must_use]
     pub fn start(self, agent: Agent) -> ObjectiveRun {

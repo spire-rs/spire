@@ -1,7 +1,9 @@
 use crate::{Error, Result, Usage};
 
-/// Admission limits based on settled provider usage. Already-running calls
-/// can cross a limit; no new calls start once it has been reached.
+/// Token and cost limits for model calls.
+///
+/// Limits use settled provider usage. Already-running calls can cross a limit;
+/// no new calls start once it has been reached.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Budget {
     pub(crate) tokens: Option<u64>,
@@ -19,6 +21,7 @@ impl Budget {
     }
 
     /// Also caps reported or fallback-priced cost, in USD.
+    ///
     /// Non-finite or negative values fail before any provider call.
     #[must_use]
     pub const fn max_cost(mut self, usd: f64) -> Self {
@@ -36,8 +39,10 @@ impl Budget {
     }
 }
 
-/// Fallback USD prices per million input and output tokens. Provider costs
-/// always take precedence. Zero prices explicitly permit free local models.
+/// Fallback USD prices per million input and output tokens.
+///
+/// Provider costs always take precedence. Zero prices explicitly permit free
+/// local models.
 #[derive(Debug, Clone, Copy)]
 pub struct Pricing {
     input: f64,

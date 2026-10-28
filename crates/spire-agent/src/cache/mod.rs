@@ -1,5 +1,7 @@
-//! Optional answer caches. Keys are hashes of content, instructions, schema,
-//! token limit and an explicit provider/model namespace, not just page URLs.
+//! Caches of validated model answers.
+//!
+//! Keys are hashes of content, instructions, schema, token limit and an
+//! explicit provider/model namespace, not just page URLs.
 
 mod memory;
 #[cfg(feature = "redb")]
@@ -14,7 +16,9 @@ pub use persistent::RedbCache;
 
 use crate::Result;
 
-/// Stores validated answer text. Cache hits do not spend model budgets.
+/// Stores validated model answers.
+///
+/// Cache hits do not spend model budgets.
 pub trait Cache: Send + Sync + 'static {
     /// Reads an answer.
     ///
@@ -31,8 +35,10 @@ pub trait Cache: Send + Sync + 'static {
     fn put<'a>(&'a self, key: &'a str, answer: &'a str) -> BoxFuture<'a, Result<()>>;
 }
 
-/// Adds model answer caching to a crawl store without another database.
-/// Each store selects its own [`Cache`] implementation.
+/// Adds an answer cache to a crawl store.
+///
+/// Each store selects its own [`Cache`] implementation, sharing its existing
+/// database.
 pub trait AgentStoreExt {
     /// The answer cache backed by this store.
     type Cache: Cache;

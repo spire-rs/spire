@@ -1,6 +1,5 @@
 //! Rig completion models as Spire providers.
 
-pub use ::rig;
 use rig::DynModel;
 use rig::completion::{CompletionRequest as RigRequest, FinishReason};
 use rig::message::AssistantContent;
@@ -8,9 +7,11 @@ use rig::operation::Completion as RigCompletion;
 
 use crate::{CompletionRequest, CompletionResponse, Error, Provider, Result, Usage};
 
-/// Wraps any Rig completion model. Schemas are included in system
-/// instructions by default; opt into native schemas for models supporting
-/// them. Responses are always validated by the agent before caching.
+/// A Rig completion model exposed as a Spire provider.
+///
+/// Schemas are included in system instructions by default; opt into native
+/// schemas for models supporting them. Responses are always validated by the
+/// agent before caching.
 #[derive(Clone)]
 pub struct Rig {
     model: DynModel<RigCompletion>,
@@ -28,6 +29,7 @@ impl Rig {
     }
 
     /// Also forwards the schema as Rig's native structured-output schema.
+    ///
     /// Enable this only when the selected provider/model supports it.
     #[must_use]
     pub const fn with_native_schema(mut self) -> Self {

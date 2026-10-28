@@ -100,17 +100,19 @@ The decision map grows with unique candidates, so keep crawl limits in place.
 A cheap scorer returns a decisive score or leaves a link uncertain:
 
 ```rust
-use spire::agent::objective::Objective;
+use spire::agent::objective::{Candidate, Objective};
 use spire::frontier::score::Keywords;
 
-let config = Objective::new("find plan prices")
-    .score_with(Keywords::new(["pricing", "billing"]));
+let keywords = Keywords::new(["pricing", "billing"]);
+let config = Objective::new("find plan prices").score_with(move |link: &Candidate| {
+    (keywords.matches(&link.text) > 0).then_some(100)
+});
 ```
 
-Positive keyword matches score 100; nonmatches go to the model.
-Negative-weight matches score zero. A closure taking `&Candidate` can
-return `Some(score)` for a clear acceptance or rejection, and `None` for
-the uncertain middle.
+This closure checks anchor text: positive keyword matches score 100;
+nonmatches go to the model. Return `Some(0)` to reject a link locally or
+`None` to ask the model. Scores are clamped to 0..=100. Choose which parts
+of the candidate to inspect explicitly, such as anchor text or the URL path.
 
 ## Report application progress explicitly
 
@@ -154,9 +156,9 @@ free-form conversation.
 | `Exhausted` | The frontier and outstanding requests drained, and a final check did not establish completion |
 | `Budget` | A token or USD model budget refused another call |
 
-Relevant pages successfully completed with reported items or a relevant
-incoming rating. Terminal failures advance the stall window; skipped and
-cancelled pages do not. Targets and stalls require no model call.
+A relevant page is a successfully completed page with reported items or a
+relevant incoming rating. Terminal failures advance the stall window;
+skipped and cancelled pages do not. Targets and stalls require no model call.
 
 Completion judgments require changed progress and run at most once per
 five completed pages by default, serialized across handlers. Configure

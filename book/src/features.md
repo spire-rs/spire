@@ -9,6 +9,7 @@ HTTP crawl, start with the dependency setup in [Installation](installation.md).
 |---|---|
 | `html` (default) | HTML extractors including `Html` and `Links`, the `Select` trait, `Collect` and `FollowLinks` |
 | `agent` | Model extraction and objective-based crawling; also enables `markdown` |
+| `agent-rig` | Rig model adapter and the upstream Rig crate; enables `agent` |
 | `markdown` | The `Markdown` extractor; also enables `html` |
 | `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
 | `reqwest` | `ReqwestBackend`, the HTTP backend |
@@ -21,7 +22,7 @@ HTTP crawl, start with the dependency setup in [Installation](installation.md).
 | `csv` | `CsvDataset` |
 | `redb` | `RedbStore`, a crash-safe frontier, seen set and datasets on disk; persistent answer caching with `agent` |
 | `rustls-tls` (default), `native-tls` | TLS for the enabled backends |
-| `testing` | `MockSite`, `MockPage`, `MockSession` and `Visit`; also `agent::testing::Script` with `agent` |
+| `testing` | `MockSite`, `MockPage`, `MockSession` and `Visit`; also `testing::Script` with `agent` |
 | `full` | Everything except `native-tls` and `testing` |
 
 No backend is enabled by default. Enable `testing` in your dev-dependencies only; see [Testing handlers](testing.md).

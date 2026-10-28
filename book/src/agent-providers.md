@@ -12,7 +12,7 @@ tokens and cost when available; leave unknown values as `None`. Providers
 own retries and rate limits and should report usage for the whole call.
 
 The [model-extraction example](https://github.com/spire-rs/spire/tree/main/examples/model-extraction)
-runs a complete crawl with `MockSite` and `spire::agent::testing::Script`, without a
+runs a complete crawl with `MockSite` and `spire::testing::Script`, without a
 network or API key:
 
 ```sh
@@ -23,13 +23,14 @@ Enable `agent` and `testing` to use `Script` in your own tests. It can
 return a queue of `CompletionResponse`s, answer from a synchronous or
 asynchronous callback, and capture requests for assertions.
 
-For Rig models, also enable `rig` on `spire-agent`:
+For Rig models, enable `agent-rig` on the facade:
 
 ```toml
 [dependencies]
-spire = { version = "0.8.0", features = ["agent", "reqwest"] }
-spire-agent = { version = "0.8.0", features = ["rig"] }
+spire = { version = "0.8.0", features = ["agent-rig", "reqwest"] }
 ```
+
+The upstream crate is re-exported as `spire::agent::rig`.
 
 Wrap a Rig completion model with `spire::agent::Rig::new(model)`, then pass
 it to `Agent::new`. The adapter includes the schema in the prompt by
@@ -44,7 +45,7 @@ Enable `agent` and `testing` on the facade to use the built-in `Script`
 provider. Fixed responses are useful for handler tests:
 
 ```rust
-use spire::agent::testing::Script;
+use spire::testing::Script;
 use spire::agent::{Agent, CompletionResponse, Usage};
 
 #[tokio::main(flavor = "current_thread")]

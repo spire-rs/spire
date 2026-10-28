@@ -14,8 +14,10 @@ use super::rating::Ratings;
 use super::{Settings, lock};
 use crate::{Agent, CompletionRequest, CompletionResponse, Error, Result};
 
-/// Why a crawl stopped pursuing its objective. The first reason wins;
-/// already-running handlers may still add evidence while draining.
+/// The reason an objective-driven crawl stopped.
+///
+/// The first reason wins; already-running handlers may still add evidence while
+/// draining.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Finished {
@@ -33,8 +35,10 @@ pub enum Finished {
     Budget,
 }
 
-/// A snapshot of objective progress. Item counts come from explicit
-/// reports; the runtime does not infer cardinality or deduplicate values.
+/// A snapshot of reported objective progress.
+///
+/// Item counts come from explicit reports; the runtime does not infer
+/// cardinality or deduplicate values.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Progress {
     /// Distinct pages that completed or failed, excluding skipped requests.
@@ -95,9 +99,11 @@ pub(super) struct Shared {
     judge: AsyncMutex<()>,
 }
 
-/// One running objective. Clones share immutable settings, one configured
-/// agent, evidence and ratings. Create it with [`super::Objective::start`],
-/// put a clone in router state and run the crawler through [`Self::run`].
+/// Shared progress and lifecycle for one objective-driven crawl.
+///
+/// Clones share immutable settings, one configured agent, evidence and ratings.
+/// Create it with [`super::Objective::start`], put a clone in router state and
+/// run the crawler through [`Self::run`].
 #[derive(Clone)]
 pub struct ObjectiveRun {
     pub(super) settings: Arc<Settings>,
@@ -140,9 +146,11 @@ impl ObjectiveRun {
         &self.settings.goal
     }
 
-    /// Runs one crawl with shutdown wiring and a final changed-evidence
-    /// judgment after all requests have drained. The crawler must use this
-    /// run's `until` frontier. A run cannot be started twice.
+    /// Runs a crawl toward this objective.
+    ///
+    /// Connects shutdown and makes a final changed-evidence judgment after all
+    /// requests have drained. The crawler must use this run's `until` frontier.
+    /// A run cannot be started twice.
     ///
     /// # Errors
     ///
@@ -205,15 +213,18 @@ impl ObjectiveRun {
         lock(&self.shared.state).progress.clone()
     }
 
-    /// Returns the first stop condition reached. External shutdown or an
-    /// unrelated failure can leave this as `None`.
+    /// Returns the first stop condition reached.
+    ///
+    /// External shutdown or an unrelated failure can leave this as `None`.
     #[must_use]
     pub fn finished(&self) -> Option<Finished> {
         lock(&self.shared.state).finished
     }
 
-    /// Reports a number of items without evidence. The caller owns counting
-    /// and deduplication; report only items its application considers new.
+    /// Reports a number of items without evidence.
+    ///
+    /// The caller owns counting and deduplication; report only items its
+    /// application considers new.
     pub fn found(&self, count: u64) {
         if count == 0 {
             return;
@@ -225,8 +236,10 @@ impl ObjectiveRun {
         self.limits(&mut state);
     }
 
-    /// Reports one item with evidence. An array is one item, not an implied
-    /// batch. Repeated values count again; uniqueness belongs to the caller.
+    /// Reports one item with evidence.
+    ///
+    /// An array is one item, not an implied batch. Repeated values count again;
+    /// uniqueness belongs to the caller.
     ///
     /// # Errors
     ///
@@ -239,8 +252,8 @@ impl ObjectiveRun {
     ///
     /// # Errors
     ///
-    /// Returns an answer error if any item cannot be serialized. No progress
-    /// is changed until all items have been encoded.
+    /// Returns an answer error if any item cannot be serialized. No progress is
+    /// changed until all items have been encoded.
     pub fn record_batch<T: Serialize>(&self, items: impl IntoIterator<Item = T>) -> Result<()> {
         let values = items
             .into_iter()
@@ -343,7 +356,9 @@ impl ObjectiveRun {
     }
 
     /// Checks changed evidence, subject to the configured completed-page
-    /// interval. Model judgments are fallible, not proof of completeness.
+    /// interval.
+    ///
+    /// Model judgments are fallible, not proof of completeness.
     ///
     /// # Errors
     ///

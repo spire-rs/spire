@@ -30,10 +30,12 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Default feature set: HTML parsing, and rustls for any enabled backend
 default = ["html", "rustls-tls"]
 # Every feature except `native-tls` and `testing`
-full = ["agent", "user-agents", "html", "markdown", "macros", "robots", "sitemap", "serde", "json", "csv", "redb", "reqwest", "thirtyfour", "rustls-tls"]
+full = ["agent", "agent-rig", "user-agents", "html", "markdown", "macros", "robots", "sitemap", "serde", "json", "csv", "redb", "reqwest", "thirtyfour", "rustls-tls"]
 
 # Model-backed extraction, with provider configuration supplied by the caller
 agent = ["dep:spire-agent", "markdown"]
+# Rig completion models as agent providers
+agent-rig = ["agent", "spire-agent/rig"]
 
 # The `Html` and `Element` extractors and the `Select` trait
 html = ["dep:scraper", "dep:url", "dep:cssparser"]

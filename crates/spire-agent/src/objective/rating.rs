@@ -2,48 +2,23 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use spire_core::frontier::score::Keywords;
 use spire_core::frontier::seed::Seed;
 use tokio::sync::{Notify, oneshot};
 
 use super::{Finished, ObjectiveRun, lock};
 use crate::{CompletionRequest, Error, Result};
 
-/// A link's resolved URL and anchor text, treated as untrusted model input.
-/// Ratings are shared by canonical URL; the first anchor seen supplies the
-/// text when several pages link to the same destination.
+/// A candidate link's resolved URL and anchor text.
+///
+/// Model input is untrusted. Ratings are shared by canonical URL; the first
+/// anchor seen supplies the text when several pages link to the same
+/// destination.
 #[derive(Debug, Clone, Serialize)]
 pub struct Candidate {
     /// An absolute HTTP or HTTPS URL.
     pub url: String,
     /// The link's visible text.
     pub text: String,
-}
-
-/// A cheap, decisive relevance scorer. `None` leaves the decision to the
-/// model; `Some(score)` settles it locally, clamped to 0..=100.
-/// Closures implement this trait. [`Keywords`] accepts matches at 100,
-/// rejects negative-weight matches at zero and leaves nonmatches uncertain.
-pub trait RelevanceScore: Send + Sync + 'static {
-    /// Returns a decisive score, or `None` for an uncertain candidate.
-    fn score(&self, candidate: &Candidate) -> Option<i32>;
-}
-
-impl<F: Fn(&Candidate) -> Option<i32> + Send + Sync + 'static> RelevanceScore for F {
-    fn score(&self, candidate: &Candidate) -> Option<i32> {
-        self(candidate)
-    }
-}
-
-impl RelevanceScore for Keywords {
-    fn score(&self, candidate: &Candidate) -> Option<i32> {
-        let matched = self.matches(&format!("{} {}", candidate.url, candidate.text));
-        match matched.cmp(&0) {
-            std::cmp::Ordering::Greater => Some(100),
-            std::cmp::Ordering::Less => Some(0),
-            std::cmp::Ordering::Equal => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -91,8 +66,9 @@ pub(super) struct Ratings {
     wake: Notify,
 }
 
-/// Releases waiters even if the worker panics or is cancelled. Failed
-/// decisions are removed so a future request can try again.
+/// Releases waiters even if the worker panics or is cancelled.
+///
+/// Failed decisions are removed so a future request can try again.
 struct Worker(ObjectiveRun, u64);
 
 impl Drop for Worker {
@@ -116,14 +92,16 @@ pub(crate) fn canonical(url: &str) -> Result<String> {
 }
 
 impl ObjectiveRun {
-    /// Rates candidates in input order. Concurrent pages share canonical-URL
-    /// decisions and fill batches together. Small batches flush after the
-    /// configured delay, so a low-concurrency crawl cannot deadlock.
+    /// Rates candidates in input order.
+    ///
+    /// Concurrent pages share canonical-URL decisions and fill batches
+    /// together. Small batches flush after the configured delay, so a
+    /// low-concurrency crawl cannot deadlock.
     ///
     /// # Errors
     ///
-    /// Propagates model, budget or schema failures. The answer must contain
-    /// one integer score in 0..=100 per candidate, in the supplied order.
+    /// Propagates model, budget or schema failures. The answer must contain one
+    /// integer score in 0..=100 per candidate, in the supplied order.
     pub async fn rate(&self, candidates: &[Candidate]) -> Result<Vec<i32>> {
         let mut receivers = Vec::with_capacity(candidates.len());
         let mut start = None;
@@ -140,7 +118,7 @@ impl ObjectiveRun {
                 self.settings
                     .scorer
                     .as_ref()
-                    .and_then(|scorer| scorer.score(candidate))
+                    .and_then(|scorer| scorer(candidate))
             };
             let mut state = lock(&self.shared.ratings.state);
             match state.entries.get_mut(&key) {

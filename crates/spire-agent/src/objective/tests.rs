@@ -9,9 +9,7 @@ use spire_core::frontier::{Admission, Frontier, InMemFrontier, NextSeed, Report}
 use spire_core::worker::{Worker, from_fn};
 
 use super::run::Phase;
-use super::{
-    AgentFrontierExt, Candidate, Finished, Objective, ObjectiveRun, RelevanceScore, Until, lock,
-};
+use super::{AgentFrontierExt, Candidate, Finished, Objective, ObjectiveRun, Until, lock};
 use crate::cache::InMemCache;
 use crate::testing::Script;
 use crate::{Agent, Budget, CompletionRequest, CompletionResponse, Error, Usage};
@@ -81,23 +79,31 @@ async fn a_thousand_pages_share_twenty_calls_for_five_thousand_unique_links() {
 async fn partial_batches_flush_and_cheap_scores_avoid_model_calls() {
     let provider = rating();
     let run = Objective::new("pricing")
-        .score_with(Keywords::new(["pricing"]))
+        .score_with({
+            let keywords = Keywords::new(["pricing"]);
+            move |candidate: &Candidate| {
+                if candidate.text == "Skip" {
+                    Some(-10)
+                } else {
+                    (keywords.matches(&candidate.text) > 0).then_some(120)
+                }
+            }
+        })
         .start(Agent::new(provider.clone()));
     let pricing = Candidate {
         url: "https://site.test/pricing".into(),
-        text: "Plans".into(),
+        text: "Pricing".into(),
     };
     assert_eq!(run.rate(&[pricing]).await.unwrap(), [100]);
     assert_eq!(provider.calls(), 0);
     assert_eq!(run.rate(&[candidate(0)]).await.unwrap(), [90]);
     assert_eq!(provider.calls(), 1);
-    assert_eq!(
-        Keywords::new(["no"]).with_weight(-1).score(&Candidate {
-            url: "https://site.test/no".into(),
-            text: String::new()
-        }),
-        Some(0)
-    );
+    let rejected = Candidate {
+        url: "https://site.test/skip".into(),
+        text: "Skip".into(),
+    };
+    assert_eq!(run.rate(&[rejected]).await.unwrap(), [0]);
+    assert_eq!(provider.calls(), 1);
 }
 
 #[tokio::test]

@@ -7,7 +7,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// The provider failed. The provider owns its retries and rate limits.
+    /// The provider failed.
+    ///
+    /// The provider owns its retries and rate limits.
     #[error("model provider failed: {0}")]
     Provider(#[source] spire_core::BoxError),
     /// A budget has run out; no further provider calls are admitted.

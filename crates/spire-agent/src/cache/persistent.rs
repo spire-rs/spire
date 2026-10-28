@@ -7,9 +7,10 @@ use crate::{Error, Result};
 
 const ANSWERS: TableDefinition<&str, &str> = TableDefinition::new("spire-agent/answers/v1");
 
-/// An answer cache sharing a crawl's [`RedbStore`], including its durability
-/// policy. Blocking reads use Tokio's blocking pool; writes use the store's
-/// own transactional write path.
+/// An answer cache backed by a shared [`RedbStore`].
+///
+/// Uses the store's durability policy. Blocking reads use Tokio's blocking
+/// pool; writes use the store's transactional write path.
 #[derive(Debug, Clone)]
 pub struct RedbCache {
     store: RedbStore,

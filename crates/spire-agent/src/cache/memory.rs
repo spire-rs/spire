@@ -6,7 +6,9 @@ use futures::future::BoxFuture;
 use super::Cache;
 use crate::Result;
 
-/// A bounded FIFO answer cache. Zero capacity disables storage.
+/// A bounded FIFO answer cache.
+///
+/// Zero capacity disables storage.
 #[derive(Debug)]
 pub struct InMemCache {
     capacity: usize,

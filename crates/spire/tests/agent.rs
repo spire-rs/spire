@@ -2,14 +2,13 @@
 #![cfg(all(feature = "agent", feature = "testing"))]
 
 use spire::agent::cache::InMemCache;
-use spire::agent::testing::Script;
 use spire::agent::{Agent, Budget, CompletionResponse, Extract, Usage};
 use spire::dataset::{Data, InMemDataset};
 use spire::extract::FromRef;
 use spire::frontier::seed::Seed;
 use spire::handler::AgentCollect;
 use spire::http::http::StatusCode;
-use spire::testing::{MockPage, MockSite};
+use spire::testing::{MockPage, MockSite, Script};
 use spire::{Crawler, Result, Router};
 
 fn script(text: &'static str) -> Script {

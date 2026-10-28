@@ -5,13 +5,12 @@ use spire::agent::objective::{AgentFrontierExt, Finished, Objective};
 use spire::agent::schemars::JsonSchema;
 use spire::agent::serde::{Deserialize, Serialize};
 use spire::agent::serde_json::{Value, json};
-use spire::agent::testing::Script;
 use spire::agent::{Agent, Budget, CompletionResponse, Usage};
 use spire::dataset::InMemDataset;
 use spire::frontier::seed::Seed;
 use spire::frontier::{FrontierExt, InMemFrontier};
 use spire::handler::{AgentCollect, FollowRelevant};
-use spire::testing::{MockPage, MockSite};
+use spire::testing::{MockPage, MockSite, Script};
 use spire::{Crawler, Router};
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, PartialEq)]

@@ -6,7 +6,9 @@ use serde_json::Value;
 
 use crate::{Result, Usage};
 
-/// One model call. The schema constrains the complete JSON answer.
+/// A model completion request.
+///
+/// The schema constrains the complete JSON answer.
 #[derive(Debug, Clone, Serialize)]
 pub struct CompletionRequest {
     /// System instructions, separate from untrusted input.
@@ -19,7 +21,7 @@ pub struct CompletionRequest {
     pub max_tokens: u64,
 }
 
-/// A provider's answer and reported resource usage.
+/// A model answer and its reported usage.
 #[derive(Debug, Clone)]
 pub struct CompletionResponse {
     /// The answer text, without Markdown fences or tool-call wrappers.
@@ -28,7 +30,9 @@ pub struct CompletionResponse {
     pub usage: Usage,
 }
 
-/// Makes one completion call. Implementations own retries and rate limits.
+/// Makes model completion calls.
+///
+/// Implementations own retries and rate limits.
 pub trait Provider: Send + Sync + 'static {
     /// Completes a request, reporting usage for the whole call.
     ///

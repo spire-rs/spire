@@ -71,7 +71,7 @@ No features are enabled by default:
 
 | Feature | Enables |
 |---|---|
-| `rig` | The `Rig` provider adapter for Rig completion models |
+| `rig` | The `Rig` adapter for Rig completion models |
 | `redb` | `RedbCache` and the `RedbStore` implementation of `AgentStoreExt` |
 | `testing` | `testing::Script`, a reusable offline provider |
 

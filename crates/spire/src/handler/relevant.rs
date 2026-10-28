@@ -9,11 +9,14 @@ use crate::frontier::queue::Link;
 use crate::worker::{IntoOutcome, Outcome};
 use crate::{Context, TRACING_TARGET};
 
-/// Follows visible links that serve a shared objective, scored best first.
-/// Concurrent pages share batches and canonical-URL ratings. The handler
-/// waits for its ratings and queue writes, keeping the crawl alive while
-/// model work is pending. Scope, deduplication and trap limits still belong
-/// on the frontier; use [`Self::same_host`] to filter before paying for ratings.
+/// Follows visible links relevant to an objective.
+///
+/// Concurrent pages share batched ratings by canonical URL. Scores become
+/// link priorities; use a priority frontier for best-first order.
+///
+/// The handler awaits ratings and queue writes before finishing. Scope,
+/// deduplication and trap limits belong on the frontier; [`Self::same_host`]
+/// filters links before rating them.
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct FollowRelevant {
@@ -23,8 +26,9 @@ pub struct FollowRelevant {
 }
 
 impl FollowRelevant {
-    /// Follows relevant links with `tag`, using the `ObjectiveRun` selected
-    /// from router state through `FromRef`.
+    /// Follows relevant links with `tag`.
+    ///
+    /// The [`ObjectiveRun`] is selected from router state through [`FromRef`].
     pub fn new(tag: impl Into<Tag>) -> Self {
         Self {
             tag: tag.into(),

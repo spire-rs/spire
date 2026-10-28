@@ -139,7 +139,7 @@ explicitly. `full` enables every feature below except `native-tls` and
 | `redb` | Crash-safe frontier, seen set and datasets through `RedbStore`; persistent answer caching with `agent` |
 | `rustls-tls` (default) | Rustls TLS for enabled backends |
 | `native-tls` | Platform-native TLS for enabled backends |
-| `testing` | Offline tests with `MockSite` and `Visit`; `agent::testing::Script` when `agent` is enabled |
+| `testing` | Offline tests with `MockSite` and `Visit`; `testing::Script` when `agent` is enabled |
 | `full` | Every feature except `native-tls` and `testing` |
 
 See [Installation](https://spire-rs.github.io/spire/installation.html) for

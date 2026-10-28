@@ -1,5 +1,7 @@
-/// Resource usage of one provider call. Missing metrics remain unknown,
-/// not zero; a budget requiring them fails rather than ignoring the call.
+/// Resource usage reported for one model call.
+///
+/// Missing metrics remain unknown, not zero; a budget requiring them fails
+/// rather than ignoring the call.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Usage {
     /// Input tokens, when reported.
@@ -29,8 +31,10 @@ impl Usage {
     }
 }
 
-/// Shared totals across clones of an agent. Token and cost totals contain
-/// known usage only; unknown metrics are explicitly counted separately.
+/// Shared model usage across agent clones.
+///
+/// Token and cost totals contain known usage only; unknown metrics are
+/// explicitly counted separately.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct UsageTotals {
     /// Provider calls started, including calls that fail or are cancelled.
