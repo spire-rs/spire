@@ -41,7 +41,7 @@ spire-redb = { workspace = true, optional = true, features = [] }
 
 # Async runtime
 futures = { workspace = true, features = [] }
-tokio = { workspace = true, features = ["sync", "rt"] }
+tokio = { workspace = true, features = ["sync", "rt", "time", "macros"] }
 
 # Structured answers and validation
 serde = { workspace = true, features = ["derive"] }

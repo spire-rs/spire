@@ -10,6 +10,11 @@ and this project adheres to
 
 ### Added
 
+- Objective link ratings share bounded cross-page batches, flushed at 256 unique
+  links or after 5 ms by default, independently of handler cancellation.
+  Configure these through `Objective::rating_batch_size` and
+  `Objective::rating_flush_interval`.
+
 - `spire-agent::objective`: typed `Objective<T>` goals registered on workers
   with `ObjectiveExt::with_objective`. Middleware supplies the shared
   `ObjectiveRegistry`, tracks independent progress and reports each goal's
@@ -44,7 +49,7 @@ and this project adheres to
   independently through `Budget::new(input, output)`. Use `input_tokens`
   and `output_tokens` on the default budget to cap only one direction;
   `Budget::tokens` is removed. Unknown usage blocks calls only when that
-  direction is capped. Provider-reported cost remains usage metadata.
+  direction is capped.
 - **Breaking:** renamed `CompletionRequest` and `CompletionResponse` to
   `ProviderRequest` and `ProviderResponse`.
 - **Breaking:** moved `spire_agent::Extract<T>` from the agent crate to
@@ -70,6 +75,9 @@ and this project adheres to
 
 - **Breaking:** `Pricing`, `Agent::with_pricing` and `Budget::max_cost`.
   Fallback pricing and monetary budget limits are removed.
+- **Breaking:** provider cost reporting through `Usage::cost_usd`,
+  `Usage::with_cost`, `UsageTotals::cost_usd` and `UsageTotals::unpriced_calls`.
+  Usage accounting tracks input/output tokens only.
 - **Breaking:** the public `dataset::READ_BATCH` constant in core and the
   facade; `Data::read_all` keeps its internal default batch size.
 

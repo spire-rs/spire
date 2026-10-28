@@ -17,7 +17,7 @@ fn script(text: &'static str) -> Script {
         assert!(!request.input.contains("Navigation"));
         Ok(ProviderResponse {
             text: text.into(),
-            usage: Usage::tokens(10, 5).with_cost(0.0),
+            usage: Usage::tokens(10, 5),
         })
     })
 }

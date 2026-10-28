@@ -24,9 +24,9 @@ Use `Budget::default().input_tokens(max)` or `.output_tokens(max)` to cap just
 one direction. `with_max_tokens` is the per-call output limit, independent of
 these aggregate limits.
 
-`agent.usage()` reports known input/output totals, provider-reported costs,
-cache hits and calls with unknown metrics. There is no inferred pricing or
-monetary budget. Failed or invalid answers still consume reported usage.
+`agent.usage()` reports known input/output token totals, cache hits and calls
+with unknown token counts. Failed or invalid answers still consume reported
+usage.
 
 Budgets check settled usage before admitting a call. Already-running calls
 can cross either cap; subsequent calls stop once either cap is reached.

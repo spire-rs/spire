@@ -36,10 +36,10 @@ async fn validates_extraction_empty_results_and_shared_usage() {
     let provider = script(&[
         (
             r#"{"result":[{"name":"Basic","price":"$9"}]}"#,
-            Usage::tokens(10, 5).with_cost(0.2),
+            Usage::tokens(10, 5),
         ),
-        (r#"{"result":[]}"#, Usage::tokens(4, 2).with_cost(0.1)),
-        (r#"{"result":null}"#, Usage::tokens(3, 1).with_cost(0.01)),
+        (r#"{"result":[]}"#, Usage::tokens(4, 2)),
+        (r#"{"result":null}"#, Usage::tokens(3, 1)),
     ]);
     let agent = Agent::new(provider.clone());
     let plans: Vec<Plan> = agent.clone().extract("# Basic\n$9").await.unwrap();
@@ -69,7 +69,6 @@ async fn validates_extraction_empty_results_and_shared_usage() {
         (totals.calls, totals.input_tokens, totals.output_tokens),
         (3, 17, 8)
     );
-    assert!((totals.cost_usd - 0.31).abs() < 1e-12);
     let requests = provider.requests();
     assert!(requests[0].system.contains("untrusted data"));
     assert!(requests[0].schema.as_ref().unwrap()["properties"]["result"].is_object());
@@ -112,12 +111,10 @@ async fn only_usage_required_by_a_capped_direction_must_be_known() {
     let missing_input = Usage {
         input_tokens: None,
         output_tokens: Some(1),
-        cost_usd: None,
     };
     let missing_output = Usage {
         input_tokens: Some(2),
         output_tokens: None,
-        cost_usd: None,
     };
     for (usage, budget) in [
         (missing_input, Budget::default().input_tokens(10)),
@@ -167,33 +164,11 @@ async fn only_usage_required_by_a_capped_direction_must_be_known() {
 }
 
 #[tokio::test]
-async fn costs_are_provider_reported_information_not_budget_limits() {
-    let provider = script(&[
-        ("one", Usage::tokens(1_000_000, 500_000)),
-        ("two", Usage::tokens(1, 1).with_cost(0.25)),
-    ]);
-    let agent = Agent::new(provider).with_budget(Budget::new(2_000_000, 1_000_000));
-    agent.complete(request("one")).await.unwrap();
-    agent.complete(request("two")).await.unwrap();
-    assert!((agent.usage().cost_usd - 0.25).abs() < 1e-12);
-    assert_eq!(agent.usage().unpriced_calls, 1);
-}
-
-#[tokio::test]
-async fn rejects_zero_per_call_output_limits_and_invalid_reported_costs() {
+async fn rejects_zero_per_call_output_limits() {
     let provider = script(&[]);
     let agent = Agent::new(provider.clone()).with_max_tokens(0);
     assert!(agent.extract::<String>("x").await.is_err());
     assert_eq!(provider.calls(), 0);
-    for cost in [f64::NAN, f64::INFINITY, -1.0] {
-        let provider = script(&[("x", Usage::tokens(1, 1).with_cost(cost))]);
-        let agent = Agent::new(provider);
-        assert!(matches!(
-            agent.complete(request("x")).await,
-            Err(Error::Configuration(_))
-        ));
-        assert!(agent.usage().cost_usd.is_finite());
-    }
 }
 
 #[tokio::test]
@@ -225,12 +200,12 @@ async fn cache_keys_include_content_question_schema_limit_and_namespace() {
 #[tokio::test]
 async fn malformed_or_wrong_schema_answers_are_charged_and_never_cached() {
     let provider = script(&[
-        ("not JSON", Usage::tokens(2, 1).with_cost(0.1)),
+        ("not JSON", Usage::tokens(2, 1)),
         (
             r#"{"result":[{"name":2,"price":"9"}]}"#,
-            Usage::tokens(2, 1).with_cost(0.1),
+            Usage::tokens(2, 1),
         ),
-        (r#"{"result":[]}"#, Usage::tokens(2, 1).with_cost(0.1)),
+        (r#"{"result":[]}"#, Usage::tokens(2, 1)),
     ]);
     let agent = Agent::new(provider.clone()).with_cache(InMemCache::default(), "model-v1");
     for _ in 0..2 {
@@ -266,7 +241,7 @@ fn waiting(entered: Arc<Notify>, release: Arc<Notify>) -> Script {
             release.notified().await;
             Ok(ProviderResponse {
                 text: "answer".into(),
-                usage: Usage::tokens(2, 1).with_cost(0.1),
+                usage: Usage::tokens(2, 1),
             })
         }
     })
@@ -322,14 +297,7 @@ async fn cancellation_releases_gate_and_marks_budget_accounting_unknown() {
         agent.complete(request("page")).await,
         Err(Error::Configuration(_))
     ));
-    assert_eq!(
-        (
-            agent.usage().calls,
-            agent.usage().unmetered_calls,
-            agent.usage().unpriced_calls
-        ),
-        (1, 1, 1)
-    );
+    assert_eq!((agent.usage().calls, agent.usage().unmetered_calls), (1, 1));
     assert_eq!(provider.calls(), 1);
 }
 

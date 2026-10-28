@@ -1,13 +1,13 @@
 //! Typed goals and middleware for objective-guided crawling.
 
 mod middleware;
+mod rater;
 mod registry;
 mod scoring;
-#[cfg(all(test, feature = "testing"))]
-mod tests;
 
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub use middleware::{ObjectiveExt, ObjectiveWorker};
 pub use registry::{
@@ -34,6 +34,8 @@ struct Settings {
     pages: Option<u64>,
     stall: Option<u64>,
     threshold: u8,
+    rating_batch_size: usize,
+    rating_flush_interval: Duration,
     scorer: Option<Arc<Scorer>>,
 }
 
@@ -60,6 +62,8 @@ impl<T> Objective<T> {
                 pages: None,
                 stall: None,
                 threshold: 50,
+                rating_batch_size: 256,
+                rating_flush_interval: Duration::from_millis(5),
                 scorer: None,
             },
             marker: PhantomData,
@@ -105,6 +109,26 @@ impl<T> Objective<T> {
     #[must_use]
     pub fn relevance_threshold(mut self, score: u8) -> Self {
         self.settings.threshold = score.clamp(1, 100);
+        self
+    }
+
+    /// Sets the maximum links per rating call, defaulting to 256.
+    ///
+    /// Zero is clamped to one. The agent's output token limit must accommodate
+    /// one score per link in a full batch.
+    #[must_use]
+    pub fn rating_batch_size(mut self, links: usize) -> Self {
+        self.settings.rating_batch_size = links.max(1);
+        self
+    }
+
+    /// Sets the rating batch collection delay, defaulting to 5 ms.
+    ///
+    /// The delay starts when a batch begins collecting links. Zero sends
+    /// each uncached link immediately. A full batch is always sent immediately.
+    #[must_use]
+    pub const fn rating_flush_interval(mut self, interval: Duration) -> Self {
+        self.settings.rating_flush_interval = interval;
         self
     }
 

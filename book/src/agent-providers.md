@@ -8,8 +8,8 @@ real model or supply deterministic answers for offline tests.
 Implement `Provider::complete` to translate a `ProviderRequest` into one
 model call and return a `ProviderResponse`. Forward the system
 instructions, input, schema and output limit. Report actual input/output
-tokens and cost when available; leave unknown values as `None`. Providers
-own retries and rate limits and should report usage for the whole call.
+token counts when available; leave unknown values as `None`. Providers own
+retries and rate limits and should report usage for the whole call.
 
 The [model-extraction example](https://github.com/spire-rs/spire/tree/main/examples/model-extraction)
 runs a complete crawl with `MockSite` and `spire::testing::Script`, without a
@@ -35,8 +35,8 @@ The upstream crate is re-exported as `spire::agent::rig`.
 Wrap a Rig completion model with `spire::agent::Rig::new(model)`, then pass
 it to `Agent::new`. The adapter includes the schema in the prompt by
 default. Opt into `with_native_schema()` when the model supports native
-structured output. Answers are validated in both modes. Rig's normalized
-usage and costs are preserved; configure fallback pricing if needed.
+structured output. Answers are validated in both modes. Rig's reported
+input/output token usage is preserved.
 
 
 ## Offline tests
@@ -52,7 +52,7 @@ use spire::agent::{Agent, ProviderResponse, Usage};
 async fn main() -> spire::agent::Result<()> {
     let provider = Script::new([ProviderResponse {
         text: r#"{"result":["Basic"]}"#.into(),
-        usage: Usage::tokens(10, 5).with_cost(0.0),
+        usage: Usage::tokens(10, 5),
     }]);
     let agent = Agent::new(provider.clone());
     let names: Vec<String> = agent.extract("Basic").await?;

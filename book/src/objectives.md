@@ -121,10 +121,14 @@ still count toward numeric targets, but model judgments stop once evidence is
 omitted. This prevents completion claims based on an incomplete evidence set.
 
 Link ratings are cached by canonical URL independently for each objective.
-Concurrent requests share decisions; each model call handles up to 256 unknown
-links from a page. There is no background rating worker or cross-page batching
-window. Keep crawl limits in place because the rating cache grows with unique
-URLs. URLs and anchor text are treated as untrusted data.
+A private shared rater combines unknown links across concurrent pages, flushing
+at 256 unique links or after 5 ms by default. Configure these per objective
+with `.rating_batch_size(links)` and `.rating_flush_interval(duration)`; zero
+delay sends uncached links immediately. Requests for links already being rated
+share the result. Cancelling a handler does not cancel its batch; failed ratings are
+not cached and can be retried. Keep crawl limits in place because the rating
+cache grows with unique URLs. URLs and anchor text are treated as untrusted
+data.
 
 Clear decisions can use an optional local scorer:
 

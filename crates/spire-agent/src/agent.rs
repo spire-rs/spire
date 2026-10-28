@@ -40,7 +40,6 @@ struct Runtime {
 #[derive(Default)]
 struct Account {
     usage: UsageTotals,
-    halted: Option<String>,
     unknown_input: bool,
     unknown_output: bool,
 }
@@ -63,7 +62,6 @@ impl Drop for Call {
         if !self.settled {
             let mut account = lock(&self.runtime);
             account.usage.unmetered_calls += 1;
-            account.usage.unpriced_calls += 1;
             account.unknown_input = true;
             account.unknown_output = true;
         }
@@ -207,7 +205,7 @@ impl Agent {
             lock(&self.runtime).usage.cache_hits += 1;
             return Ok(ProviderResponse {
                 text,
-                usage: Usage::tokens(0, 0).with_cost(0.0),
+                usage: Usage::tokens(0, 0),
             });
         }
         let _permit = self
@@ -217,9 +215,6 @@ impl Agent {
             .map_err(|error| Error::Configuration(error.to_string()))?;
         {
             let mut account = lock(&self.runtime);
-            if let Some(reason) = &account.halted {
-                return Err(Error::Configuration(reason.clone()));
-            }
             self.budget.check(
                 &account.usage,
                 account.unknown_input,
@@ -231,7 +226,7 @@ impl Agent {
             runtime: self.runtime.clone(),
             settled: false,
         };
-        let mut completion = match self.provider.call(request).await {
+        let completion = match self.provider.call(request).await {
             Ok(completion) => completion,
             Err(error) => {
                 drop(call);
@@ -246,7 +241,7 @@ impl Agent {
         };
         let accounted = self.account(completion.usage);
         call.settled = true;
-        completion.usage = accounted?;
+        accounted?;
         validate(&completion.text, validator.as_ref())?;
         if let (Some((cache, _)), Some(key)) = (&self.cache, &key) {
             cache.put(key, &completion.text).await?;
@@ -254,13 +249,7 @@ impl Agent {
         Ok(completion)
     }
 
-    fn account(&self, mut usage: Usage) -> Result<Usage> {
-        let invalid_cost = usage
-            .cost_usd
-            .is_some_and(|usd| !usd.is_finite() || usd < 0.0);
-        if invalid_cost {
-            usage.cost_usd = None;
-        }
+    fn account(&self, usage: Usage) -> Result<()> {
         let mut account = lock(&self.runtime);
         account.unknown_input |= usage.input_tokens.is_none();
         account.unknown_output |= usage.output_tokens.is_none();
@@ -275,20 +264,6 @@ impl Agent {
         if unknown_tokens {
             totals.unmetered_calls += 1;
         }
-        if let Some(cost) = usage
-            .cost_usd
-            .filter(|cost| cost.is_finite() && *cost >= 0.0)
-        {
-            totals.cost_usd += cost;
-        } else {
-            totals.unpriced_calls += 1;
-            usage.cost_usd = None;
-        }
-        if invalid_cost || !totals.cost_usd.is_finite() {
-            let reason = "provider cost is invalid";
-            account.halted = Some(reason.into());
-            return Err(Error::Configuration(reason.into()));
-        }
         if self.budget.input_tokens.is_some() && usage.input_tokens.is_none() {
             return Err(Error::Configuration(
                 "input token budget requires reported input usage".into(),
@@ -299,7 +274,7 @@ impl Agent {
                 "output token budget requires reported output usage".into(),
             ));
         }
-        Ok(usage)
+        Ok(())
     }
 }
 

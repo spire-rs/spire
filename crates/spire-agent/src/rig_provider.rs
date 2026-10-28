@@ -63,7 +63,7 @@ impl Provider for Rig {
             || response
                 .finish_reason()
                 .is_some_and(|reason| !matches!(reason, FinishReason::Stop));
-        // Preserve paid usage even on refusals/truncation: the agent accounts
+        // Preserve token usage even on refusals/truncation: the agent accounts
         // it first, then rejects the empty answer without caching it.
         let text = if known_bad {
             String::new()
@@ -79,13 +79,11 @@ impl Provider for Rig {
                 .join("")
         };
         let reported = response.usage;
-        let cost = reported.cost;
         Ok(ProviderResponse {
             text,
             usage: Usage {
                 input_tokens: reported.input_tokens,
                 output_tokens: reported.output_tokens,
-                cost_usd: cost.map(|cost| cost.total),
             },
         })
     }

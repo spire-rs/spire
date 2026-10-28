@@ -109,7 +109,7 @@ where
         if !matches!(outcome, Outcome::Continue) {
             return outcome;
         }
-        if let Err(error) = self.registry.page_done(&source, &active).await {
+        if let Err(error) = self.registry.page_done(&source, &active) {
             return error.into_outcome();
         }
         if let Err(error) = self.registry.check(&agent).await {

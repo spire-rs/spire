@@ -52,7 +52,7 @@ pub fn provider() -> Script {
         };
         Ok(ProviderResponse {
             text,
-            usage: Usage::tokens(10, 5).with_cost(0.0),
+            usage: Usage::tokens(10, 5),
         })
     })
 }

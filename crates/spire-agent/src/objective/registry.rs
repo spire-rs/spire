@@ -1,7 +1,7 @@
 use std::any::{Any, TypeId};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -73,7 +73,7 @@ pub(super) struct Entry {
     pub schema: Value,
     encode: Encode,
     pub state: Mutex<State>,
-    pub ratings: AsyncMutex<HashMap<String, i32>>,
+    pub rater: OnceLock<super::rater::LinkRater>,
     pub judge: AsyncMutex<()>,
 }
 
@@ -150,7 +150,7 @@ impl ObjectiveRegistry {
                     .map_err(|error| Error::Answer(error.to_string()))
             },
             state: Mutex::default(),
-            ratings: AsyncMutex::default(),
+            rater: OnceLock::new(),
             judge: AsyncMutex::new(()),
         };
         entry.limits(&mut lock(&entry.state));
@@ -241,18 +241,17 @@ impl ObjectiveRegistry {
             .transpose()
     }
 
-    pub(super) async fn page_done(&self, source: &Uri, active: &[TypeId]) -> Result<()> {
+    pub(super) fn page_done(&self, source: &Uri, active: &[TypeId]) -> Result<()> {
         let source = canonical(source)?;
         for entry in &self.inner.entries {
             if !active.contains(&entry.id) {
                 continue;
             }
             let relevant = entry
-                .ratings
-                .lock()
-                .await
-                .get(&source)
-                .is_some_and(|score| *score >= i32::from(entry.settings.threshold));
+                .rater
+                .get()
+                .and_then(|rater| rater.cached(&source))
+                .is_some_and(|score| score >= i32::from(entry.settings.threshold));
             let mut state = lock(&entry.state);
             if !state.visited.insert(source.clone()) {
                 continue;

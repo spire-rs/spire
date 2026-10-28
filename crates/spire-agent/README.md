@@ -27,8 +27,8 @@ providers independent of the facade's router and HTML extractors.
   Providers own retries, rate limits and transport timeouts.
 - **`objective::Objective<T>`** configures typed goals through worker
   middleware, with independent progress and shared link discovery.
-- **`Agent`** shares token usage and provider cost accounting, budgets and a model-call
-  concurrency limit. Structured answers are validated against JSON Schema.
+- **`Agent`** shares token usage, budgets and a model-call concurrency limit.
+  Structured answers are validated against JSON Schema.
 
 
 The `agent` feature on `spire` re-exports this crate as `spire::agent` and
@@ -60,8 +60,8 @@ println!("{names:?}: {:?}", agent.usage());
 ```
 
 Budget admission uses settled usage; calls already in flight can cross a
-limit. A budget requiring unknown tokens or cost fails closed. Use `Vec<T>`
-or `Option<T>` when data may be absent. Schema validation checks structure,
+limit. A budget requiring unknown token counts fails closed. Use `Vec<T>` or
+`Option<T>` when data may be absent. Schema validation checks structure,
 not whether a model's statements are true.
 
 ### Features
@@ -92,7 +92,7 @@ use spire_agent::{Agent, ProviderResponse, Usage};
 # async fn example() -> spire_agent::Result<()> {
 let provider = Script::new([ProviderResponse {
     text: r#"{"result":["Basic"]}"#.into(),
-    usage: Usage::tokens(10, 5).with_cost(0.0),
+    usage: Usage::tokens(10, 5),
 }]);
 let agent = Agent::new(provider.clone());
 let names: Vec<String> = agent.extract("Basic").await?;

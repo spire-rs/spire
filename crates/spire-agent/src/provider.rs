@@ -26,7 +26,7 @@ pub struct ProviderRequest {
 pub struct ProviderResponse {
     /// The answer text, without Markdown fences or tool-call wrappers.
     pub text: String,
-    /// The reported usage, including cost when known.
+    /// The reported input/output token usage.
     pub usage: Usage,
 }
 

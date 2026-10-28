@@ -6,7 +6,7 @@ use spire::testing::{MockPage, MockSite, Script};
 pub fn script() -> Script {
     Script::new([ProviderResponse {
         text: r#"{"result":[{"name":"Desk lamp","price":"€29"}]}"#.into(),
-        usage: Usage::tokens(120, 25).with_cost(0.0),
+        usage: Usage::tokens(120, 25),
     }])
 }
 
