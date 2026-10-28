@@ -37,7 +37,7 @@ Depend on it next to `spire` to turn them on:
 
 ```toml
 [dependencies]
-spire-reqwest = { version = "0.7", features = ["gzip", "brotli", "cookies"] }
+spire-reqwest = { version = "0.8", features = ["gzip", "brotli", "cookies"] }
 ```
 
 | Feature | Enables |
@@ -59,8 +59,8 @@ cache and start a driver; the browser itself must already be installed.
 
 ```toml
 [dependencies]
-spire = { version = "0.7", features = ["thirtyfour"] }
-spire-thirtyfour = { version = "0.7", features = ["manager"] }
+spire = { version = "0.8", features = ["thirtyfour"] }
+spire-thirtyfour = { version = "0.8", features = ["manager"] }
 ```
 
 | Feature | Enables |
@@ -92,8 +92,8 @@ on `spire-agent`:
 
 ```toml
 [dependencies]
-spire = { version = "0.7", features = ["agent", "redb", "reqwest"] }
-spire-agent = { version = "0.7", features = ["rig"] }
+spire = { version = "0.8", features = ["agent", "redb", "reqwest"] }
+spire-agent = { version = "0.8", features = ["rig"] }
 ```
 
 The facade's `redb` feature also enables persistent answer caching when

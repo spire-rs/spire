@@ -7,7 +7,7 @@ for predictable markup and need no model calls.
 
 ```toml
 [dependencies]
-spire = { version = "0.7.0", features = ["agent", "reqwest"] }
+spire = { version = "0.8.0", features = ["agent", "reqwest"] }
 ```
 
 The facade re-exports the separate `spire-agent` crate as `spire::agent`.
@@ -103,8 +103,8 @@ For Rig models, also enable `rig` on `spire-agent`:
 
 ```toml
 [dependencies]
-spire = { version = "0.7.0", features = ["agent", "reqwest"] }
-spire-agent = { version = "0.7.0", features = ["rig"] }
+spire = { version = "0.8.0", features = ["agent", "reqwest"] }
+spire-agent = { version = "0.8.0", features = ["rig"] }
 ```
 
 Wrap a Rig completion model with `spire::agent::Rig::new(model)`, then pass
@@ -171,7 +171,7 @@ For persistence, enable Spire's `agent` and `redb` features and use
 
 ```toml
 [dependencies]
-spire = { version = "0.7.0", features = ["agent", "redb"] }
+spire = { version = "0.8.0", features = ["agent", "redb"] }
 ```
 
 ```rust,no_run

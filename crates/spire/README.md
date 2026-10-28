@@ -43,7 +43,7 @@ The flexible crawler and scraper framework for Rust, built on
 
 ```toml
 [dependencies]
-spire = { version = "0.7.0", features = ["reqwest", "macros"] }
+spire = { version = "0.8.0", features = ["reqwest", "macros"] }
 ```
 
 See the book for [every feature flag](https://spire-rs.github.io/spire/installation.html).
