@@ -58,7 +58,7 @@ sha2 = { workspace = true, features = [] }
 
 [dev-dependencies]
 # Enable test utilities for this crate
-spire-agent = { workspace = true, features = ["testing"] }
+spire-agent = { path = ".", features = ["testing"] }
 
 # Testing
 tokio = { workspace = true, features = ["rt", "macros", "time", "test-util"] }
