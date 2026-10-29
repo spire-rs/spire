@@ -46,7 +46,7 @@ in the main `spire` crate and refer to the
 
 ```toml
 [dependencies]
-spire = { version = "0.8.0", features = ["reqwest"] }
+spire = { version = "0.9.0", features = ["reqwest"] }
 ```
 
 See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#http-backend)

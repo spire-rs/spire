@@ -42,7 +42,7 @@ Depend on it next to `spire` to turn them on:
 
 ```toml
 [dependencies]
-spire-reqwest = { version = "0.8", features = ["gzip", "brotli", "cookies"] }
+spire-reqwest = { version = "0.9", features = ["gzip", "brotli", "cookies"] }
 ```
 
 | Feature | Enables |
@@ -65,8 +65,8 @@ cache and start a driver; the browser itself must already be installed.
 
 ```toml
 [dependencies]
-spire = { version = "0.8", features = ["thirtyfour"] }
-spire-thirtyfour = { version = "0.8", features = ["manager"] }
+spire = { version = "0.9", features = ["thirtyfour"] }
+spire-thirtyfour = { version = "0.9", features = ["manager"] }
 ```
 
 | Feature | Enables |

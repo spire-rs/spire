@@ -7,7 +7,7 @@ for predictable markup and need no model calls.
 
 ```toml
 [dependencies]
-spire = { version = "0.8.0", features = ["agent", "reqwest"] }
+spire = { version = "0.9.0", features = ["agent", "reqwest"] }
 ```
 
 The facade exposes the separate `spire-agent` crate through `spire::agent`.

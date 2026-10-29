@@ -37,7 +37,7 @@ For a Spire crawl, enable the facade integration:
 
 ```toml
 [dependencies]
-spire = { version = "0.8.0", features = ["agent", "reqwest"] }
+spire = { version = "0.9.0", features = ["agent", "reqwest"] }
 ```
 
 For text extraction without the router or an HTTP backend, use this crate
