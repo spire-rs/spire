@@ -33,7 +33,7 @@ pub(crate) enum Health {
 
 impl Health {
     /// Classifies a finished request from its outcome and, if it was
-    /// fetched, its response status.
+    /// fetched, the status the server answered with.
     pub(crate) fn of(outcome: &Outcome, status: Option<StatusCode>) -> Self {
         let error = match outcome {
             Outcome::Fail(error) => Some(error),

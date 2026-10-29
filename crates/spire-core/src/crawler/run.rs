@@ -12,9 +12,12 @@ use tokio::time::{Instant, sleep_until, timeout};
 use tracing::Instrument;
 
 use crate::backend::Backend;
-use crate::context::{Context, FETCH, Fetch};
+use crate::context::{Context, FETCH, Fetch, FetchScope};
 use crate::crawler::concurrency::{Feedback, Signal};
 use crate::crawler::connector::Connector;
+use crate::crawler::event::{
+    Emitter, Event, Failure, OutcomeKind, RequestInfo, SkipReason, StopReason,
+};
 use crate::crawler::hosts::{Admit, Hosts};
 #[cfg(feature = "robots")]
 use crate::crawler::robots::{BackendSource, RobotsCache, RobotsSource, Verdict};
@@ -85,6 +88,7 @@ struct Run<B> {
     hosts: Hosts,
     /// Connects for requests and robots.txt, as an identity or plainly.
     connector: Arc<Connector<B>>,
+    events: Emitter,
     aborted: HashSet<Option<Tag>>,
     started: usize,
     stopping: bool,
@@ -101,6 +105,20 @@ struct InFlight {
     host: Option<String>,
     /// When it started.
     started: Instant,
+}
+
+/// The event for a request handled with `outcome`.
+fn handled(request: RequestInfo, outcome: &Outcome, elapsed: Duration) -> Event {
+    let error = match outcome {
+        Outcome::Fail(error) | Outcome::Fatal(error) => Some(Failure::from(error)),
+        _ => None,
+    };
+    Event::Handled {
+        request,
+        outcome: OutcomeKind::from(outcome),
+        error,
+        elapsed,
+    }
 }
 
 /// How a request went, as far as its host is concerned: a host answering
@@ -161,17 +179,28 @@ impl<B: Backend> Run<B> {
             unchanged: fetch.status == Some(StatusCode::NOT_MODIFIED),
             signal,
         };
-        self.hosts.finished(&host, Some(feedback), now);
-        if let Some(pause) = pause {
-            self.hosts.pause(&host, now + pause);
+        if let Some(slowdown) = self.hosts.finished(&host, Some(feedback), now) {
+            self.events.emit(|| Event::HostSlowed {
+                host: host.clone(),
+                slowdown,
+            });
+        }
+        if let Some(pause) = pause
+            && self.hosts.pause(&host, now + pause)
+        {
+            self.events.emit(|| Event::HostPaused {
+                host,
+                duration: pause,
+            });
         }
     }
 
-    fn stop(&mut self, reason: &'static str, grace: Option<Duration>) {
+    fn stop(&mut self, reason: StopReason, grace: Option<Duration>) {
         if self.stopping {
             return;
         }
-        tracing::info!(target: TRACING_TARGET, in_flight = self.tasks.len(), reason, "stopping crawl");
+        tracing::info!(target: TRACING_TARGET, in_flight = self.tasks.len(), %reason, "stopping crawl");
+        self.events.emit(|| Event::Stopping { reason });
         self.stopping = true;
         self.grace = grace.map(|grace| Instant::now() + grace);
     }
@@ -181,7 +210,7 @@ impl<B: Backend> Run<B> {
     fn fail(&mut self, error: Error, grace: Option<Duration>) {
         tracing::error!(target: TRACING_TARGET, %error, "crawl failed");
         self.error.get_or_insert(error);
-        self.stop("crawl failed", grace);
+        self.stop(StopReason::Failed, grace);
     }
 
     fn is_aborted(&self, seed: &Seed) -> bool {
@@ -296,6 +325,7 @@ where
         let deadline = settings.time_limit.map(|limit| started + limit);
         let mut run = self.new_run();
         tracing::info!(target: TRACING_TARGET, concurrency = settings.concurrency.get(), "crawl started");
+        self.events.emit(|| Event::Started);
 
         // Timers and the shutdown signal are created once and re-armed as
         // needed: `select!` would otherwise build them again for every
@@ -335,10 +365,10 @@ where
             tokio::select! {
                 biased;
                 () = &mut shutdown, if !run.stopping => {
-                    run.stop("shutdown requested", settings.shutdown_grace);
+                    run.stop(StopReason::Shutdown, settings.shutdown_grace);
                 }
                 () = &mut deadline_timer, if deadline.is_some() && !run.stopping => {
-                    run.stop("time limit reached", settings.shutdown_grace);
+                    run.stop(StopReason::TimeLimit, settings.shutdown_grace);
                 }
                 () = &mut grace_timer, if run.grace.is_some() => {
                     tracing::warn!(target: TRACING_TARGET, in_flight = run.tasks.len(), "shutdown grace period over, cancelling requests");
@@ -374,6 +404,7 @@ where
             elapsed_ms = stats.elapsed.as_millis(),
             "crawl finished",
         );
+        self.events.emit(|| Event::Finished { stats });
 
         match run.error {
             Some(error) => Err(error),
@@ -398,6 +429,7 @@ where
             robots,
             hosts,
             connector,
+            events: self.events.clone(),
             aborted: HashSet::new(),
             started: 0,
             stopping: false,
@@ -414,7 +446,7 @@ where
 
         while run.tasks.len() < settings.concurrency.get() {
             if settings.max_requests.is_some_and(|max| run.started >= max) {
-                run.stop("request budget spent", settings.shutdown_grace);
+                run.stop(StopReason::RequestBudget, settings.shutdown_grace);
                 return None;
             }
 
@@ -455,7 +487,7 @@ where
                 Admit::Start(seed) => self.start(run, seed).await,
                 Admit::Parked => {}
             },
-            Access::Disallow(seed) => self.skip(run, seed, "disallowed by robots.txt").await,
+            Access::Disallow(seed) => self.skip(run, seed, SkipReason::Disallowed).await,
             Access::Parked => {}
         }
     }
@@ -491,6 +523,10 @@ where
         let Some(robots) = &mut run.robots else {
             return;
         };
+        run.events.emit(|| Event::RobotsFetched {
+            origin: origin.clone(),
+            error: result.as_ref().err().map(Failure::from),
+        });
         let fetched = robots.cache.fetched(&origin, result, Instant::now());
         if let Some(delay) = fetched.delay {
             let host = origin
@@ -516,22 +552,30 @@ where
     }
 
     /// Skips `seed` without crawling it.
-    async fn skip(&self, run: &mut Run<B>, seed: Seed, reason: &'static str) {
-        tracing::debug!(target: TRACING_TARGET, uri = %seed.uri(), reason, "skipping request");
+    async fn skip(&self, run: &mut Run<B>, seed: Seed, reason: SkipReason) {
+        tracing::debug!(target: TRACING_TARGET, uri = %seed.uri(), %reason, "skipping request");
         self.tally(|stats| stats.skipped += 1);
+        run.events.emit(|| Event::Skipped {
+            request: (&seed).into(),
+            reason,
+        });
         self.report(run, Report::Skipped(seed)).await;
     }
 
     /// Skips `seed` if its tag was aborted, and otherwise spawns the request.
     async fn start(&self, run: &mut Run<B>, seed: Seed) {
         if run.is_aborted(&seed) {
-            self.skip(run, seed, "tag aborted").await;
+            self.skip(run, seed, SkipReason::TagAborted).await;
             return;
         }
 
         run.started += 1;
         let now = Instant::now();
         let host = run.hosts.start(&seed, now);
+        run.events.emit(|| Event::RequestStarted {
+            request: (&seed).into(),
+        });
+        let notify = run.events.notify(&seed);
 
         let worker = self.worker.clone();
         let queue = self.queue();
@@ -573,8 +617,12 @@ where
             // The context records the fetch into this task's scope, which
             // outlives a timeout: a fetch that finished before the handlers
             // ran out of time still counts.
+            let scope = FetchScope {
+                fetch: Cell::default(),
+                notify,
+            };
             let (outcome, fetch) = FETCH
-                .scope(Cell::default(), async {
+                .scope(scope, async {
                     let outcome = match deadline {
                         Some(deadline) => timeout(deadline, handle).await.unwrap_or_else(|_| {
                             let error =
@@ -583,13 +631,13 @@ where
                         }),
                         None => handle.await,
                     };
-                    (outcome, FETCH.with(Cell::get))
+                    (outcome, FETCH.with(|scope| scope.fetch.get()))
                 })
                 .await;
 
             tracing::debug!(
                 target: TRACING_TARGET,
-                outcome = %label(&outcome),
+                outcome = %OutcomeKind::from(&outcome),
                 elapsed_ms = started.elapsed().as_millis(),
                 "request handled",
             );
@@ -619,6 +667,9 @@ where
                     run.hosts.finished(&host, None, Instant::now());
                 }
                 self.tally(|stats| stats.cancelled += 1);
+                run.events.emit(|| Event::Cancelled {
+                    request: (&seed).into(),
+                });
                 self.report(run, Report::Cancelled(seed)).await;
                 return;
             }
@@ -636,6 +687,12 @@ where
         else {
             return;
         };
+        // Built once for the events that follow, if anyone is subscribed.
+        let request = run.events.is_active().then(|| RequestInfo::from(&seed));
+        run.events.emit_for(request.as_ref(), |request| {
+            handled(request, &outcome, started.elapsed())
+        });
+
         run.finish_host(host, &seed, started, fetch, &outcome);
         if let Some(identity) = &identity {
             run.connector
@@ -648,8 +705,21 @@ where
             }
         });
 
+        self.settle(run, seed, outcome, request).await;
+    }
+
+    /// Settles a handled request: applies what its outcome asks of the run,
+    /// reports it to the frontier, and counts how it ended.
+    async fn settle(
+        &self,
+        run: &mut Run<B>,
+        seed: Seed,
+        outcome: Outcome,
+        request: Option<RequestInfo>,
+    ) {
         let uri = seed.uri().clone();
         let mut failure = None;
+        let mut failed = false;
         let report = match outcome {
             Outcome::Continue => {
                 self.tally(|stats| stats.succeeded += 1);
@@ -657,7 +727,7 @@ where
             }
             Outcome::Stop => {
                 self.tally(|stats| stats.succeeded += 1);
-                run.stop("worker requested stop", self.settings.shutdown_grace);
+                run.stop(StopReason::Requested, self.settings.shutdown_grace);
                 Report::Done(seed)
             }
             Outcome::Abort(scope) => {
@@ -673,7 +743,7 @@ where
             Outcome::Retry { after } => Report::Retry { seed, after },
             Outcome::Backoff { scope, duration } => self.backoff(run, seed, scope, duration).await,
             Outcome::Fatal(error) => {
-                self.tally(|stats| stats.failed += 1);
+                failed = true;
                 run.fail(error.with_uri(uri.clone()), self.settings.shutdown_grace);
                 Report::Failed(seed)
             }
@@ -691,17 +761,27 @@ where
                     Report::Retry { seed, after }
                 } else {
                     tracing::warn!(target: TRACING_TARGET, %uri, %error, "request failed");
-                    self.tally(|stats| stats.failed += 1);
+                    failed = true;
                     Report::Failed(seed)
                 }
             }
         };
 
-        let retry = matches!(report, Report::Retry { .. });
+        let retry = match &report {
+            Report::Retry { after, .. } => Some(*after),
+            _ => None,
+        };
         match self.report(run, report).await {
-            Some(Ack::Applied) if retry => self.tally(|stats| stats.retried += 1),
+            Some(Ack::Applied) if let Some(after) = retry => {
+                self.tally(|stats| stats.retried += 1);
+                run.events
+                    .emit_for(request.as_ref(), |request| Event::Retried {
+                        request,
+                        after,
+                    });
+            }
             Some(Ack::RetryRefused) => {
-                self.tally(|stats| stats.failed += 1);
+                failed = true;
                 tracing::warn!(
                     target: TRACING_TARGET,
                     %uri,
@@ -710,6 +790,11 @@ where
                 );
             }
             _ => {}
+        }
+        if failed {
+            self.tally(|stats| stats.failed += 1);
+            run.events
+                .emit_for(request.as_ref(), |request| Event::Failed { request });
         }
     }
 
@@ -750,18 +835,5 @@ where
                 None
             }
         }
-    }
-}
-
-/// Names an outcome for logs.
-const fn label(outcome: &Outcome) -> &'static str {
-    match outcome {
-        Outcome::Continue => "continue",
-        Outcome::Retry { .. } => "retry",
-        Outcome::Backoff { .. } => "backoff",
-        Outcome::Abort(_) => "abort",
-        Outcome::Stop => "stop",
-        Outcome::Fail(_) => "fail",
-        Outcome::Fatal(_) => "fatal",
     }
 }

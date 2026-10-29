@@ -9,6 +9,7 @@ use tokio::time::Instant;
 use crate::TRACING_TARGET;
 use crate::crawler::concurrency::{Feedback, HostConcurrency, Limit, Signal};
 use crate::crawler::delay::HostDelay;
+use crate::crawler::event::Slowdown;
 use crate::frontier::seed::Seed;
 
 /// How a crawl treats every host.
@@ -176,13 +177,16 @@ impl Hosts {
         host.last_start = Some(now);
     }
 
-    /// Starts no request to `key` before `until`, e.g. for a `Retry-After`.
-    pub(crate) fn pause(&mut self, key: &str, until: Instant) {
+    /// Starts no request to `key` before `until`, e.g. for a `Retry-After`,
+    /// returning whether that extends the host's pause.
+    pub(crate) fn pause(&mut self, key: &str, until: Instant) -> bool {
         let host = self.host(key);
-        if host.paused_until.is_none_or(|at| at < until) {
+        let extends = host.paused_until.is_none_or(|at| at < until);
+        if extends {
             tracing::info!(target: TRACING_TARGET, host = key, "pausing host, as it asked");
             host.paused_until = Some(until);
         }
+        extends
     }
 
     /// Records that a request to `key` finished at `now`, and slows the
@@ -191,14 +195,18 @@ impl Hosts {
     /// A throttled host first loses concurrency, if its limit adapts and is
     /// above one; then its gap grows, up to the delay's maximum. A host
     /// recovers in the other order: its gap shrinks back to the minimum,
-    /// then an adaptive limit grows again.
-    pub(crate) fn finished(&mut self, key: &str, feedback: Option<Feedback>, now: Instant) {
+    /// then an adaptive limit grows again. Returns how the host was slowed
+    /// down, if it was.
+    pub(crate) fn finished(
+        &mut self,
+        key: &str,
+        feedback: Option<Feedback>,
+        now: Instant,
+    ) -> Option<Slowdown> {
         let concurrency = self.policy.concurrency;
         let host = self.host(key);
         host.in_flight = host.in_flight.saturating_sub(1);
-        let Some(feedback) = feedback else {
-            return;
-        };
+        let feedback = feedback?;
 
         let adaptive = concurrency.filter(|concurrency| concurrency.is_adaptive());
         let slow = adaptive.is_some()
@@ -209,15 +217,21 @@ impl Hosts {
             // Requests started before the host was last slowed down were
             // sent at the old pace: they slow it down once, not once each.
             if host.slowed.is_some_and(|at| feedback.started < at) {
-                return;
+                return None;
             }
             host.slowed = Some(now);
             if adaptive.is_some() && host.limit.halve() {
                 tracing::debug!(target: TRACING_TARGET, host = key, limit = host.limit.get(), "host throttled, lowering its concurrency");
-            } else {
-                host.gap = host.delay.grow(host.gap);
-                tracing::debug!(target: TRACING_TARGET, host = key, gap_ms = host.gap.as_millis(), "host throttled, widening its gap");
+                return Some(Slowdown::Concurrency {
+                    limit: host.limit.get(),
+                });
             }
+            let gap = host.delay.grow(host.gap);
+            // A gap already at its maximum does not slow the host further.
+            let widened = gap > host.gap;
+            host.gap = gap;
+            tracing::debug!(target: TRACING_TARGET, host = key, gap_ms = host.gap.as_millis(), "host throttled, widening its gap");
+            return widened.then_some(Slowdown::Gap { gap });
         } else if feedback.signal == Signal::Ok {
             if host.gap > host.delay.min() {
                 host.gap = host.delay.shrink(host.gap);
@@ -225,6 +239,7 @@ impl Hosts {
                 host.limit.grow(adaptive.max());
             }
         }
+        None
     }
 
     /// Raises the delay of `key` to at least `delay`, e.g. for a

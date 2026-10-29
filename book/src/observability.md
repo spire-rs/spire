@@ -72,3 +72,5 @@ println!("done in {:?}", stats.elapsed);
 # Ok(())
 # }
 ```
+
+To follow a crawl event by event instead, see [Crawl events](events.md).

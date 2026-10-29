@@ -10,12 +10,13 @@ use bytes::Bytes;
 use tokio::sync::OnceCell;
 use tokio::time::Instant;
 
-use crate::Result;
 use crate::backend::Session;
+use crate::crawler::event::Notify;
 use crate::dataset::{Data, Dataset, Datasets};
 use crate::frontier::InMemFrontier;
 use crate::frontier::queue::Queue;
 use crate::http::{Request, Response, ResponseExt};
+use crate::{Error, Result};
 
 /// A request being crawled, with everything needed to handle it.
 ///
@@ -38,7 +39,9 @@ pub struct Context<C> {
     response: OnceCell<Response>,
 }
 
-/// How a request's fetch went: how long it took, and the response's status.
+/// How a request's fetch went: how long it took, and the status the server
+/// answered with, also when the session failed the fetch for it, e.g. a
+/// `404` its status policy rejects.
 ///
 /// The crawler runs each request on a task of its own, with a [`FETCH`]
 /// scope the context records the fetch into, so the crawler reads it back
@@ -46,12 +49,30 @@ pub struct Context<C> {
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct Fetch {
     pub(crate) latency: Option<Duration>,
+    /// `None` if no response came, e.g. the connection failed.
     pub(crate) status: Option<StatusCode>,
+}
+
+/// Where the current task's request records how it was fetched.
+#[derive(Default)]
+pub(crate) struct FetchScope {
+    pub(crate) fetch: Cell<Fetch>,
+    /// Reports the fetch as it happens, if anyone subscribed to events.
+    pub(crate) notify: Option<Notify>,
+}
+
+impl FetchScope {
+    fn record(&self, fetch: Fetch) {
+        self.fetch.set(fetch);
+        if let Some(notify) = &self.notify {
+            notify.fetched(fetch);
+        }
+    }
 }
 
 tokio::task_local! {
     /// How the current task's request was fetched, see [`Fetch`].
-    pub(crate) static FETCH: Cell<Fetch>;
+    pub(crate) static FETCH: FetchScope;
 }
 
 impl<C> Context<C> {
@@ -161,9 +182,11 @@ impl<C> Context<C> {
                 // record into.
                 let fetch = Fetch {
                     latency: Some(started.elapsed()),
-                    status: response.as_ref().ok().map(::http::Response::status),
+                    status: response
+                        .as_ref()
+                        .map_or_else(Error::status, |response| Some(response.status())),
                 };
-                let _ = FETCH.try_with(|cell| cell.set(fetch));
+                let _ = FETCH.try_with(|scope| scope.record(fetch));
                 let response = response?;
                 if let Some(uri) = response.final_uri() {
                     self.queue.rebase(uri.clone());

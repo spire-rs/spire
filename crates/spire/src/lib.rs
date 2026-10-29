@@ -59,17 +59,18 @@ pub mod backend {
 
 /// Crawl metadata, settings and statistics; the [`Crawler`] itself is at the
 /// crate root.
+///
+/// [`Crawler`]: crate::Crawler
 pub mod crawler {
     #[cfg(feature = "robots")]
     #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
     pub use spire_core::crawler::Robots;
-    pub use spire_core::crawler::{Attempt, Depth, HostConcurrency, Revisit, Stats, Tag, Tags};
+    pub use spire_core::crawler::{
+        Attempt, Depth, HostConcurrency, Revisit, Stats, Tag, Tags, event,
+    };
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
     pub use spire_macros::{Revisit, Tags};
-
-    #[cfg(doc)]
-    use crate::Crawler;
 }
 
 /// Datasets: where handlers store what they scrape.
@@ -182,6 +183,7 @@ mod book {
         Recrawls: "recrawls.md",
         Redb: "redb.md",
         Observability: "observability.md",
+        Events: "events.md",
         Testing: "testing.md",
         CustomBackends: "custom-backends.md",
         CustomStorage: "custom-storage.md",
