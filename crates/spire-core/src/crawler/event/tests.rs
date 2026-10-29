@@ -202,7 +202,7 @@ async fn throttled_hosts_are_slowed_down_or_paused() {
 #[tokio::test(start_paused = true)]
 async fn requests_past_the_grace_period_are_cancelled() {
     let worker = from_fn(|_: Context<Noop>| async {
-        sleep(Duration::from_secs(60)).await;
+        sleep(Duration::from_mins(1)).await;
     });
     let crawler = Crawler::new(Noop, worker)
         .with_shutdown_grace(Duration::from_secs(1))
