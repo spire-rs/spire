@@ -3,6 +3,7 @@
 mod concurrency;
 mod connector;
 mod delay;
+pub mod event;
 mod hosts;
 mod meta;
 #[cfg(feature = "robots")]
@@ -29,6 +30,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::Result;
 use crate::backend::Backend;
+use crate::crawler::event::{Emitter, Events};
 use crate::crawler::hosts::HostPolicy;
 use crate::dataset::{Data, Dataset, Datasets};
 use crate::frontier::dynamic::DynFrontier;
@@ -108,6 +110,7 @@ pub struct Crawler<B, W> {
     settings: Settings,
     shutdown: CancellationToken,
     live: Arc<Mutex<Live>>,
+    events: Emitter,
 }
 
 /// How a run behaves.
@@ -166,6 +169,7 @@ impl<B, W> Crawler<B, W> {
             settings,
             shutdown: CancellationToken::new(),
             live: Arc::default(),
+            events: Emitter::new(event::CAPACITY),
         }
     }
 
@@ -373,6 +377,56 @@ impl<B, W> Crawler<B, W> {
             stats.elapsed = started.elapsed();
         }
         stats
+    }
+
+    /// Subscribes to the [`Event`]s of every run from now on: requests
+    /// starting, fetched, handled, retried or skipped, hosts slowed down,
+    /// robots.txt fetched, and the run stopping and finishing.
+    ///
+    /// Events are not built while no one is subscribed. A subscriber never
+    /// slows the crawl down: one that falls more than 1024 events behind
+    /// misses the oldest, and gets an [`Event::Lagged`] in their place. The
+    /// stream ends once the crawler is dropped; [`Event::Finished`] marks
+    /// the end of a run.
+    ///
+    /// ```
+    /// use futures::StreamExt;
+    /// use spire_core::backend::Noop;
+    /// use spire_core::crawler::Crawler;
+    /// use spire_core::crawler::event::Event;
+    /// use spire_core::frontier::seed::Seed;
+    /// use spire_core::worker::from_fn;
+    /// use spire_core::{Context, Result};
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> Result<()> {
+    /// let worker = from_fn(|_: Context<Noop>| async {});
+    /// let crawler = Crawler::new(Noop, worker).with_seed(Seed::get("https://example.com/")?);
+    ///
+    /// let mut events = crawler.events();
+    /// let watch = tokio::spawn(async move {
+    ///     let mut handled = 0;
+    ///     while let Some(event) = events.next().await {
+    ///         match event {
+    ///             Event::Handled { .. } => handled += 1,
+    ///             Event::Finished { .. } => break,
+    ///             _ => {}
+    ///         }
+    ///     }
+    ///     handled
+    /// });
+    ///
+    /// crawler.run().await?;
+    /// assert_eq!(watch.await.unwrap(), 1);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`Event`]: event::Event
+    /// [`Event::Lagged`]: event::Event::Lagged
+    /// [`Event::Finished`]: event::Event::Finished
+    pub fn events(&self) -> Events {
+        self.events.subscribe()
     }
 
     /// Returns a token that stops the run when cancelled.

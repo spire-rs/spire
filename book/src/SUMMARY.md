@@ -49,6 +49,7 @@
 - [Recrawls](recrawls.md)
 - [Persistence with redb](redb.md)
 - [Logs and statistics](observability.md)
+- [Crawl events](events.md)
 
 # Extending Spire
 

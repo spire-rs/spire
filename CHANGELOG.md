@@ -10,6 +10,14 @@ and this project adheres to
 
 ### Added
 
+- `spire-core`: `Crawler::events`, a stream of typed `crawler::event::Event`s
+  for every run: requests starting, fetched (status and latency), handled
+  (outcome and elapsed time), retried, failed, skipped or cancelled; hosts
+  slowed down or paused; robots.txt fetched; the run starting, stopping and
+  finishing. Events are broadcast, so a slow subscriber misses the oldest
+  ones, past 1024, and gets `Event::Lagged` instead of slowing the crawl
+  down. Without a subscriber, no event is built. Exposed as
+  `spire::crawler::event`.
 - Objective link ratings share bounded cross-page batches, flushed at 256 unique
   links or after 5 ms by default, independently of handler cancellation.
   Configure these through `Objective::rating_batch_size` and
@@ -45,6 +53,10 @@ and this project adheres to
 
 ### Changed
 
+- `spire-core`: identities are judged by the status the server answered
+  with, also when a handler ignores the failed fetch: a swallowed `403`,
+  `407` or `429` now counts against the identity, instead of telling
+  nothing about it.
 - **Breaking:** `spire-agent` budgets now cap input and output tokens
   independently through `Budget::new(input, output)`. Use `input_tokens`
   and `output_tokens` on the default budget to cap only one direction;

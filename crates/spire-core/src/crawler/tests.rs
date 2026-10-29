@@ -1204,6 +1204,32 @@ mod identities {
     }
 
     #[tokio::test]
+    async fn blocked_identities_are_replaced_even_if_handlers_ignore_it() {
+        use ::http::StatusCode;
+
+        // Every page answers `403`; the handler ignores the failed fetch.
+        let blocked = MockPage::status(StatusCode::FORBIDDEN);
+        let site = MockSite::new()
+            .page("https://a.test/1", blocked.clone())
+            .page("https://a.test/2", blocked);
+        let worker = from_fn(|cx: Context<MockSession>| async move {
+            let _ = cx.response().await;
+        });
+        let crawler = Crawler::new(site.clone(), worker)
+            .with_concurrency(1)
+            .with_identities(generated().max_active(1).max_failures(1))
+            .with_seeds([
+                Seed::get("https://a.test/1").unwrap(),
+                Seed::get("https://a.test/2").unwrap(),
+            ]);
+
+        let stats = crawler.run().await.unwrap();
+        assert_eq!(stats.succeeded, 2);
+        let used: Vec<_> = site.sent().into_iter().map(|sent| sent.identity).collect();
+        assert_eq!(used, [Some("id-0".to_owned()), Some("id-1".to_owned())]);
+    }
+
+    #[tokio::test]
     async fn pinned_seeds_go_out_as_their_identity() {
         let site = site(&["a.test"]);
         let identities = Identities::new([Identity::new("guest"), Identity::new("account")]);
