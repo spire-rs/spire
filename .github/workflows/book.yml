@@ -6,16 +6,19 @@ on:
       - "main"
     paths:
       - "book/**"
+      - "Makefile"
       - ".github/workflows/book.yml"
   pull_request:
     branches: [main]
     paths:
       - "book/**"
+      - "Makefile"
       - ".github/workflows/book.yml"
   workflow_dispatch:
 
 env:
   MDBOOK_VERSION: "0.5.4"
+  LYCHEE_VERSION: "0.24.2"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,13 +32,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install mdBook
+      - name: Install book tools
         uses: taiki-e/install-action@v2
         with:
-          tool: mdbook@${{ env.MDBOOK_VERSION }}
+          tool: |
+            mdbook@${{ env.MDBOOK_VERSION }}
+            lychee@${{ env.LYCHEE_VERSION }}
 
-      - name: Build the book
-        run: mdbook build book
+      - name: Build the book and check local links
+        run: make book-check
 
       - name: Upload the book
         if: github.event_name != 'pull_request'

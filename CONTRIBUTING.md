@@ -146,9 +146,21 @@ The book is built with [mdBook](https://rust-lang.github.io/mdBook/), and
 published to GitHub Pages from `main`. Preview it while writing:
 
 ```bash
-cargo install mdbook
+cargo install mdbook --version 0.5.4 --locked
 mdbook serve book --open
 ```
+
+Before submitting book changes, run the same offline link check as CI:
+
+```bash
+cargo install lychee --version 0.24.2 --locked
+make book-check
+```
+
+This builds the book and checks chapter links, heading anchors and local
+assets in the rendered HTML. External URLs are skipped. The check mirrors
+GitHub Pages' `/spire/` URL prefix in a temporary directory; the published
+book stays in `book/book`.
 
 Its examples are doctests of the `spire` crate, so `make test` compiles them,
 and runs those that need no network. Mark examples that crawl a real site
