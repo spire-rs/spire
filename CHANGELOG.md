@@ -8,6 +8,11 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Offline book link checking in CI and `make book-check`, validating local
+  chapter links, heading anchors and assets with pinned Lychee tooling.
+
 ## [0.9.0] - 2026-10-29
 
 ### Added

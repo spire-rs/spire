@@ -30,6 +30,16 @@ fmt: ## Fixes code formatting.
 	@cargo +nightly fmt --all
 	@$(call log,Formatting fixed!)
 
+# Book checks (mirror the Book workflow)
+.PHONY: book-check
+book-check: ## Builds the book and checks local links, heading anchors and assets offline.
+	@mdbook build book
+	@set -eu; \
+	book_root=$$(mktemp -d); \
+	trap 'rm -rf "$$book_root"' EXIT; \
+	ln -s "$(CURDIR)/book/book" "$$book_root/spire"; \
+	lychee --offline --include-fragments --index-files index.html --root-dir "$$book_root" 'book/book/**/*.html'
+
 # Benchmarks
 .PHONY: bench
 bench: ## Runs the criterion benchmarks; pass flags with ARGS, e.g. ARGS=crawler.
