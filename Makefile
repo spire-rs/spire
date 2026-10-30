@@ -38,7 +38,7 @@ book-check: ## Builds the book and checks local links, heading anchors and asset
 	book_root=$$(mktemp -d); \
 	trap 'rm -rf "$$book_root"' EXIT; \
 	ln -s "$(CURDIR)/book/book" "$$book_root/spire"; \
-	lychee --offline --include-fragments --root-dir "$$book_root" 'book/book/**/*.html'
+	lychee --offline --include-fragments --index-files index.html --root-dir "$$book_root" 'book/book/**/*.html'
 
 # Benchmarks
 .PHONY: bench
