@@ -536,7 +536,7 @@ mod tests {
         let first = store(&path).await;
         let frontier = first.frontier().await.unwrap();
         frontier
-            .schedule(seed("later", 7), Instant::now() + Duration::from_secs(3600))
+            .schedule(seed("later", 7), Instant::now() + Duration::from_hours(1))
             .await
             .unwrap();
         drop(frontier);
