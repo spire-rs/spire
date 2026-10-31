@@ -8,6 +8,7 @@ members = [
     "./crates/spire-agent",
     "./crates/spire-macros",
     "./crates/spire-redb",
+    "./crates/spire-sqlx",
     "./crates/spire-reqwest",
     "./crates/spire-thirtyfour",
     "./examples/*",
@@ -19,6 +20,7 @@ default-members = [
     "./crates/spire-agent",
     "./crates/spire-macros",
     "./crates/spire-redb",
+    "./crates/spire-sqlx",
     "./crates/spire-reqwest",
     "./crates/spire-thirtyfour",
 ]
@@ -57,6 +59,7 @@ spire = { path = "./crates/spire", version = "0.9.0" }
 spire-core = { path = "./crates/spire-core", version = "0.9.0" }
 spire-macros = { path = "./crates/spire-macros", version = "0.9.0" }
 spire-redb = { path = "./crates/spire-redb", version = "0.9.0" }
+spire-sqlx = { path = "./crates/spire-sqlx", version = "0.9.0" }
 spire-reqwest = { path = "./crates/spire-reqwest", version = "0.9.0" }
 spire-thirtyfour = { path = "./crates/spire-thirtyfour", version = "0.9.0" }
 
@@ -96,6 +99,7 @@ url = { version = "2.5", features = [] }
 
 # Storage
 redb = { version = "4.4", features = [] }
+sqlx = { version = "0.9", default-features = false, features = [] }
 
 # Politeness
 robotxt = { version = "0.7", default-features = false, features = ["parser"] }
@@ -120,7 +124,8 @@ syn = { version = "3.0", features = [] }
 # Benchmarking
 criterion = { version = "0.8", features = ["async_tokio", "html_reports"] }
 
-# Compile-fail tests
+# Testing
+tempfile = { version = "3", features = [] }
 trybuild = { version = "1.0", features = [] }
 
 # Model extraction

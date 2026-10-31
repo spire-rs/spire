@@ -1311,3 +1311,36 @@ async fn crawler_extensions_reach_followed_and_retried_requests_without_leaking_
     assert_eq!(stats.failed, 0);
     assert_eq!(calls.load(Ordering::SeqCst), 3);
 }
+
+#[tokio::test(start_paused = true)]
+async fn seed_extensions_override_crawler_defaults_through_retries() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let observed = calls.clone();
+    let worker = from_fn(move |cx: Context<Noop>| {
+        let observed = observed.clone();
+        async move {
+            assert_eq!(cx.request().extensions().get::<usize>(), Some(&42));
+            assert_eq!(cx.request().extensions().get::<bool>(), Some(&true));
+            observed.fetch_add(1, Ordering::SeqCst);
+            if cx.request().attempt().get() == 0 {
+                Outcome::retry_after(Duration::ZERO)
+            } else {
+                Outcome::Continue
+            }
+        }
+    });
+    let mut request = seed("root");
+    request.extensions_mut().insert(42_usize);
+    request
+        .extensions_mut()
+        .insert(crate::http::RequestMeta::default());
+    let crawler = Crawler::new(Noop, worker)
+        .with_extension(7_usize)
+        .with_extension(crate::http::RequestMeta::default())
+        .with_extension(true)
+        .with_seed(request);
+    let stats = crawler.run().await.unwrap();
+    assert_eq!(stats.requests, 2);
+    assert_eq!(stats.failed, 0);
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+}

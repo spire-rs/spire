@@ -48,6 +48,7 @@
 - [Errors and retries](errors.md)
 - [Recrawls](recrawls.md)
 - [Persistence with redb](redb.md)
+- [Persistence with SQLite](sqlite.md)
 - [Logs and statistics](observability.md)
 - [Crawl events](events.md)
 
