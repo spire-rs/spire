@@ -33,7 +33,7 @@ impl SqliteStore {
     ///
     /// This is explicit schema initialization, not an application migration
     /// runner. The `spire_dataset_*`, `spire_seen`, `spire_validators`,
-    /// `spire_frontier_*` and `spire_scheduled*` names are reserved for this crate.
+    /// `spire_frontier_*` and `spire_frontier_scheduled*` names are reserved for this crate.
     /// Application tables are not altered or repurposed.
     /// Applications control when this runs and must grant schema permissions.
     /// Migration history is isolated in `_spire_sqlx_migrations`; the

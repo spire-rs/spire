@@ -4,7 +4,7 @@
 use std::sync::LazyLock;
 
 use ::http::header::IntoHeaderName;
-use ::http::{HeaderMap, HeaderValue, Method, Uri};
+use ::http::{Extensions, HeaderMap, HeaderValue, Method, Uri};
 use bytes::Bytes;
 
 mod fingerprint;
@@ -158,6 +158,23 @@ impl Seed {
             .map_or(&EMPTY, |extras| &extras.headers)
     }
 
+    /// Returns runtime metadata associated with this seed.
+    ///
+    /// Extensions survive cloning and retries and move into the request.
+    /// They are excluded from serialization and request fingerprints.
+    #[must_use]
+    pub fn extensions(&self) -> &Extensions {
+        static EMPTY: LazyLock<Extensions> = LazyLock::new(Extensions::new);
+        self.extras
+            .as_ref()
+            .map_or(&EMPTY, |extras| &extras.extensions)
+    }
+
+    /// Returns mutable runtime metadata associated with this seed.
+    pub fn extensions_mut(&mut self) -> &mut Extensions {
+        &mut self.extras_mut().extensions
+    }
+
     /// Returns the body.
     #[must_use]
     pub fn body(&self) -> &Bytes {
@@ -218,12 +235,18 @@ impl Seed {
     /// attempt as extensions.
     #[must_use]
     pub fn into_request(self) -> Request {
-        let Extras { headers, body, .. } = self.extras.map(|extras| *extras).unwrap_or_default();
+        let Extras {
+            headers,
+            body,
+            extensions,
+            ..
+        } = self.extras.map(|extras| *extras).unwrap_or_default();
         let mut request = Request::new(body);
         *request.method_mut() = self.method;
         *request.uri_mut() = self.uri;
         *request.headers_mut() = headers;
 
+        request.extensions_mut().extend(extensions);
         request.extensions_mut().insert(RequestMeta {
             tag: self.tag,
             depth: self.depth,
@@ -246,6 +269,7 @@ struct Extras {
     headers: HeaderMap,
     body: Bytes,
     identity: Option<Box<str>>,
+    extensions: Extensions,
 }
 
 impl TryFrom<&str> for Seed {
@@ -279,6 +303,35 @@ mod tests {
 
     fn fingerprint(uri: &str) -> Fingerprint {
         Seed::get(uri).unwrap().fingerprint()
+    }
+
+    #[test]
+    fn runtime_extensions_survive_clones_retries_and_request_conversion() {
+        #[derive(Debug, Clone, PartialEq)]
+        struct Token(u64);
+
+        let mut seed = Seed::get("https://example.com/").unwrap();
+        let before = seed.fingerprint();
+        assert!(seed.extensions().get::<Token>().is_none());
+        seed.extensions_mut().insert(Token(42));
+        let retry = seed.clone().next_attempt();
+        assert_eq!(retry.extensions().get::<Token>(), Some(&Token(42)));
+        assert_eq!(retry.fingerprint(), before);
+        assert_eq!(
+            retry.into_request().extensions().get::<Token>(),
+            Some(&Token(42))
+        );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn runtime_extensions_are_not_serialized() {
+        let mut seed = Seed::get("https://example.com/").unwrap();
+        seed.extensions_mut().insert(42_u64);
+        let json = serde_json::to_string(&seed).unwrap();
+        let restored: Seed = serde_json::from_str(&json).unwrap();
+        assert!(restored.extensions().get::<u64>().is_none());
+        assert_eq!(restored.fingerprint(), seed.fingerprint());
     }
 
     #[test]

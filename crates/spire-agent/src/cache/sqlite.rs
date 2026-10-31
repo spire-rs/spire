@@ -12,7 +12,7 @@ use crate::{Error, Result};
 
 /// Validated model answers sharing a SQLite store's connection pool.
 ///
-/// The first operation migrates the reserved `spire_agent_answers` table,
+/// The first operation migrates the reserved `spire_agent_cache` table,
 /// tracking versions in `_spire_agent_migrations`. Clones share initialization.
 /// Pool durability settings are unchanged.
 /// Attach this cache explicitly with [`crate::Agent::with_cache`].
@@ -43,9 +43,9 @@ impl SqliteCache {
             .get_or_try_init(|| async {
                 let mut migrator = Migrator::with_migrations(vec![Migration::new(
                     1,
-                    "agent answers".into(),
+                    "agent cache".into(),
                     MigrationType::Simple,
-                    include_str!("../../migrations/sqlite/0001_agent_answers.sql").into_sql_str(),
+                    include_str!("../../migrations/sqlite/0001_agent_cache.sql").into_sql_str(),
                     false,
                 )]);
                 migrator.dangerous_set_table_name("_spire_agent_migrations");
@@ -72,7 +72,7 @@ impl Cache for SqliteCache {
     fn get<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Result<Option<String>>> {
         Box::pin(async move {
             self.initialize().await?;
-            sqlx::query_scalar("SELECT answer FROM spire_agent_answers WHERE key = $1")
+            sqlx::query_scalar("SELECT answer FROM spire_agent_cache WHERE key = $1")
                 .bind(key)
                 .fetch_optional(self.store.pool())
                 .await
@@ -84,7 +84,7 @@ impl Cache for SqliteCache {
         Box::pin(async move {
             self.initialize().await?;
             sqlx::query(
-                "INSERT INTO spire_agent_answers (key, answer) VALUES ($1, $2)
+                "INSERT INTO spire_agent_cache (key, answer) VALUES ($1, $2)
                 ON CONFLICT(key) DO UPDATE SET answer = excluded.answer",
             )
             .bind(key)

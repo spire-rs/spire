@@ -18,6 +18,8 @@ use crate::error::frontier_error;
 /// until reported, and abandoned seeds are recovered on the next exclusive
 /// open. Cancellation requeues immediately. Retry facades retain their seeds
 /// in memory; recovery restarts those requests at their stored attempt.
+/// Reports must carry the popped seed or its clone so they acknowledge the
+/// exact occurrence, including when identical seeds are queued together.
 ///
 /// An OS lock on `<database>.spire-frontier.lock` protects one frontier owner
 /// per database file. Clones share ownership. The lock file is deliberately
@@ -35,6 +37,7 @@ pub(super) struct Inner {
     _lock: File,
     epoch: i64,
     started: Instant,
+    owner: Arc<()>,
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -49,18 +52,13 @@ fn decode(payload: &str) -> Result<Seed> {
     serde_json::from_str(payload).map_err(frontier_error)
 }
 
-// Reports may have a different retry attempt. All other request properties
-// identify which stored occurrence to acknowledge, including identical URLs
-// submitted under different tags, headers or identities.
-fn matches(stored: &Seed, reported: &Seed) -> bool {
-    stored.method() == reported.method()
-        && stored.uri() == reported.uri()
-        && stored.headers() == reported.headers()
-        && stored.body() == reported.body()
-        && stored.tag() == reported.tag()
-        && stored.depth() == reported.depth()
-        && stored.priority() == reported.priority()
-        && stored.identity() == reported.identity()
+// The row ID follows one popped occurrence through clones and Retry. The
+// owner marker prevents seeds from an older frontier session acknowledging
+// records after recovery, without retaining the frontier's file lock.
+#[derive(Debug, Clone)]
+struct Occurrence {
+    id: i64,
+    owner: Arc<()>,
 }
 
 impl SqliteFrontier {
@@ -117,6 +115,7 @@ impl SqliteFrontier {
                 _lock: file,
                 epoch,
                 started: Instant::now(),
+                owner: Arc::new(()),
             }),
         })
     }
@@ -177,9 +176,9 @@ impl Frontier for SqliteFrontier {
             .map_err(frontier_error)?;
         let now = self.now();
         sqlx::query("INSERT INTO spire_frontier_items (fingerprint, priority, payload)
-            SELECT fingerprint, priority, payload FROM spire_scheduled WHERE due <= $1 ORDER BY due, fingerprint")
+            SELECT fingerprint, priority, payload FROM spire_frontier_scheduled WHERE due <= $1 ORDER BY due, fingerprint")
             .bind(now).execute(&mut *transaction).await.map_err(frontier_error)?;
-        sqlx::query("DELETE FROM spire_scheduled WHERE due <= $1")
+        sqlx::query("DELETE FROM spire_frontier_scheduled WHERE due <= $1")
             .bind(now)
             .execute(&mut *transaction)
             .await
@@ -193,7 +192,11 @@ impl Frontier for SqliteFrontier {
         };
         // Corrupt seeds remain stored and return an error, rather than being
         // silently discarded or allowing an incomplete recovery.
-        let seed = decode(&payload)?;
+        let mut seed = decode(&payload)?;
+        seed.extensions_mut().insert(Occurrence {
+            id,
+            owner: self.inner.owner.clone(),
+        });
         sqlx::query("UPDATE spire_frontier_items SET in_flight = 1 WHERE id = $1")
             .bind(id)
             .execute(&mut *transaction)
@@ -212,32 +215,28 @@ impl Frontier for SqliteFrontier {
             Report::Retry { seed, .. } => (seed, false, Ack::RetryRefused),
             _ => return Ok(Ack::Applied),
         };
+        let occurrence = seed.extensions().get::<Occurrence>().ok_or_else(|| {
+            invalid("SQLite reports require the seed returned by pop, or its clone")
+        })?;
+        if !Arc::ptr_eq(&occurrence.owner, &self.inner.owner) {
+            return Err(invalid(
+                "SQLite report belongs to a different frontier session",
+            ));
+        }
         let mut transaction = self
             .inner
             .pool
             .begin_with("BEGIN IMMEDIATE")
             .await
             .map_err(frontier_error)?;
-        let candidates: Vec<(i64, String)> = sqlx::query_as(
-            "SELECT id, payload FROM spire_frontier_items WHERE fingerprint = $1 AND in_flight = 1 ORDER BY id",
-        ).bind(seed.fingerprint().get().to_be_bytes().to_vec())
-            .fetch_all(&mut *transaction).await.map_err(frontier_error)?;
-        let mut found = None;
-        for (id, payload) in candidates {
-            if matches(&decode(&payload)?, &seed) {
-                found = Some(id);
-                break;
-            }
-        }
-        if let Some(id) = found {
-            sqlx::query("DELETE FROM spire_frontier_items WHERE id = $1")
-                .bind(id)
+        let deleted =
+            sqlx::query("DELETE FROM spire_frontier_items WHERE id = $1 AND in_flight = 1")
+                .bind(occurrence.id)
                 .execute(&mut *transaction)
                 .await
                 .map_err(frontier_error)?;
-            if requeue {
-                enqueue(&mut transaction, &seed).await?;
-            }
+        if requeue && deleted.rows_affected() == 1 {
+            enqueue(&mut transaction, &seed).await?;
         }
         transaction.commit().await.map_err(frontier_error)?;
         Ok(ack)
@@ -253,7 +252,7 @@ impl Schedule for SqliteFrontier {
             )
             .unwrap_or(i64::MAX),
         );
-        sqlx::query("INSERT INTO spire_scheduled (fingerprint, due, priority, payload) VALUES ($1, $2, $3, $4)
+        sqlx::query("INSERT INTO spire_frontier_scheduled (fingerprint, due, priority, payload) VALUES ($1, $2, $3, $4)
             ON CONFLICT(fingerprint) DO UPDATE SET due = excluded.due, priority = excluded.priority, payload = excluded.payload")
             .bind(seed.fingerprint().get().to_be_bytes().to_vec()).bind(due).bind(seed.priority()).bind(encode(&seed)?)
             .execute(&self.inner.pool).await.map_err(frontier_error)?;
@@ -261,7 +260,7 @@ impl Schedule for SqliteFrontier {
     }
 
     async fn next_due(&self) -> Result<Option<Instant>> {
-        let due: Option<i64> = sqlx::query_scalar("SELECT MIN(due) FROM spire_scheduled")
+        let due: Option<i64> = sqlx::query_scalar("SELECT MIN(due) FROM spire_frontier_scheduled")
             .fetch_one(&self.inner.pool)
             .await
             .map_err(frontier_error)?;
@@ -388,6 +387,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn repeated_and_stale_reports_cannot_acknowledge_other_occurrences() {
+        let directory = TempDir::new().unwrap();
+        let store = store(&directory.path().join("test.sqlite")).await;
+        let frontier = store.frontier().await.unwrap();
+        frontier.push(seed("same", 0)).await.unwrap();
+        frontier.push(seed("same", 0)).await.unwrap();
+        let first = pop(&frontier).await;
+        let second = pop(&frontier).await;
+        assert!(
+            frontier
+                .report(Report::Done(seed("same", 0)))
+                .await
+                .is_err()
+        );
+        frontier
+            .report(Report::Cancelled(first.clone()))
+            .await
+            .unwrap();
+        let requeued = pop(&frontier).await;
+        frontier
+            .report(Report::Cancelled(first.clone()))
+            .await
+            .unwrap();
+        frontier.report(Report::Done(first)).await.unwrap();
+        assert_eq!(frontier.in_flight().await.unwrap(), 2);
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
+        drop(frontier);
+        let reopened = store.frontier().await.unwrap();
+        let recovered = pop(&reopened).await;
+        assert!(reopened.report(Report::Done(second)).await.is_err());
+        assert!(reopened.report(Report::Done(requeued)).await.is_err());
+        assert_eq!(reopened.in_flight().await.unwrap(), 1);
+        reopened.report(Report::Done(recovered)).await.unwrap();
+        let remaining = pop(&reopened).await;
+        reopened.report(Report::Done(remaining)).await.unwrap();
+        assert!(matches!(reopened.pop().await.unwrap(), NextSeed::Empty));
+        drop(reopened);
+        store.pool().close().await;
+    }
+
+    #[tokio::test]
     async fn scheduled_revisits_replace_and_compete_by_priority() {
         let directory = TempDir::new().unwrap();
         let store = store(&directory.path().join("test.sqlite")).await;
@@ -446,6 +486,58 @@ mod tests {
         drop(frontier);
         drop(inner);
         store.pool().close().await;
+    }
+
+    #[tokio::test]
+    async fn completing_a_duplicate_does_not_acknowledge_a_pending_retry_occurrence() {
+        let directory = TempDir::new().unwrap();
+        let path = directory.path().join("retry.sqlite");
+        let first = store(&path).await;
+        let inner = first.frontier().await.unwrap();
+        let frontier = inner.clone().retry(3);
+        frontier.push(seed("same", 0)).await.unwrap();
+        let NextSeed::Ready(original) = frontier.pop().await.unwrap() else {
+            panic!()
+        };
+        frontier
+            .report(Report::Retry {
+                seed: original,
+                after: Some(Duration::ZERO),
+            })
+            .await
+            .unwrap();
+        let NextSeed::Ready(retried) = frontier.pop().await.unwrap() else {
+            panic!()
+        };
+        assert_eq!(retried.attempt().get(), 1);
+        // Cancellation stores this occurrence at attempt one before a fresh
+        // identical request is admitted at attempt zero.
+        frontier.report(Report::Cancelled(retried)).await.unwrap();
+        frontier.push(seed("same", 0)).await.unwrap();
+        let NextSeed::Ready(pending) = frontier.pop().await.unwrap() else {
+            panic!()
+        };
+        let NextSeed::Ready(completed) = frontier.pop().await.unwrap() else {
+            panic!()
+        };
+        assert_eq!((pending.attempt().get(), completed.attempt().get()), (1, 0));
+        frontier
+            .report(Report::Retry {
+                seed: pending,
+                after: Some(Duration::from_hours(1)),
+            })
+            .await
+            .unwrap();
+        frontier.report(Report::Done(completed)).await.unwrap();
+        drop(frontier);
+        drop(inner);
+        first.pool().close().await;
+        let reopened = store(&path).await;
+        let recovered = reopened.frontier().await.unwrap();
+        assert_eq!(pop(&recovered).await.attempt().get(), 1);
+        assert!(matches!(recovered.pop().await.unwrap(), NextSeed::Empty));
+        drop(recovered);
+        reopened.pool().close().await;
     }
 
     #[tokio::test]
@@ -551,7 +643,7 @@ mod tests {
         let frontier = second.frontier().await.unwrap();
         assert!(frontier.next_due().await.unwrap().unwrap() > Instant::now());
         assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
-        sqlx::query("UPDATE spire_scheduled SET due = 0")
+        sqlx::query("UPDATE spire_frontier_scheduled SET due = 0")
             .execute(second.pool())
             .await
             .unwrap();

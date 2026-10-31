@@ -10,6 +10,9 @@ and this project adheres to
 
 ### Added
 
+- Runtime `Seed` extensions, preserved through cloning and retries and moved
+  into requests, without affecting serialization or fingerprints.
+
 - `spire-sqlx` with an opt-in `sqlite` backend: caller-owned pools, versioned
   schema migrations and named JSON datasets with transactional FIFO
   reads and writes, persistent seen sets and raw-byte HTTP validators.

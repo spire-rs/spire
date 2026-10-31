@@ -15,7 +15,7 @@ The application creates and owns the SQLx pool. `SqliteStore::new(pool)` only
 stores a pool handle; it performs no SQL and changes no pool options.
 Call `store.initialize().await?` explicitly before using storage services.
 It applies embedded, versioned SQL migrations to the `spire_dataset_*`,
-`spire_seen`, `spire_validators`, `spire_frontier_*` and `spire_scheduled*`
+`spire_seen`, `spire_validators`, `spire_frontier_*` and `spire_frontier_scheduled*`
 tables and indexes. Spire records applied versions and checksums in
 `_spire_sqlx_migrations`, leaving the application's `_sqlx_migrations` table
 and other application schema untouched.

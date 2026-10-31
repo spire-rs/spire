@@ -41,19 +41,14 @@ CREATE TABLE spire_frontier_items (
 CREATE INDEX spire_frontier_order
     ON spire_frontier_items (in_flight, priority DESC, id);
 
--- Reports locate in-flight occurrences by fingerprint before matching the
--- complete request, so different tags, headers and identities remain distinct.
-CREATE INDEX spire_frontier_reports
-    ON spire_frontier_items (fingerprint, in_flight);
-
 -- Each fingerprint has at most one scheduled revisit. Due times are persisted
 -- as UTC milliseconds since the Unix epoch and survive process restarts.
-CREATE TABLE spire_scheduled (
+CREATE TABLE spire_frontier_scheduled (
     fingerprint BLOB PRIMARY KEY NOT NULL,
     due INTEGER NOT NULL,
     priority INTEGER NOT NULL,
     payload TEXT NOT NULL
 );
 
-CREATE INDEX spire_scheduled_due
-    ON spire_scheduled (due);
+CREATE INDEX spire_frontier_scheduled_due
+    ON spire_frontier_scheduled (due);
