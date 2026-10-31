@@ -23,6 +23,10 @@ uses a caller-owned connection pool; each named dataset stores JSON records and
 reads them destructively in FIFO order. Batch operations are transactional,
 including decoding: an incompatible record leaves the whole batch stored.
 
+The frontier serializes seeds when enqueueing or scheduling them. Caller-attached
+seed extensions are discarded even within the same process; register runtime
+services with `Crawler::with_extension` instead.
+
 This crate depends on `spire-core`, keeping SQL drivers out of the crawl
 engine. No backend is enabled by default. See the book's
 [Feature flags](https://spire-rs.github.io/spire/features.html#sqlx-storage)

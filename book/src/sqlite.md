@@ -165,6 +165,12 @@ hard-link aliases. In-memory databases support datasets and other services,
 but cannot host a persistent frontier. Other pools can still use datasets,
 seen sets, validators and caches while one frontier owns the file.
 
+Enqueueing or scheduling a seed serializes it. Caller-attached `Seed` extensions
+are discarded at that boundary, even without a restart, as with redb. Register
+runtime services with `Crawler::with_extension` so they are supplied to every
+request, including recovered requests. Keep per-request data that must survive
+persistence in serializable seed fields, such as its tag.
+
 Popping a seed atomically marks it in flight. Reporting completion, failure
 or a skip removes it; cancellation requeues it. Each queued occurrence is
 stored separately, so duplicate requests do not overwrite in-flight records.

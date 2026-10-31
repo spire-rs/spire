@@ -21,6 +21,10 @@ use crate::error::frontier_error;
 /// Reports must carry the popped seed or its clone so they acknowledge the
 /// exact occurrence, including when identical seeds are queued together.
 ///
+/// Enqueueing or scheduling serializes the seed and discards caller-attached
+/// runtime extensions, even without a restart. Register shared runtime services
+/// with `Crawler::with_extension` instead.
+///
 /// An OS lock on `<database>.spire-frontier.lock` protects one frontier owner
 /// per database file. Clones share ownership. The lock file is deliberately
 /// not deleted, preventing races involving different lock-file inodes. Do not
