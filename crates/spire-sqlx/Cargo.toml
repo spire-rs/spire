@@ -1,0 +1,53 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "spire-sqlx"
+description = "SQLx-backed crawl storage for the Spire web scraping framework"
+readme = "./README.md"
+keywords = ["crawler", "scraper", "dataset", "sqlx", "persistence"]
+categories = ["asynchronous", "web-programming", "database"]
+
+version = { workspace = true }
+rust-version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+
+authors = { workspace = true }
+repository = { workspace = true }
+documentation = { workspace = true }
+
+[lib]
+bench = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+# Database backends are opt-in and compile independently
+default = []
+sqlite = ["sqlx/sqlite", "spire-core/serde"]
+
+[dependencies]
+# Internal crates
+spire-core = { workspace = true, features = [] }
+
+# Async runtime
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
+
+# Storage
+sqlx = { workspace = true, features = ["runtime-tokio"] }
+
+# (De)serialization
+serde = { workspace = true, features = [] }
+serde_json = { workspace = true, features = [] }
+
+[dev-dependencies]
+# Testing
+spire-core = { workspace = true, features = ["testing"] }
+tempfile = { workspace = true, features = [] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "test-util"] }
+
+[lints]
+workspace = true

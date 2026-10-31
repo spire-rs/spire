@@ -136,3 +136,9 @@ while let Some(batch) = batches.try_next().await? {
 
 Implement `spire::dataset::Dataset<T>` to store items anywhere else, such as
 a database: see [Custom storage](custom-storage.md).
+
+## SQLite
+
+Enable `sqlite` to use named JSON datasets backed by a caller-owned SQLx
+pool. See [SQLite datasets](sqlite.md) for schema setup, transactions and
+durability.

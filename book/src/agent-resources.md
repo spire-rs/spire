@@ -82,3 +82,26 @@ let agent = Agent::new(provider).with_cache(cache, "provider/model/settings-v1")
 The cache shares the store's database and durability policy. It creates a
 namespaced table lazily, so the crawl's frontier and cached answers can be
 reopened together.
+
+### SQLite answer caches
+
+Enable `agent` and `sqlite` on the facade, or `sqlite` on `spire-agent`, to
+use the same extension trait with `SqliteStore`:
+
+```rust,no_run
+use spire::agent::{Agent, Provider};
+use spire::agent::cache::AgentStoreExt;
+use spire::sqlite::SqliteStore;
+
+# fn configure(provider: impl Provider, store: &SqliteStore) -> Agent {
+let agent = Agent::new(provider)
+    .with_cache(store.agent_cache(), "provider/model/settings-v1");
+# agent
+# }
+```
+
+The first cache operation creates the reserved `spire_agent_answers` table,
+so the pool must permit schema creation. SQL work stays asynchronous and
+uses the caller's durability settings. Enabling a feature only exposes the
+cache; `Agent::with_cache` attaches it. See [SQLite storage](sqlite.md) for
+pool configuration and other services sharing the database.

@@ -21,6 +21,7 @@ HTTP crawl, start with the dependency setup in [Installation](installation.md).
 | `json` | `JsonlDataset` |
 | `csv` | `CsvDataset` |
 | `redb` | `RedbStore`, a crash-safe frontier, seen set and datasets on disk; `RedbCache` with `agent` |
+| `sqlite` | SQLite frontier, datasets, seen sets and validators; answer caching with `agent` |
 | `rustls-tls` (default), `native-tls` | TLS for the enabled backends |
 | `testing` | `MockSite`, `MockPage`, `MockSession` and `Visit`; also `testing::Script` with `agent` |
 | `full` | Everything except `native-tls` and `testing` |
@@ -103,6 +104,7 @@ No features are enabled by default on `spire-agent`:
 |---|---|
 | `rig` | The `Rig` adapter and upstream Rig crate re-export |
 | `redb` | `RedbCache` and the `RedbStore` implementation of `AgentStoreExt` |
+| `sqlite` | `SqliteCache` and the `SqliteStore` implementation of `AgentStoreExt` |
 | `testing` | `testing::Script`, an offline provider |
 
 Enable `agent-rig` on the facade or `rig` directly on `spire-agent` for Rig
@@ -110,3 +112,12 @@ integration. With `agent` and `redb`, `RedbCache` and
 `AgentStoreExt::agent_cache()` are available. A cache is used only when attached
 with `Agent::with_cache`. With `agent` and `testing`, `spire::testing::Script`
 is available.
+
+## SQLx storage
+
+`spire-sqlx` enables no database driver by default. Its `sqlite` feature
+provides `sqlite::SqliteStore`, `SqliteFrontier`, `SqliteDataset<T>`,
+`SqliteSeen` and `SqliteValidators`, using SQLx's Tokio runtime and SQLite
+driver. Enable `sqlite` on the facade for the same types
+and the SQLx re-export under `spire::sqlite`. It is included in `full`.
+See [SQLite storage](sqlite.md) for setup.

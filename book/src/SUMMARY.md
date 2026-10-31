@@ -19,6 +19,7 @@
 
 - [HTML](html.md)
 - [Storing results](datasets.md)
+- [SQLite storage](sqlite.md)
 
 # AI-driven crawling
 

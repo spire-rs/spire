@@ -109,6 +109,17 @@ pub mod redb {
     };
 }
 
+/// SQLite crawl storage backed by a caller-owned connection pool.
+#[cfg(feature = "sqlite")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
+pub mod sqlite {
+    pub use spire_sqlx::sqlite::{
+        SqliteDataset, SqliteFrontier, SqliteSeen, SqliteStore, SqliteValidators,
+    };
+    #[doc(no_inline)]
+    pub use spire_sqlx::sqlx;
+}
+
 /// HTTP requests and responses, their crawl metadata, and the underlying
 /// [`http`](self::http::http) crate.
 pub mod http {
@@ -169,6 +180,7 @@ mod book {
         AgentResources: "agent-resources.md",
         Objectives: "objectives.md",
         Datasets: "datasets.md",
+        Sqlite: "sqlite.md",
         Links: "links.md",
         BestFirst: "best-first.md",
         Sitemaps: "sitemaps.md",
