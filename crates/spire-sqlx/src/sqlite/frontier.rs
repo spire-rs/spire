@@ -143,7 +143,7 @@ impl SqliteFrontier {
 
 async fn enqueue(transaction: &mut sqlx::Transaction<'_, Sqlite>, seed: &Seed) -> Result<()> {
     sqlx::query(
-        "INSERT INTO spire_frontier_items (fingerprint, priority, payload) VALUES (?, ?, ?)",
+        "INSERT INTO spire_frontier_items (fingerprint, priority, payload) VALUES ($1, $2, $3)",
     )
     .bind(seed.fingerprint().get().to_be_bytes().to_vec())
     .bind(seed.priority())
@@ -156,9 +156,15 @@ async fn enqueue(transaction: &mut sqlx::Transaction<'_, Sqlite>, seed: &Seed) -
 
 impl Frontier for SqliteFrontier {
     async fn push(&self, seed: Seed) -> Result<Admission> {
-        let mut transaction = self.inner.pool.begin().await.map_err(frontier_error)?;
-        enqueue(&mut transaction, &seed).await?;
-        transaction.commit().await.map_err(frontier_error)?;
+        sqlx::query(
+            "INSERT INTO spire_frontier_items (fingerprint, priority, payload) VALUES ($1, $2, $3)",
+        )
+        .bind(seed.fingerprint().get().to_be_bytes().to_vec())
+        .bind(seed.priority())
+        .bind(encode(&seed)?)
+        .execute(&self.inner.pool)
+        .await
+        .map_err(frontier_error)?;
         Ok(Admission::Queued)
     }
 
@@ -171,9 +177,9 @@ impl Frontier for SqliteFrontier {
             .map_err(frontier_error)?;
         let now = self.now();
         sqlx::query("INSERT INTO spire_frontier_items (fingerprint, priority, payload)
-            SELECT fingerprint, priority, payload FROM spire_scheduled WHERE due <= ? ORDER BY due, fingerprint")
+            SELECT fingerprint, priority, payload FROM spire_scheduled WHERE due <= $1 ORDER BY due, fingerprint")
             .bind(now).execute(&mut *transaction).await.map_err(frontier_error)?;
-        sqlx::query("DELETE FROM spire_scheduled WHERE due <= ?")
+        sqlx::query("DELETE FROM spire_scheduled WHERE due <= $1")
             .bind(now)
             .execute(&mut *transaction)
             .await
@@ -188,7 +194,7 @@ impl Frontier for SqliteFrontier {
         // Corrupt seeds remain stored and return an error, rather than being
         // silently discarded or allowing an incomplete recovery.
         let seed = decode(&payload)?;
-        sqlx::query("UPDATE spire_frontier_items SET in_flight = 1 WHERE id = ?")
+        sqlx::query("UPDATE spire_frontier_items SET in_flight = 1 WHERE id = $1")
             .bind(id)
             .execute(&mut *transaction)
             .await
@@ -213,7 +219,7 @@ impl Frontier for SqliteFrontier {
             .await
             .map_err(frontier_error)?;
         let candidates: Vec<(i64, String)> = sqlx::query_as(
-            "SELECT id, payload FROM spire_frontier_items WHERE fingerprint = ? AND in_flight = 1 ORDER BY id",
+            "SELECT id, payload FROM spire_frontier_items WHERE fingerprint = $1 AND in_flight = 1 ORDER BY id",
         ).bind(seed.fingerprint().get().to_be_bytes().to_vec())
             .fetch_all(&mut *transaction).await.map_err(frontier_error)?;
         let mut found = None;
@@ -224,7 +230,7 @@ impl Frontier for SqliteFrontier {
             }
         }
         if let Some(id) = found {
-            sqlx::query("DELETE FROM spire_frontier_items WHERE id = ?")
+            sqlx::query("DELETE FROM spire_frontier_items WHERE id = $1")
                 .bind(id)
                 .execute(&mut *transaction)
                 .await
@@ -247,7 +253,7 @@ impl Schedule for SqliteFrontier {
             )
             .unwrap_or(i64::MAX),
         );
-        sqlx::query("INSERT INTO spire_scheduled (fingerprint, due, priority, payload) VALUES (?, ?, ?, ?)
+        sqlx::query("INSERT INTO spire_scheduled (fingerprint, due, priority, payload) VALUES ($1, $2, $3, $4)
             ON CONFLICT(fingerprint) DO UPDATE SET due = excluded.due, priority = excluded.priority, payload = excluded.payload")
             .bind(seed.fingerprint().get().to_be_bytes().to_vec()).bind(due).bind(seed.priority()).bind(encode(&seed)?)
             .execute(&self.inner.pool).await.map_err(frontier_error)?;

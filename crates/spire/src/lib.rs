@@ -116,9 +116,12 @@ pub mod sqlite {
     pub use spire_sqlx::sqlite::{
         SqliteDataset, SqliteFrontier, SqliteSeen, SqliteStore, SqliteValidators,
     };
-    #[doc(no_inline)]
-    pub use spire_sqlx::sqlx;
 }
+
+#[cfg(feature = "sqlite")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
+#[doc(no_inline)]
+pub use spire_sqlx::sqlx;
 
 /// HTTP requests and responses, their crawl metadata, and the underlying
 /// [`http`](self::http::http) crate.

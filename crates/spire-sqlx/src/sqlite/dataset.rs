@@ -44,7 +44,7 @@ impl<T> SqliteDataset<T> {
     /// Returns a dataset error if the query fails or the count exceeds `usize`.
     pub async fn len(&self) -> Result<usize> {
         let count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM spire_dataset_items WHERE dataset = ?")
+            sqlx::query_scalar("SELECT COUNT(*) FROM spire_dataset_items WHERE dataset = $1")
                 .bind(&*self.name)
                 .fetch_one(&self.pool)
                 .await
@@ -58,7 +58,7 @@ impl<T> SqliteDataset<T> {
     /// Returns a dataset error if the query fails.
     pub async fn is_empty(&self) -> Result<bool> {
         let present: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM spire_dataset_items WHERE dataset = ?)",
+            "SELECT EXISTS(SELECT 1 FROM spire_dataset_items WHERE dataset = $1)",
         )
         .bind(&*self.name)
         .fetch_one(&self.pool)
@@ -107,7 +107,7 @@ impl<T: Serialize + DeserializeOwned + Send + 'static> Dataset<T> for SqliteData
             .await
             .map_err(dataset_error)?;
         for payload in encoded {
-            sqlx::query("INSERT INTO spire_dataset_items (dataset, payload) VALUES (?, ?)")
+            sqlx::query("INSERT INTO spire_dataset_items (dataset, payload) VALUES ($1, $2)")
                 .bind(&*self.name)
                 .bind(payload)
                 .execute(&mut *transaction)
@@ -134,7 +134,7 @@ impl<T: Serialize + DeserializeOwned + Send + 'static> Dataset<T> for SqliteData
             .await
             .map_err(dataset_error)?;
         let rows = sqlx::query(
-            "SELECT id, payload FROM spire_dataset_items WHERE dataset = ? ORDER BY id LIMIT ?",
+            "SELECT id, payload FROM spire_dataset_items WHERE dataset = $1 ORDER BY id LIMIT $2",
         )
         .bind(&*self.name)
         .bind(limit)
@@ -149,7 +149,7 @@ impl<T: Serialize + DeserializeOwned + Send + 'static> Dataset<T> for SqliteData
             last = Some(row.try_get::<i64, _>("id").map_err(dataset_error)?);
         }
         if let Some(last) = last {
-            sqlx::query("DELETE FROM spire_dataset_items WHERE dataset = ? AND id <= ?")
+            sqlx::query("DELETE FROM spire_dataset_items WHERE dataset = $1 AND id <= $2")
                 .bind(&*self.name)
                 .bind(last)
                 .execute(&mut *transaction)
@@ -277,7 +277,7 @@ mod tests {
         assert!(numbers.read().await.is_err());
         assert_eq!(numbers.len().await.unwrap(), 2);
         sqlx::query(
-            "UPDATE spire_dataset_items SET payload = '2' WHERE dataset = ? AND payload = ?",
+            "UPDATE spire_dataset_items SET payload = '2' WHERE dataset = $1 AND payload = $2",
         )
         .bind("mixed")
         .bind("\"bad\"")

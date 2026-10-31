@@ -10,12 +10,13 @@ and this project adheres to
 
 ### Added
 
-- `spire-sqlx` with an opt-in `sqlite` backend: caller-owned pools, explicit
-  schema initialization and named JSON datasets with transactional FIFO
+- `spire-sqlx` with an opt-in `sqlite` backend: caller-owned pools, versioned
+  schema migrations and named JSON datasets with transactional FIFO
   reads and writes, persistent seen sets and raw-byte HTTP validators.
   Its frontier uses exclusive sidecar-lock ownership, automatic in-flight
   recovery, persistent priority ordering and scheduled revisits.
-  The facade exposes it through `sqlite`, also in `full`. With `agent`,
+  The facade exposes it through `sqlite`, also in `full`, and re-exports
+  SQLx as `spire::sqlx`. With `agent`,
   `AgentStoreExt` provides a persistent `SqliteCache` in the same database.
 
 - Offline book link checking in CI and `make book-check`, validating local

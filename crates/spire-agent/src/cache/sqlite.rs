@@ -3,6 +3,8 @@ use std::sync::Arc;
 use futures::future::BoxFuture;
 use spire_sqlx::sqlite::SqliteStore;
 use spire_sqlx::sqlx;
+use spire_sqlx::sqlx::SqlSafeStr;
+use spire_sqlx::sqlx::migrate::{Migration, MigrationType, Migrator};
 use tokio::sync::OnceCell;
 
 use super::{AgentStoreExt, Cache};
@@ -10,8 +12,9 @@ use crate::{Error, Result};
 
 /// Validated model answers sharing a SQLite store's connection pool.
 ///
-/// The first cache operation creates the reserved `spire_agent_answers` table.
-/// Clones share initialization. Pool durability settings are unchanged.
+/// The first operation migrates the reserved `spire_agent_answers` table,
+/// tracking versions in `_spire_agent_migrations`. Clones share initialization.
+/// Pool durability settings are unchanged.
 /// Attach this cache explicitly with [`crate::Agent::with_cache`].
 #[derive(Debug, Clone)]
 pub struct SqliteCache {
@@ -38,16 +41,27 @@ impl SqliteCache {
     async fn initialize(&self) -> Result<()> {
         self.initialized
             .get_or_try_init(|| async {
-                sqlx::query(
-                    "CREATE TABLE IF NOT EXISTS spire_agent_answers (
-                key TEXT PRIMARY KEY NOT NULL,
-                answer TEXT NOT NULL
-            )",
-                )
-                .execute(self.store.pool())
-                .await
-                .map_err(failed)?;
-                Ok(())
+                let mut migrator = Migrator::with_migrations(vec![Migration::new(
+                    1,
+                    "agent answers".into(),
+                    MigrationType::Simple,
+                    include_str!("../../migrations/sqlite/0001_agent_answers.sql").into_sql_str(),
+                    false,
+                )]);
+                migrator.dangerous_set_table_name("_spire_agent_migrations");
+                let mut transaction = self
+                    .store
+                    .pool()
+                    .begin_with("BEGIN IMMEDIATE")
+                    .await
+                    .map_err(failed)?;
+                // Run on the existing connection. The generic Acquire entry point
+                // cannot produce a Send future here on our supported Rust version.
+                migrator
+                    .run_direct(None, &mut *transaction, false)
+                    .await
+                    .map_err(failed)?;
+                transaction.commit().await.map_err(failed)
             })
             .await
             .copied()
@@ -58,7 +72,7 @@ impl Cache for SqliteCache {
     fn get<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Result<Option<String>>> {
         Box::pin(async move {
             self.initialize().await?;
-            sqlx::query_scalar("SELECT answer FROM spire_agent_answers WHERE key = ?")
+            sqlx::query_scalar("SELECT answer FROM spire_agent_answers WHERE key = $1")
                 .bind(key)
                 .fetch_optional(self.store.pool())
                 .await
@@ -70,7 +84,7 @@ impl Cache for SqliteCache {
         Box::pin(async move {
             self.initialize().await?;
             sqlx::query(
-                "INSERT INTO spire_agent_answers (key, answer) VALUES (?, ?)
+                "INSERT INTO spire_agent_answers (key, answer) VALUES ($1, $2)
                 ON CONFLICT(key) DO UPDATE SET answer = excluded.answer",
             )
             .bind(key)
@@ -135,5 +149,34 @@ mod tests {
         assert_eq!(agent.extract::<String>("plans").await.unwrap(), "Basic");
         assert_eq!(provider.calls(), 0);
         reopened.close().await;
+    }
+    #[tokio::test]
+    async fn cache_and_store_migration_histories_are_independent_and_checksums_are_validated() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        let store = SqliteStore::new(pool.clone());
+        let cache = store.agent_cache();
+        cache.put("key", "retained").await.unwrap();
+        store.initialize().await.unwrap();
+        for query in [
+            "SELECT COUNT(*) FROM _spire_agent_migrations",
+            "SELECT COUNT(*) FROM _spire_sqlx_migrations",
+        ] {
+            let count: i64 = sqlx::query_scalar(query).fetch_one(&pool).await.unwrap();
+            assert_eq!(count, 1);
+        }
+        sqlx::query("UPDATE _spire_agent_migrations SET checksum = X'00' WHERE version = 1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(matches!(
+            store.agent_cache().get("key").await,
+            Err(Error::Cache(_))
+        ));
+        assert_eq!(cache.get("key").await.unwrap().as_deref(), Some("retained"));
+        pool.close().await;
     }
 }

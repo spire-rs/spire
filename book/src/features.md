@@ -119,5 +119,6 @@ is available.
 provides `sqlite::SqliteStore`, `SqliteFrontier`, `SqliteDataset<T>`,
 `SqliteSeen` and `SqliteValidators`, using SQLx's Tokio runtime and SQLite
 driver. Enable `sqlite` on the facade for the same types
-and the SQLx re-export under `spire::sqlite`. It is included in `full`.
-See [SQLite storage](sqlite.md) for setup.
+under `spire::sqlite`, and the upstream crate under `spire::sqlx`. The
+feature is included in `full`.
+See [Persistence with SQLite](sqlite.md) for setup.

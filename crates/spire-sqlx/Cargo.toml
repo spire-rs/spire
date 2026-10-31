@@ -27,7 +27,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 # Database backends are opt-in and compile independently
 default = []
-sqlite = ["sqlx/sqlite", "spire-core/serde"]
+sqlite = ["sqlx/sqlite", "sqlx/migrate", "spire-core/serde"]
 
 [dependencies]
 # Internal crates

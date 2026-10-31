@@ -48,7 +48,7 @@ impl SqliteSeen {
 impl SeenSet for SqliteSeen {
     async fn insert(&self, fingerprint: Fingerprint) -> Result<bool> {
         let result = sqlx::query(
-            "INSERT INTO spire_seen (fingerprint) VALUES (?) ON CONFLICT(fingerprint) DO NOTHING",
+            "INSERT INTO spire_seen (fingerprint) VALUES ($1) ON CONFLICT(fingerprint) DO NOTHING",
         )
         .bind(fingerprint.get().to_be_bytes().to_vec())
         .execute(&self.pool)

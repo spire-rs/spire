@@ -48,7 +48,7 @@ impl SqliteValidators {
 impl Validators for SqliteValidators {
     async fn get(&self, request: Fingerprint) -> Result<Option<Validator>> {
         let row =
-            sqlx::query("SELECT etag, last_modified FROM spire_validators WHERE fingerprint = ?")
+            sqlx::query("SELECT etag, last_modified FROM spire_validators WHERE fingerprint = $1")
                 .bind(request.get().to_be_bytes().to_vec())
                 .fetch_optional(&self.pool)
                 .await
@@ -69,7 +69,7 @@ impl Validators for SqliteValidators {
     }
 
     async fn set(&self, request: Fingerprint, validator: Validator) -> Result<()> {
-        sqlx::query("INSERT INTO spire_validators (fingerprint, etag, last_modified) VALUES (?, ?, ?)
+        sqlx::query("INSERT INTO spire_validators (fingerprint, etag, last_modified) VALUES ($1, $2, $3)
             ON CONFLICT(fingerprint) DO UPDATE SET etag = excluded.etag, last_modified = excluded.last_modified")
             .bind(request.get().to_be_bytes().to_vec())
             .bind(validator.etag.map(|value| value.as_bytes().to_vec()))

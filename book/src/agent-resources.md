@@ -100,8 +100,10 @@ let agent = Agent::new(provider)
 # }
 ```
 
-The first cache operation creates the reserved `spire_agent_answers` table,
-so the pool must permit schema creation. SQL work stays asynchronous and
-uses the caller's durability settings. Enabling a feature only exposes the
-cache; `Agent::with_cache` attaches it. See [SQLite storage](sqlite.md) for
+The first cache operation applies embedded SQL migrations for the reserved
+`spire_agent_answers` table. Its independent history lives in
+`_spire_agent_migrations`, leaving application and crawl storage migrations
+alone. The pool must permit schema creation and upgrades. SQL work stays
+asynchronous and uses the caller's durability settings. Enabling a feature only exposes the
+cache; `Agent::with_cache` attaches it. See [Persistence with SQLite](sqlite.md) for
 pool configuration and other services sharing the database.

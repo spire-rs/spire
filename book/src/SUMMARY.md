@@ -19,7 +19,6 @@
 
 - [HTML](html.md)
 - [Storing results](datasets.md)
-- [SQLite storage](sqlite.md)
 
 # AI-driven crawling
 
@@ -49,6 +48,7 @@
 - [Errors and retries](errors.md)
 - [Recrawls](recrawls.md)
 - [Persistence with redb](redb.md)
+- [Persistence with SQLite](sqlite.md)
 - [Logs and statistics](observability.md)
 - [Crawl events](events.md)
 

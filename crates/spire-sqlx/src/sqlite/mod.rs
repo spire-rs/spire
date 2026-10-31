@@ -1,5 +1,6 @@
 mod dataset;
 mod frontier;
+mod migration;
 mod seen;
 mod store;
 mod validators;

@@ -1,22 +1,37 @@
-# SQLite storage
+# Persistence with SQLite
 
 Enable `sqlite` on `spire` to store scraped records in SQLite. The integration
 lives in `spire-sqlx` behind its own `sqlite` feature, independently of other
 SQL drivers. SQL dependencies are kept out of `spire-core`. The SQLite driver
 builds a bundled SQLite library, requiring a C compiler.
 
+SQLite runs inside your process. Opening a pool opens the database file;
+`create_if_missing(true)` creates it when needed. There is no database server
+to start.
+
 ## Pool and schema ownership
 
 The application creates and owns the SQLx pool. `SqliteStore::new(pool)` only
 stores a pool handle; it performs no SQL and changes no pool options.
-Call `store.initialize().await?` explicitly before using datasets. It creates
-the `spire_dataset_*`, `spire_seen`, `spire_validators`, `spire_frontier_*`
-and `spire_scheduled*` tables and indexes in one transaction,
-requiring permission to create schema objects. Repeating initialization is
-safe; an incompatible existing table is rejected. These names are reserved;
-Spire does not adapt arbitrary application
-tables or run application migrations. Future schema upgrades require explicit
-migrations, rather than silently converting stored records.
+Call `store.initialize().await?` explicitly before using storage services.
+It applies embedded, versioned SQL migrations to the `spire_dataset_*`,
+`spire_seen`, `spire_validators`, `spire_frontier_*` and `spire_scheduled*`
+tables and indexes. Spire records applied versions and checksums in
+`_spire_sqlx_migrations`, leaving the application's `_sqlx_migrations` table
+and other application schema untouched.
+
+Initialization uses one write transaction, including migration history.
+Concurrent initializers serialize; repeated calls are safe. If a migration
+fails, its schema changes and history are rolled back together. Untracked
+tables with reserved Spire names are rejected rather than adopted. Changed
+migration checksums and versions unknown to this library also produce an
+error. The pool must permit schema creation and upgrades.
+
+New library migrations run only when `initialize()` is called. Initialize
+before opening a frontier, and stop existing crawls that use the database
+before applying upgrades. Keep released migration files unchanged and add
+new versions for later schema changes.
+Your JSON record schema and application migrations remain your responsibility.
 
 For a simple crawl, one connection serializes SQLite work without lock
 contention. For more connections, configure a busy timeout and consider WAL.
@@ -38,7 +53,7 @@ use spire::extract::{Data, html::Html};
 use spire::frontier::FrontierExt;
 use spire::frontier::seed::Seed;
 use spire::sqlite::SqliteStore;
-use spire::sqlite::sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteSynchronous};
+use spire::sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteSynchronous};
 use spire::testing::{MockPage, MockSite};
 use spire::worker::{WorkerExt, middleware::Revalidate};
 use spire::{Crawler, Result, Router};

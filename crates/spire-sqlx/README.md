@@ -64,17 +64,19 @@ pool.close().await;
 # }
 ```
 
-Initialization explicitly creates the reserved `spire_*` crawl tables and
-indexes. Those names belong to Spire; application schema and migrations
-remain yours. Do not reuse them for unrelated tables. Pool,
-locking and durability options are never changed by the store.
+Initialization applies embedded SQL migrations to the reserved `spire_*`
+crawl tables, tracking versions and checksums in `_spire_sqlx_migrations`.
+The application's `_sqlx_migrations` table and other schema remain untouched.
+Schema changes and migration history commit together. Repeating initialization
+is safe; changed applied migrations and unknown versions are rejected.
+Pool, locking and durability options are never changed by the store.
 
 `store.frontier().await?` acquires exclusive ownership through a sidecar
 file lock and requeues abandoned in-flight requests. Clones share ownership;
 other stores or processes cannot open a frontier until it is released.
 Datasets, seen sets, validators and caches remain shareable across pools.
 
-See [SQLite storage](https://spire-rs.github.io/spire/sqlite.html) for pool
+See [Persistence with SQLite](https://spire-rs.github.io/spire/sqlite.html) for pool
 configuration, concurrency, rollback and persistence guarantees.
 
 ## Contributing

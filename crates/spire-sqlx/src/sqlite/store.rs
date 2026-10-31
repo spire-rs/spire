@@ -1,18 +1,17 @@
 use std::sync::{Arc, Weak};
 
-use spire_core::{Error, ErrorKind, Result};
-use sqlx::{Sqlite, SqlitePool, Transaction};
+use spire_core::Result;
+use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 
 use super::frontier::{Inner, SqliteFrontier};
 use super::{SqliteDataset, SqliteSeen, SqliteValidators};
-use crate::error::dataset_error;
 
 /// Persistent crawl storage sharing a caller-owned SQLite connection pool.
 ///
 /// Construction performs no SQL. Call [`initialize`](Self::initialize) once
-/// before using its storage services. Pool options, journal mode, synchronous settings,
-/// busy timeout and connection lifetime remain under the caller's control.
+/// before using storage services. Pool options, journal mode, synchronous
+/// settings, busy timeout and connection lifetime remain caller-controlled.
 /// Clones share the pool; dropping a store does not explicitly close it.
 #[derive(Debug, Clone)]
 pub struct SqliteStore {
@@ -30,65 +29,22 @@ impl SqliteStore {
         }
     }
 
-    /// Creates Spire's crawl storage tables and indexes atomically.
+    /// Applies Spire's versioned schema migrations atomically.
     ///
     /// This is explicit schema initialization, not an application migration
     /// runner. The `spire_dataset_*`, `spire_seen`, `spire_validators`,
     /// `spire_frontier_*` and `spire_scheduled*` names are reserved for this crate.
-    /// Existing tables are not altered or repurposed.
+    /// Application tables are not altered or repurposed.
     /// Applications control when this runs and must grant schema permissions.
-    /// Repeated calls are safe; future schema changes require an explicit
-    /// migration rather than silently rewriting stored records.
+    /// Migration history is isolated in `_spire_sqlx_migrations`; the
+    /// application's `_sqlx_migrations` table is untouched. Repeated calls are
+    /// safe. Applied checksums and versions are validated before any upgrades.
     ///
     /// # Errors
     /// Returns a dataset error on SQL, schema or lock failures, including
-    /// an existing reserved table with an incompatible layout.
+    /// untracked reserved tables, changed migration checksums or unknown versions.
     pub async fn initialize(&self) -> Result<()> {
-        let mut transaction = self
-            .pool
-            .begin_with("BEGIN IMMEDIATE")
-            .await
-            .map_err(dataset_error)?;
-        sqlx::raw_sql(
-            "CREATE TABLE IF NOT EXISTS spire_dataset_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                dataset TEXT NOT NULL,
-                payload TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS spire_dataset_order
-                ON spire_dataset_items (dataset, id);
-            CREATE TABLE IF NOT EXISTS spire_seen (
-                fingerprint BLOB PRIMARY KEY NOT NULL CHECK(length(fingerprint) = 8)
-            );
-            CREATE TABLE IF NOT EXISTS spire_validators (
-                fingerprint BLOB PRIMARY KEY NOT NULL CHECK(length(fingerprint) = 8),
-                etag BLOB,
-                last_modified BLOB
-            );
-            CREATE TABLE IF NOT EXISTS spire_frontier_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                fingerprint BLOB NOT NULL,
-                priority INTEGER NOT NULL,
-                payload TEXT NOT NULL,
-                in_flight INTEGER NOT NULL DEFAULT 0 CHECK(in_flight IN (0, 1))
-            );
-            CREATE INDEX IF NOT EXISTS spire_frontier_order
-                ON spire_frontier_items (in_flight, priority DESC, id);
-            CREATE INDEX IF NOT EXISTS spire_frontier_reports
-                ON spire_frontier_items (fingerprint, in_flight);
-            CREATE TABLE IF NOT EXISTS spire_scheduled (
-                fingerprint BLOB PRIMARY KEY NOT NULL,
-                due INTEGER NOT NULL,
-                priority INTEGER NOT NULL,
-                payload TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS spire_scheduled_due ON spire_scheduled (due);",
-        )
-        .execute(&mut *transaction)
-        .await
-        .map_err(dataset_error)?;
-        validate_schema(&mut transaction).await?;
-        transaction.commit().await.map_err(dataset_error)
+        super::migration::run(&self.pool).await
     }
 
     /// Opens a named JSON dataset without creating a table per name.
@@ -138,86 +94,6 @@ impl SqliteStore {
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
     }
-}
-
-// Do not treat unrelated tables with matching names as crawl storage.
-async fn validate_schema(transaction: &mut Transaction<'_, Sqlite>) -> Result<()> {
-    check_columns(transaction,
-        "SELECT name, type, \"notnull\", pk FROM pragma_table_info('spire_dataset_items') ORDER BY cid",
-        "spire_dataset_items", &[("id", "INTEGER", 0, 1), ("dataset", "TEXT", 1, 0), ("payload", "TEXT", 1, 0)],
-    ).await?;
-    check_columns(
-        transaction,
-        "SELECT name, type, \"notnull\", pk FROM pragma_table_info('spire_seen') ORDER BY cid",
-        "spire_seen",
-        &[("fingerprint", "BLOB", 1, 1)],
-    )
-    .await?;
-    check_columns(transaction,
-        "SELECT name, type, \"notnull\", pk FROM pragma_table_info('spire_validators') ORDER BY cid",
-        "spire_validators", &[("fingerprint", "BLOB", 1, 1), ("etag", "BLOB", 0, 0), ("last_modified", "BLOB", 0, 0)],
-    ).await?;
-    check_columns(transaction,
-        "SELECT name, type, \"notnull\", pk FROM pragma_table_info('spire_frontier_items') ORDER BY cid",
-        "spire_frontier_items", &[("id", "INTEGER", 0, 1), ("fingerprint", "BLOB", 1, 0), ("priority", "INTEGER", 1, 0), ("payload", "TEXT", 1, 0), ("in_flight", "INTEGER", 1, 0)],
-    ).await?;
-    check_columns(
-        transaction,
-        "SELECT name, type, \"notnull\", pk FROM pragma_table_info('spire_scheduled') ORDER BY cid",
-        "spire_scheduled",
-        &[
-            ("fingerprint", "BLOB", 1, 1),
-            ("due", "INTEGER", 1, 0),
-            ("priority", "INTEGER", 1, 0),
-            ("payload", "TEXT", 1, 0),
-        ],
-    )
-    .await?;
-    // An INTEGER PRIMARY KEY aliases rowid and has no separate PK index.
-    // This also rejects WITHOUT ROWID and the PRIMARY KEY DESC special case.
-    let primary_indexes: i64 = sqlx::query_scalar(
-        "SELECT (SELECT COUNT(*) FROM pragma_index_list('spire_dataset_items') WHERE origin = 'pk')
-            + (SELECT COUNT(*) FROM pragma_index_list('spire_frontier_items') WHERE origin = 'pk')",
-    )
-    .fetch_one(&mut **transaction)
-    .await
-    .map_err(dataset_error)?;
-    if primary_indexes != 0 {
-        return Err(Error::new(ErrorKind::Dataset).with_message(
-            "Spire dataset and frontier tables must use INTEGER PRIMARY KEY rowids",
-        ));
-    }
-    Ok(())
-}
-
-async fn check_columns(
-    transaction: &mut Transaction<'_, Sqlite>,
-    query: &'static str,
-    table: &str,
-    expected: &[(&str, &str, i64, i64)],
-) -> Result<()> {
-    let columns: Vec<(String, String, i64, i64)> = sqlx::query_as(query)
-        .fetch_all(&mut **transaction)
-        .await
-        .map_err(dataset_error)?;
-    let compatible = columns.len() == expected.len()
-        && columns.iter().zip(expected).all(
-            |(
-                (name, kind, not_null, primary_key),
-                (expected_name, expected_kind, expected_null, expected_key),
-            )| {
-                name == expected_name
-                    && kind.eq_ignore_ascii_case(expected_kind)
-                    && not_null == expected_null
-                    && primary_key == expected_key
-            },
-        );
-    if !compatible {
-        return Err(Error::new(ErrorKind::Dataset).with_message(format!(
-            "incompatible {table} schema; expected the Spire storage layout"
-        )));
-    }
-    Ok(())
 }
 
 #[cfg(test)]
