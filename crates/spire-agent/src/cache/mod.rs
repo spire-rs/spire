@@ -6,13 +6,20 @@
 mod memory;
 #[cfg(feature = "redb")]
 #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
-mod persistent;
+mod redb;
+
+#[cfg(feature = "sqlite")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
+mod sqlite;
 
 use futures::future::BoxFuture;
 pub use memory::InMemCache;
 #[cfg(feature = "redb")]
 #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
-pub use persistent::RedbCache;
+pub use redb::RedbCache;
+#[cfg(feature = "sqlite")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
+pub use sqlite::SqliteCache;
 
 use crate::Result;
 

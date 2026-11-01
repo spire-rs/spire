@@ -33,11 +33,14 @@ testing = []
 rig = ["dep:rig"]
 # Answer caching in the crawl's RedbStore
 redb = ["dep:spire-redb"]
+# Answer caching in the crawl's SQLite store
+sqlite = ["dep:spire-sqlx", "spire-sqlx/sqlite"]
 
 [dependencies]
 # Internal crates
 spire-core = { workspace = true, features = [] }
 spire-redb = { workspace = true, optional = true, features = [] }
+spire-sqlx = { workspace = true, optional = true, features = [] }
 
 # Async runtime
 futures = { workspace = true, features = [] }
@@ -61,6 +64,7 @@ sha2 = { workspace = true, features = [] }
 spire-agent = { path = ".", features = ["testing"] }
 
 # Testing
+tempfile = { workspace = true, features = [] }
 tokio = { workspace = true, features = ["rt", "macros", "time", "test-util"] }
 
 [lints]

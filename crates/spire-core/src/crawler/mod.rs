@@ -177,6 +177,7 @@ impl<B, W> Crawler<B, W> {
     ///
     /// A later registration of the same type replaces the previous value.
     /// Values are cloned for each request; use `Arc<T>` for shared ownership.
+    /// Seed extensions override crawler defaults of the same type.
     /// Middleware can replace a value on an individual request.
     #[must_use]
     pub fn with_extension<T: Clone + Send + Sync + 'static>(mut self, value: T) -> Self {

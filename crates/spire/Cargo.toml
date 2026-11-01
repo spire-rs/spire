@@ -30,7 +30,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Default feature set: HTML parsing, and rustls for any enabled backend
 default = ["html", "rustls-tls"]
 # Every feature except `native-tls` and `testing`
-full = ["agent", "agent-rig", "user-agents", "html", "markdown", "macros", "robots", "sitemap", "serde", "json", "csv", "redb", "reqwest", "thirtyfour", "rustls-tls"]
+full = ["agent", "agent-rig", "user-agents", "html", "markdown", "macros", "robots", "sitemap", "serde", "json", "csv", "redb", "sqlite", "reqwest", "thirtyfour", "rustls-tls"]
 
 # Model-backed extraction, with provider configuration supplied by the caller
 agent = ["dep:spire-agent", "markdown"]
@@ -62,6 +62,9 @@ user-agents = ["spire-core/user-agents"]
 # Crash-safe frontier and seen set stored in redb
 redb = ["dep:spire-redb", "spire-agent?/redb"]
 
+# SQLite datasets through SQLx
+sqlite = ["dep:spire-sqlx", "spire-sqlx/sqlite", "spire-agent?/sqlite"]
+
 # HTTP backend built on reqwest
 reqwest = ["dep:spire-reqwest"]
 # Browser backend built on thirtyfour (WebDriver)
@@ -78,6 +81,7 @@ spire-agent = { workspace = true, optional = true, features = [] }
 spire-core = { workspace = true, features = [] }
 spire-macros = { workspace = true, optional = true, features = [] }
 spire-redb = { workspace = true, optional = true, features = [] }
+spire-sqlx = { workspace = true, optional = true, features = [] }
 spire-reqwest = { workspace = true, optional = true, features = [] }
 spire-thirtyfour = { workspace = true, optional = true, features = [] }
 

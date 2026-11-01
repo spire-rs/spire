@@ -10,6 +10,18 @@ and this project adheres to
 
 ### Added
 
+- Runtime `Seed` extensions, preserved through cloning and retries and moved
+  into requests, without affecting serialization or fingerprints.
+
+- `spire-sqlx` with an opt-in `sqlite` backend: caller-owned pools, versioned
+  schema migrations and named JSON datasets with transactional FIFO
+  reads and writes, persistent seen sets and raw-byte HTTP validators.
+  Its frontier uses exclusive sidecar-lock ownership, automatic in-flight
+  recovery, persistent priority ordering and scheduled revisits.
+  The facade exposes it through `sqlite`, also in `full`, and re-exports
+  SQLx as `spire::sqlx`. With `agent`,
+  `AgentStoreExt` provides a persistent `SqliteCache` in the same database.
+
 - Offline book link checking in CI and `make book-check`, validating local
   chapter links, heading anchors and assets with pinned Lychee tooling.
 
