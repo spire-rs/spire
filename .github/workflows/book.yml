@@ -6,13 +6,13 @@ on:
       - "main"
     paths:
       - "book/**"
-      - "Makefile"
+      - "scripts/book-check.sh"
       - ".github/workflows/book.yml"
   pull_request:
     branches: [main]
     paths:
       - "book/**"
-      - "Makefile"
+      - "scripts/book-check.sh"
       - ".github/workflows/book.yml"
   workflow_dispatch:
 
@@ -40,7 +40,7 @@ jobs:
             lychee@${{ env.LYCHEE_VERSION }}
 
       - name: Build the book and check local links
-        run: make book-check
+        run: scripts/book-check.sh
 
       - name: Upload the book
         if: github.event_name != 'pull_request'

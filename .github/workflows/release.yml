@@ -12,9 +12,36 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  semver:
+    name: Semver
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install cargo-semver-checks
+        run: cargo binstall cargo-semver-checks --no-confirm --no-symlinks
+
+      # Compares against the last release on crates.io, so a breaking change
+      # without the matching version bump stops the release before publishing.
+      # `spire-sqlx` has no published version to compare against until its
+      # first release: remove the exclusion after that.
+      - name: Check semver
+        run: cargo semver-checks --workspace --all-features --exclude spire-sqlx
+
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
+    needs: semver
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
     steps:

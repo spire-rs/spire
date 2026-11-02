@@ -24,7 +24,7 @@ and this project adheres to
   re-exports SQLx as `spire::store::sqlx`. With `agent`, `AgentStoreExt`
   provides a persistent `SqliteCache` in the same database.
 
-- Offline book link checking in CI and `make book-check`, validating local
+- Offline book link checking in CI and `scripts/book-check.sh`, validating local
   chapter links, heading anchors and assets with pinned Lychee tooling.
 
 - `spire::crawler::HostDelay`, the argument type of `Crawler::with_host_delay`,
@@ -33,6 +33,9 @@ and this project adheres to
 
 - `RedbStoreBuilder::new`, and `SqliteStoreBuilder::new`, the same as the
   stores' `builder` functions.
+
+- `cargo-semver-checks` in the release workflow, stopping a release whose
+  version does not match its breaking changes.
 
 ### Changed
 

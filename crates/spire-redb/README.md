@@ -39,7 +39,7 @@ none, since a link is never committed after the page that found it.
 only the requests in flight, at a large cost in throughput. In the `redb`
 benchmark on macOS, pushing and popping a seed takes about 0.6 ms with batched
 syncs and about 11 ms with `sync_always`, twenty times slower; run
-`make bench ARGS=redb` to measure your own machine.
+`cargo bench --workspace --all-features --bench '*' -- redb` to measure your own machine.
 
 See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#spire-facade)
 page for configuration.

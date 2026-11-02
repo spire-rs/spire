@@ -136,10 +136,12 @@ frontier, seen set, page versions and scheduled revisits. See
 
 ### SQLite
 
-With the `sqlite` feature, `SqliteStore` uses a caller-owned SQLx pool.
+With the `sqlite` feature, `SqliteStore::open(path)` creates the database and
+applies the schema. `SqliteStore::new(pool)` uses a caller-owned SQLx pool
+instead, and needs `store.initialize().await?` before use.
 `store.dataset::<T>("products")` selects a named collection in a shared table.
-Initialize the store's schema explicitly before using it. See
-[Persistence with SQLite](sqlite.md) for pool setup, transactions and frontier recovery.
+See [Persistence with SQLite](sqlite.md) for options, pool setup, transactions
+and frontier recovery.
 
 Dataset writes and frontier updates are separate transactions. A page may
 run again after its records were stored, so persistent output can contain
