@@ -131,5 +131,5 @@ trybuild = { version = "1.0", features = [] }
 # Model extraction
 schemars = { version = "1.2", features = ["derive"] }
 jsonschema = { version = "0.60", default-features = false }
-sha2 = { version = "0.10" }
+sha2 = { version = "0.11" }
 rig = { package = "rig-core", version = "0.44", default-features = false, features = ["reqwest", "rustls"] }
