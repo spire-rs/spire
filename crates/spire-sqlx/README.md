@@ -39,7 +39,7 @@ with its `sqlite` feature directly:
 
 ```toml
 [dependencies]
-spire-sqlx = { version = "0.9.0", features = ["sqlite"] }
+spire-sqlx = { version = "0.10.0", features = ["sqlite"] }
 ```
 
 ```rust,no_run

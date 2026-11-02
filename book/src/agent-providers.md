@@ -27,7 +27,7 @@ For Rig models, enable `rig` on the facade:
 
 ```toml
 [dependencies]
-spire = { version = "0.9.0", features = ["rig", "reqwest"] }
+spire = { version = "0.10.0", features = ["rig", "reqwest"] }
 ```
 
 The upstream crate is re-exported as `spire::agent::rig`.
