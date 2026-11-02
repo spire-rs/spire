@@ -301,9 +301,16 @@ fn validate(text: &str, validator: Option<&jsonschema::Validator>) -> Result<()>
 }
 
 fn cache_key(namespace: &str, request: &ProviderRequest) -> Result<String> {
+    use std::fmt::Write as _;
+
     let bytes = serde_json::to_vec(&(namespace, request))
         .map_err(|error| Error::Configuration(error.to_string()))?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    let digest = Sha256::digest(bytes);
+    let mut key = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        write!(key, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    Ok(key)
 }
 
 impl fmt::Debug for Agent {
