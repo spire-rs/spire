@@ -5,7 +5,7 @@ tokio to run it:
 
 ```toml
 [dependencies]
-spire = { version = "0.9", features = ["reqwest", "macros"] }
+spire = { version = "0.10", features = ["reqwest", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
