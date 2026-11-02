@@ -7,15 +7,16 @@ mod dataset;
 mod frontier;
 mod seen;
 mod store;
-mod validators;
+mod validator;
 
+#[doc(no_inline)]
 pub use redb;
 
 pub use crate::dataset::RedbDataset;
 pub use crate::frontier::RedbFrontier;
 pub use crate::seen::RedbSeen;
 pub use crate::store::{RedbStore, RedbStoreBuilder};
-pub use crate::validators::RedbValidators;
+pub use crate::validator::RedbValidator;
 
 /// Tracing target for redb storage.
 const TRACING_TARGET: &str = "spire_redb";

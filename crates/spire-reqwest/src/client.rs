@@ -27,7 +27,8 @@ use crate::conversion::{head_from_reqwest, request_to_reqwest};
 /// ```
 /// use std::time::Duration;
 ///
-/// use spire_reqwest::{ReqwestBackend, StatusPolicy};
+/// use spire_core::backend::StatusPolicy;
+/// use spire_reqwest::ReqwestBackend;
 ///
 /// let backend = ReqwestBackend::from_builder(|| {
 ///     reqwest::Client::builder()

@@ -4,32 +4,32 @@ use std::future::{Future, ready};
 use spire_core::Result;
 use spire_core::frontier::seed::Fingerprint;
 use spire_core::http::http::HeaderValue;
-use spire_core::worker::middleware::{Validator, Validators};
+use spire_core::worker::middleware::{PageVersion, Validator};
 
-use crate::store::{RedbStore, VALIDATORS};
+use crate::store::{PAGE_VERSIONS, RedbStore};
 
-/// [`Validators`] stored in a [`RedbStore`], so later runs revalidate the
+/// [`Validator`] stored in a [`RedbStore`], so later runs revalidate the
 /// pages earlier ones crawled.
-pub struct RedbValidators {
+pub struct RedbValidator {
     store: RedbStore,
 }
 
-impl RedbValidators {
+impl RedbValidator {
     pub(crate) const fn new(store: RedbStore) -> Self {
         Self { store }
     }
 
-    /// Returns the number of pages with a stored validator.
+    /// Returns the number of pages with a stored version.
     ///
     /// # Errors
     ///
     /// Returns a [`Frontier`](spire_core::ErrorKind::Frontier) error if the
     /// store cannot be read.
     pub fn len(&self) -> Result<usize> {
-        self.store.count(VALIDATORS)
+        self.store.count(PAGE_VERSIONS)
     }
 
-    /// Whether no validator is stored.
+    /// Whether no version is stored.
     ///
     /// # Errors
     ///
@@ -40,25 +40,25 @@ impl RedbValidators {
     }
 }
 
-impl Clone for RedbValidators {
+impl Clone for RedbValidator {
     fn clone(&self) -> Self {
         Self::new(self.store.clone())
     }
 }
 
-impl fmt::Debug for RedbValidators {
+impl fmt::Debug for RedbValidator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RedbValidators")
+        f.debug_struct("RedbValidator")
             .field("store", &self.store)
             .finish()
     }
 }
 
-/// Encodes a validator as its two header values, each a presence byte, a
+/// Encodes a version as its two header values, each a presence byte, a
 /// length and the raw bytes, so values that are not text survive.
-fn encode(validator: &Validator) -> Vec<u8> {
+fn encode(version: &PageVersion) -> Vec<u8> {
     let mut bytes = Vec::new();
-    for value in [&validator.etag, &validator.last_modified] {
+    for value in [&version.etag, &version.last_modified] {
         match value {
             Some(value) => {
                 let value = value.as_bytes();
@@ -74,8 +74,8 @@ fn encode(validator: &Validator) -> Vec<u8> {
     bytes
 }
 
-/// Decodes a validator, or `None` if the bytes are not one.
-fn decode(mut bytes: &[u8]) -> Option<Validator> {
+/// Decodes a version, or `None` if the bytes are not one.
+fn decode(mut bytes: &[u8]) -> Option<PageVersion> {
     let mut next = || -> Option<Option<HeaderValue>> {
         let (&present, rest) = bytes.split_first()?;
         bytes = rest;
@@ -90,17 +90,20 @@ fn decode(mut bytes: &[u8]) -> Option<Validator> {
     };
     let etag = next()?;
     let last_modified = next()?;
-    Some(Validator {
+    Some(PageVersion {
         etag,
         last_modified,
     })
 }
 
-impl Validators for RedbValidators {
-    fn get(&self, request: Fingerprint) -> impl Future<Output = Result<Option<Validator>>> + Send {
+impl Validator for RedbValidator {
+    fn get(
+        &self,
+        request: Fingerprint,
+    ) -> impl Future<Output = Result<Option<PageVersion>>> + Send {
         let key = request.get();
         let bytes = self.store.read(|txn| {
-            let table = match txn.open_table(VALIDATORS) {
+            let table = match txn.open_table(PAGE_VERSIONS) {
                 Ok(table) => table,
                 Err(redb::TableError::TableDoesNotExist(_)) => return Ok(None),
                 Err(error) => return Err(error.into()),
@@ -110,12 +113,13 @@ impl Validators for RedbValidators {
         ready(bytes.map(|bytes| bytes.as_deref().and_then(decode)))
     }
 
-    async fn set(&self, request: Fingerprint, validator: Validator) -> Result<()> {
+    async fn set(&self, request: Fingerprint, version: PageVersion) -> Result<()> {
         let key = request.get();
-        let bytes = encode(&validator);
+        let bytes = encode(&version);
         self.store
             .write(move |txn| {
-                txn.open_table(VALIDATORS)?.insert(key, bytes.as_slice())?;
+                txn.open_table(PAGE_VERSIONS)?
+                    .insert(key, bytes.as_slice())?;
                 Ok(())
             })
             .await
@@ -128,35 +132,35 @@ mod tests {
     use crate::frontier::tests::{TempPath, seed};
 
     #[test]
-    fn validators_round_trip_including_bytes_that_are_not_text() {
-        let validator = Validator {
+    fn versions_round_trip_including_bytes_that_are_not_text() {
+        let version = PageVersion {
             etag: Some(HeaderValue::from_bytes(b"\"v\xff1\"").unwrap()),
             last_modified: None,
         };
-        assert_eq!(decode(&encode(&validator)), Some(validator));
+        assert_eq!(decode(&encode(&version)), Some(version));
         assert_eq!(
-            decode(&encode(&Validator::default())),
-            Some(Validator::default())
+            decode(&encode(&PageVersion::default())),
+            Some(PageVersion::default())
         );
         assert_eq!(decode(&[1, 9]), None, "truncated");
     }
 
     #[tokio::test]
-    async fn validators_survive_reopening() {
+    async fn versions_survive_reopening() {
         let path = TempPath::new();
         let key = seed("a").fingerprint();
-        let validator = Validator {
+        let version = PageVersion {
             etag: Some(HeaderValue::from_static("\"v1\"")),
             last_modified: Some(HeaderValue::from_static("Wed, 21 Oct 2026 07:28:00 GMT")),
         };
         {
-            let validators = RedbStore::open(&path.0).await.unwrap().validators();
-            assert_eq!(validators.get(key).await.unwrap(), None);
-            validators.set(key, validator.clone()).await.unwrap();
+            let validator = RedbStore::open(&path.0).await.unwrap().validator();
+            assert_eq!(validator.get(key).await.unwrap(), None);
+            validator.set(key, version.clone()).await.unwrap();
         }
 
-        let validators = RedbStore::open(&path.0).await.unwrap().validators();
-        assert_eq!(validators.get(key).await.unwrap(), Some(validator));
-        assert_eq!(validators.len().unwrap(), 1);
+        let validator = RedbStore::open(&path.0).await.unwrap().validator();
+        assert_eq!(validator.get(key).await.unwrap(), Some(version));
+        assert_eq!(validator.len().unwrap(), 1);
     }
 }

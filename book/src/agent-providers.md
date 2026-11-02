@@ -23,11 +23,11 @@ Enable `agent` and `testing` to use `Script` in your own tests. It can
 return a queue of `ProviderResponse`s, answer from a synchronous or
 asynchronous callback, and capture requests for assertions.
 
-For Rig models, enable `agent-rig` on the facade:
+For Rig models, enable `rig` on the facade:
 
 ```toml
 [dependencies]
-spire = { version = "0.9.0", features = ["agent-rig", "reqwest"] }
+spire = { version = "0.9.0", features = ["rig", "reqwest"] }
 ```
 
 The upstream crate is re-exported as `spire::agent::rig`.

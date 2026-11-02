@@ -681,7 +681,7 @@ mod tests {
         let frontier = first.frontier().await.unwrap();
         let crawler = Crawler::new(
             site,
-            from_fn(collect).layer(Revalidate::new(first.validators())),
+            from_fn(collect).layer(Revalidate::new(first.validator())),
         )
         .with_frontier(frontier.clone().dedup_with(first.seen()).retry(1))
         .with_dataset(first.dataset::<String>("pages"))
@@ -713,7 +713,7 @@ mod tests {
         let frontier = second.frontier().await.unwrap();
         let crawler = Crawler::new(
             site.clone(),
-            from_fn(collect).layer(Revalidate::new(second.validators())),
+            from_fn(collect).layer(Revalidate::new(second.validator())),
         )
         .with_frontier(frontier.clone())
         .with_dataset(second.dataset::<String>("pages"))

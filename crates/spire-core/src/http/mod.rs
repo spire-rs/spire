@@ -6,6 +6,7 @@ mod request_ext;
 mod response_ext;
 mod uri_ext;
 
+#[doc(no_inline)]
 pub use ::http;
 
 pub(crate) use self::meta::RequestMeta;

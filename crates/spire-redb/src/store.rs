@@ -13,7 +13,7 @@ use crate::codec;
 use crate::dataset::RedbDataset;
 use crate::frontier::RedbFrontier;
 use crate::seen::RedbSeen;
-use crate::validators::RedbValidators;
+use crate::validator::RedbValidator;
 
 /// Queued seeds, by negated priority then insertion order.
 pub(crate) const QUEUE: TableDefinition<(i64, u64), &[u8]> = TableDefinition::new("queue");
@@ -24,9 +24,9 @@ pub(crate) const IN_FLIGHT: TableDefinition<u64, &[u8]> = TableDefinition::new("
 pub(crate) const SCHEDULED: TableDefinition<u64, &[u8]> = TableDefinition::new("scheduled");
 /// The seeds of [`SCHEDULED`] by when they are due, then fingerprint.
 pub(crate) const SCHEDULE: TableDefinition<(u64, u64), ()> = TableDefinition::new("schedule");
-/// Validators of crawled pages, by their request's fingerprint, see
-/// [`RedbValidators`].
-pub(crate) const VALIDATORS: TableDefinition<u64, &[u8]> = TableDefinition::new("validators");
+/// Versions of crawled pages, by their request's fingerprint, see
+/// [`RedbValidator`].
+pub(crate) const PAGE_VERSIONS: TableDefinition<u64, &[u8]> = TableDefinition::new("page_versions");
 /// Fingerprints seen by [`RedbSeen`].
 pub(crate) const SEEN: TableDefinition<u64, ()> = TableDefinition::new("seen");
 /// Counters, such as the next insertion sequence.
@@ -92,6 +92,12 @@ impl Default for RedbStoreBuilder {
 }
 
 impl RedbStoreBuilder {
+    /// Returns a builder with the default options, the same as
+    /// [`RedbStore::builder`].
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Syncs commits to disk at most every `interval`, one second by
     /// default. A crash repeats up to `interval` of work and loses none.
     /// Pending commits are synced when the store is dropped.
@@ -202,11 +208,11 @@ impl RedbStore {
         RedbSeen::new(self.clone())
     }
 
-    /// Returns the validators stored in this database, for conditional
+    /// Returns the page versions stored in this database, for conditional
     /// requests with `Revalidate`.
     #[must_use]
-    pub fn validators(&self) -> RedbValidators {
-        RedbValidators::new(self.clone())
+    pub fn validator(&self) -> RedbValidator {
+        RedbValidator::new(self.clone())
     }
 
     /// Returns the dataset stored in this database under `name`, created on

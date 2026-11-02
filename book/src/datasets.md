@@ -131,7 +131,7 @@ makes unconsumed records available to the next run.
 
 With the `redb` feature, `store.dataset::<T>("products")` keeps items in a
 table of the crawl's own database file. The same `RedbStore` can persist its
-frontier, seen set, validators and scheduled revisits. See
+frontier, seen set, page versions and scheduled revisits. See
 [Persistence with redb](redb.md) for setup and durability settings.
 
 ### SQLite

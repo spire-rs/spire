@@ -13,17 +13,79 @@ and this project adheres to
 - Runtime `Seed` extensions, preserved through cloning and retries and moved
   into requests, without affecting serialization or fingerprints.
 
-- `spire-sqlx` with an opt-in `sqlite` backend: caller-owned pools, versioned
+- `spire-sqlx` with an opt-in `sqlite` backend: `SqliteStore::open` and
+  `SqliteStoreBuilder`, which configure the database without SQLx, or a
+  caller-owned pool through `SqliteStore::new`, versioned
   schema migrations and named JSON datasets with transactional FIFO
   reads and writes, persistent seen sets and raw-byte HTTP validators.
   Its frontier uses exclusive sidecar-lock ownership, automatic in-flight
   recovery, persistent priority ordering and scheduled revisits.
-  The facade exposes it through `sqlite`, also in `full`, and re-exports
-  SQLx as `spire::sqlx`. With `agent`,
-  `AgentStoreExt` provides a persistent `SqliteCache` in the same database.
+  The facade enables it with the `sqlite` feature, also in `full`, and
+  re-exports SQLx as `spire::store::sqlx`. With `agent`, `AgentStoreExt`
+  provides a persistent `SqliteCache` in the same database.
 
 - Offline book link checking in CI and `make book-check`, validating local
   chapter links, heading anchors and assets with pinned Lychee tooling.
+
+- `spire::crawler::HostDelay`, the argument type of `Crawler::with_host_delay`,
+  and `spire::BoxError`, used by `Error::from_boxed` and `Error::with_source`,
+  which were missing from the facade.
+
+- `RedbStoreBuilder::new`, and `SqliteStoreBuilder::new`, the same as the
+  stores' `builder` functions.
+
+### Changed
+
+- **Breaking:** `spire` exports storage types beside the traits they implement,
+  so one module lists every implementation of a trait. Stores and their
+  database crates move to the new `spire::store` module, and `spire::redb` is
+  removed:
+
+  | Before | After |
+  |---|---|
+  | `spire::redb::{RedbStore, RedbStoreBuilder}` | `spire::store::{RedbStore, RedbStoreBuilder}` |
+  | `spire::redb::redb` | `spire::store::redb` |
+  | `spire::redb::RedbDataset` | `spire::dataset::RedbDataset` |
+  | `spire::redb::RedbFrontier` | `spire::frontier::RedbFrontier` |
+  | `spire::redb::RedbSeen` | `spire::frontier::seen::RedbSeen` |
+  | `spire::redb::RedbValidators` | `spire::worker::middleware::RedbValidator` |
+
+  The SQLite types follow the same layout.
+
+- **Breaking:** revalidation types are renamed, because `Validator` held a
+  page's version and validated nothing:
+
+  | Before | After |
+  |---|---|
+  | `struct Validator` | `struct PageVersion` |
+  | `trait Validators` | `trait Validator` |
+  | `InMemValidators` | `InMemValidator` |
+  | `RedbValidators` | `RedbValidator` |
+  | `RedbStore::validators` | `RedbStore::validator` |
+
+- **Breaking:** the redb table of stored page versions is renamed from
+  `validators` to `page_versions`. Existing files keep the old table, unused,
+  and each page is fetched in full once before revalidating again.
+
+- **Breaking:** the `agent-rig` feature of `spire` is renamed to `rig`. It still
+  enables `agent`.
+
+- The `backend`, `frontier` and `http` modules of `spire`, and the new
+  `frontier::seen`, `worker` and `worker::middleware` modules that replace
+  direct re-exports, list their items by name instead of using globs, so new
+  `spire-core` items are no longer published through them automatically.
+
+- Re-exported third-party crates link to their own documentation instead of
+  being inlined.
+
+### Removed
+
+- **Breaking:** the undocumented `spire::prelude`. Import items from their
+  modules, such as `spire::http::RequestExt` and `spire::worker::WorkerExt`.
+
+- **Breaking:** `spire_reqwest::StatusPolicy` and
+  `spire_thirtyfour::StatusPolicy`. Use `spire_core::backend::StatusPolicy`, or
+  `spire::backend::StatusPolicy` through the facade.
 
 ## [0.9.0] - 2026-10-29
 

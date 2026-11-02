@@ -45,6 +45,10 @@ spire = { version = "0.9.0", features = ["reqwest", "macros"] }
 
 See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html) page for configuration.
 
+Applications depend on `spire`, which re-exports everything a crawl needs.
+Depend on `spire-core` directly to implement a backend, a frontier or a
+dataset.
+
 ## Quick Start
 
 Crawl a listing, follow its pagination and extract every product:

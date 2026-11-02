@@ -97,7 +97,8 @@ not retried. `StatusPolicy::Accept` returns every response to the handler
 instead:
 
 ```rust
-use spire_reqwest::{ReqwestBackend, StatusPolicy};
+use spire_core::backend::StatusPolicy;
+use spire_reqwest::ReqwestBackend;
 
 let backend = ReqwestBackend::new().with_status_policy(StatusPolicy::Accept);
 ```

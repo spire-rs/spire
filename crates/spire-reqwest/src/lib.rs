@@ -9,7 +9,7 @@ mod client;
 mod clients;
 mod conversion;
 
+#[doc(no_inline)]
 pub use reqwest;
-pub use spire_core::backend::StatusPolicy;
 
 pub use crate::client::{ReqwestBackend, ReqwestSession};

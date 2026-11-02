@@ -20,7 +20,7 @@ CREATE TABLE spire_seen (
 
 -- Conditional HTTP request headers retain their raw bytes, including non-UTF-8
 -- values. A missing header is NULL rather than an empty header value.
-CREATE TABLE spire_validators (
+CREATE TABLE spire_page_versions (
     fingerprint BLOB PRIMARY KEY NOT NULL CHECK(length(fingerprint) = 8),
     etag BLOB,
     last_modified BLOB

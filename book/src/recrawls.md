@@ -78,7 +78,7 @@ change, so its handlers are skipped:
 ```rust,no_run
 use spire::backend::ReqwestBackend;
 use spire::frontier::FrontierExt;
-use spire::redb::RedbStore;
+use spire::store::RedbStore;
 use spire::worker::WorkerExt;
 use spire::worker::middleware::Revalidate;
 use spire::{Crawler, Result, Router};
@@ -88,7 +88,7 @@ use spire::{Crawler, Result, Router};
 let store = RedbStore::open("crawl.redb").await?;
 let router = Router::new()
     .fallback(page)
-    .layer(Revalidate::new(store.validators()));
+    .layer(Revalidate::new(store.validator()));
 let crawler = Crawler::new(ReqwestBackend::default(), router)
     .with_frontier(store.frontier().dedup_with(store.seen()));
 
@@ -98,9 +98,9 @@ println!("{} pages unchanged", stats.unchanged);
 # }
 ```
 
-- Validators are stored once a page's handlers continued, so a page whose
+- Page versions are stored once a page's handlers continued, so a page whose
   extraction failed is fetched in full next time.
-- `InMemValidators` keeps them for one run; `store.validators()` keeps them
+- `InMemValidator` keeps them for one run; `store.validator()` keeps them
   in the redb file, so later runs are conditional too.
 - Only `GET` and `HEAD` requests are revalidated, and only over HTTP:
   browsers handle conditional requests themselves.

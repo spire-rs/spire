@@ -17,37 +17,38 @@ use crate::worker::Outcome;
 /// What identifies a page's version, from its response: its `ETag` and
 /// `Last-Modified` headers, see [`Revalidate`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Validator {
+pub struct PageVersion {
     /// The page's `ETag`.
     pub etag: Option<HeaderValue>,
     /// The page's `Last-Modified`.
     pub last_modified: Option<HeaderValue>,
 }
 
-impl Validator {
-    /// Reads the validator of a response with `headers`, or `None` if it has
+impl PageVersion {
+    /// Reads the version of a response with `headers`, or `None` if it has
     /// neither header.
     #[must_use]
     pub fn from_headers(headers: &HeaderMap) -> Option<Self> {
-        let validator = Self {
+        let version = Self {
             etag: headers.get(ETAG).cloned(),
             last_modified: headers.get(LAST_MODIFIED).cloned(),
         };
-        (validator != Self::default()).then_some(validator)
+        (version != Self::default()).then_some(version)
     }
 }
 
-/// Stores the [`Validator`]s of the pages a crawl has seen, by the
+/// Stores the [`PageVersion`]s of the pages a crawl has seen, by the
 /// [`Fingerprint`] of their request.
-pub trait Validators: Send + Sync + 'static {
-    /// Returns the validator stored for `request`, if any.
+pub trait Validator: Send + Sync + 'static {
+    /// Returns the version stored for `request`, if any.
     ///
     /// # Errors
     ///
     /// Returns an error if the underlying storage fails.
-    fn get(&self, request: Fingerprint) -> impl Future<Output = Result<Option<Validator>>> + Send;
+    fn get(&self, request: Fingerprint)
+    -> impl Future<Output = Result<Option<PageVersion>>> + Send;
 
-    /// Stores `validator` for `request`, replacing any earlier one.
+    /// Stores `version` for `request`, replacing any earlier one.
     ///
     /// # Errors
     ///
@@ -55,17 +56,17 @@ pub trait Validators: Send + Sync + 'static {
     fn set(
         &self,
         request: Fingerprint,
-        validator: Validator,
+        version: PageVersion,
     ) -> impl Future<Output = Result<()>> + Send;
 }
 
-/// [`Validators`] kept in memory, for one run. Clones share the store.
+/// [`Validator`] kept in memory, for one run. Clones share the store.
 #[derive(Debug, Clone, Default)]
-pub struct InMemValidators {
-    inner: Arc<Mutex<HashMap<Fingerprint, Validator>>>,
+pub struct InMemValidator {
+    inner: Arc<Mutex<HashMap<Fingerprint, PageVersion>>>,
 }
 
-impl InMemValidators {
+impl InMemValidator {
     /// Creates an empty store.
     #[must_use]
     pub fn new() -> Self {
@@ -73,17 +74,20 @@ impl InMemValidators {
     }
 }
 
-impl Validators for InMemValidators {
-    fn get(&self, request: Fingerprint) -> impl Future<Output = Result<Option<Validator>>> + Send {
+impl Validator for InMemValidator {
+    fn get(
+        &self,
+        request: Fingerprint,
+    ) -> impl Future<Output = Result<Option<PageVersion>>> + Send {
         ready(Ok(lock(&self.inner).get(&request).cloned()))
     }
 
     fn set(
         &self,
         request: Fingerprint,
-        validator: Validator,
+        version: PageVersion,
     ) -> impl Future<Output = Result<()>> + Send {
-        lock(&self.inner).insert(request, validator);
+        lock(&self.inner).insert(request, version);
         ready(Ok(()))
     }
 }
@@ -91,39 +95,39 @@ impl Validators for InMemValidators {
 /// A [`Middleware`] that crawls only pages changed since the crawl last saw
 /// them, with conditional requests.
 ///
-/// For a `GET` or `HEAD` whose page has a stored [`Validator`], it sends
+/// For a `GET` or `HEAD` whose page has a stored [`PageVersion`], it sends
 /// `If-None-Match` and `If-Modified-Since`, unless the request has them
 /// already. A server answering `304 Not Modified` says the page did not
 /// change: the handlers are skipped, the request is done, and the crawl
 /// counts it in [`Stats::unchanged`](crate::crawler::Stats::unchanged).
-/// Otherwise the handlers run, and the response's validator is stored once
+/// Otherwise the handlers run, and the response's version is stored once
 /// they continued, so a page whose handlers failed is fetched in full next
 /// time.
 ///
-/// Validators kept on disk, e.g. in a redb store, make later runs
+/// A [`Validator`] kept on disk, e.g. in a redb store, makes later runs
 /// conditional too. Browsers handle conditional requests themselves, so it
 /// is meant for HTTP backends.
 ///
 /// ```
 /// use spire_core::backend::Noop;
-/// use spire_core::worker::middleware::{InMemValidators, Revalidate};
+/// use spire_core::worker::middleware::{InMemValidator, Revalidate};
 /// use spire_core::worker::{WorkerExt, from_fn};
 /// use spire_core::crawler::Crawler;
 /// use spire_core::Context;
 ///
 /// let worker = from_fn(|cx: Context<Noop>| async move { cx.body().await.map(drop) })
-///     .layer(Revalidate::new(InMemValidators::new()));
+///     .layer(Revalidate::new(InMemValidator::new()));
 /// let crawler = Crawler::new(Noop, worker);
 /// ```
 #[derive(Clone)]
 pub struct Revalidate<V> {
-    validators: V,
+    validator: V,
 }
 
 impl<V> Revalidate<V> {
-    /// Revalidates pages with the validators in `validators`.
-    pub const fn new(validators: V) -> Self {
-        Self { validators }
+    /// Revalidates pages with the versions in `validator`.
+    pub const fn new(validator: V) -> Self {
+        Self { validator }
     }
 }
 
@@ -136,7 +140,7 @@ impl<V> fmt::Debug for Revalidate<V> {
 impl<C, V> Middleware<C> for Revalidate<V>
 where
     C: Session,
-    V: Validators,
+    V: Validator,
 {
     async fn handle(&self, mut cx: Context<C>, next: Next<C>) -> Outcome {
         let request = cx.request();
@@ -145,7 +149,7 @@ where
         }
         let key = fingerprint(request.method(), request.uri(), request.body());
 
-        let stored = match self.validators.get(key).await {
+        let stored = match self.validator.get(key).await {
             Ok(stored) => stored,
             Err(error) => return Outcome::Fail(error),
         };
@@ -167,12 +171,12 @@ where
             Ok(response) if response.status() == StatusCode::NOT_MODIFIED => {
                 return Outcome::Continue;
             }
-            Ok(response) => Validator::from_headers(response.headers()),
+            Ok(response) => PageVersion::from_headers(response.headers()),
             Err(error) => return Outcome::Fail(error),
         };
         let outcome = next.run(cx).await;
         if let (Outcome::Continue, Some(fresh)) = (&outcome, fresh)
-            && let Err(error) = self.validators.set(key, fresh).await
+            && let Err(error) = self.validator.set(key, fresh).await
         {
             return Outcome::Fail(error);
         }
@@ -191,9 +195,9 @@ mod tests {
     use crate::worker::{WorkerExt, from_fn};
     use crate::{Error, Result};
 
-    /// Crawls `site`'s `/` once with `validators`, returning how many times
+    /// Crawls `site`'s `/` once with `validator`, returning how many times
     /// the handler ran and the crawl's unchanged count.
-    async fn crawl(site: &MockSite, validators: &InMemValidators) -> (usize, usize) {
+    async fn crawl(site: &MockSite, validator: &InMemValidator) -> (usize, usize) {
         let runs = Arc::new(Mutex::new(0));
         let worker = {
             let runs = Arc::clone(&runs);
@@ -206,7 +210,7 @@ mod tests {
                 }
             })
         };
-        let worker = worker.layer(Revalidate::new(validators.clone()));
+        let worker = worker.layer(Revalidate::new(validator.clone()));
         let crawler = Crawler::new(site.clone(), worker)
             .with_seed(Seed::get("https://example.com/").unwrap());
         let stats = crawler.run().await.unwrap();
@@ -219,57 +223,57 @@ mod tests {
         let page =
             MockPage::html("<p>Hi</p>").with_header(ETAG, HeaderValue::from_static("\"v1\""));
         let site = MockSite::new().page("https://example.com/", page);
-        let validators = InMemValidators::new();
+        let validator = InMemValidator::new();
 
-        // Fetched in full, and its validator stored.
-        assert_eq!(crawl(&site, &validators).await, (1, 0));
+        // Fetched in full, and its version stored.
+        assert_eq!(crawl(&site, &validator).await, (1, 0));
         let key = Seed::get("https://example.com/").unwrap().fingerprint();
-        let stored = validators.get(key).await.unwrap().unwrap();
+        let stored = validator.get(key).await.unwrap().unwrap();
         assert_eq!(stored.etag.unwrap(), "\"v1\"");
 
         // Then revalidated: unchanged, so the handler does not run.
-        assert_eq!(crawl(&site, &validators).await, (0, 1));
+        assert_eq!(crawl(&site, &validator).await, (0, 1));
     }
 
     #[tokio::test]
-    async fn changed_pages_and_pages_without_validators_run_their_handlers() -> Result<()> {
-        let validators = InMemValidators::new();
+    async fn changed_pages_and_pages_without_versions_run_their_handlers() -> Result<()> {
+        let validator = InMemValidator::new();
         let v1 = MockPage::html("1").with_header(ETAG, HeaderValue::from_static("\"v1\""));
         let v2 = MockPage::html("2").with_header(ETAG, HeaderValue::from_static("\"v2\""));
         crawl(
             &MockSite::new().page("https://example.com/", v1),
-            &validators,
+            &validator,
         )
         .await;
         assert_eq!(
             crawl(
                 &MockSite::new().page("https://example.com/", v2),
-                &validators
+                &validator
             )
             .await,
             (1, 0)
         );
 
         let plain = MockSite::new().page("https://example.com/", MockPage::html("x"));
-        let fresh = InMemValidators::new();
+        let fresh = InMemValidator::new();
         assert_eq!(crawl(&plain, &fresh).await, (1, 0));
         assert_eq!(crawl(&plain, &fresh).await, (1, 0), "nothing to revalidate");
         Ok(())
     }
 
     #[tokio::test]
-    async fn failed_handlers_store_no_validator() {
+    async fn failed_handlers_store_no_version() {
         let page = MockPage::html("x").with_header(ETAG, HeaderValue::from_static("\"v1\""));
         let site = MockSite::new().page("https://example.com/", page);
-        let validators = InMemValidators::new();
+        let validator = InMemValidator::new();
         let failing =
             from_fn(|_: Context<MockSession>| async { Err::<(), _>(Error::worker("bad page")) })
-                .layer(Revalidate::new(validators.clone()));
+                .layer(Revalidate::new(validator.clone()));
         let crawler =
             Crawler::new(site, failing).with_seed(Seed::get("https://example.com/").unwrap());
         crawler.run().await.unwrap();
 
         let key = Seed::get("https://example.com/").unwrap().fingerprint();
-        assert_eq!(validators.get(key).await.unwrap(), None);
+        assert_eq!(validator.get(key).await.unwrap(), None);
     }
 }

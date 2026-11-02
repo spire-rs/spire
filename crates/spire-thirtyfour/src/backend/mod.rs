@@ -29,9 +29,9 @@ use crate::session::ThirtyfourSession;
 ///
 /// The backend speaks WebDriver BiDi, which current chromedriver and
 /// geckodriver support: responses carry the page's real status and headers,
-/// error statuses follow the [`StatusPolicy`](crate::StatusPolicy), and requests are sent with
-/// their method, headers and body. Starting a session fails on a WebDriver
-/// server without BiDi.
+/// error statuses follow the [`StatusPolicy`](spire_core::backend::StatusPolicy),
+/// and requests are sent with their method, headers and body. Starting a
+/// session fails on a WebDriver server without BiDi.
 ///
 /// Call [`close`](Self::close) once the crawl is over, to quit every session
 /// before going on. A backend dropped without it quits its sessions on

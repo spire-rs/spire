@@ -1,7 +1,7 @@
 # Persistence with redb
 
 With the `redb` feature, a `RedbStore` keeps a whole crawl in one file on
-disk: its queue, the URLs it has seen, what it scraped, the validators of the
+disk: its queue, the URLs it has seen, what it scraped, the versions of the
 pages it fetched, and its scheduled revisits. Reopening the file resumes the
 crawl where it stopped, after a clean stop or a crash.
 
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use spire::backend::ReqwestBackend;
 use spire::frontier::FrontierExt;
 use spire::frontier::seed::Seed;
-use spire::redb::RedbStore;
+use spire::store::RedbStore;
 use spire::worker::WorkerExt;
 use spire::worker::middleware::Revalidate;
 use spire::{Crawler, Result, Router};
@@ -25,7 +25,7 @@ struct Product {
 let store = RedbStore::open("crawl.redb").await?;
 let router = Router::new()
     .fallback(page)
-    .layer(Revalidate::new(store.validators()));
+    .layer(Revalidate::new(store.validator()));
 let crawler = Crawler::new(ReqwestBackend::default(), router)
     .with_frontier(store.frontier().dedup_with(store.seen()).retry(3))
     .with_dataset(store.dataset::<Product>("products"))
@@ -41,7 +41,11 @@ crawler.run().await?;
 | `frontier()` | Queued seeds, by priority then insertion order, and scheduled revisits | [Seeds and the frontier](frontier.md), [Recrawls](recrawls.md) |
 | `seen()` | Every fingerprint seen, exact, on disk | [Seeds and the frontier](frontier.md) |
 | `dataset::<T>(name)` | Items of type `T`, a table per name | [Storing results](datasets.md) |
-| `validators()` | Pages' `ETag` and `Last-Modified` | [Recrawls](recrawls.md) |
+| `validator()` | Pages' `ETag` and `Last-Modified` | [Recrawls](recrawls.md) |
+
+The facade exports these services beside their traits: `RedbFrontier` in
+`spire::frontier`, `RedbSeen` in `spire::frontier::seen`, `RedbDataset` in
+`spire::dataset` and `RedbValidator` in `spire::worker::middleware`.
 
 ## What survives a crash
 
@@ -75,5 +79,5 @@ against 11 ms synced each time.
 The store's file is the crawl's own. redb locks its file and lets one
 transaction write at a time, so an application's own tables, e.g. a search
 index, belong in a database of their own, where they do not wait on the
-frontier's every commit. `spire::redb::redb` re-exports redb at the version
+frontier's every commit. `spire::store::redb` re-exports redb at the version
 spire uses.
