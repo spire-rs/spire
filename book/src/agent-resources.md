@@ -69,7 +69,7 @@ spire = { version = "0.9.0", features = ["agent", "redb"] }
 ```rust,no_run
 use spire::agent::{Agent, Provider};
 use spire::agent::cache::AgentStoreExt;
-use spire::redb::RedbStore;
+use spire::store::RedbStore;
 
 # async fn configure(provider: impl Provider) -> spire::Result<Agent> {
 let store = RedbStore::open("crawl.redb").await?;
@@ -91,7 +91,7 @@ use the same extension trait with `SqliteStore`:
 ```rust,no_run
 use spire::agent::{Agent, Provider};
 use spire::agent::cache::AgentStoreExt;
-use spire::sqlite::SqliteStore;
+use spire::store::SqliteStore;
 
 # fn configure(provider: impl Provider, store: &SqliteStore) -> Agent {
 let agent = Agent::new(provider)
@@ -103,7 +103,7 @@ let agent = Agent::new(provider)
 The first cache operation applies embedded SQL migrations for the reserved
 `spire_agent_cache` table. Its independent history lives in
 `_spire_agent_migrations`, leaving application and crawl storage migrations
-alone. The pool must permit schema creation and upgrades. SQL work stays
-asynchronous and uses the caller's durability settings. Enabling a feature only exposes the
+alone. The connection must permit schema creation and upgrades. SQL work stays
+asynchronous and uses the store's durability settings. Enabling a feature only exposes the
 cache; `Agent::with_cache` attaches it. See [Persistence with SQLite](sqlite.md) for
 pool configuration and other services sharing the database.

@@ -5,7 +5,7 @@
 #[cfg(feature = "sqlite")]
 mod error;
 
-/// SQLite frontiers, datasets, seen sets and HTTP validators.
+/// SQLite frontiers, datasets, seen sets and validators.
 #[cfg(feature = "sqlite")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
 pub mod sqlite;

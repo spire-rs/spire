@@ -10,7 +10,7 @@ database, a queue service, or memory shared with something else.
 | `SeenSet` | Fingerprints of seeds seen before | `InMemSeen`, `BloomSeen`, `RedbSeen`, `SqliteSeen` |
 | `Schedule` | Seeds held back until a time, for revisits | `InMemFrontier`, `RedbFrontier`, `SqliteFrontier` |
 | `Dataset<T>` | Scraped items | `InMemDataset`, `JsonlDataset`, `CsvDataset`, `RedbDataset`, `SqliteDataset` |
-| `Validators` | Pages' `ETag` and `Last-Modified` | `InMemValidators`, `RedbValidators`, `SqliteValidators` |
+| `Validator` | Pages' `ETag` and `Last-Modified` | `InMemValidator`, `RedbValidator`, `SqliteValidator` |
 
 ## Datasets
 
@@ -110,6 +110,6 @@ as well lets [revisits](recrawls.md) sit on it.
 ## Seen sets and validators
 
 A `SeenSet` has one method, `insert`, returning whether the fingerprint is
-new. `Validators` has `get` and `set`, by the fingerprint of the request.
+new. `Validator` has `get` and `set`, by the fingerprint of the request.
 Both are shared by every request, so they take `&self` and synchronize
 inside.

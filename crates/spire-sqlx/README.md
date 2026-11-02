@@ -18,9 +18,9 @@ SQLx-backed crawl storage for Spire, with independently enabled database backend
 ## Overview
 
 The `sqlite` module provides `SqliteStore`, `SqliteFrontier`,
-`SqliteDataset<T>`, `SqliteSeen` and `SqliteValidators`. A store
-uses a caller-owned connection pool; each named dataset stores JSON records and
-reads them destructively in FIFO order. Batch operations are transactional,
+`SqliteDataset<T>`, `SqliteSeen` and `SqliteValidator`. A store opens its
+own database file, or uses a connection pool you configured; each named dataset
+stores JSON records and reads them destructively in FIFO order. Batch operations are transactional,
 including decoding: an incompatible record leaves the whole batch stored.
 
 The frontier serializes seeds when enqueueing or scheduling them. Caller-attached
@@ -34,7 +34,7 @@ page for configuration.
 
 ## Usage
 
-Enable `sqlite` on `spire` for `spire::sqlite`, or depend on `spire-sqlx`
+Enable `sqlite` on `spire` for `spire::store::SqliteStore`, or depend on `spire-sqlx`
 with its `sqlite` feature directly:
 
 ```toml
@@ -46,34 +46,29 @@ spire-sqlx = { version = "0.9.0", features = ["sqlite"] }
 # #[cfg(feature = "sqlite")] {
 use spire_core::dataset::Dataset;
 use spire_sqlx::sqlite::SqliteStore;
-use spire_sqlx::sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
 # async fn example() -> Result<(), spire_core::BoxError> {
-let pool = SqlitePoolOptions::new()
-    .max_connections(1)
-    .connect_with(
-        SqliteConnectOptions::new()
-            .filename("crawl.sqlite")
-            .create_if_missing(true),
-    )
-    .await?;
-let store = SqliteStore::new(pool.clone());
-store.initialize().await?;
+let store = SqliteStore::open("crawl.sqlite").await?;
 let titles = store.dataset::<String>("titles");
 titles.write("Example Domain".into()).await?;
 assert_eq!(titles.read().await?.as_deref(), Some("Example Domain"));
-pool.close().await;
+store.close().await;
 # Ok(())
 # }
 # }
 ```
 
-Initialization applies embedded SQL migrations to the reserved `spire_*`
+`SqliteStore::open` uses write-ahead logging, `synchronous=NORMAL`, a five-second
+busy timeout and one connection; `SqliteStore::builder` changes all but the
+first. WAL is saved in the file, so opening an existing database converts it.
+`SqliteStore::new` instead uses a pool you created, whose options the store
+never changes, followed by `store.initialize().await?`.
+
+Opening or initializing applies embedded SQL migrations to the reserved `spire_*`
 crawl tables, tracking versions and checksums in `_spire_sqlx_migrations`.
 The application's `_sqlx_migrations` table and other schema remain untouched.
-Schema changes and migration history commit together. Repeating initialization
-is safe; changed applied migrations and unknown versions are rejected.
-Pool, locking and durability options are never changed by the store.
+Schema changes and migration history commit together. Repeating this is safe;
+changed applied migrations and unknown versions are rejected.
 
 `store.frontier().await?` acquires exclusive ownership through a sidecar
 file lock and requeues abandoned in-flight requests. Clones share ownership;

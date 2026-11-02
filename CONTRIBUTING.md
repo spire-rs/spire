@@ -52,23 +52,37 @@ cargo install cargo-deny cargo-machete --locked
 
 ### Building the Project
 
-The `Makefile` mirrors the CI checks:
+These commands mirror the CI checks:
 
 ```bash
 # Build the project with all features
 cargo build --all-features
 
-# Check, format, clippy, tests, docs and machete, as CI runs them
-make ci
+# Check
+cargo check --workspace --no-default-features
+cargo check --workspace --all-features
 
 # Fix the formatting with nightly rustfmt
-make fmt
+cargo +nightly fmt --all
+
+# Clippy
+cargo clippy --workspace -- -D warnings
+cargo clippy --workspace --all-features --all-targets -- -D warnings
+
+# Tests
+cargo test --workspace --all-features
+
+# Docs, as docs.rs builds them
+RUSTDOCFLAGS="--cfg docsrs -D warnings" cargo +nightly doc --no-deps --all-features --workspace
+
+# Unused dependencies
+cargo machete
 
 # Check advisories, licenses and sources with cargo-deny
-make security
+cargo deny check all
 
 # Package and verify every publishable crate
-make publish-dry-run
+cargo publish --workspace --dry-run
 ```
 
 ## Making Changes
@@ -109,16 +123,16 @@ routing, HTML extraction and sitemap parsing. Run them all, or filter by
 name:
 
 ```bash
-make bench
-make bench ARGS=frontier
+cargo bench --workspace --all-features --bench '*'
+cargo bench --workspace --all-features --bench '*' -- frontier
 ```
 
 To check a change for regressions, save a baseline on `main` and compare
 your branch against it:
 
 ```bash
-make bench ARGS="--save-baseline main"
-make bench ARGS="--baseline main"
+cargo bench --workspace --all-features --bench '*' -- --save-baseline main
+cargo bench --workspace --all-features --bench '*' -- --baseline main
 ```
 
 CI compiles the benchmarks but does not run them: timings on shared runners
@@ -128,7 +142,7 @@ are too noisy to gate a merge. Reports are written to `target/criterion`.
 
 This project follows the standard Rust style guidelines:
 
-- Format with nightly rustfmt (`make fmt`), which applies the import grouping
+- Format with nightly rustfmt (`cargo +nightly fmt --all`), which applies the import grouping
   in `rustfmt.toml`
 - Ensure `cargo clippy` passes with no warnings
 - Add documentation comments (`///`) for public APIs
@@ -154,7 +168,7 @@ Before submitting book changes, run the same offline link check as CI:
 
 ```bash
 cargo install lychee --version 0.24.2 --locked
-make book-check
+scripts/book-check.sh
 ```
 
 This builds the book and checks chapter links, heading anchors and local
@@ -162,8 +176,9 @@ assets in the rendered HTML. External URLs are skipped. The check mirrors
 GitHub Pages' `/spire/` URL prefix in a temporary directory; the published
 book stays in `book/book`.
 
-Its examples are doctests of the `spire` crate, so `make test` compiles them,
-and runs those that need no network. Mark examples that crawl a real site
+Its examples are doctests of the `spire` crate, so
+`cargo test --workspace --all-features` compiles them, and runs those that need
+no network. Mark examples that crawl a real site
 `no_run`, and hide boilerplate with `# ` lines, which both rustdoc and mdBook
 hide.
 

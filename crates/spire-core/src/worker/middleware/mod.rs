@@ -45,7 +45,7 @@ use std::sync::Arc;
 
 use futures::future::BoxFuture;
 pub use header::SetHeader;
-pub use revalidate::{InMemValidators, Revalidate, Validator, Validators};
+pub use revalidate::{InMemValidator, PageVersion, Revalidate, Validator};
 
 use crate::context::Context;
 use crate::worker::{IntoOutcome, Outcome, Worker};

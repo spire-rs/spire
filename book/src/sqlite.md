@@ -5,41 +5,96 @@ lives in `spire-sqlx` behind its own `sqlite` feature, independently of other
 SQL drivers. SQL dependencies are kept out of `spire-core`. The SQLite driver
 builds a bundled SQLite library, requiring a C compiler.
 
-SQLite runs inside your process. Opening a pool opens the database file;
-`create_if_missing(true)` creates it when needed. There is no database server
-to start.
+SQLite runs inside your process, so there is no database server to start.
 
-## Pool and schema ownership
+## Opening a store
 
-The application creates and owns the SQLx pool. `SqliteStore::new(pool)` only
-stores a pool handle; it performs no SQL and changes no pool options.
-Call `store.initialize().await?` explicitly before using storage services.
-It applies embedded, versioned SQL migrations to the `spire_dataset_*`,
-`spire_seen`, `spire_validators`, `spire_frontier_*` and `spire_frontier_scheduled*`
-tables and indexes. Spire records applied versions and checksums in
-`_spire_sqlx_migrations`, leaving the application's `_sqlx_migrations` table
-and other application schema untouched.
+`SqliteStore::open(path)` creates the database file if needed and applies
+Spire's schema. `SqliteStore::builder()` opens one with options:
 
-Initialization uses one write transaction, including migration history.
-Concurrent initializers serialize; repeated calls are safe. If a migration
-fails, its schema changes and history are rolled back together. Untracked
-tables with reserved Spire names are rejected rather than adopted. Changed
-migration checksums and versions unknown to this library also produce an
-error. The pool must permit schema creation and upgrades.
+| Setting | Default | Builder option |
+|---|---|---|
+| Journal mode | Write-ahead logging (WAL) | None |
+| `synchronous` | `NORMAL` | `sync_always()` for `FULL` |
+| Busy timeout | 5 seconds | `busy_timeout(duration)` |
+| Connections | 1 | `max_connections(limit)` |
 
-New library migrations run only when `initialize()` is called. Initialize
+```rust,no_run
+use std::time::Duration;
+
+use spire::store::SqliteStore;
+
+# async fn open() -> spire::Result<()> {
+let store = SqliteStore::builder()
+    .sync_always()
+    .busy_timeout(Duration::from_secs(10))
+    .open("crawl.sqlite")
+    .await?;
+# Ok(())
+# }
+```
+
+By default, commits survive an application crash. A power loss or system crash
+may roll back the latest commits, to an earlier consistent state, so a crawl
+repeats some work and resumes. `sync_always()` keeps every commit through those
+too, at a cost in throughput.
+
+SQLite saves WAL mode in the file, so opening an existing database converts it,
+and it keeps `-wal` and `-shm` files beside it. To share a database with an
+application that manages its settings, [use your own pool](#using-your-own-pool).
+
+One connection serializes SQLite work without lock contention, and suits most
+crawls. SQLite allows one writer at a time, so more connections only help
+concurrent reads.
+
+`store.close().await` closes the store's connections, for every clone of it.
+
+## Using your own pool
+
+`SqliteStore::new(pool)` uses a SQLx pool you created, from the upstream crate
+at `spire::store::sqlx`. It stores a handle, performs no SQL and changes no pool
+options: journal mode, `synchronous`, busy timeout and connection limits remain
+yours, so durability follows your configuration. Call
+`store.initialize().await?` before using storage services. In-memory databases
+need their own pool. They disappear when their connections close.
+
+```rust,no_run
+use spire::store::SqliteStore;
+use spire::store::sqlx::sqlite::SqlitePoolOptions;
+
+# async fn open() -> Result<(), spire::BoxError> {
+let pool = SqlitePoolOptions::new()
+    .max_connections(1)
+    .connect("sqlite:crawl.sqlite?mode=rwc")
+    .await?;
+let store = SqliteStore::new(pool);
+store.initialize().await?;
+# Ok(())
+# }
+```
+
+With more than one connection, configure a busy timeout and consider WAL.
+
+## Schema migrations
+
+`open` and `initialize` apply embedded, versioned SQL migrations to the
+`spire_dataset_*`, `spire_seen`, `spire_page_versions`, `spire_frontier_*` and
+`spire_frontier_scheduled*` tables and indexes. Spire records applied versions
+and checksums in `_spire_sqlx_migrations`, leaving the application's
+`_sqlx_migrations` table and other application schema untouched.
+
+Migrations use one write transaction, including migration history. Concurrent
+runs serialize; repeated runs are safe. If a migration fails, its schema changes
+and history are rolled back together. Untracked tables with reserved Spire names
+are rejected rather than adopted. Changed migration checksums and versions
+unknown to this library also produce an error. The connection must permit schema
+creation and upgrades.
+
+New library migrations run only when you open or initialize a store. Do so
 before opening a frontier, and stop existing crawls that use the database
 before applying upgrades. Keep released migration files unchanged and add
-new versions for later schema changes.
-Your JSON record schema and application migrations remain your responsibility.
-
-For a simple crawl, one connection serializes SQLite work without lock
-contention. For more connections, configure a busy timeout and consider WAL.
-SQLite still allows only one writer at a time. The store never changes
-journal mode, `synchronous`, busy timeout, or connection limits. Durability
-therefore follows the caller's SQLite configuration; use `synchronous=FULL`
-when stronger commit durability is required. In-memory databases disappear
-when their connections close; a file-backed database can be reopened.
+new versions for later schema changes. Your JSON record schema and application
+migrations remain your responsibility.
 
 ## A crawl with persistent results
 
@@ -47,13 +102,10 @@ This example uses offline pages; enable `sqlite` and `testing`. The same
 dataset works with a real HTTP or browser backend.
 
 ```rust,no_run
-use std::time::Duration;
-
 use spire::extract::{Data, html::Html};
 use spire::frontier::FrontierExt;
 use spire::frontier::seed::Seed;
-use spire::sqlite::SqliteStore;
-use spire::sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteSynchronous};
+use spire::store::SqliteStore;
 use spire::testing::{MockPage, MockSite};
 use spire::worker::{WorkerExt, middleware::Revalidate};
 use spire::{Crawler, Result, Router};
@@ -63,21 +115,10 @@ async fn page(html: Html, titles: Data<String>) -> Result<()> {
 }
 
 # async fn crawl() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-let pool = SqlitePoolOptions::new()
-    .max_connections(1)
-    .connect_with(
-        SqliteConnectOptions::new()
-            .filename("crawl.sqlite")
-            .create_if_missing(true)
-            .busy_timeout(Duration::from_secs(5))
-            .synchronous(SqliteSynchronous::Full),
-    )
-    .await?;
-let store = SqliteStore::new(pool.clone());
-store.initialize().await?;
+let store = SqliteStore::open("crawl.sqlite").await?;
 let site = MockSite::new().page("https://example.com/", MockPage::html("<title>Example Domain</title>"));
 let worker = Router::new().fallback(page)
-    .layer(Revalidate::new(store.validators()));
+    .layer(Revalidate::new(store.validator()));
 let frontier = store.frontier().await?.dedup_with(store.seen()).retry(3);
 let crawler = Crawler::new(site, worker)
     .with_frontier(frontier)
@@ -88,10 +129,16 @@ for title in crawler.dataset::<String>()?.read_all().await? {
     println!("{title}");
 }
 drop(crawler); // Release frontier ownership before another crawl opens it.
-pool.close().await;
+store.close().await;
 # Ok(())
 # }
 ```
+
+The facade exports the store's services beside their traits: `SqliteDataset`
+in `spire::dataset`, `SqliteFrontier` in `spire::frontier`, `SqliteSeen` in
+`spire::frontier::seen` and `SqliteValidator` in `spire::worker::middleware`.
+
+`SqliteStoreBuilder` is in `spire::store`, beside the store.
 
 Direct integrations can use `spire_sqlx::sqlite::SqliteStore` and the
 `spire_sqlx::sqlx` crate re-export instead of the facade.
@@ -114,7 +161,7 @@ Batch writes serialize all records first and insert them in one transaction.
 Batch reads select, decode and delete in one `BEGIN IMMEDIATE` transaction,
 avoiding competing read-to-write lock upgrades. Any SQL or decode failure
 rolls the batch back. A malformed record can block reads until repaired or
-removed through the caller's pool; inspect and repair before retrying.
+removed through `store.pool()`; inspect and repair before retrying.
 SQLite failures are reported as `ErrorKind::Dataset`, with the original
 error preserved as the source. `size_hint()` returns `None`; use the async
 `len()` when an exact current count is needed.
@@ -132,9 +179,9 @@ once across concurrent connections. Use it with `.dedup_with(store.seen())`
 on a frontier to retain deduplication across restarts. Fingerprints are
 stored as eight-byte blobs so the entire unsigned 64-bit range is preserved.
 
-`store.validators()` implements `Validators` for the `Revalidate` middleware.
+`store.validator()` implements `Validator` for the `Revalidate` middleware.
 ETag and Last-Modified are stored as raw bytes, including non-UTF-8 values.
-Replacing a validator also clears headers absent from its replacement.
+Replacing a page version also clears headers absent from its replacement.
 Both services share the store's pool and durability settings. Their `len()`
 and `is_empty()` queries are asynchronous.
 

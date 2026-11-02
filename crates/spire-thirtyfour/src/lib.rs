@@ -9,7 +9,7 @@ mod backend;
 mod error;
 mod session;
 
-pub use spire_core::backend::StatusPolicy;
+#[doc(no_inline)]
 pub use thirtyfour;
 
 pub use crate::backend::{ThirtyfourBackend, ThirtyfourBuilder};

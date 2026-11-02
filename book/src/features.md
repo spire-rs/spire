@@ -9,7 +9,7 @@ HTTP crawl, start with the dependency setup in [Installation](installation.md).
 |---|---|
 | `html` (default) | HTML extractors including `Html` and `Links`, the `Select` trait, `Collect` and `FollowLinks` |
 | `agent` | Model extraction; also enables `markdown` |
-| `agent-rig` | Rig model adapter and the upstream Rig crate; enables `agent` |
+| `rig` | Rig model adapter and the upstream Rig crate; enables `agent` |
 | `markdown` | The `Markdown` extractor; also enables `html` |
 | `macros` | `Select`, `FromRef`, `Tags` and `Revisit` derives; also enables `html` |
 | `reqwest` | `ReqwestBackend`, the HTTP backend |
@@ -107,7 +107,7 @@ No features are enabled by default on `spire-agent`:
 | `sqlite` | `SqliteCache` and the `SqliteStore` implementation of `AgentStoreExt` |
 | `testing` | `testing::Script`, an offline provider |
 
-Enable `agent-rig` on the facade or `rig` directly on `spire-agent` for Rig
+Enable `rig` on the facade or directly on `spire-agent` for Rig
 integration. With `agent` and `redb`, `RedbCache` and
 `AgentStoreExt::agent_cache()` are available. A cache is used only when attached
 with `Agent::with_cache`. With `agent` and `testing`, `spire::testing::Script`
@@ -116,9 +116,9 @@ is available.
 ## SQLx storage
 
 `spire-sqlx` enables no database driver by default. Its `sqlite` feature
-provides `sqlite::SqliteStore`, `SqliteFrontier`, `SqliteDataset<T>`,
-`SqliteSeen` and `SqliteValidators`, using SQLx's Tokio runtime and SQLite
-driver. Enable `sqlite` on the facade for the same types
-under `spire::sqlite`, and the upstream crate under `spire::sqlx`. The
-feature is included in `full`.
+provides `sqlite::SqliteStore`, `SqliteStoreBuilder`, `SqliteFrontier`, `SqliteDataset<T>`,
+`SqliteSeen` and `SqliteValidator`, using SQLx's Tokio runtime and SQLite
+driver. Enable `sqlite` on the facade for `spire::store::SqliteStore`, each
+service beside its trait, such as `spire::dataset::SqliteDataset`, and the
+upstream crate under `spire::store::sqlx`. The feature is included in `full`.
 See [Persistence with SQLite](sqlite.md) for setup.

@@ -28,7 +28,10 @@ pub use rig;
 #[cfg(feature = "rig")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rig")))]
 pub use rig_provider::Rig;
+#[doc(no_inline)]
 pub use schemars;
+#[doc(no_inline)]
 pub use serde;
+#[doc(no_inline)]
 pub use serde_json;
 pub use usage::{Usage, UsageTotals};
