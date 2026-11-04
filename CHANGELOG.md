@@ -10,9 +10,10 @@ and this project adheres to
 
 ### Changed
 
-- **Breaking:** `RedbStore::write` callbacks now return `WriteError`, a new type
-  that `?` produces from redb's errors and spire's. A callback can roll back with
-  any `spire::Error`, and `write` hands it back with its kind and message.
+- **Breaking:** `RedbStore::read` and `RedbStore::write` callbacks now return
+  `RedbTxnError`, a new type that `?` produces from redb's errors and spire's. A
+  callback can return any `spire::Error`, which comes back with its kind and
+  message, and in `write` rolls back.
 
 - **Breaking:** `RedbStore` tables are now namespaced, as `spire/queue/v1`,
   `spire/dataset/{name}/v1` and so on. There is no migration, and old tables are

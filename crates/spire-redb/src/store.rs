@@ -252,7 +252,7 @@ impl RedbStore {
     pub async fn write<T, F>(&self, f: F) -> Result<T>
     where
         T: Send + 'static,
-        F: FnOnce(&WriteTransaction) -> Result<T, WriteError> + Send + 'static,
+        F: FnOnce(&WriteTransaction) -> Result<T, RedbTxnError> + Send + 'static,
     {
         let inner = self.inner.clone();
         tokio::task::spawn_blocking(move || {
@@ -276,13 +276,18 @@ impl RedbStore {
     /// blocks: async code should move it to a blocking pool, such as with
     /// [`spawn_blocking`](tokio::task::spawn_blocking).
     ///
+    /// In the callback, `?` works on redb's errors and on spire's.
+    ///
     /// # Errors
     ///
-    /// Returns a [`Frontier`](ErrorKind::Frontier) error if the transaction
-    /// cannot be opened or the callback fails.
-    pub fn read<T>(&self, f: impl FnOnce(&ReadTransaction) -> Result<T, redb::Error>) -> Result<T> {
+    /// Returns the callback's error, or a [`Frontier`](ErrorKind::Frontier)
+    /// error if the transaction cannot be opened.
+    pub fn read<T>(
+        &self,
+        f: impl FnOnce(&ReadTransaction) -> Result<T, RedbTxnError>,
+    ) -> Result<T> {
         let txn = self.inner.db.begin_read().map_err(storage_error)?;
-        f(&txn).map_err(storage_error)
+        Ok(f(&txn)?)
     }
 
     /// Returns the number of entries in `table`, zero if it was never
@@ -350,40 +355,40 @@ impl fmt::Debug for RedbStore {
     }
 }
 
-/// Why a [`RedbStore::write`] callback rolled back: a [`spire_core::Error`],
-/// or one of redb's errors, which `?` converts into a
+/// The error of a [`RedbStore::read`] or [`RedbStore::write`] callback: a
+/// [`spire_core::Error`], or one of redb's errors, which `?` converts into a
 /// [`Frontier`](ErrorKind::Frontier) error.
 #[derive(Debug)]
-pub struct WriteError(Error);
+pub struct RedbTxnError(Error);
 
-impl fmt::Display for WriteError {
+impl fmt::Display for RedbTxnError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl StdError for WriteError {
+impl StdError for RedbTxnError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         self.0.source()
     }
 }
 
-impl From<Error> for WriteError {
+impl From<Error> for RedbTxnError {
     fn from(error: Error) -> Self {
         Self(error)
     }
 }
 
-impl From<WriteError> for Error {
-    fn from(error: WriteError) -> Self {
+impl From<RedbTxnError> for Error {
+    fn from(error: RedbTxnError) -> Self {
         error.0
     }
 }
 
-macro_rules! write_error_from_redb {
+macro_rules! txn_error_from_redb {
     ($($error:ty),* $(,)?) => {
         $(
-            impl From<$error> for WriteError {
+            impl From<$error> for RedbTxnError {
                 fn from(error: $error) -> Self {
                     Self(storage_error(error))
                 }
@@ -392,7 +397,7 @@ macro_rules! write_error_from_redb {
     };
 }
 
-write_error_from_redb!(
+txn_error_from_redb!(
     redb::Error,
     redb::StorageError,
     redb::TableError,
@@ -498,6 +503,17 @@ mod tests {
             .await;
         assert_eq!(failed.unwrap_err().kind(), ErrorKind::Frontier);
         assert_eq!(visits(&store), None);
+    }
+
+    #[tokio::test]
+    async fn a_read_callback_error_comes_back_intact() {
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+
+        let failed: Result<()> = store.read(|_| Err(Error::invalid("bad value").into()));
+        let failed = failed.unwrap_err();
+        assert_eq!(failed.kind(), ErrorKind::Invalid);
+        assert_eq!(failed.message(), "bad value");
     }
 
     #[tokio::test]

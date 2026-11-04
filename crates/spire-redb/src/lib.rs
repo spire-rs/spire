@@ -15,7 +15,7 @@ pub use redb;
 pub use crate::dataset::RedbDataset;
 pub use crate::frontier::RedbFrontier;
 pub use crate::seen::RedbSeen;
-pub use crate::store::{RedbStore, RedbStoreBuilder, WriteError};
+pub use crate::store::{RedbStore, RedbStoreBuilder, RedbTxnError};
 pub use crate::validator::RedbValidator;
 
 /// Tracing target for redb storage.
