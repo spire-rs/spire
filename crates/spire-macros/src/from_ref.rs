@@ -1,7 +1,6 @@
 //! `#[derive(FromRef)]`.
 
 use quote::quote;
-use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields, Result};
 
 /// Whether `field` has `#[from_ref(skip)]`, rejecting any other argument.
@@ -12,7 +11,9 @@ fn skipped(field: &syn::Field) -> Result<bool> {
         .iter()
         .filter(|attr| attr.path().is_ident("from_ref"))
     {
+        let mut empty = true;
         attr.parse_nested_meta(|meta| {
+            empty = false;
             if meta.path.is_ident("skip") {
                 skip = true;
                 Ok(())
@@ -20,26 +21,40 @@ fn skipped(field: &syn::Field) -> Result<bool> {
                 Err(meta.error("expected `skip`"))
             }
         })?;
+        if empty {
+            return Err(Error::new_spanned(attr, "expected `skip`"));
+        }
     }
     Ok(skip)
 }
 
 pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
+    if let Some(attr) = input
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("from_ref"))
+    {
+        return Err(Error::new_spanned(
+            attr,
+            "`#[from_ref]` is only allowed on fields",
+        ));
+    }
+
     let Data::Struct(data) = &input.data else {
         return Err(Error::new(
-            input.span(),
+            crate::item_keyword(input),
             "`FromRef` can only be derived for structs",
         ));
     };
     let Fields::Named(fields) = &data.fields else {
         return Err(Error::new(
-            input.span(),
+            crate::item_keyword(input),
             "`FromRef` can only be derived for structs with named fields",
         ));
     };
     if !input.generics.params.is_empty() {
-        return Err(Error::new(
-            input.generics.span(),
+        return Err(Error::new_spanned(
+            &input.generics,
             "`FromRef` cannot be derived for generic structs",
         ));
     }
@@ -88,6 +103,8 @@ mod tests {
             "struct App(Pool);",
             "struct App<T> { db: T }",
             "struct App { #[from_ref(clone)] db: Pool }",
+            "struct App { #[from_ref()] db: Pool }",
+            "#[from_ref(skip)] struct App { db: Pool }",
         ] {
             assert!(expand_str(input).is_err(), "{input} should be rejected");
         }

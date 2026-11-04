@@ -52,7 +52,7 @@ impl<T> RedbDataset<T> {
     pub(crate) fn new(store: RedbStore, name: &str) -> Self {
         Self {
             store,
-            table: format!("dataset:{name}").into(),
+            table: format!("spire/dataset/{name}/v1").into(),
             marker: PhantomData,
         }
     }

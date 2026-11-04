@@ -65,7 +65,7 @@ impl Frontier for RedbFrontier {
         let bytes = codec::encode(&seed)?;
         let priority = seed.priority();
         self.store
-            .write(move |txn| enqueue(txn, priority, &bytes))
+            .write(move |txn| Ok(enqueue(txn, priority, &bytes)?))
             .await?;
         Ok(Admission::Queued)
     }

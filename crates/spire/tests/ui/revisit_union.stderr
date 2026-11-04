@@ -1,0 +1,5 @@
+error: `Revisit` can only be derived for enums
+ --> tests/ui/revisit_union.rs:4:1
+  |
+4 | union Page {
+  | ^^^^^

@@ -1,0 +1,5 @@
+error: expected attribute arguments in parentheses: #[revisit(...)]
+ --> tests/ui/revisit_missing_args.rs:5:7
+  |
+5 |     #[revisit]
+  |       ^^^^^^^

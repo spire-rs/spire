@@ -1,4 +1,5 @@
-//! The compile errors of `#[derive(Select)]` and `#[derive(Tags)]`.
+//! The compile errors of `#[derive(FromRef)]`, `#[derive(Revisit)]`,
+//! `#[derive(Select)]` and `#[derive(Tags)]`.
 //!
 //! The expected `.stderr` files are pinned to the toolchain CI uses; after a
 //! toolchain bump, regenerate them with `TRYBUILD=overwrite`.

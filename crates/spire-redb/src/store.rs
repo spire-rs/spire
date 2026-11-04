@@ -1,6 +1,7 @@
+use std::error::Error as StdError;
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 use redb::{
@@ -16,21 +17,25 @@ use crate::seen::RedbSeen;
 use crate::validator::RedbValidator;
 
 /// Queued seeds, by negated priority then insertion order.
-pub(crate) const QUEUE: TableDefinition<(i64, u64), &[u8]> = TableDefinition::new("queue");
+pub(crate) const QUEUE: TableDefinition<(i64, u64), &[u8]> = TableDefinition::new("spire/queue/v1");
 /// Popped seeds not yet reported, by fingerprint.
-pub(crate) const IN_FLIGHT: TableDefinition<u64, &[u8]> = TableDefinition::new("in_flight");
+pub(crate) const IN_FLIGHT: TableDefinition<u64, &[u8]> =
+    TableDefinition::new("spire/in_flight/v1");
 /// Seeds to crawl again, one per fingerprint: when they are due, in
 /// milliseconds since the Unix epoch, then the encoded seed.
-pub(crate) const SCHEDULED: TableDefinition<u64, &[u8]> = TableDefinition::new("scheduled");
+pub(crate) const SCHEDULED: TableDefinition<u64, &[u8]> =
+    TableDefinition::new("spire/scheduled/v1");
 /// The seeds of [`SCHEDULED`] by when they are due, then fingerprint.
-pub(crate) const SCHEDULE: TableDefinition<(u64, u64), ()> = TableDefinition::new("schedule");
+pub(crate) const SCHEDULE: TableDefinition<(u64, u64), ()> =
+    TableDefinition::new("spire/schedule/v1");
 /// Versions of crawled pages, by their request's fingerprint, see
 /// [`RedbValidator`].
-pub(crate) const PAGE_VERSIONS: TableDefinition<u64, &[u8]> = TableDefinition::new("page_versions");
+pub(crate) const PAGE_VERSIONS: TableDefinition<u64, &[u8]> =
+    TableDefinition::new("spire/page_versions/v1");
 /// Fingerprints seen by [`RedbSeen`].
-pub(crate) const SEEN: TableDefinition<u64, ()> = TableDefinition::new("seen");
+pub(crate) const SEEN: TableDefinition<u64, ()> = TableDefinition::new("spire/seen/v1");
 /// Counters, such as the next insertion sequence.
-pub(crate) const META: TableDefinition<&str, u64> = TableDefinition::new("meta");
+pub(crate) const META: TableDefinition<&str, u64> = TableDefinition::new("spire/meta/v1");
 
 /// The key of the next insertion sequence in [`META`].
 pub(crate) const NEXT_SEQUENCE: &str = "next_sequence";
@@ -49,10 +54,12 @@ pub(crate) const NEXT_SEQUENCE: &str = "next_sequence";
 /// [`RedbStoreBuilder::sync_always`] to sync every commit instead, at a
 /// large cost in throughput.
 ///
-/// The database is the crawl's own. Keep an application's own tables, such
-/// as a search index, in a database of their own: redb locks its file and
-/// lets one transaction write at a time, so tables in the same file would
-/// wait on the frontier's every commit, and it on theirs.
+/// Small extensions to the crawl, such as a cache, can keep namespaced tables
+/// in this database through [`read`](Self::read) and [`write`](Self::write).
+/// Keep unrelated application tables, such as a search index, in a database
+/// of their own: redb locks its file and lets one transaction write at a
+/// time, so tables in the same file wait on the frontier's every commit, and
+/// it on theirs.
 ///
 /// ```no_run
 /// use spire_core::frontier::FrontierExt;
@@ -230,41 +237,57 @@ impl RedbStore {
     }
 
     /// Runs an extension's write transaction off the async runtime and
-    /// commits it using this store's durability policy. Use a namespaced
-    /// table name and leave the store's built-in tables untouched.
+    /// commits it using this store's durability policy. Returning an error
+    /// rolls back what the callback wrote. Use a namespaced table name and
+    /// leave the store's built-in tables untouched.
+    ///
+    /// In the callback, `?` works on redb's errors and on spire's. To reject
+    /// the transaction for a reason of the extension's own, return a
+    /// [`spire_core::Error`] converted with `into()`: it comes back as is.
     ///
     /// # Errors
     ///
-    /// Returns a [`Frontier`](ErrorKind::Frontier) error if the transaction,
-    /// callback or commit fails. A failed callback is not committed.
+    /// Returns the callback's error, or a [`Frontier`](ErrorKind::Frontier)
+    /// error if the transaction or commit fails.
     pub async fn write<T, F>(&self, f: F) -> Result<T>
     where
         T: Send + 'static,
-        F: FnOnce(&WriteTransaction) -> Result<T, redb::Error> + Send + 'static,
+        F: FnOnce(&WriteTransaction) -> Result<T, RedbTxnError> + Send + 'static,
     {
         let inner = self.inner.clone();
         tokio::task::spawn_blocking(move || {
             let mut txn = inner.db.begin_write().map_err(storage_error)?;
-            txn.set_durability(inner.durability())
-                .map_err(storage_error)?;
-            let value = f(&txn).map_err(storage_error)?;
+            let durability = inner.durability();
+            let syncs = matches!(durability, Durability::Immediate);
+            txn.set_durability(durability).map_err(storage_error)?;
+            // An error drops the transaction, which rolls it back.
+            let value = f(&txn)?;
             txn.commit().map_err(storage_error)?;
+            if syncs {
+                *inner.last_sync() = Instant::now();
+            }
             Ok(value)
         })
         .await
         .map_err(join_error)?
     }
 
-    /// Runs an extension's read transaction on the calling thread. Async
-    /// extensions can dispatch this to a blocking pool for large reads.
+    /// Runs an extension's read transaction on the calling thread, where it
+    /// blocks: async code should move it to a blocking pool, such as with
+    /// [`spawn_blocking`](tokio::task::spawn_blocking).
+    ///
+    /// In the callback, `?` works on redb's errors and on spire's.
     ///
     /// # Errors
     ///
-    /// Returns a [`Frontier`](ErrorKind::Frontier) error if the transaction
-    /// cannot be opened or the callback fails.
-    pub fn read<T>(&self, f: impl FnOnce(&ReadTransaction) -> Result<T, redb::Error>) -> Result<T> {
+    /// Returns the callback's error, or a [`Frontier`](ErrorKind::Frontier)
+    /// error if the transaction cannot be opened.
+    pub fn read<T>(
+        &self,
+        f: impl FnOnce(&ReadTransaction) -> Result<T, RedbTxnError>,
+    ) -> Result<T> {
         let txn = self.inner.db.begin_read().map_err(storage_error)?;
-        f(&txn).map_err(storage_error)
+        Ok(f(&txn)?)
     }
 
     /// Returns the number of entries in `table`, zero if it was never
@@ -284,22 +307,25 @@ impl RedbStore {
 }
 
 impl Inner {
-    /// Commits durably always, or once per sync interval.
+    /// Commits durably always, or once per sync interval. The interval runs
+    /// from the last durable commit, so a transaction that does not commit
+    /// leaves the next one to sync.
     fn durability(&self) -> Durability {
         let Some(interval) = self.sync_interval else {
             return Durability::Immediate;
         };
 
-        let mut last_sync = self
-            .last_sync
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        if last_sync.elapsed() >= interval {
-            *last_sync = Instant::now();
+        if self.last_sync().elapsed() >= interval {
             Durability::Immediate
         } else {
             Durability::None
         }
+    }
+
+    fn last_sync(&self) -> MutexGuard<'_, Instant> {
+        self.last_sync
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 }
 
@@ -329,6 +355,56 @@ impl fmt::Debug for RedbStore {
     }
 }
 
+/// The error of a [`RedbStore::read`] or [`RedbStore::write`] callback: a
+/// [`spire_core::Error`], or one of redb's errors, which `?` converts into a
+/// [`Frontier`](ErrorKind::Frontier) error.
+#[derive(Debug)]
+pub struct RedbTxnError(Error);
+
+impl fmt::Display for RedbTxnError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl StdError for RedbTxnError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.0.source()
+    }
+}
+
+impl From<Error> for RedbTxnError {
+    fn from(error: Error) -> Self {
+        Self(error)
+    }
+}
+
+impl From<RedbTxnError> for Error {
+    fn from(error: RedbTxnError) -> Self {
+        error.0
+    }
+}
+
+macro_rules! txn_error_from_redb {
+    ($($error:ty),* $(,)?) => {
+        $(
+            impl From<$error> for RedbTxnError {
+                fn from(error: $error) -> Self {
+                    Self(storage_error(error))
+                }
+            }
+        )*
+    };
+}
+
+txn_error_from_redb!(
+    redb::Error,
+    redb::StorageError,
+    redb::TableError,
+    redb::SavepointError,
+    redb::CursorError,
+);
+
 /// Converts a storage failure into a frontier error.
 pub(crate) fn storage_error(error: impl Into<redb::Error>) -> Error {
     Error::new(ErrorKind::Frontier)
@@ -340,4 +416,124 @@ fn join_error(error: tokio::task::JoinError) -> Error {
     Error::new(ErrorKind::Frontier)
         .with_message("redb task failed")
         .with_source(error)
+}
+
+#[cfg(test)]
+mod tests {
+    use redb::TableHandle;
+    use spire_core::dataset::Dataset;
+    use spire_core::worker::middleware::{PageVersion, Validator};
+
+    use super::*;
+    use crate::frontier::tests::{TempPath, seed};
+
+    const VISITS: TableDefinition<&str, u64> = TableDefinition::new("test/visits/v1");
+
+    fn visits(store: &RedbStore) -> Option<u64> {
+        store
+            .read(|txn| {
+                let table = match txn.open_table(VISITS) {
+                    Ok(table) => table,
+                    Err(TableError::TableDoesNotExist(_)) => return Ok(None),
+                    Err(error) => return Err(error.into()),
+                };
+                Ok(table.get("example.com")?.map(|visits| visits.value()))
+            })
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn every_table_is_namespaced() {
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+        store.dataset::<u32>("products").write(1).await.unwrap();
+        let fingerprint = seed("a").fingerprint();
+        let version = PageVersion::default();
+        store.validator().set(fingerprint, version).await.unwrap();
+
+        let names: Vec<String> = store
+            .read(|txn| {
+                let tables = txn.list_tables()?;
+                Ok(tables.map(|table| table.name().to_owned()).collect())
+            })
+            .unwrap();
+        assert!(names.contains(&"spire/dataset/products/v1".to_owned()));
+        assert!(
+            names.iter().all(|name| name.starts_with("spire/")),
+            "{names:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn write_commits_on_ok_and_rolls_back_on_error() {
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+
+        store
+            .write(|txn| {
+                txn.open_table(VISITS)?.insert("example.com", 1)?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+        assert_eq!(visits(&store), Some(1));
+
+        let rejected: Result<()> = store
+            .write(|txn| {
+                txn.open_table(VISITS)?.insert("example.com", 2)?;
+                Err(Error::invalid("too many visits").into())
+            })
+            .await;
+        let rejected = rejected.unwrap_err();
+        assert_eq!(rejected.kind(), ErrorKind::Invalid);
+        assert_eq!(rejected.message(), "too many visits");
+        assert_eq!(visits(&store), Some(1));
+    }
+
+    #[tokio::test]
+    async fn a_storage_error_in_a_write_is_a_frontier_error() {
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+
+        let failed: Result<()> = store
+            .write(|txn| {
+                txn.open_table(VISITS)?.insert("example.com", 1)?;
+                Err(redb::Error::Io(std::io::Error::other("disk")).into())
+            })
+            .await;
+        assert_eq!(failed.unwrap_err().kind(), ErrorKind::Frontier);
+        assert_eq!(visits(&store), None);
+    }
+
+    #[tokio::test]
+    async fn a_read_callback_error_comes_back_intact() {
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+
+        let failed: Result<()> = store.read(|_| Err(Error::invalid("bad value").into()));
+        let failed = failed.unwrap_err();
+        assert_eq!(failed.kind(), ErrorKind::Invalid);
+        assert_eq!(failed.message(), "bad value");
+    }
+
+    #[tokio::test]
+    async fn only_a_committed_write_counts_as_a_sync() {
+        let path = TempPath::new();
+        let store = RedbStore::builder()
+            .sync_interval(Duration::ZERO)
+            .open(&path.0)
+            .await
+            .unwrap();
+        let last_sync = || *store.inner.last_sync.lock().unwrap();
+        let before = last_sync();
+
+        let rejected: Result<()> = store
+            .write(|_| Err(Error::invalid("rejected").into()))
+            .await;
+        assert!(rejected.is_err());
+        assert_eq!(last_sync(), before);
+
+        store.write(|_| Ok(())).await.unwrap();
+        assert!(last_sync() > before);
+    }
 }

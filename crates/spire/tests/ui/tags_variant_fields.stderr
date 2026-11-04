@@ -1,5 +1,5 @@
 error: `Tags` variants cannot have fields
- --> tests/ui/tags_variant_fields.rs:6:5
+ --> tests/ui/tags_variant_fields.rs:6:10
   |
 6 |     Item { id: u32 },
-  |     ^^^^
+  |          ^^^^^^^^^^^

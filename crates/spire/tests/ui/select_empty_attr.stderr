@@ -2,4 +2,4 @@ error: `#[select]` needs a selector or `attr`
  --> tests/ui/select_empty_attr.rs:5:5
   |
 5 |     #[select()]
-  |     ^
+  |     ^^^^^^^^^^^

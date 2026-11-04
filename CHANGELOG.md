@@ -8,6 +8,38 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `RedbStore::read` and `RedbStore::write` callbacks now return
+  `RedbTxnError`, a new type that `?` produces from redb's errors and spire's. A
+  callback can return any `spire::Error`, which comes back with its kind and
+  message, and in `write` rolls back.
+
+- **Breaking:** `RedbStore` tables are now namespaced, as `spire/queue/v1`,
+  `spire/dataset/{name}/v1` and so on. There is no migration, and old tables are
+  neither read nor reported: a crawl file from an earlier version looks empty,
+  so its crawl starts over.
+
+- **Breaking:** `#[derive(FromRef)]` now rejects `#[from_ref()]` and
+  `#[from_ref]` on the type, and `#[derive(Revisit)]` rejects `#[revisit]` on
+  the type. All of these were silently ignored.
+
+- Errors from `#[derive(FromRef)]`, `#[derive(Revisit)]`, `#[derive(Select)]`
+  and `#[derive(Tags)]` now point at the code at fault: the whole attribute,
+  generics, variant fields, field name or tag, and the `struct`, `enum` or
+  `union` keyword whatever precedes it, rather than the first token of the item.
+
+### Fixed
+
+- A `RedbStore` write that did not commit no longer counts as a sync, which
+  could extend the work a crash loses past the sync interval.
+
+### Documentation
+
+- The book and `RedbStore` docs now cover keeping small crawl-related tables in
+  the store's database, through `read` and `write`, including their crash
+  behaviour. Unrelated application data still belongs in its own database.
+
 ## [0.10.0] - 2026-11-02
 
 ### Added

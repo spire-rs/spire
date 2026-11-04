@@ -1,0 +1,5 @@
+error: expected an interval such as "90s", "30m", "1h30m" or "1d"
+ --> tests/ui/revisit_trailing_number.rs:5:15
+  |
+5 |     #[revisit("1h30")]
+  |               ^^^^^^

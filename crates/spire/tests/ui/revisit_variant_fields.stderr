@@ -1,0 +1,5 @@
+error: `Revisit` variants cannot have fields
+ --> tests/ui/revisit_variant_fields.rs:6:9
+  |
+6 |     List(u8),
+  |         ^^^^

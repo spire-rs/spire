@@ -1,0 +1,5 @@
+error: a revisit interval must be above zero
+ --> tests/ui/revisit_zero_interval.rs:5:15
+  |
+5 |     #[revisit("0s")]
+  |               ^^^^

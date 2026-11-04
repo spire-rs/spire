@@ -148,7 +148,7 @@ pub mod store {
     pub use spire_redb::redb;
     #[cfg(feature = "redb")]
     #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]
-    pub use spire_redb::{RedbStore, RedbStoreBuilder};
+    pub use spire_redb::{RedbStore, RedbStoreBuilder, RedbTxnError};
     #[cfg(feature = "sqlite")]
     #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
     pub use spire_sqlx::sqlite::{SqliteStore, SqliteStoreBuilder};
