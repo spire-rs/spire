@@ -1,0 +1,5 @@
+error: `FromRef` cannot be derived for generic structs
+ --> tests/ui/from_ref_generic.rs:4:11
+  |
+4 | struct App<T> {
+  |           ^^^

@@ -1,0 +1,5 @@
+error: `FromRef` can only be derived for structs
+ --> tests/ui/from_ref_documented_enum.rs:5:5
+  |
+5 | pub enum App {
+  |     ^^^^

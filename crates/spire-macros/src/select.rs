@@ -2,7 +2,6 @@
 
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
-use syn::spanned::Spanned;
 use syn::{
     Attribute, Data, DeriveInput, Error, Field, Fields, GenericArgument, Ident, LitStr,
     PathArguments, Result, Token, Type,
@@ -47,7 +46,7 @@ fn select_args(attrs: &[Attribute]) -> Result<Option<SelectArgs>> {
     let mut found = None;
     for attr in attrs.iter().filter(|attr| attr.path().is_ident("select")) {
         if found.is_some() {
-            return Err(Error::new(attr.span(), "duplicate `#[select]` attribute"));
+            return Err(Error::new_spanned(attr, "duplicate `#[select]` attribute"));
         }
         found = Some(attr.parse_args::<SelectArgs>()?);
     }
@@ -96,13 +95,17 @@ fn option(value: Option<&LitStr>) -> proc_macro2::TokenStream {
 fn expand_field(owner: &str, name: &Ident, field: &Field) -> Result<proc_macro2::TokenStream> {
     let Some(args) = select_args(&field.attrs)? else {
         return Err(Error::new(
-            field.span(),
+            name.span(),
             "every field needs `#[select(\"css\")]` or `#[select(attr = \"...\")]`",
         ));
     };
     if args.css.is_none() && args.attr.is_none() {
-        return Err(Error::new(
-            field.span(),
+        let attr = field
+            .attrs
+            .iter()
+            .find(|attr| attr.path().is_ident("select"));
+        return Err(Error::new_spanned(
+            attr,
             "`#[select]` needs a selector or `attr`",
         ));
     }
@@ -161,13 +164,13 @@ fn expand_field(owner: &str, name: &Ident, field: &Field) -> Result<proc_macro2:
 pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
     let Data::Struct(data) = &input.data else {
         return Err(Error::new(
-            input.span(),
+            crate::item_keyword(input),
             "`Select` can only be derived for structs",
         ));
     };
     let Fields::Named(fields) = &data.fields else {
         return Err(Error::new(
-            input.span(),
+            crate::item_keyword(input),
             "`Select` needs a struct with named fields",
         ));
     };

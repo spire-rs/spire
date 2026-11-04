@@ -4,7 +4,6 @@ use std::collections::HashMap;
 
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::spanned::Spanned;
 use syn::{Attribute, Data, DeriveInput, Error, Fields, Ident, LitStr, Result, Token};
 
 /// The argument of `#[tag(rename_all = "...")]` or `#[tag(rename = "...")]`.
@@ -28,7 +27,7 @@ fn tag_arg(attrs: &[Attribute], expected: &str) -> Result<Option<LitStr>> {
     let mut found = None;
     for attr in attrs.iter().filter(|attr| attr.path().is_ident("tag")) {
         if found.is_some() {
-            return Err(Error::new(attr.span(), "duplicate `#[tag]` attribute"));
+            return Err(Error::new_spanned(attr, "duplicate `#[tag]` attribute"));
         }
         let arg = attr.parse_args::<TagArg>()?;
         if arg.key != expected {
@@ -152,19 +151,19 @@ fn capitalize(word: &str) -> String {
 pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
     let Data::Enum(data) = &input.data else {
         return Err(Error::new(
-            input.span(),
+            crate::item_keyword(input),
             "`Tags` can only be derived for enums",
         ));
     };
     if !input.generics.params.is_empty() {
-        return Err(Error::new(
-            input.generics.span(),
+        return Err(Error::new_spanned(
+            &input.generics,
             "`Tags` cannot be derived for generic enums",
         ));
     }
     if data.variants.is_empty() {
         return Err(Error::new(
-            input.span(),
+            crate::item_keyword(input),
             "`Tags` needs at least one variant",
         ));
     }
@@ -179,21 +178,25 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
     let mut names = Vec::with_capacity(data.variants.len());
     for variant in &data.variants {
         if !matches!(variant.fields, Fields::Unit) {
-            return Err(Error::new(
-                variant.span(),
+            return Err(Error::new_spanned(
+                &variant.fields,
                 "`Tags` variants cannot have fields",
             ));
         }
-        let name = match tag_arg(&variant.attrs, "rename")? {
+        let rename = tag_arg(&variant.attrs, "rename")?;
+        let span = rename
+            .as_ref()
+            .map_or_else(|| variant.ident.span(), LitStr::span);
+        let name = match &rename {
             Some(value) => value.value(),
             None => case.apply(&variant.ident.to_string()),
         };
         if name.is_empty() {
-            return Err(Error::new(variant.span(), "a tag cannot be empty"));
+            return Err(Error::new(span, "a tag cannot be empty"));
         }
         if let Some(other) = seen.insert(name.clone(), &variant.ident) {
             let message = format!("`{other}` and `{}` are both tagged `{name}`", variant.ident);
-            return Err(Error::new(variant.span(), message));
+            return Err(Error::new(span, message));
         }
         variants.push(&variant.ident);
         names.push(name);

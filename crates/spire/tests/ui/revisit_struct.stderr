@@ -1,0 +1,5 @@
+error: `Revisit` can only be derived for enums
+ --> tests/ui/revisit_struct.rs:4:1
+  |
+4 | struct Page;
+  | ^^^^^^

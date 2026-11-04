@@ -1,7 +1,6 @@
 //! `#[derive(Revisit)]`.
 
 use quote::quote;
-use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields, LitStr, Result};
 
 /// Parses an interval such as `90s`, `30m`, `1h30m` or `1d` into seconds.
@@ -47,15 +46,26 @@ fn seconds(value: &LitStr) -> Result<u64> {
 }
 
 pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
+    if let Some(attr) = input
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("revisit"))
+    {
+        return Err(Error::new_spanned(
+            attr,
+            "`#[revisit]` is only allowed on variants",
+        ));
+    }
+
     let Data::Enum(data) = &input.data else {
         return Err(Error::new(
-            input.span(),
+            crate::item_keyword(input),
             "`Revisit` can only be derived for enums",
         ));
     };
     if !input.generics.params.is_empty() {
-        return Err(Error::new(
-            input.generics.span(),
+        return Err(Error::new_spanned(
+            &input.generics,
             "`Revisit` cannot be derived for generic enums",
         ));
     }
@@ -63,8 +73,8 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
     let mut arms = Vec::with_capacity(data.variants.len());
     for variant in &data.variants {
         if !matches!(variant.fields, Fields::Unit) {
-            return Err(Error::new(
-                variant.span(),
+            return Err(Error::new_spanned(
+                &variant.fields,
                 "`Revisit` variants cannot have fields",
             ));
         }
@@ -75,7 +85,7 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
             .filter(|attr| attr.path().is_ident("revisit"))
         {
             if interval.is_some() {
-                return Err(Error::new(attr.span(), "duplicate `#[revisit]` attribute"));
+                return Err(Error::new_spanned(attr, "duplicate `#[revisit]` attribute"));
             }
             interval = Some(seconds(&attr.parse_args::<LitStr>()?)?);
         }

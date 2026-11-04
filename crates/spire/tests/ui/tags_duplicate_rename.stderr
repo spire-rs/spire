@@ -1,5 +1,5 @@
 error: `List` and `Index` are both tagged `list`
- --> tests/ui/tags_duplicate_rename.rs:6:5
+ --> tests/ui/tags_duplicate_rename.rs:6:20
   |
 6 |     #[tag(rename = "list")]
-  |     ^
+  |                    ^^^^^^

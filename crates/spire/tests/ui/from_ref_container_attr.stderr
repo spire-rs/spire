@@ -1,0 +1,5 @@
+error: `#[from_ref]` is only allowed on fields
+ --> tests/ui/from_ref_container_attr.rs:4:1
+  |
+4 | #[from_ref(skip)]
+  | ^^^^^^^^^^^^^^^^^

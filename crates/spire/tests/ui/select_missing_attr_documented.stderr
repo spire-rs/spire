@@ -1,0 +1,5 @@
+error: every field needs `#[select("css")]` or `#[select(attr = "...")]`
+ --> tests/ui/select_missing_attr_documented.rs:8:5
+  |
+8 |     price: String,
+  |     ^^^^^

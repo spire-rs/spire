@@ -1,0 +1,5 @@
+error: `#[revisit]` is only allowed on variants
+ --> tests/ui/revisit_container_attr.rs:4:1
+  |
+4 | #[revisit("1h")]
+  | ^^^^^^^^^^^^^^^^
