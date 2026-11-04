@@ -38,7 +38,7 @@ crawler.run().await?;
 
 | From the store | Holds | See |
 |---|---|---|
-| `frontier()` | Queued seeds, by priority then insertion order, and scheduled revisits | [Seeds and the frontier](frontier.md), [Recrawls](recrawls.md) |
+| `frontier()` | Queued seeds, by priority then insertion order, retries waiting to run, and scheduled revisits | [Seeds and the frontier](frontier.md), [Recrawls](recrawls.md) |
 | `seen()` | Every fingerprint seen, exact, on disk | [Seeds and the frontier](frontier.md) |
 | `dataset::<T>(name)` | Items of type `T`, a table per name | [Storing results](datasets.md) |
 | `validator()` | Pages' `ETag` and `Last-Modified` | [Recrawls](recrawls.md) |
@@ -61,6 +61,9 @@ Every change is a committed transaction, and nothing is lost:
   separately, so a page whose items were committed just before a crash may be
   crawled again and write them again: deduplicate by a key such as the URL
   when reading.
+- **Retries keep their place.** A seed waiting for a retry is stored with its
+  attempt and when it is due, so it neither starts its retries over nor runs
+  early.
 - **Revisits are kept, one per page.** A revisit is scheduled before its
   page is reported, so a crash in between crawls the page once more rather
   than losing its revisit.

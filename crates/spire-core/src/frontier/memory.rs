@@ -19,7 +19,63 @@ pub struct InMemFrontier {
     seeds: Mutex<Store>,
     /// Created on the first schedule, so the constructors stay `const`.
     scheduled: Mutex<Option<Scheduled>>,
+    requeued: Mutex<Requeued>,
 }
+
+/// Seeds held back until a time by [`Report::Requeue`], earliest first.
+struct Requeued {
+    seeds: BinaryHeap<Reverse<RequeuedSeed>>,
+    sequence: u64,
+}
+
+impl Requeued {
+    fn insert(&mut self, seed: Seed, due: Instant) {
+        self.sequence += 1;
+        self.seeds.push(Reverse(RequeuedSeed {
+            due,
+            sequence: self.sequence,
+            seed,
+        }));
+    }
+
+    fn pop_due(&mut self, now: Instant) -> Option<(Instant, Seed)> {
+        if self.earliest()? > now {
+            return None;
+        }
+        let Reverse(entry) = self.seeds.pop()?;
+        Some((entry.due, entry.seed))
+    }
+
+    fn earliest(&self) -> Option<Instant> {
+        self.seeds.peek().map(|Reverse(entry)| entry.due)
+    }
+}
+
+struct RequeuedSeed {
+    due: Instant,
+    sequence: u64,
+    seed: Seed,
+}
+
+impl Ord for RequeuedSeed {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.due, self.sequence).cmp(&(other.due, other.sequence))
+    }
+}
+
+impl PartialOrd for RequeuedSeed {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for RequeuedSeed {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl Eq for RequeuedSeed {}
 
 /// Seeds held back until a time, one per fingerprint, see [`Schedule`].
 #[derive(Default)]
@@ -56,14 +112,16 @@ impl Scheduled {
         }
     }
 
-    fn pop_due(&mut self, now: Instant) -> Option<Seed> {
+    fn pop_due(&mut self, now: Instant) -> Option<(Instant, Seed)> {
         self.settle();
         let Reverse((due, _, fingerprint)) = *self.due.peek()?;
         if due > now {
             return None;
         }
         self.due.pop();
-        self.seeds.remove(&fingerprint).map(|(_, _, seed)| seed)
+        self.seeds
+            .remove(&fingerprint)
+            .map(|(_, _, seed)| (due, seed))
     }
 
     fn next_due(&mut self) -> Option<Instant> {
@@ -148,6 +206,26 @@ impl InMemFrontier {
         Self {
             seeds: Mutex::new(store),
             scheduled: Mutex::new(None),
+            requeued: Mutex::new(Requeued {
+                seeds: BinaryHeap::new(),
+                sequence: 0,
+            }),
+        }
+    }
+
+    /// Moves the seeds that have come due to the queue, in the order they did.
+    fn release_due(&self, now: Instant) {
+        let mut due = Vec::new();
+        if let Some(scheduled) = lock(&self.scheduled).as_mut() {
+            due.extend(std::iter::from_fn(|| scheduled.pop_due(now)));
+        }
+        let mut requeued = lock(&self.requeued);
+        due.extend(std::iter::from_fn(|| requeued.pop_due(now)));
+        drop(requeued);
+
+        due.sort_by_key(|(due, _)| *due);
+        for (_, seed) in due {
+            self.insert(seed);
         }
     }
 
@@ -183,6 +261,7 @@ impl fmt::Debug for InMemFrontier {
             .field("order", &store.order())
             .field("len", &store.len())
             .field("scheduled", &scheduled)
+            .field("requeued", &lock(&self.requeued).seeds.len())
             .finish()
     }
 }
@@ -193,20 +272,22 @@ impl Frontier for InMemFrontier {
         ready(Ok(Admission::Queued))
     }
 
-    /// Hands out a due scheduled seed first, then the queue.
+    /// Moves seeds that have come due to the queue, then hands out the next.
+    /// Only requeued seeds are waited for; see [`Schedule::next_due`].
     fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
-        let due = lock(&self.scheduled)
-            .as_mut()
-            .and_then(|scheduled| scheduled.pop_due(Instant::now()));
-        if let Some(seed) = due {
-            return ready(Ok(NextSeed::Ready(seed)));
-        }
+        self.release_due(Instant::now());
         let seed = match &mut *lock(&self.seeds) {
             Store::Fifo(seeds) => seeds.pop_front(),
             Store::Lifo(seeds) => seeds.pop_back(),
             Store::Priority(seeds, _) => seeds.pop().map(|prioritized| prioritized.seed),
         };
-        ready(Ok(seed.map_or(NextSeed::Empty, NextSeed::Ready)))
+        let next = match seed {
+            Some(seed) => NextSeed::Ready(seed),
+            None => lock(&self.requeued)
+                .earliest()
+                .map_or(NextSeed::Empty, NextSeed::Wait),
+        };
+        ready(Ok(next))
     }
 
     /// Re-queues seeds the crawl stopped before finishing, so a
@@ -217,18 +298,24 @@ impl Frontier for InMemFrontier {
                 self.insert(seed);
                 Ack::Applied
             }
+            Report::Requeue { seed, due } => {
+                lock(&self.requeued).insert(seed, due);
+                Ack::Applied
+            }
             Report::Retry { .. } => Ack::RetryRefused,
             _ => Ack::Applied,
         };
         ready(Ok(ack))
     }
 
+    /// Counts queued and requeued seeds.
     fn size_hint(&self) -> Option<usize> {
-        Some(lock(&self.seeds).len())
+        let queued = lock(&self.seeds).len();
+        Some(queued + lock(&self.requeued).seeds.len())
     }
 
-    /// Lists queued and scheduled seeds, the latter without when they are
-    /// due.
+    /// Lists queued, requeued and scheduled seeds, the latter two without when
+    /// they are due.
     fn snapshot(&self) -> Option<Vec<Seed>> {
         let store = lock(&self.seeds);
         let mut seeds: Vec<Seed> = match &*store {
@@ -238,6 +325,13 @@ impl Frontier for InMemFrontier {
         if let Some(scheduled) = &*lock(&self.scheduled) {
             seeds.extend(scheduled.seeds.values().map(|(_, _, seed)| seed.clone()));
         }
+        let requeued = lock(&self.requeued);
+        seeds.extend(
+            requeued
+                .seeds
+                .iter()
+                .map(|Reverse(entry)| entry.seed.clone()),
+        );
         Some(seeds)
     }
 }

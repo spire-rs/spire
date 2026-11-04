@@ -28,6 +28,10 @@ pub(crate) const SCHEDULED: TableDefinition<u64, &[u8]> =
 /// The seeds of [`SCHEDULED`] by when they are due, then fingerprint.
 pub(crate) const SCHEDULE: TableDefinition<(u64, u64), ()> =
     TableDefinition::new("spire/schedule/v1");
+/// Seeds waiting for a retry, by when they are due, in milliseconds since the
+/// Unix epoch, then a sequence, so several of one page can wait.
+pub(crate) const RETRIES: TableDefinition<(u64, u64), &[u8]> =
+    TableDefinition::new("spire/retries/v1");
 /// Versions of crawled pages, by their request's fingerprint, see
 /// [`RedbValidator`].
 pub(crate) const PAGE_VERSIONS: TableDefinition<u64, &[u8]> =
@@ -171,6 +175,7 @@ fn recover(db: &Database) -> Result<usize, redb::Error> {
         let mut in_flight = txn.open_table(IN_FLIGHT)?;
         let mut meta = txn.open_table(META)?;
         txn.open_table(SEEN)?;
+        txn.open_table(RETRIES)?;
 
         let mut sequence = meta.get(NEXT_SEQUENCE)?.map_or(0, |guard| guard.value());
         while let Some((_, bytes)) = in_flight.pop_first()? {

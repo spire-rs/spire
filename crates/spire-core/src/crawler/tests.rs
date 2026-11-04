@@ -339,6 +339,7 @@ mod limits {
                 Report::Skipped(seed) => format!("skipped {}", seed.uri().path()),
                 Report::Cancelled(seed) => format!("cancelled {}", seed.uri().path()),
                 Report::Retry { seed, .. } => format!("retry {}", seed.uri().path()),
+                Report::Requeue { seed, .. } => format!("requeue {}", seed.uri().path()),
                 Report::Backoff { .. } => "backoff".to_owned(),
             };
             lock(&self.reports).push(entry);

@@ -10,6 +10,19 @@ and this project adheres to
 
 ### Changed
 
+- **Breaking:** Storage now holds retries, through a new `Report::Requeue`. The
+  `retry` facade sends it inwards, and storage that does not handle it refuses
+  it, so custom storage must handle it or its retried seeds fail.
+
+- **Breaking:** Due retries and revisits now join the queue and run in the
+  frontier's order, rather than ahead of it. On a priority frontier they compete
+  by priority, on FIFO they go behind what is queued, and on LIFO they run next.
+  SQLite revisits already competed by priority.
+
+- `RedbFrontier` and `SqliteFrontier` now store seeds waiting for a retry, with
+  their attempt and due time, so a restart keeps both, and caller-attached `Seed`
+  extensions on a retried seed are discarded like any other stored seed's.
+
 - **Breaking:** `RedbStore::read` and `RedbStore::write` callbacks now return
   `RedbTxnError`, a new type that `?` produces from redb's errors and spire's. A
   callback can return any `spire::Error`, which comes back with its kind and
@@ -30,6 +43,9 @@ and this project adheres to
   `union` keyword whatever precedes it, rather than the first token of the item.
 
 ### Fixed
+
+- Due retries no longer bypass priority order, and neither do `InMemFrontier` and
+  `RedbFrontier` revisits.
 
 - A `RedbStore` write that did not commit no longer counts as a sync, which
   could extend the work a crash loses past the sync interval.

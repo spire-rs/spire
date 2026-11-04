@@ -20,9 +20,9 @@ use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report, Schedule};
 /// going until it is stopped.
 ///
 /// The storage keeps the schedule, one revisit per page: in memory, or in a
-/// redb file, where it survives a restart. Revisits come out of the storage
-/// like queued seeds, so facades above it apply to them too, and
-/// deduplication does not refuse them: they are never pushed.
+/// redb file, where it survives a restart. A due revisit joins the queue and
+/// runs in the storage's order, so facades above it apply to it too, and
+/// deduplication does not refuse it: it is never pushed.
 ///
 /// A [snapshot](Frontier::snapshot) of in-memory storage lists scheduled
 /// seeds without when they are due, so a crawl resumed from it crawls them
@@ -56,14 +56,16 @@ impl<F: Schedule, T: Revisit> Frontier for Revisits<F, T> {
     }
 
     async fn pop(&self) -> Result<NextSeed> {
-        match self.inner.pop().await? {
-            NextSeed::Empty => Ok(self
-                .inner
-                .next_due()
-                .await?
-                .map_or(NextSeed::Empty, NextSeed::Wait)),
-            next => Ok(next),
+        let next = self.inner.pop().await?;
+        if matches!(next, NextSeed::Ready(_)) {
+            return Ok(next);
         }
+        let due = self.inner.next_due().await?;
+        Ok(match (next, due) {
+            (NextSeed::Wait(at), Some(due)) => NextSeed::Wait(at.min(due)),
+            (_, Some(due)) => NextSeed::Wait(due),
+            (next, None) => next,
+        })
     }
 
     async fn report(&self, report: Report) -> Result<Ack> {
@@ -214,5 +216,41 @@ mod tests {
         assert_eq!(pop_path(&storage).await.as_deref(), Some("now"));
         assert!(matches!(storage.pop().await.unwrap(), NextSeed::Empty));
         assert_eq!(storage.next_due().await.unwrap(), Some(due));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_due_revisit_competes_by_priority() {
+        let storage = InMemFrontier::priority();
+        let due = Instant::now() + Duration::from_secs(1);
+        let revisit = seed("revisit").with_priority(5);
+        storage.schedule(revisit, due).await.unwrap();
+        for (path, priority) in [("high", 9), ("equal", 5), ("low", 1)] {
+            let fresh = seed(path).with_priority(priority);
+            storage.push(fresh).await.unwrap();
+        }
+        advance(Duration::from_secs(1)).await;
+
+        let mut order = Vec::new();
+        while let Some(path) = pop_path(&storage).await {
+            order.push(path);
+        }
+        assert_eq!(order, ["high", "equal", "revisit", "low"]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_revisit_sooner_than_a_retry_is_waited_for() {
+        let frontier = InMemFrontier::fifo().revisit::<Page>().retry(3);
+        let done = Report::Done(seed("list").with_tag(Page::Listing));
+        frontier.report(done).await.unwrap();
+        let retry = Report::Retry {
+            seed: seed("retried"),
+            after: Some(Duration::from_hours(1)),
+        };
+        frontier.report(retry).await.unwrap();
+
+        let NextSeed::Wait(at) = frontier.pop().await.unwrap() else {
+            panic!("expected a wait");
+        };
+        assert_eq!(at - Instant::now(), Duration::from_mins(1));
     }
 }

@@ -192,8 +192,8 @@ For cached model answers sharing this file, see
 
 `store.frontier().await?` opens one persistent priority queue per database
 file. Higher priorities run first, with insertion order breaking ties. Due
-scheduled revisits join the queue and compete by priority, rather than
-always preceding fresh requests. `.revisit::<YourTags>()` supplies the usual
+retries and scheduled revisits join the queue and compete by priority, rather
+than always preceding fresh requests. `.revisit::<YourTags>()` supplies the usual
 revisit behavior. Scheduled times are persisted at millisecond resolution;
 while open, elapsed time follows the monotonic clock.
 
@@ -221,10 +221,9 @@ persistence in serializable seed fields, such as its tag.
 Popping a seed atomically marks it in flight. Reporting completion, failure
 or a skip removes it; cancellation requeues it. Each queued occurrence is
 stored separately, so duplicate requests do not overwrite in-flight records.
-A corrupt seed returns an error and remains stored for repair. Retry facades
-hold delayed retries in memory, while their original records stay in flight;
-a restart recovers them at their stored attempt, as with redb. The separate
-retry facade's ordering limitations still apply.
+A corrupt seed returns an error and remains stored for repair. A seed waiting
+for a retry is stored with its attempt and due time, so a restart keeps both,
+as with redb.
 
 Frontier pops and reports are separate transactions from dataset writes and
 seen-set admission. Delivery is at least once across recovery; a page can run

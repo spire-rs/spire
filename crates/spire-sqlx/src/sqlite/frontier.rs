@@ -14,10 +14,10 @@ use crate::error::frontier_error;
 /// A persistent priority frontier with exclusive ownership and crash recovery.
 ///
 /// Higher priorities run first; equal priorities use insertion order. Due
-/// revisits compete with fresh seeds by priority. Popped seeds remain stored
-/// until reported, and abandoned seeds are recovered on the next exclusive
-/// open. Cancellation requeues immediately. Retry facades retain their seeds
-/// in memory; recovery restarts those requests at their stored attempt.
+/// revisits and retries compete with fresh seeds by priority. Popped seeds
+/// remain stored until reported, and abandoned seeds are recovered on the next
+/// exclusive open. Cancellation requeues immediately. Seeds waiting for a retry
+/// are stored with their attempt and due time, and survive a restart.
 /// Reports must carry the popped seed or its clone so they acknowledge the
 /// exact occurrence, including when identical seeds are queued together.
 ///
@@ -124,6 +124,25 @@ impl SqliteFrontier {
         })
     }
 
+    /// Converts `due` to the stored clock.
+    fn stored_due(&self, due: Instant) -> i64 {
+        self.inner.epoch.saturating_add(
+            i64::try_from(
+                due.saturating_duration_since(self.inner.started)
+                    .as_millis(),
+            )
+            .unwrap_or(i64::MAX),
+        )
+    }
+
+    /// Converts a time on the stored clock to an [`Instant`].
+    fn instant_at(&self, due: i64) -> Result<Instant> {
+        let wait = u64::try_from(due.saturating_sub(self.now())).unwrap_or_default();
+        Instant::now()
+            .checked_add(Duration::from_millis(wait))
+            .ok_or_else(|| invalid("a stored SQLite due time exceeds the clock range"))
+    }
+
     fn now(&self) -> i64 {
         self.inner.epoch.saturating_add(
             i64::try_from(self.inner.started.elapsed().as_millis()).unwrap_or(i64::MAX),
@@ -157,6 +176,13 @@ async fn enqueue(transaction: &mut sqlx::Transaction<'_, Sqlite>, seed: &Seed) -
     Ok(())
 }
 
+/// What happens to a reported seed once its in-flight row is removed.
+enum Then {
+    Forget,
+    Queue,
+    Hold(Instant),
+}
+
 impl Frontier for SqliteFrontier {
     async fn push(&self, seed: Seed) -> Result<Admission> {
         sqlx::query(
@@ -179,10 +205,24 @@ impl Frontier for SqliteFrontier {
             .await
             .map_err(frontier_error)?;
         let now = self.now();
-        sqlx::query("INSERT INTO spire_frontier_items (fingerprint, priority, payload)
-            SELECT fingerprint, priority, payload FROM spire_frontier_scheduled WHERE due <= $1 ORDER BY due, fingerprint")
-            .bind(now).execute(&mut *transaction).await.map_err(frontier_error)?;
+        sqlx::query(
+            "INSERT INTO spire_frontier_items (fingerprint, priority, payload)
+            SELECT fingerprint, priority, payload FROM (
+                SELECT fingerprint, priority, payload, due FROM spire_frontier_scheduled
+                UNION ALL
+                SELECT fingerprint, priority, payload, due FROM spire_frontier_retries
+            ) WHERE due <= $1 ORDER BY due",
+        )
+        .bind(now)
+        .execute(&mut *transaction)
+        .await
+        .map_err(frontier_error)?;
         sqlx::query("DELETE FROM spire_frontier_scheduled WHERE due <= $1")
+            .bind(now)
+            .execute(&mut *transaction)
+            .await
+            .map_err(frontier_error)?;
+        sqlx::query("DELETE FROM spire_frontier_retries WHERE due <= $1")
             .bind(now)
             .execute(&mut *transaction)
             .await
@@ -191,8 +231,16 @@ impl Frontier for SqliteFrontier {
             "SELECT id, payload FROM spire_frontier_items WHERE in_flight = 0 ORDER BY priority DESC, id LIMIT 1",
         ).fetch_optional(&mut *transaction).await.map_err(frontier_error)?;
         let Some((id, payload)) = next else {
+            let earliest: Option<i64> =
+                sqlx::query_scalar("SELECT MIN(due) FROM spire_frontier_retries")
+                    .fetch_one(&mut *transaction)
+                    .await
+                    .map_err(frontier_error)?;
             transaction.commit().await.map_err(frontier_error)?;
-            return Ok(NextSeed::Empty);
+            return Ok(match earliest {
+                Some(due) => NextSeed::Wait(self.instant_at(due)?),
+                None => NextSeed::Empty,
+            });
         };
         // Corrupt seeds remain stored and return an error, rather than being
         // silently discarded or allowing an incomplete recovery.
@@ -211,12 +259,13 @@ impl Frontier for SqliteFrontier {
     }
 
     async fn report(&self, report: Report) -> Result<Ack> {
-        let (seed, requeue, ack) = match report {
+        let (seed, then, ack) = match report {
             Report::Done(seed) | Report::Failed(seed) | Report::Skipped(seed) => {
-                (seed, false, Ack::Applied)
+                (seed, Then::Forget, Ack::Applied)
             }
-            Report::Cancelled(seed) => (seed, true, Ack::Applied),
-            Report::Retry { seed, .. } => (seed, false, Ack::RetryRefused),
+            Report::Cancelled(seed) => (seed, Then::Queue, Ack::Applied),
+            Report::Requeue { seed, due } => (seed, Then::Hold(due), Ack::Applied),
+            Report::Retry { seed, .. } => (seed, Then::Forget, Ack::RetryRefused),
             _ => return Ok(Ack::Applied),
         };
         let occurrence = seed.extensions().get::<Occurrence>().ok_or_else(|| {
@@ -239,8 +288,24 @@ impl Frontier for SqliteFrontier {
                 .execute(&mut *transaction)
                 .await
                 .map_err(frontier_error)?;
-        if requeue && deleted.rows_affected() == 1 {
-            enqueue(&mut transaction, &seed).await?;
+        if deleted.rows_affected() == 1 {
+            match then {
+                Then::Forget => {}
+                Then::Queue => enqueue(&mut transaction, &seed).await?,
+                Then::Hold(due) => {
+                    sqlx::query(
+                        "INSERT INTO spire_frontier_retries (fingerprint, due, priority, payload)
+                        VALUES ($1, $2, $3, $4)",
+                    )
+                    .bind(seed.fingerprint().get().to_be_bytes().to_vec())
+                    .bind(self.stored_due(due))
+                    .bind(seed.priority())
+                    .bind(encode(&seed)?)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(frontier_error)?;
+                }
+            }
         }
         transaction.commit().await.map_err(frontier_error)?;
         Ok(ack)
@@ -249,13 +314,7 @@ impl Frontier for SqliteFrontier {
 
 impl Schedule for SqliteFrontier {
     async fn schedule(&self, seed: Seed, due: Instant) -> Result<()> {
-        let due = self.inner.epoch.saturating_add(
-            i64::try_from(
-                due.saturating_duration_since(self.inner.started)
-                    .as_millis(),
-            )
-            .unwrap_or(i64::MAX),
-        );
+        let due = self.stored_due(due);
         sqlx::query("INSERT INTO spire_frontier_scheduled (fingerprint, due, priority, payload) VALUES ($1, $2, $3, $4)
             ON CONFLICT(fingerprint) DO UPDATE SET due = excluded.due, priority = excluded.priority, payload = excluded.payload")
             .bind(seed.fingerprint().get().to_be_bytes().to_vec()).bind(due).bind(seed.priority()).bind(encode(&seed)?)
@@ -268,13 +327,7 @@ impl Schedule for SqliteFrontier {
             .fetch_one(&self.inner.pool)
             .await
             .map_err(frontier_error)?;
-        due.map(|due| {
-            let wait = u64::try_from(due.saturating_sub(self.now())).unwrap_or_default();
-            Instant::now()
-                .checked_add(Duration::from_millis(wait))
-                .ok_or_else(|| invalid("scheduled SQLite revisit exceeds the clock range"))
-        })
-        .transpose()
+        due.map(|due| self.instant_at(due)).transpose()
     }
 }
 
@@ -538,9 +591,57 @@ mod tests {
         first.pool().close().await;
         let reopened = store(&path).await;
         let recovered = reopened.frontier().await.unwrap();
-        assert_eq!(pop(&recovered).await.attempt().get(), 1);
-        assert!(matches!(recovered.pop().await.unwrap(), NextSeed::Empty));
+        // The retry is still waiting, and nothing else was left behind.
+        assert_eq!(recovered.in_flight().await.unwrap(), 0);
+        let NextSeed::Wait(at) = recovered.pop().await.unwrap() else {
+            panic!("expected a wait for the pending retry")
+        };
+        assert!(at - Instant::now() > Duration::from_mins(59));
         drop(recovered);
+        reopened.pool().close().await;
+    }
+
+    #[tokio::test]
+    async fn due_retries_compete_by_priority_and_survive_reopening() {
+        let directory = TempDir::new().unwrap();
+        let path = directory.path().join("order.sqlite");
+        let first = store(&path).await;
+        let inner = first.frontier().await.unwrap();
+        let frontier = inner.clone().retry(3);
+        frontier.push(seed("retried", 5)).await.unwrap();
+        let NextSeed::Ready(retried) = frontier.pop().await.unwrap() else {
+            panic!()
+        };
+        frontier
+            .report(Report::Retry {
+                seed: retried,
+                after: Some(Duration::ZERO),
+            })
+            .await
+            .unwrap();
+        frontier.push(seed("low", 1)).await.unwrap();
+        frontier.push(seed("high", 9)).await.unwrap();
+        drop(frontier);
+        drop(inner);
+        first.pool().close().await;
+
+        let reopened = store(&path).await;
+        let frontier = reopened.frontier().await.unwrap();
+        let order = [
+            pop(&frontier).await,
+            pop(&frontier).await,
+            pop(&frontier).await,
+        ];
+        let order = order.map(|seed| (seed.uri().path().to_owned(), seed.attempt().get()));
+        assert_eq!(
+            order,
+            [
+                ("/high".to_owned(), 0),
+                ("/retried".to_owned(), 1),
+                ("/low".to_owned(), 0),
+            ]
+        );
+        drop(frontier);
         reopened.pool().close().await;
     }
 

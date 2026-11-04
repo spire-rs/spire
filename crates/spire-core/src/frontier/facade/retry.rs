@@ -1,8 +1,4 @@
-use std::cmp::{Ordering, Reverse};
-use std::collections::BinaryHeap;
-use std::fmt;
 use std::future::Future;
-use std::sync::Mutex;
 use std::time::Duration;
 
 use tokio::time::Instant;
@@ -11,7 +7,6 @@ use crate::Result;
 use crate::crawler::Attempt;
 use crate::frontier::seed::Seed;
 use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
-use crate::sync::lock;
 
 /// How often and how fast a [`Retry`] facade retries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,90 +86,22 @@ impl Default for RetryPolicy {
 
 /// A facade that re-queues seeds reported with [`Report::Retry`].
 ///
-/// Retried seeds wait in the facade until their delay passes; they are not
-/// pushed again, so facades inside it never refuse them. Waiting seeds are
-/// held in memory; they are bounded by the requests that failed, not by the
-/// size of the frontier. Seeds out of
-/// retries are reported inwards as [`Report::Failed`] and refused with
-/// [`Ack::RetryRefused`].
+/// The facade decides whether a seed is tried again and when; the storage
+/// holds it until then, see [`Report::Requeue`]. A retried seed keeps its
+/// priority and is not pushed again, so facades inside this one never refuse
+/// it. Once due it joins the queue, and the storage's order decides when it
+/// runs. Seeds out of retries are reported inwards as [`Report::Failed`] and
+/// refused with [`Ack::RetryRefused`].
+#[derive(Debug)]
 pub struct Retry<F> {
     inner: F,
     policy: RetryPolicy,
-    delayed: Mutex<Delayed>,
-}
-
-#[derive(Default)]
-struct Delayed {
-    heap: BinaryHeap<Reverse<Entry>>,
-    sequence: u64,
-}
-
-struct Entry {
-    at: Instant,
-    sequence: u64,
-    seed: Seed,
-}
-
-impl Ord for Entry {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (self.at, self.sequence).cmp(&(other.at, other.sequence))
-    }
-}
-
-impl PartialOrd for Entry {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for Entry {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other).is_eq()
-    }
-}
-
-impl Eq for Entry {}
-
-impl Delayed {
-    fn insert(&mut self, at: Instant, seed: Seed) {
-        self.sequence += 1;
-        self.heap.push(Reverse(Entry {
-            at,
-            sequence: self.sequence,
-            seed,
-        }));
-    }
-
-    fn pop_due(&mut self, now: Instant) -> Option<Seed> {
-        if self.earliest()? > now {
-            return None;
-        }
-        self.heap.pop().map(|Reverse(entry)| entry.seed)
-    }
-
-    fn earliest(&self) -> Option<Instant> {
-        self.heap.peek().map(|Reverse(entry)| entry.at)
-    }
 }
 
 impl<F> Retry<F> {
     /// Wraps `inner`, retrying according to `policy`.
-    pub fn new(inner: F, policy: RetryPolicy) -> Self {
-        Self {
-            inner,
-            policy,
-            delayed: Mutex::default(),
-        }
-    }
-}
-
-impl<F: fmt::Debug> fmt::Debug for Retry<F> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Retry")
-            .field("inner", &self.inner)
-            .field("policy", &self.policy)
-            .field("delayed", &lock(&self.delayed).heap.len())
-            .finish()
+    pub const fn new(inner: F, policy: RetryPolicy) -> Self {
+        Self { inner, policy }
     }
 }
 
@@ -183,19 +110,8 @@ impl<F: Frontier> Frontier for Retry<F> {
         self.inner.push(seed)
     }
 
-    async fn pop(&self) -> Result<NextSeed> {
-        let now = Instant::now();
-        if let Some(seed) = lock(&self.delayed).pop_due(now) {
-            return Ok(NextSeed::Ready(seed));
-        }
-
-        let next = self.inner.pop().await?;
-        let earliest = lock(&self.delayed).earliest();
-        Ok(match (next, earliest) {
-            (NextSeed::Wait(at), Some(earliest)) => NextSeed::Wait(at.min(earliest)),
-            (NextSeed::Empty, Some(earliest)) => NextSeed::Wait(earliest),
-            (next, _) => next,
-        })
+    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
+        self.inner.pop()
     }
 
     async fn report(&self, report: Report) -> Result<Ack> {
@@ -216,20 +132,16 @@ impl<F: Frontier> Frontier for Retry<F> {
 
         let seed = seed.next_attempt();
         let delay = after.unwrap_or_else(|| self.policy.jittered(&seed));
-        lock(&self.delayed).insert(Instant::now() + delay, seed);
-        Ok(Ack::Applied)
+        let due = Instant::now() + delay;
+        self.inner.report(Report::Requeue { seed, due }).await
     }
 
     fn size_hint(&self) -> Option<usize> {
-        let delayed = lock(&self.delayed).heap.len();
-        self.inner.size_hint().map(|len| len + delayed)
+        self.inner.size_hint()
     }
 
     fn snapshot(&self) -> Option<Vec<Seed>> {
-        let mut seeds = self.inner.snapshot()?;
-        let delayed = lock(&self.delayed);
-        seeds.extend(delayed.heap.iter().map(|Reverse(entry)| entry.seed.clone()));
-        Some(seeds)
+        self.inner.snapshot()
     }
 }
 
@@ -323,5 +235,106 @@ mod tests {
         assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Wait(_)));
         advance(Duration::from_secs(1)).await;
         assert_eq!(pop_path(&frontier).await.as_deref(), Some("retried"));
+    }
+
+    /// Fails `seed`, to be retried after `secs`.
+    async fn retry_after(frontier: &impl Frontier, seed: Seed, secs: u64) {
+        let after = Some(Duration::from_secs(secs));
+        let ack = frontier.report(Report::Retry { seed, after }).await;
+        assert_eq!(ack.unwrap(), Ack::Applied);
+    }
+
+    async fn drain(frontier: &impl Frontier) -> Vec<String> {
+        let mut order = Vec::new();
+        while let Some(path) = pop_path(frontier).await {
+            order.push(path);
+        }
+        order
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_fresh_seed_of_higher_priority_precedes_a_due_retry() {
+        let frontier = InMemFrontier::priority().retry(3);
+        retry_after(&frontier, seed("retried").with_priority(1), 1).await;
+        frontier
+            .push(seed("fresh").with_priority(100))
+            .await
+            .unwrap();
+        advance(Duration::from_secs(1)).await;
+
+        assert_eq!(drain(&frontier).await, ["fresh", "retried"]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_due_retry_of_higher_priority_precedes_a_fresh_seed() {
+        let frontier = InMemFrontier::priority().retry(3);
+        retry_after(&frontier, seed("retried").with_priority(100), 1).await;
+        frontier.push(seed("fresh").with_priority(1)).await.unwrap();
+        advance(Duration::from_secs(1)).await;
+
+        let NextSeed::Ready(retried) = frontier.pop().await.unwrap() else {
+            panic!("expected the retried seed");
+        };
+        assert_eq!(retried.priority(), 100);
+        assert_eq!(retried.attempt(), Attempt::new(1));
+        assert_eq!(drain(&frontier).await, ["fresh"]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn due_retries_run_by_priority_then_join_equal_seeds_at_the_back() {
+        let frontier = InMemFrontier::priority().retry(3);
+        retry_after(&frontier, seed("late").with_priority(5), 2).await;
+        retry_after(&frontier, seed("high").with_priority(9), 3).await;
+        retry_after(&frontier, seed("early").with_priority(5), 1).await;
+        frontier
+            .push(seed("queued").with_priority(5))
+            .await
+            .unwrap();
+        advance(Duration::from_secs(3)).await;
+
+        assert_eq!(drain(&frontier).await, ["high", "queued", "early", "late"]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_due_retry_joins_a_fifo_at_the_back_and_a_lifo_at_the_top() {
+        let fifo = InMemFrontier::fifo().retry(3);
+        let lifo = InMemFrontier::lifo().retry(3);
+        for path in ["a", "b"] {
+            fifo.push(seed(path)).await.unwrap();
+            lifo.push(seed(path)).await.unwrap();
+        }
+        retry_after(&fifo, seed("retried"), 1).await;
+        retry_after(&lifo, seed("retried"), 1).await;
+        advance(Duration::from_secs(1)).await;
+
+        assert_eq!(drain(&fifo).await, ["a", "b", "retried"]);
+        assert_eq!(drain(&lifo).await, ["retried", "b", "a"]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_retry_passes_the_facades_that_admit_seeds() {
+        let frontier = InMemFrontier::priority()
+            .dedup()
+            .filter(|seed| seed.uri().path() != "/retried")
+            .max_depth(0)
+            .retry(3);
+        retry_after(&frontier, seed("retried"), 1).await;
+        assert_eq!(frontier.size_hint(), Some(1));
+        assert_eq!(frontier.snapshot().map(|seeds| seeds.len()), Some(1));
+
+        advance(Duration::from_secs(1)).await;
+        assert_eq!(drain(&frontier).await, ["retried"]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_wait_is_for_the_earliest_retry() {
+        let frontier = InMemFrontier::priority().retry(3);
+        retry_after(&frontier, seed("later"), 5).await;
+        retry_after(&frontier, seed("sooner"), 2).await;
+
+        let NextSeed::Wait(at) = frontier.pop().await.unwrap() else {
+            panic!("expected a wait");
+        };
+        assert_eq!(at - Instant::now(), Duration::from_secs(2));
     }
 }
