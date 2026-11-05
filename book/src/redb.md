@@ -63,7 +63,10 @@ Every change is a committed transaction, and nothing is lost:
   when reading.
 - **Retries keep their place.** A seed waiting for a retry is stored with its
   attempt and when it is due, so it neither starts its retries over nor runs
-  early.
+  early. Due times follow a monotonic clock while the store is open, and the
+  wall clock across a restart. The store keeps the latest time it saw, so a
+  clock moved back between runs does not delay them, while one moved forward
+  brings them forward.
 - **Revisits are kept, one per page.** A revisit is scheduled before its
   page is reported, so a crash in between crawls the page once more rather
   than losing its revisit.

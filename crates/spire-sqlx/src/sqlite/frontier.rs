@@ -17,7 +17,10 @@ use crate::error::frontier_error;
 /// revisits and retries compete with fresh seeds by priority. Popped seeds
 /// remain stored until reported, and abandoned seeds are recovered on the next
 /// exclusive open. Cancellation requeues immediately. Seeds waiting for a retry
-/// are stored with their attempt and due time, and survive a restart.
+/// are stored with their attempt and due time, and survive a restart. The
+/// frontier keeps the latest time it saw, so a wall clock moved back between
+/// runs does not delay due times; one moved forward brings them forward, as
+/// that cannot be told from time passing.
 /// Reports must carry the popped seed or its clone so they acknowledge the
 /// exact occurrence, including when identical seeds are queued together.
 ///
@@ -105,14 +108,20 @@ impl SqliteFrontier {
             .execute(&mut *transaction)
             .await
             .map_err(frontier_error)?;
+        let last_seen: Option<i64> =
+            sqlx::query_scalar("SELECT last_seen FROM spire_frontier_clock")
+                .fetch_optional(&mut *transaction)
+                .await
+                .map_err(frontier_error)?;
         transaction.commit().await.map_err(frontier_error)?;
-        let epoch = i64::try_from(
+        let wall = i64::try_from(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_millis(),
         )
         .unwrap_or(i64::MAX);
+        let epoch = wall.max(last_seen.unwrap_or_default());
         Ok(Self {
             inner: Arc::new(Inner {
                 pool,
@@ -163,6 +172,19 @@ impl SqliteFrontier {
     }
 }
 
+/// Records `now` as the latest time the frontier saw.
+async fn mark_seen(transaction: &mut sqlx::Transaction<'_, Sqlite>, now: i64) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO spire_frontier_clock (id, last_seen) VALUES (1, $1)
+        ON CONFLICT(id) DO UPDATE SET last_seen = MAX(last_seen, excluded.last_seen)",
+    )
+    .bind(now)
+    .execute(&mut **transaction)
+    .await
+    .map_err(frontier_error)?;
+    Ok(())
+}
+
 async fn enqueue(transaction: &mut sqlx::Transaction<'_, Sqlite>, seed: &Seed) -> Result<()> {
     sqlx::query(
         "INSERT INTO spire_frontier_items (fingerprint, priority, payload) VALUES ($1, $2, $3)",
@@ -205,13 +227,16 @@ impl Frontier for SqliteFrontier {
             .await
             .map_err(frontier_error)?;
         let now = self.now();
+        mark_seen(&mut transaction, now).await?;
         sqlx::query(
             "INSERT INTO spire_frontier_items (fingerprint, priority, payload)
             SELECT fingerprint, priority, payload FROM (
-                SELECT fingerprint, priority, payload, due FROM spire_frontier_scheduled
+                SELECT fingerprint, priority, payload, due, 0 AS source, rowid AS position
+                    FROM spire_frontier_scheduled
                 UNION ALL
-                SELECT fingerprint, priority, payload, due FROM spire_frontier_retries
-            ) WHERE due <= $1 ORDER BY due",
+                SELECT fingerprint, priority, payload, due, 1 AS source, id AS position
+                    FROM spire_frontier_retries
+            ) WHERE due <= $1 ORDER BY due, source, position",
         )
         .bind(now)
         .execute(&mut *transaction)
@@ -293,6 +318,7 @@ impl Frontier for SqliteFrontier {
                 Then::Forget => {}
                 Then::Queue => enqueue(&mut transaction, &seed).await?,
                 Then::Hold(due) => {
+                    mark_seen(&mut transaction, self.now()).await?;
                     sqlx::query(
                         "INSERT INTO spire_frontier_retries (fingerprint, due, priority, payload)
                         VALUES ($1, $2, $3, $4)",
@@ -315,10 +341,18 @@ impl Frontier for SqliteFrontier {
 impl Schedule for SqliteFrontier {
     async fn schedule(&self, seed: Seed, due: Instant) -> Result<()> {
         let due = self.stored_due(due);
+        let mut transaction = self
+            .inner
+            .pool
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(frontier_error)?;
+        mark_seen(&mut transaction, self.now()).await?;
         sqlx::query("INSERT INTO spire_frontier_scheduled (fingerprint, due, priority, payload) VALUES ($1, $2, $3, $4)
             ON CONFLICT(fingerprint) DO UPDATE SET due = excluded.due, priority = excluded.priority, payload = excluded.payload")
             .bind(seed.fingerprint().get().to_be_bytes().to_vec()).bind(due).bind(seed.priority()).bind(encode(&seed)?)
-            .execute(&self.inner.pool).await.map_err(frontier_error)?;
+            .execute(&mut *transaction).await.map_err(frontier_error)?;
+        transaction.commit().await.map_err(frontier_error)?;
         Ok(())
     }
 
@@ -643,6 +677,80 @@ mod tests {
         );
         drop(frontier);
         reopened.pool().close().await;
+    }
+
+    #[tokio::test]
+    async fn seeds_due_together_join_the_queue_in_a_fixed_order() {
+        let directory = TempDir::new().unwrap();
+        // Reverses whatever order SQLite leaves unspecified, so the test
+        // depends on the query spelling out the order.
+        let pool = SqlitePoolOptions::new()
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(directory.path().join("ties.sqlite"))
+                    .create_if_missing(true)
+                    .pragma("reverse_unordered_selects", "ON"),
+            )
+            .await
+            .unwrap();
+        let store = SqliteStore::new(pool);
+        store.initialize().await.unwrap();
+        let frontier = store.frontier().await.unwrap();
+        let names = ["e", "b", "d", "a", "c"];
+        let mut popped = Vec::new();
+        for name in names {
+            frontier.push(seed(name, 0)).await.unwrap();
+            popped.push(pop(&frontier).await);
+        }
+        let due = Instant::now();
+        for seed in popped {
+            let requeue = Report::Requeue { seed, due };
+            assert_eq!(frontier.report(requeue).await.unwrap(), Ack::Applied);
+        }
+        frontier.schedule(seed("revisit", 0), due).await.unwrap();
+
+        let mut order = Vec::new();
+        for _ in 0..=names.len() {
+            order.push(pop(&frontier).await.uri().path().to_owned());
+        }
+        assert_eq!(order, ["/revisit", "/e", "/b", "/d", "/a", "/c"]);
+        drop(frontier);
+        store.pool().close().await;
+    }
+
+    #[tokio::test]
+    async fn a_clock_moved_back_between_runs_does_not_delay_a_retry() {
+        let directory = TempDir::new().unwrap();
+        let store = store(&directory.path().join("clock.sqlite")).await;
+        let wall = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        // As left by a run whose clock was ten hours ahead of this one's, with
+        // a retry due a minute after it stopped.
+        let last_seen = i64::try_from((wall + Duration::from_hours(10)).as_millis()).unwrap();
+        sqlx::query("INSERT INTO spire_frontier_clock (id, last_seen) VALUES (1, $1)")
+            .bind(last_seen)
+            .execute(store.pool())
+            .await
+            .unwrap();
+        let retried = seed("retried", 0);
+        sqlx::query(
+            "INSERT INTO spire_frontier_retries (fingerprint, due, priority, payload)
+            VALUES ($1, $2, 0, $3)",
+        )
+        .bind(retried.fingerprint().get().to_be_bytes().to_vec())
+        .bind(last_seen + 60_000)
+        .bind(encode(&retried).unwrap())
+        .execute(store.pool())
+        .await
+        .unwrap();
+
+        let frontier = store.frontier().await.unwrap();
+        let NextSeed::Wait(at) = frontier.pop().await.unwrap() else {
+            panic!("expected a wait for the retry");
+        };
+        let wait = at - Instant::now();
+        assert!(wait <= Duration::from_mins(1), "{wait:?}");
+        drop(frontier);
+        store.pool().close().await;
     }
 
     #[tokio::test]

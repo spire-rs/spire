@@ -404,7 +404,8 @@ mod tests {
                     if update.table == "spire_dataset_items" && !paused {
                         paused = true;
                         entered.notify_one();
-                        // Pause SQLx's dedicated SQLite worker, not the async runtime.
+                        // Pause SQLx's dedicated SQLite worker, not the async
+                        // runtime.
                         let _ = wait.recv();
                     }
                 });

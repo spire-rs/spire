@@ -195,7 +195,9 @@ file. Higher priorities run first, with insertion order breaking ties. Due
 retries and scheduled revisits join the queue and compete by priority, rather
 than always preceding fresh requests. `.revisit::<YourTags>()` supplies the usual
 revisit behavior. Scheduled times are persisted at millisecond resolution;
-while open, elapsed time follows the monotonic clock.
+while open, elapsed time follows the monotonic clock. The frontier keeps the
+latest time it saw, so a wall clock moved back between runs does not delay due
+times, while one moved forward brings them forward.
 
 Opening the frontier acquires an OS lock on
 `<database>.spire-frontier.lock`, then requeues requests abandoned in flight.

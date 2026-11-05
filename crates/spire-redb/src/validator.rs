@@ -1,5 +1,4 @@
 use std::fmt;
-use std::future::{Future, ready};
 
 use spire_core::Result;
 use spire_core::frontier::seed::Fingerprint;
@@ -25,8 +24,10 @@ impl RedbValidator {
     ///
     /// Returns a [`Frontier`](spire_core::ErrorKind::Frontier) error if the
     /// store cannot be read.
-    pub fn len(&self) -> Result<usize> {
-        self.store.count(PAGE_VERSIONS)
+    pub async fn len(&self) -> Result<usize> {
+        self.store
+            .blocking(|store| store.count(PAGE_VERSIONS))
+            .await
     }
 
     /// Whether no version is stored.
@@ -35,8 +36,8 @@ impl RedbValidator {
     ///
     /// Returns a [`Frontier`](spire_core::ErrorKind::Frontier) error if the
     /// store cannot be read.
-    pub fn is_empty(&self) -> Result<bool> {
-        self.len().map(|len| len == 0)
+    pub async fn is_empty(&self) -> Result<bool> {
+        Ok(self.len().await? == 0)
     }
 }
 
@@ -97,20 +98,22 @@ fn decode(mut bytes: &[u8]) -> Option<PageVersion> {
 }
 
 impl Validator for RedbValidator {
-    fn get(
-        &self,
-        request: Fingerprint,
-    ) -> impl Future<Output = Result<Option<PageVersion>>> + Send {
+    async fn get(&self, request: Fingerprint) -> Result<Option<PageVersion>> {
         let key = request.get();
-        let bytes = self.store.read(|txn| {
-            let table = match txn.open_table(PAGE_VERSIONS) {
-                Ok(table) => table,
-                Err(redb::TableError::TableDoesNotExist(_)) => return Ok(None),
-                Err(error) => return Err(error.into()),
-            };
-            Ok(table.get(key)?.map(|bytes| bytes.value().to_vec()))
-        });
-        ready(bytes.map(|bytes| bytes.as_deref().and_then(decode)))
+        let bytes = self
+            .store
+            .blocking(move |store| {
+                store.read(|txn| {
+                    let table = match txn.open_table(PAGE_VERSIONS) {
+                        Ok(table) => table,
+                        Err(redb::TableError::TableDoesNotExist(_)) => return Ok(None),
+                        Err(error) => return Err(error.into()),
+                    };
+                    Ok(table.get(key)?.map(|bytes| bytes.value().to_vec()))
+                })
+            })
+            .await?;
+        Ok(bytes.as_deref().and_then(decode))
     }
 
     async fn set(&self, request: Fingerprint, version: PageVersion) -> Result<()> {
@@ -161,6 +164,6 @@ mod tests {
 
         let validator = RedbStore::open(&path.0).await.unwrap().validator();
         assert_eq!(validator.get(key).await.unwrap(), Some(version));
-        assert_eq!(validator.len().unwrap(), 1);
+        assert_eq!(validator.len().await.unwrap(), 1);
     }
 }

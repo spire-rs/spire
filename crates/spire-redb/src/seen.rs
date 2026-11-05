@@ -23,8 +23,8 @@ impl RedbSeen {
     ///
     /// Returns a [`Frontier`](spire_core::ErrorKind::Frontier) error if the
     /// store cannot be read.
-    pub fn len(&self) -> Result<usize> {
-        self.store.count(SEEN)
+    pub async fn len(&self) -> Result<usize> {
+        self.store.blocking(|store| store.count(SEEN)).await
     }
 
     /// Whether nothing was seen yet.
@@ -33,8 +33,8 @@ impl RedbSeen {
     ///
     /// Returns a [`Frontier`](spire_core::ErrorKind::Frontier) error if the
     /// store cannot be read.
-    pub fn is_empty(&self) -> Result<bool> {
-        self.len().map(|len| len == 0)
+    pub async fn is_empty(&self) -> Result<bool> {
+        Ok(self.len().await? == 0)
     }
 }
 
@@ -73,7 +73,7 @@ mod tests {
         }
 
         let seen = RedbStore::open(&path.0).await.unwrap().seen();
-        assert_eq!(seen.len().unwrap(), 1);
+        assert_eq!(seen.len().await.unwrap(), 1);
         assert!(!seen.insert(seed("a").fingerprint()).await.unwrap());
         assert!(seen.insert(seed("b").fingerprint()).await.unwrap());
     }

@@ -90,8 +90,8 @@ impl Default for RetryPolicy {
 /// holds it until then, see [`Report::Requeue`]. A retried seed keeps its
 /// priority and is not pushed again, so facades inside this one never refuse
 /// it. Once due it joins the queue, and the storage's order decides when it
-/// runs. Seeds out of retries are reported inwards as [`Report::Failed`] and
-/// refused with [`Ack::RetryRefused`].
+/// runs. Seeds out of retries, or refused by the storage, are reported inwards
+/// as [`Report::Failed`] and refused with [`Ack::RetryRefused`].
 #[derive(Debug)]
 pub struct Retry<F> {
     inner: F,
@@ -130,10 +130,17 @@ impl<F: Frontier> Frontier for Retry<F> {
             return Ok(Ack::RetryRefused);
         }
 
-        let seed = seed.next_attempt();
-        let delay = after.unwrap_or_else(|| self.policy.jittered(&seed));
+        let retried = seed.clone().next_attempt();
+        let delay = after.unwrap_or_else(|| self.policy.jittered(&retried));
         let due = Instant::now() + delay;
-        self.inner.report(Report::Requeue { seed, due }).await
+        let ack = self
+            .inner
+            .report(Report::Requeue { seed: retried, due })
+            .await?;
+        if ack == Ack::RetryRefused {
+            self.inner.report(Report::Failed(seed)).await?;
+        }
+        Ok(ack)
     }
 
     fn size_hint(&self) -> Option<usize> {
@@ -336,5 +343,42 @@ mod tests {
             panic!("expected a wait");
         };
         assert_eq!(at - Instant::now(), Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn a_seed_storage_refuses_to_requeue_is_reported_failed() {
+        /// Storage that leaves `Report::Requeue` to the default.
+        #[derive(Default)]
+        struct NoRequeue(std::sync::Mutex<Vec<Attempt>>);
+
+        impl Frontier for NoRequeue {
+            fn push(&self, _: Seed) -> impl Future<Output = Result<Admission>> + Send {
+                std::future::ready(Ok(Admission::Queued))
+            }
+
+            fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
+                std::future::ready(Ok(NextSeed::Empty))
+            }
+
+            fn report(&self, report: Report) -> impl Future<Output = Result<Ack>> + Send {
+                let ack = match report {
+                    Report::Failed(seed) => {
+                        self.0.lock().unwrap().push(seed.attempt());
+                        Ack::Applied
+                    }
+                    Report::Requeue { .. } => Ack::RetryRefused,
+                    _ => Ack::Applied,
+                };
+                std::future::ready(Ok(ack))
+            }
+        }
+
+        let frontier = NoRequeue::default().retry(3);
+        let retry = Report::Retry {
+            seed: seed("a"),
+            after: None,
+        };
+        assert_eq!(frontier.report(retry).await.unwrap(), Ack::RetryRefused);
+        assert_eq!(*frontier.inner.0.lock().unwrap(), [Attempt::FIRST]);
     }
 }
