@@ -271,7 +271,7 @@ impl fmt::Display for SkipReason {
 #[non_exhaustive]
 pub enum Slowdown {
     /// Its adaptive concurrency was lowered, see
-    /// [`HostConcurrency::adaptive`](crate::crawler::HostConcurrency::adaptive).
+    /// [`HostConcurrency::adaptive`](super::HostConcurrency::adaptive).
     Concurrency {
         /// Requests in flight to it at most, from now on.
         limit: usize,

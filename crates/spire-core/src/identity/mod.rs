@@ -22,7 +22,9 @@
 //! // A rotating gateway: each session id is a different exit IP.
 //! let identities = Identities::from_fn(|n| {
 //!     Ok(Identity::new(format!("session-{n}"))
-//!         .with_proxy(format!("http://user-session-{n}:secret@gate.example:7000"))?
+//!         .with_proxy(format!(
+//!             "http://user-session-{n}:secret@gate.example:7000"
+//!         ))?
 //!         .with_header(USER_AGENT, HeaderValue::from_static("MyBot/1.0")))
 //! })
 //! .max_active(100)

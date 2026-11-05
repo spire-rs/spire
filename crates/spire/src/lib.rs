@@ -191,14 +191,19 @@ pub mod worker {
         //! /// Retries pages that answer with a captcha instead of content.
         //! async fn captcha(cx: Context<Noop>, next: Next<Noop>) -> Result<Outcome> {
         //!     if cx.response().await?.headers().contains_key("x-captcha") {
-        //!         return Ok(Outcome::Retry { after: Some(Duration::from_secs(60)) });
+        //!         return Ok(Outcome::Retry {
+        //!             after: Some(Duration::from_secs(60)),
+        //!         });
         //!     }
         //!     Ok(next.run(cx).await)
         //! }
         //!
         //! let worker = from_fn(|_: Context<Noop>| async {})
         //!     .layer(middleware::from_fn(captcha))
-        //!     .layer(SetHeader::new(USER_AGENT, HeaderValue::from_static("MyBot/1.0")));
+        //!     .layer(SetHeader::new(
+        //!         USER_AGENT,
+        //!         HeaderValue::from_static("MyBot/1.0"),
+        //!     ));
         //! let crawler = Crawler::new(Noop, worker);
         //! ```
         //!

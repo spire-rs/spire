@@ -25,8 +25,8 @@ use std::time::Duration;
 /// ```
 /// use std::time::Duration;
 ///
-/// use spire_core::crawler::Crawler;
 /// use spire_core::backend::Noop;
+/// use spire_core::crawler::Crawler;
 /// use spire_core::worker::from_fn;
 ///
 /// let worker = from_fn(|_: spire_core::Context<Noop>| async {});

@@ -17,11 +17,13 @@ pub type Request<B = Bytes> = ::http::Request<B>;
 /// to test a handler, build it from a seed:
 ///
 /// ```
+/// use spire_core::crawler::Tag;
 /// use spire_core::frontier::seed::Seed;
 /// use spire_core::http::RequestExt;
-/// use spire_core::crawler::Tag;
 ///
-/// let request = Seed::get("https://example.com/")?.with_tag("page").into_request();
+/// let request = Seed::get("https://example.com/")?
+///     .with_tag("page")
+///     .into_request();
 /// assert_eq!(request.tag(), Some(&Tag::from("page")));
 /// # Ok::<_, spire_core::Error>(())
 /// ```

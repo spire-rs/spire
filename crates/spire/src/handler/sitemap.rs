@@ -29,8 +29,8 @@ use crate::{Context, Result, TRACING_TARGET};
 /// a crawl's own scale, write a handler with the [`Sitemap`] extractor.
 ///
 /// ```
-/// use spire::handler::FollowSitemap;
 /// use spire::Router;
+/// use spire::handler::FollowSitemap;
 ///
 /// async fn product() {}
 ///

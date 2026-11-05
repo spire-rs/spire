@@ -14,11 +14,14 @@ use crate::{Context, Error};
 /// services.
 ///
 /// ```
+/// use spire::backend::Noop;
 /// use spire::extract::{Extension, State};
 /// use spire::{Crawler, Router};
-/// use spire::backend::Noop;
 ///
-/// async fn page(State(prefix): State<String>, Extension(limit): Extension<usize>) {
+/// async fn page(
+///     State(prefix): State<String>,
+///     Extension(limit): Extension<usize>,
+/// ) {
 ///     println!("{prefix}: {limit}");
 /// }
 ///

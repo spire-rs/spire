@@ -38,7 +38,12 @@ use crate::store::RedbStore;
 /// # async fn example() -> spire_core::Result<()> {
 /// let store = RedbStore::open("crawl.redb").await?;
 /// let products = store.dataset::<Product>("products");
-/// products.write(Product { name: "Lamp".into(), price: 20.0 }).await?;
+/// products
+///     .write(Product {
+///         name: "Lamp".into(),
+///         price: 20.0,
+///     })
+///     .await?;
 /// # Ok(())
 /// # }
 /// ```

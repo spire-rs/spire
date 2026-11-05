@@ -111,7 +111,9 @@ impl From<&PageLink> for Link {
 ///
 /// async fn page(links: Links, queue: Queue) -> Result<()> {
 ///     // The next page of a listing, if the site says which it is.
-///     queue.follow_all(links.followable().same_host().with_rel("next")).await?;
+///     queue
+///         .follow_all(links.followable().same_host().with_rel("next"))
+///         .await?;
 ///     Ok(())
 /// }
 /// ```

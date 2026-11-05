@@ -37,9 +37,14 @@ const MAX_REDIRECTS: usize = 10;
 /// # async fn main() -> spire_core::Result<()> {
 /// let site = MockSite::new()
 ///     .page("https://example.com/", MockPage::html("<p>Home</p>"))
-///     .page("https://example.com/old", MockPage::redirect("https://example.com/"));
+///     .page(
+///         "https://example.com/old",
+///         MockPage::redirect("https://example.com/"),
+///     );
 ///
-/// let worker = from_fn(|cx: spire_core::Context<_>| async move { cx.body().await.map(drop) });
+/// let worker = from_fn(|cx: spire_core::Context<_>| async move {
+///     cx.body().await.map(drop)
+/// });
 /// let crawler = Crawler::new(site.clone(), worker).with_seeds([
 ///     Seed::get("https://example.com/old")?,
 ///     Seed::get("https://example.com/missing")?,

@@ -40,8 +40,8 @@ use crate::worker::{IntoOutcome, Outcome};
 ///
 /// ```
 /// use spire::Router;
-/// use spire::extract::Text;
 /// use spire::crawler::Tag;
+/// use spire::extract::Text;
 ///
 /// async fn log(tag: Tag, Text(body): Text) {
 ///     println!("{tag}: {} bytes", body.len());
@@ -53,7 +53,8 @@ use crate::worker::{IntoOutcome, Outcome};
 ///     Ok(())
 /// }
 ///
-/// let router: Router<spire::backend::Noop> = Router::new().route("page", (log, store));
+/// let router: Router<spire::backend::Noop> =
+///     Router::new().route("page", (log, store));
 /// ```
 ///
 /// [extractors]: crate::extract

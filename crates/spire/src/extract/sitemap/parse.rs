@@ -26,7 +26,10 @@ const GZIP: [u8; 2] = [0x1f, 0x8b];
 /// use spire::extract::sitemap::{Record, Sitemap};
 /// use spire::frontier::queue::Queue;
 ///
-/// async fn sitemap(queue: Queue, Sitemap(records): Sitemap) -> spire::Result<()> {
+/// async fn sitemap(
+///     queue: Queue,
+///     Sitemap(records): Sitemap,
+/// ) -> spire::Result<()> {
 ///     for record in records {
 ///         if let Record::Entry(entry) = record {
 ///             queue.follow(entry.location.as_str()).await?;

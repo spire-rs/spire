@@ -72,7 +72,9 @@ impl ThirtyfourBuilder {
     ///
     /// ```
     /// use spire_thirtyfour::ThirtyfourBackend;
-    /// use spire_thirtyfour::thirtyfour::{ChromiumLikeCapabilities, DesiredCapabilities};
+    /// use spire_thirtyfour::thirtyfour::{
+    ///     ChromiumLikeCapabilities, DesiredCapabilities,
+    /// };
     ///
     /// let mut capabilities = DesiredCapabilities::chrome();
     /// capabilities.add_arg("--headless=new").unwrap();

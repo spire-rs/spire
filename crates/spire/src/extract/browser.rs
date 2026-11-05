@@ -34,7 +34,11 @@ use crate::{Context, Error, Result};
 /// use spire::extract::{Head, ThirtyfourTab};
 /// use spire::frontier::queue::Queue;
 ///
-/// async fn handler(head: Head, queue: Queue, tab: ThirtyfourTab) -> spire::Result<()> {
+/// async fn handler(
+///     head: Head,
+///     queue: Queue,
+///     tab: ThirtyfourTab,
+/// ) -> spire::Result<()> {
 ///     if let Ok(more) = tab.find(By::Css("button.more")).await {
 ///         let _ = more.click().await;
 ///     }

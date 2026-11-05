@@ -20,15 +20,15 @@ use crate::crawler::connector::Connector;
 /// robots.txt is fetched once per origin (scheme, host and port) before its
 /// first request, and handled as RFC 9309 describes:
 ///
-/// - Its rules for [`user agent`](Self::new) decide what is crawled;
-///   disallowed requests are skipped, and `Crawl-delay` slows the host down.
+/// - Its rules for [`user agent`](Self::new) decide what is crawled; disallowed
+///   requests are skipped, and `Crawl-delay` slows the host down.
 /// - A `4xx` other than `429`, or too many redirects, allows everything.
 /// - A `5xx`, a `429` or a network failure disallows everything while
 ///   robots.txt is retried with backoff. Once the
-///   [retries](Self::with_unreachable_retries) are spent, the origin's
-///   requests are skipped.
-/// - Rules older than the [maximum age](Self::with_max_age) are fetched
-///   again; until then, and if fetching fails, the old rules apply.
+///   [retries](Self::with_unreachable_retries) are spent, the origin's requests
+///   are skipped.
+/// - Rules older than the [maximum age](Self::with_max_age) are fetched again;
+///   until then, and if fetching fails, the old rules apply.
 ///
 /// robots.txt is fetched with the crawl's backend unless
 /// [`with_backend`](Self::with_backend) sets another, e.g. an HTTP client

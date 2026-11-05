@@ -23,7 +23,10 @@ use crate::{Context, Error, Result};
 ///     page: u32,
 /// }
 ///
-/// async fn listing(Query(Page { page }): Query<Page>, queue: Queue) -> spire::Result<()> {
+/// async fn listing(
+///     Query(Page { page }): Query<Page>,
+///     queue: Queue,
+/// ) -> spire::Result<()> {
 ///     queue.follow(format!("?page={}", page + 1)).await?;
 ///     Ok(())
 /// }
