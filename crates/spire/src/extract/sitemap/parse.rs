@@ -16,8 +16,8 @@ const GZIP: [u8; 2] = [0x1f, 0x8b];
 ///
 /// Pages are [`Record::Entry`]s and the sitemaps of an index are
 /// [`Record::Sitemap`]s, which a handler typically queues in turn.
-/// [`FollowSitemap`](crate::handler::FollowSitemap) does exactly that, so most crawls
-/// need no handler of their own.
+/// [`FollowSitemap`](crate::handler::FollowSitemap) does exactly that, so most
+/// crawls need no handler of their own.
 ///
 /// A sitemap is parsed off the async threads, and capped by the protocol's
 /// limits of 50 000 URLs and 50 MiB: the records before a limit are kept.

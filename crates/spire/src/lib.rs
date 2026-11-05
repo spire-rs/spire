@@ -167,14 +167,14 @@ pub mod worker {
     pub mod middleware {
         //! Middleware, which runs around a [`Worker`] for every request.
         //!
-        //! A [`Middleware`] receives the [`Context`] before any handler, and the
-        //! [`Next`] worker to pass it on to. Before passing it on, it can change the
-        //! request, e.g. add headers, or answer without fetching. Around, it can
-        //! check the response's head: fetched once, it is shared with the handlers.
-        //! After, it can change the [`Outcome`].
+        //! A [`Middleware`] receives the [`Context`] before any handler, and
+        //! the [`Next`] worker to pass it on to. Before passing it on, it can
+        //! change the request, e.g. add headers, or answer without fetching.
+        //! Around, it can check the response's head: fetched once, it is shared
+        //! with the handlers. After, it can change the [`Outcome`].
         //!
-        //! [`WorkerExt::layer`] wraps a worker, such as a router, in middleware. The
-        //! middleware added last runs first.
+        //! [`WorkerExt::layer`] wraps a worker, such as a router, in
+        //! middleware. The middleware added last runs first.
         //!
         //! # Examples
         //!

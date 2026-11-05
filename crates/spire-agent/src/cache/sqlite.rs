@@ -14,8 +14,8 @@ use crate::{Error, Result};
 ///
 /// The first operation migrates the reserved `spire_agent_cache` table,
 /// tracking versions in `_spire_agent_migrations`. Clones share initialization.
-/// Pool durability settings are unchanged.
-/// Attach this cache explicitly with [`crate::Agent::with_cache`].
+/// Pool durability settings are unchanged. Attach this cache explicitly with
+/// [`crate::Agent::with_cache`].
 #[derive(Debug, Clone)]
 pub struct SqliteCache {
     store: SqliteStore,
@@ -55,8 +55,9 @@ impl SqliteCache {
                     .begin_with("BEGIN IMMEDIATE")
                     .await
                     .map_err(failed)?;
-                // Run on the existing connection. The generic Acquire entry point
-                // cannot produce a Send future here on our supported Rust version.
+                // Run on the existing connection. The generic Acquire entry
+                // point cannot produce a Send future here on our supported Rust
+                // version.
                 migrator
                     .run_direct(None, &mut *transaction, false)
                     .await

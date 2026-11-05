@@ -1,4 +1,5 @@
-//! Crawler services remain independent of application state and middleware overrides.
+//! Crawler services remain independent of application state and middleware
+//! overrides.
 
 use spire::backend::Noop;
 use spire::extract::{Extension, FromContext, State};

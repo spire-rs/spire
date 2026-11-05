@@ -182,8 +182,7 @@ pub enum OutcomeKind {
     Abort,
     /// [`Outcome::Stop`].
     Stop,
-    /// [`Outcome::Fail`], including a
-    /// timeout or a panic.
+    /// [`Outcome::Fail`], including a timeout or a panic.
     Fail,
     /// [`Outcome::Fatal`].
     Fatal,
@@ -300,8 +299,7 @@ pub enum StopReason {
     RequestBudget,
     /// A handler returned [`Outcome::Stop`].
     Requested,
-    /// A handler returned [`Outcome::Fatal`],
-    /// or the frontier failed.
+    /// A handler returned [`Outcome::Fatal`], or the frontier failed.
     Failed,
 }
 

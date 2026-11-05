@@ -306,8 +306,8 @@ impl Html {
     }
 }
 
-/// Resolves the links of a page as a browser does: against its
-/// `<base href>`, itself resolved against the URI the page was served from.
+/// Resolves the links of a page as a browser does: against its `<base href>`,
+/// itself resolved against the URI the page was served from.
 struct Resolver {
     base: Option<Url>,
 }

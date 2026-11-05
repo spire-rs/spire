@@ -15,7 +15,8 @@
 //! - Sitemaps, with the `sitemap` feature, in [`sitemap`]; and a browser
 //!   [`ThirtyfourTab`] with the `thirtyfour` feature.
 //! - Model selection, with the `agent` feature: `AgentExtract<T>`.
-//! - Application state: [`State`]; crawler and middleware services: [`Extension`].
+//! - Application state: [`State`]; crawler and middleware services:
+//!   [`Extension`].
 //!
 //! Wrapping an extractor in `Option` or `Result` makes it infallible.
 //!

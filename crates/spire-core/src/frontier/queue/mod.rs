@@ -95,9 +95,10 @@ impl Queue {
     /// seed's. Tags are not inherited: an untagged link goes to the router's
     /// path routes or fallback, so pagination tags its links explicitly.
     ///
-    /// The tag is not part of the [`Fingerprint`](crate::frontier::seed::Fingerprint):
-    /// with a deduplicating frontier, a URL already followed under one tag is
-    /// a [`Duplicate`](Admission::Duplicate) under any other.
+    /// The tag is not part of the
+    /// [`Fingerprint`](crate::frontier::seed::Fingerprint): with a
+    /// deduplicating frontier, a URL already followed under one tag is a
+    /// [`Duplicate`](Admission::Duplicate) under any other.
     ///
     /// Relative `href`s resolve against the page; fragments are dropped.
     /// Links that are not `http(s)` URLs, such as `mailto:` or malformed

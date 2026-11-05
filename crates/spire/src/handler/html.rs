@@ -15,11 +15,11 @@ use crate::{Context, TRACING_TARGET};
 
 /// A handler that follows the links of a page, queueing them with a tag.
 ///
-/// By default it follows visible `<a href>` and `<area href>` links; [`select`](Self::select)
-/// narrows it to the elements matching a CSS selector, e.g. a pagination
-/// link. Which links are crawled is still up to the frontier: its scope,
-/// deduplication and depth limits apply. Combine it with other handlers in a
-/// tuple to do more with the same page.
+/// By default it follows visible `<a href>` and `<area href>` links;
+/// [`select`](Self::select) narrows it to the elements matching a CSS selector,
+/// e.g. a pagination link. Which links are crawled is still up to the frontier:
+/// its scope, deduplication and depth limits apply. Combine it with other
+/// handlers in a tuple to do more with the same page.
 ///
 /// ```
 /// use spire::handler::FollowLinks;

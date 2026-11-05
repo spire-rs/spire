@@ -12,7 +12,8 @@ struct Judgment {
 }
 
 impl ObjectiveRegistry {
-    /// Rates links against all active objectives, merging accepted scores by maximum.
+    /// Rates links against all active objectives, merging accepted scores by
+    /// maximum.
     ///
     /// Each objective caches canonical URLs and shares batches across pages.
     /// Batches default to 256 links or a 5 ms collection delay; configure them

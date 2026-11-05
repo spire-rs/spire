@@ -52,16 +52,16 @@ const DEFAULT_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 /// gets its own client from the backend and is handed to the worker, whose
 /// [`Outcome`] is reported back to the frontier.
 ///
-/// The run ends once the frontier is empty and no request is in flight, when
-/// a worker returns [`Outcome::Stop`], the request or time budget is spent,
-/// or the [`shutdown_token`](Self::shutdown_token) is cancelled. Stopping
-/// lets requests in flight finish, for at most the
-/// [shutdown grace period](Self::with_shutdown_grace) if one is set.
+/// The run ends once the frontier is empty and no request is in flight, when a
+/// worker returns [`Outcome::Stop`], the request or time budget is spent, or
+/// the [`shutdown_token`](Self::shutdown_token) is cancelled. Stopping lets
+/// requests in flight finish, for at most the [shutdown grace
+/// period](Self::with_shutdown_grace) if one is set.
 ///
-/// Politeness is per host: [`with_host_concurrency`](Self::with_host_concurrency)
-/// and [`with_host_delay`](Self::with_host_delay) limit how hard a single
-/// host is crawled, and with the `robots` feature, `with_robots` obeys
-/// robots.txt.
+/// Politeness is per host:
+/// [`with_host_concurrency`](Self::with_host_concurrency) and
+/// [`with_host_delay`](Self::with_host_delay) limit how hard a single host is
+/// crawled, and with the `robots` feature, `with_robots` obeys robots.txt.
 ///
 /// # Examples
 ///
@@ -246,9 +246,9 @@ impl<B, W> Crawler<B, W> {
         self
     }
 
-    /// Sets how many requests to the same host are in flight at once:
-    /// a fixed number, at least one, or a limit per host adapted to how it
-    /// responds with [`HostConcurrency::adaptive`]. Unlimited by default.
+    /// Sets how many requests to the same host are in flight at once: a fixed
+    /// number, at least one, or a limit per host adapted to how it responds
+    /// with [`HostConcurrency::adaptive`]. Unlimited by default.
     #[must_use]
     pub fn with_host_concurrency(mut self, limit: impl Into<HostConcurrency>) -> Self {
         self.settings.hosts.concurrency = Some(limit.into());

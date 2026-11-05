@@ -1,4 +1,5 @@
-//! Seen sets: what a [`Dedup`](crate::frontier::facade::Dedup) frontier remembers.
+//! Seen sets: what a [`Dedup`](crate::frontier::facade::Dedup) frontier
+//! remembers.
 
 mod bloom;
 mod memory;
@@ -11,7 +12,8 @@ pub use memory::InMemSeen;
 use crate::Result;
 use crate::frontier::seed::Fingerprint;
 
-/// Remembers which [`Fingerprint`]s a [`Dedup`](crate::frontier::facade::Dedup) frontier has seen.
+/// Remembers which [`Fingerprint`]s a [`Dedup`](crate::frontier::facade::Dedup)
+/// frontier has seen.
 pub trait SeenSet: Send + Sync + 'static {
     /// Records `fingerprint`, returning `true` if it was not seen before.
     ///

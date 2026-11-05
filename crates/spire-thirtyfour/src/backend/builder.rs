@@ -130,8 +130,8 @@ impl ThirtyfourBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an [`Invalid`](spire_core::ErrorKind::Invalid) error if no endpoint was
-    /// added or a remote URL is not an absolute `http(s)` URL.
+    /// Returns an [`Invalid`](spire_core::ErrorKind::Invalid) error if no
+    /// endpoint was added or a remote URL is not an absolute `http(s)` URL.
     pub fn build(self) -> Result<ThirtyfourBackend> {
         let mut endpoints = Vec::with_capacity(self.remotes.len() + 1);
         for url in self.remotes {

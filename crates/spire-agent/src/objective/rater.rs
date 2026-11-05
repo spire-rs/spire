@@ -107,7 +107,8 @@ fn rater_stopped() -> Error {
     Error::Configuration("objective link rater stopped".into())
 }
 
-// Preserve fatal budget/configuration classifications when distributing an error.
+// Preserve fatal budget/configuration classifications when distributing an
+// error.
 fn copy_error(error: Arc<Error>) -> Error {
     match error.as_ref() {
         Error::Budget(message) => Error::Budget(message),

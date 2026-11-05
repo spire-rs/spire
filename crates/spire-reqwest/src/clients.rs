@@ -12,8 +12,8 @@ use spire_core::{Error, Result};
 /// Makes the builder every client starts from.
 pub(crate) type Builder = dyn Fn() -> reqwest::ClientBuilder + Send + Sync;
 
-/// Every reqwest client of an [`ReqwestBackend`](crate::ReqwestBackend), all from
-/// one configuration.
+/// Every reqwest client of an [`ReqwestBackend`](crate::ReqwestBackend), all
+/// from one configuration.
 #[derive(Clone)]
 pub(crate) struct Clients {
     builder: Arc<Builder>,

@@ -87,7 +87,8 @@ impl Seed {
     }
 
     /// Sets the priority, `0` by default; frontiers that order by priority,
-    /// such as [`InMemFrontier::priority`](crate::frontier::InMemFrontier::priority),
+    /// such as
+    /// [`InMemFrontier::priority`](crate::frontier::InMemFrontier::priority),
     /// crawl higher priorities first.
     #[must_use]
     pub const fn with_priority(mut self, priority: i32) -> Self {
@@ -160,11 +161,11 @@ impl Seed {
 
     /// Returns runtime metadata associated with this seed.
     ///
-    /// Extensions survive cloning and retries and move into the request.
-    /// They are excluded from serialization and request fingerprints. Persistent
+    /// Extensions survive cloning and retries and move into the request. They
+    /// are excluded from serialization and request fingerprints. Persistent
     /// frontiers that serialize seeds discard caller extensions on enqueue,
-    /// even within the same process. Use crawler extensions for runtime services
-    /// that must be available to persisted requests.
+    /// even within the same process. Use crawler extensions for runtime
+    /// services that must be available to persisted requests.
     #[must_use]
     pub fn extensions(&self) -> &Extensions {
         static EMPTY: LazyLock<Extensions> = LazyLock::new(Extensions::new);

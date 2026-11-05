@@ -4,22 +4,23 @@ use std::ops::RangeInclusive;
 use std::time::Duration;
 
 /// The gap between starting two requests to the same host, see
-/// [`Crawler::with_host_delay`](crate::crawler::Crawler::with_host_delay): at least
-/// a minimum, growing towards a maximum while the host is throttled.
+/// [`Crawler::with_host_delay`](crate::crawler::Crawler::with_host_delay): at
+/// least a minimum, growing towards a maximum while the host is throttled.
 ///
-/// A host is throttled when it answers `429 Too Many Requests` or `503
-/// Service Unavailable`, or a request to it times out.
-/// Once its concurrency cannot go lower, at a fixed limit or at one with
+/// A host is throttled when it answers `429 Too Many Requests` or `503 Service
+/// Unavailable`, or a request to it times out. Once its concurrency cannot go
+/// lower, at a fixed limit or at one with
 /// [`HostConcurrency::adaptive`](crate::crawler::HostConcurrency::adaptive),
-/// each round of throttling doubles its gap, from the minimum, or one
-/// second without one, up to the maximum. Each success halves it back to
-/// the minimum. A `Retry-After` from the host pauses it for exactly as long
-/// as it asks, beyond the maximum if need be, without widening its gap.
-/// The next request waits for the gap after the last one started, as the
-/// gap is when it is due, so a widened gap applies at once.
+/// each round of throttling doubles its gap, from the minimum, or one second
+/// without one, up to the maximum. Each success halves it back to the minimum.
+/// A `Retry-After` from the host pauses it for exactly as long as it asks,
+/// beyond the maximum if need be, without widening its gap. The next request
+/// waits for the gap after the last one started, as the gap is when it is due,
+/// so a widened gap applies at once.
 ///
-/// A [`Duration`] is the minimum, with the [default maximum](Self::DEFAULT_MAX). A
-/// range sets both ends; the same value at both ends keeps the gap fixed.
+/// A [`Duration`] is the minimum, with the [default
+/// maximum](Self::DEFAULT_MAX). A range sets both ends; the same value at both
+/// ends keeps the gap fixed.
 ///
 /// ```
 /// use std::time::Duration;
@@ -95,7 +96,8 @@ impl HostDelay {
 }
 
 impl Default for HostDelay {
-    /// No gap, growing up to [`DEFAULT_MAX`](Self::DEFAULT_MAX) while a host is throttled.
+    /// No gap, growing up to [`DEFAULT_MAX`](Self::DEFAULT_MAX) while a host is
+    /// throttled.
     fn default() -> Self {
         Self::from(Duration::ZERO)
     }

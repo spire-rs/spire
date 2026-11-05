@@ -16,13 +16,12 @@ use crate::{Context, Error, Result};
 ///
 /// Navigates to the request URI if no earlier extractor did.
 ///
-/// Through [`Deref`], `ThirtyfourTab` exposes the full [`WebDriver`] API, pointed at
-/// the request's tab, to query and interact with the live page.
+/// Through [`Deref`], `ThirtyfourTab` exposes the full [`WebDriver`] API,
+/// pointed at the request's tab, to query and interact with the live page.
 /// [`snapshot`](Self::snapshot) parses a copy of the page as currently
-/// rendered, including what scripts and interaction changed since it
-/// loaded; an [`Html`] argument takes one too, but before the handler runs.
-/// Relative links followed through the queue resolve against the URI the
-/// browser ended up on.
+/// rendered, including what scripts and interaction changed since it loaded; an
+/// [`Html`] argument takes one too, but before the handler runs. Relative links
+/// followed through the queue resolve against the URI the browser ended up on.
 ///
 /// Error statuses are rejected by the backend's status policy before the
 /// handler runs; [`status`](Self::status) and [`headers`](Self::headers)
@@ -71,10 +70,9 @@ impl ThirtyfourTab {
         self.driver.clone()
     }
 
-    /// Parses a copy of the page as currently rendered, to search it
-    /// locally, e.g. with [`Html::select`]. It does not change with the page:
-    /// take another after interacting. Use `find` to query
-    /// the live page instead.
+    /// Parses a copy of the page as currently rendered, to search it locally,
+    /// e.g. with [`Html::select`]. It does not change with the page: take
+    /// another after interacting. Use `find` to query the live page instead.
     ///
     /// # Errors
     ///

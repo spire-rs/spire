@@ -111,12 +111,12 @@ impl MarkdownOptions {
 
 impl Markdown {
     /// Converts the page's main content, as [`Html::main_text`] finds it, to
-    /// Markdown: headings, paragraphs, lists, emphasis, links,
-    /// images, tables, block quotes and code are kept, scripts, navigation
-    /// and asides left out.
+    /// Markdown: headings, paragraphs, lists, emphasis, links, images, tables,
+    /// block quotes and code are kept, scripts, navigation and asides left out.
     ///
-    /// Conversion is done by [html-to-markdown-rs](https://docs.rs/html-to-markdown-rs),
-    /// which logs an `html_to_markdown::convert` span for each page.
+    /// Conversion is done by
+    /// [html-to-markdown-rs](https://docs.rs/html-to-markdown-rs), which logs
+    /// an `html_to_markdown::convert` span for each page.
     ///
     /// ```
     /// use spire::extract::html::{Html, Markdown, MarkdownOptions};

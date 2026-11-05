@@ -1,7 +1,7 @@
 //! Datasets: where handlers store what they scrape.
 //!
-//! A crawl holds at most one [`Dataset`] per item type. Datasets are
-//! registered on the [`Crawler`](crate::crawler::Crawler) and reached from handlers
+//! A crawl holds at most one [`Dataset`] per item type. Datasets are registered
+//! on the [`Crawler`](crate::crawler::Crawler) and reached from handlers
 //! through a [`Data`] handle:
 //!
 //! ```
