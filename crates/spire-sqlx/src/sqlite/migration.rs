@@ -20,13 +20,6 @@ fn migrator() -> Migrator {
             include_str!("../../migrations/sqlite/0002_frontier_retries.sql").into_sql_str(),
             false,
         ),
-        Migration::new(
-            3,
-            "frontier clock".into(),
-            MigrationType::Simple,
-            include_str!("../../migrations/sqlite/0003_frontier_clock.sql").into_sql_str(),
-            false,
-        ),
     ]);
     // This name is fixed from the first release, not changed on live databases.
     migrator.dangerous_set_table_name("_spire_sqlx_migrations");
@@ -91,7 +84,7 @@ mod tests {
                 .fetch_all(store.pool())
                 .await
                 .unwrap();
-        assert_eq!(versions, [1, 2, 3]);
+        assert_eq!(versions, [1, 2]);
         let app: String = sqlx::query_scalar("SELECT application FROM _sqlx_migrations")
             .fetch_one(store.pool())
             .await

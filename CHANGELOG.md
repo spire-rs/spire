@@ -27,6 +27,7 @@ and this project adheres to
 - `RedbFrontier` and `SqliteFrontier` now store seeds waiting for a retry, with
   their attempt and due time, so a restart keeps both, and caller-attached `Seed`
   extensions on a retried seed are discarded like any other stored seed's.
+  SQLite adds the migration `0002_frontier_retries.sql`.
 
 - **Breaking:** `RedbStore::read` and `RedbStore::write` callbacks now return
   `RedbTxnError`, a new type that `?` produces from redb's errors and spire's. A
@@ -61,8 +62,7 @@ and this project adheres to
 - `RedbFrontier` and `SqliteFrontier` now record the latest time they saw. After
   a wall clock is moved back between runs, a retry waits no longer than it had
   left at that record. A clock moved forward between runs still brings due times
-  forward. SQLite adds the migration
-  `0003_frontier_clock.sql`.
+  forward.
 
 - Due retries no longer bypass priority order, and neither do `InMemFrontier` and
   `RedbFrontier` revisits.
