@@ -2,9 +2,6 @@ use std::sync::Arc;
 
 use futures::future::BoxFuture;
 use spire_sqlx::sqlite::SqliteStore;
-use spire_sqlx::sqlx;
-use spire_sqlx::sqlx::SqlSafeStr;
-use spire_sqlx::sqlx::migrate::{Migration, MigrationType, Migrator};
 use tokio::sync::OnceCell;
 
 use super::{AgentStoreExt, Cache};
@@ -41,13 +38,7 @@ impl SqliteCache {
     async fn initialize(&self) -> Result<()> {
         self.initialized
             .get_or_try_init(|| async {
-                let mut migrator = Migrator::with_migrations(vec![Migration::new(
-                    1,
-                    "agent cache".into(),
-                    MigrationType::Simple,
-                    include_str!("../../migrations/sqlite/0001_agent_cache.sql").into_sql_str(),
-                    false,
-                )]);
+                let mut migrator = sqlx::migrate!("migrations/sqlite");
                 migrator.dangerous_set_table_name("_spire_agent_migrations");
                 let mut transaction = self
                     .store
@@ -100,7 +91,7 @@ impl Cache for SqliteCache {
 
 #[cfg(test)]
 mod tests {
-    use spire_sqlx::sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
     use super::*;
     use crate::testing::Script;

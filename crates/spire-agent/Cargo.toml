@@ -34,13 +34,16 @@ rig = ["dep:rig"]
 # Answer caching in the crawl's RedbStore
 redb = ["dep:spire-redb"]
 # Answer caching in the crawl's SQLite store
-sqlite = ["dep:spire-sqlx", "spire-sqlx/sqlite"]
+sqlite = ["dep:spire-sqlx", "dep:sqlx", "spire-sqlx/sqlite"]
 
 [dependencies]
 # Internal crates
 spire-core = { workspace = true, features = [] }
 spire-redb = { workspace = true, optional = true, features = [] }
 spire-sqlx = { workspace = true, optional = true, features = [] }
+
+# `migrate!` expands to `::sqlx` paths, so it needs sqlx as a direct dependency.
+sqlx = { workspace = true, optional = true, features = ["migrate", "macros"] }
 
 # Async runtime
 futures = { workspace = true, features = [] }

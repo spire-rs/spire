@@ -1,26 +1,12 @@
 use spire_core::Result;
-use sqlx::migrate::{Migration, MigrationType, Migrator};
-use sqlx::{SqlSafeStr, SqlitePool};
+use sqlx::SqlitePool;
+use sqlx::migrate::Migrator;
 
 use crate::error::dataset_error;
 
 fn migrator() -> Migrator {
-    let mut migrator = Migrator::with_migrations(vec![
-        Migration::new(
-            1,
-            "crawl storage".into(),
-            MigrationType::Simple,
-            include_str!("../../migrations/sqlite/0001_crawl_storage.sql").into_sql_str(),
-            false,
-        ),
-        Migration::new(
-            2,
-            "frontier retries".into(),
-            MigrationType::Simple,
-            include_str!("../../migrations/sqlite/0002_frontier_retries.sql").into_sql_str(),
-            false,
-        ),
-    ]);
+    // Embeds every file in the directory, numbered by its prefix.
+    let mut migrator = sqlx::migrate!("migrations/sqlite");
     // This name is fixed from the first release, not changed on live databases.
     migrator.dangerous_set_table_name("_spire_sqlx_migrations");
     migrator
