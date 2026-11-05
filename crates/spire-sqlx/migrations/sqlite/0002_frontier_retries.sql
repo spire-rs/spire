@@ -1,3 +1,6 @@
+-- Frontier retries schema. Spire owns this table and index; application
+-- migrations are tracked separately from this migration.
+
 -- Seeds waiting for a retry, each occurrence separately. Due times are
 -- persisted as UTC milliseconds since the Unix epoch and survive restarts.
 CREATE TABLE spire_frontier_retries (
