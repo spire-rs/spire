@@ -98,6 +98,11 @@ A facade passes on what it does not handle: `report`, `size_hint` and
 `snapshot` have defaults that refuse retries and hide the queue, so forward
 them to the inner frontier, as above.
 
+Storage handles `Report::Requeue { seed, due }` to support the `retry` facade:
+it holds the seed until `due`, then queues it in its usual order, and `pop`
+returns `NextSeed::Wait` when only such seeds are left. Storage that leaves it
+to the default refuses it, so a retried seed fails.
+
 ## Frontiers
 
 A storage frontier implements `push`, `pop` and `report`. `pop` returns

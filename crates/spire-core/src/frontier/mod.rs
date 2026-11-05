@@ -20,7 +20,8 @@
 //! - [`Filter`] refuses seeds outside the crawl's scope, e.g. other hosts.
 //! - [`Dedup`] refuses seeds whose [`Fingerprint`](seed::Fingerprint) was seen before.
 //! - [`MaxDepth`] refuses seeds deeper than a limit.
-//! - [`Retry`] re-queues seeds after [`Report::Retry`], with a delay.
+//! - [`Retry`] re-queues seeds after [`Report::Retry`], with a delay, in
+//!   storage that handles [`Report::Requeue`].
 //! - [`TagBackoff`] holds back a tag's seeds after [`Report::Backoff`].
 //! - [`Revisits`] crawls seeds again on a schedule, kept by storage that
 //!   implements [`Schedule`].
@@ -29,6 +30,10 @@
 //!
 //! Without a [`Retry`] facade, retries are refused and the seeds fail;
 //! without a [`TagBackoff`] facade, backoffs only delay the retried request.
+//!
+//! A retry or revisit that comes due joins the queue, and the storage's order
+//! decides when it runs, as for any other seed: by priority on a priority
+//! frontier, behind what is queued on a FIFO one, and next on a LIFO one.
 
 pub(crate) mod dynamic;
 pub mod facade;
@@ -67,6 +72,9 @@ pub trait Frontier: Send + Sync + 'static {
 
     /// Takes the next seed that is ready to be crawled.
     ///
+    /// Storage returns [`NextSeed::Wait`] when only seeds held by
+    /// [`Report::Requeue`] are left.
+    ///
     /// # Errors
     ///
     /// Returns an error if the underlying storage fails.
@@ -75,14 +83,15 @@ pub trait Frontier: Send + Sync + 'static {
     /// Tells the frontier how a popped seed ended.
     ///
     /// Facades react to the reports they handle and pass the rest inwards.
-    /// The default implementation ignores the report, refusing retries.
+    /// The default implementation ignores the report, refusing
+    /// [`Report::Retry`] and [`Report::Requeue`].
     ///
     /// # Errors
     ///
     /// Returns an error if the underlying storage fails.
     fn report(&self, report: Report) -> impl Future<Output = Result<Ack>> + Send {
         let ack = match report {
-            Report::Retry { .. } => Ack::RetryRefused,
+            Report::Retry { .. } | Report::Requeue { .. } => Ack::RetryRefused,
             _ => Ack::Applied,
         };
         ready(Ok(ack))
@@ -111,8 +120,7 @@ pub trait Frontier: Send + Sync + 'static {
 /// storage, not a facade: revisits sit directly on it, so every facade above
 /// sees them as it sees queued seeds.
 pub trait Schedule: Frontier {
-    /// Holds `seed` back until `due`, then hands it out from
-    /// [`pop`](Frontier::pop) like a queued seed. A seed with the same
+    /// Holds `seed` back until `due`, when it joins the queue. A seed with the same
     /// [fingerprint](seed::Seed::fingerprint) scheduled before is replaced,
     /// so a page has at most one revisit.
     ///
@@ -225,6 +233,19 @@ pub enum Report {
         /// Delay before the next attempt; `None` defers to the frontier.
         after: Option<Duration>,
     },
+    /// Storage should hold `seed` until `due`, when it joins the queue.
+    ///
+    /// [`Retry`] sends this inwards, so it passes admission facades without
+    /// being refused. Storage that does not handle it answers
+    /// [`Ack::RetryRefused`], and the seed fails. Unlike
+    /// [`Schedule::schedule`], requeued seeds of one fingerprint do not replace
+    /// each other.
+    Requeue {
+        /// The seed to crawl again.
+        seed: Seed,
+        /// When it joins the queue.
+        due: Instant,
+    },
     /// Seeds with `tag` should not be crawled before `until`.
     Backoff {
         /// The tag to pause; `None` pauses untagged seeds.
@@ -240,8 +261,8 @@ pub enum Report {
 pub enum Ack {
     /// The report was applied.
     Applied,
-    /// A [`Report::Retry`] was refused, because the seed is out of retries or
-    /// the frontier cannot retry; the seed has failed.
+    /// A [`Report::Retry`] or [`Report::Requeue`] was refused, because the seed
+    /// is out of retries or the frontier cannot retry; the seed has failed.
     RetryRefused,
 }
 

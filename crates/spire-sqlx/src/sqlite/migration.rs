@@ -5,13 +5,22 @@ use sqlx::{SqlSafeStr, SqlitePool};
 use crate::error::dataset_error;
 
 fn migrator() -> Migrator {
-    let mut migrator = Migrator::with_migrations(vec![Migration::new(
-        1,
-        "crawl storage".into(),
-        MigrationType::Simple,
-        include_str!("../../migrations/sqlite/0001_crawl_storage.sql").into_sql_str(),
-        false,
-    )]);
+    let mut migrator = Migrator::with_migrations(vec![
+        Migration::new(
+            1,
+            "crawl storage".into(),
+            MigrationType::Simple,
+            include_str!("../../migrations/sqlite/0001_crawl_storage.sql").into_sql_str(),
+            false,
+        ),
+        Migration::new(
+            2,
+            "frontier retries".into(),
+            MigrationType::Simple,
+            include_str!("../../migrations/sqlite/0002_frontier_retries.sql").into_sql_str(),
+            false,
+        ),
+    ]);
     // This name is fixed from the first release, not changed on live databases.
     migrator.dangerous_set_table_name("_spire_sqlx_migrations");
     migrator
@@ -70,11 +79,12 @@ mod tests {
         });
         second.initialize().await.unwrap();
         first.await.unwrap().unwrap();
-        let versions: Vec<i64> = sqlx::query_scalar("SELECT version FROM _spire_sqlx_migrations")
-            .fetch_all(store.pool())
-            .await
-            .unwrap();
-        assert_eq!(versions, [1]);
+        let versions: Vec<i64> =
+            sqlx::query_scalar("SELECT version FROM _spire_sqlx_migrations ORDER BY version")
+                .fetch_all(store.pool())
+                .await
+                .unwrap();
+        assert_eq!(versions, [1, 2]);
         let app: String = sqlx::query_scalar("SELECT application FROM _sqlx_migrations")
             .fetch_one(store.pool())
             .await
@@ -82,6 +92,32 @@ mod tests {
         assert_eq!(app, "retained");
         store.pool().close().await;
         other.close().await;
+    }
+
+    #[tokio::test]
+    async fn a_database_from_before_the_retries_table_upgrades_and_keeps_its_data() {
+        use spire_core::dataset::Dataset;
+
+        let (_directory, store) = store().await;
+        store.initialize().await.unwrap();
+        let data = store.dataset::<String>("records");
+        data.write("retained".into()).await.unwrap();
+        sqlx::raw_sql(
+            "DROP TABLE spire_frontier_retries;
+            DELETE FROM _spire_sqlx_migrations WHERE version = 2;",
+        )
+        .execute(store.pool())
+        .await
+        .unwrap();
+
+        store.initialize().await.unwrap();
+        let waiting: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM spire_frontier_retries")
+            .fetch_one(store.pool())
+            .await
+            .unwrap();
+        assert_eq!(waiting, 0);
+        assert_eq!(data.read().await.unwrap().as_deref(), Some("retained"));
+        store.pool().close().await;
     }
 
     #[tokio::test]

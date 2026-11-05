@@ -162,8 +162,8 @@ mod tests {
         cache.put("key", "retained").await.unwrap();
         store.initialize().await.unwrap();
         for query in [
-            "SELECT COUNT(*) FROM _spire_agent_migrations",
-            "SELECT COUNT(*) FROM _spire_sqlx_migrations",
+            "SELECT COUNT(*) FROM _spire_agent_migrations WHERE version = 1",
+            "SELECT COUNT(*) FROM _spire_sqlx_migrations WHERE version = 1",
         ] {
             let count: i64 = sqlx::query_scalar(query).fetch_one(&pool).await.unwrap();
             assert_eq!(count, 1);
