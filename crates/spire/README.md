@@ -21,7 +21,7 @@ The flexible crawler and scraper framework for Rust, built on
 
 [tokio-rs/tokio]: https://github.com/tokio-rs/tokio/
 
-## Features
+## Overview
 
 - **Tag-based routing**: requests carry a tag that picks their handler, with
   handlers written as async functions of typed extractors.
@@ -40,16 +40,19 @@ The flexible crawler and scraper framework for Rust, built on
 
 ```toml
 [dependencies]
-spire = { version = "0.10.0", features = ["reqwest", "macros"] }
+spire = { version = "0.11", features = ["reqwest", "macros"] }
 ```
-
-See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html) page for configuration.
 
 Applications depend on `spire`, which re-exports everything a crawl needs.
 Depend on `spire-core` directly to implement a backend, a frontier or a
 dataset.
 
-## Quick Start
+`html` and `rustls-tls` are enabled by default. Backends, storage, macros,
+robots.txt, sitemaps and model extraction are each a feature, listed on the
+book's [Feature flags](https://spire-rs.github.io/spire/features.html) page;
+`full` enables all of them but `native-tls` and `testing`.
+
+## Usage
 
 Crawl a listing, follow its pagination and extract every product:
 
@@ -117,7 +120,7 @@ serving several variants takes `page: Page` as an argument. A URL is fetched
 once whatever its tag. Error statuses become failures: `5xx` and `429` are
 retried, honouring `Retry-After`.
 
-## Guide
+## Learn more
 
 [The Spire Book](https://spire-rs.github.io/spire) explains every part of a crawl:
 
@@ -148,13 +151,12 @@ The API reference is on [docs.rs](https://docs.rs/spire).
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup and
 guidelines.
 
 ## License
 
-This project is licensed under the MIT License; see the
-[LICENSE](../../LICENSE) file for details.
+MIT License, see [LICENSE](../../LICENSE).
 
 ## Acknowledgments
 

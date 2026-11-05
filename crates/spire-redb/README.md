@@ -12,13 +12,14 @@
 [crates-url]: https://crates.io/crates/spire-redb
 [docs-badge]: https://img.shields.io/docsrs/spire-redb?logo=Docs.rs&style=flat-square
 [docs-url]: http://docs.rs/spire-redb
+
 Crash-safe frontier and seen set for Spire, stored in
 [redb](https://github.com/cberner/redb), a pure-Rust embedded database.
 
 ## Overview
 
-A `RedbStore` is one database file holding a crawl's queue, the URLs it
-has seen, and what it scraped:
+A `RedbStore` is one database file holding a crawl's queue, the URLs it has
+seen, and what it scraped:
 
 - **`RedbFrontier`** queues seeds by priority, then in insertion order. A
   popped seed stays recorded as in flight until it is reported, so the seeds
@@ -26,23 +27,28 @@ has seen, and what it scraped:
   crawled again: requests are at least once, never lost.
 - **`RedbSeen`** deduplicates exactly, on disk, so memory stays flat however
   large the crawl.
-- **`RedbDataset`** stores a crawl's results as a table per dataset, as
-  JSON, read back in the order they were written. Items survive a crash as
-  the frontier does; a page whose items were committed just before a crash
-  may be crawled again and write them twice.
+- **`RedbDataset`** stores a crawl's results as a table per dataset, as JSON,
+  read back in the order they were written. Items survive a crash as the
+  frontier does; a page whose items were committed just before a crash may be
+  crawled again and write them twice.
 
-Every change is a committed transaction. Commits are synced to disk at most
-once a second: a crash rolls the store back to its last synced commit, a
-consistent earlier state, so it repeats at most a second of work and loses
-none, since a link is never committed after the page that found it.
-`RedbStore::builder().sync_always()` syncs every commit instead, repeating
-only the requests in flight, at a large cost in throughput. In the `redb`
-benchmark on macOS, pushing and popping a seed takes about 0.6 ms with batched
-syncs and about 11 ms with `sync_always`, twenty times slower; run
-`cargo bench --workspace --all-features --bench '*' -- redb` to measure your own machine.
+## Installation
 
-See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#spire-facade)
-page for configuration.
+Enable the `redb` feature of `spire`, for `spire::store::RedbStore`:
+
+```toml
+[dependencies]
+spire = { version = "0.11", features = ["redb"] }
+```
+
+Or depend on this crate directly to use the store with `spire-core`:
+
+```toml
+[dependencies]
+spire-redb = { version = "0.11" }
+```
+
+This crate has no features of its own.
 
 ## Usage
 
@@ -74,12 +80,31 @@ async fn example() -> spire_core::Result<()> {
 }
 ```
 
+## Durability
+
+Every change is a committed transaction. Commits are synced to disk at most
+once a second: a crash rolls the store back to its last synced commit, a
+consistent earlier state, so it repeats at most a second of work and loses
+none, since a link is never committed after the page that found it.
+
+`RedbStore::builder().sync_always()` syncs every commit instead, repeating
+only the requests in flight, at a large cost in throughput. In the `redb`
+benchmark on macOS, pushing and popping a seed takes about 0.6 ms with batched
+syncs and about 11 ms with `sync_always`, twenty times slower; run
+`cargo bench --workspace --all-features --bench '*' -- redb` to measure your
+own machine.
+
+## Learn more
+
+- The book's [Persistence with redb](https://spire-rs.github.io/spire/redb.html)
+  page, and [Feature flags](https://spire-rs.github.io/spire/features.html#spire-facade)
+- The [API documentation](https://docs.rs/spire-redb)
+
 ## Contributing
 
-This crate follows the same contribution guidelines as the main spire project.
-Please see [CONTRIBUTING.md](../../CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup and
+guidelines.
 
 ## License
 
-This project is licensed under the MIT License; see the
-[LICENSE](../../LICENSE) file for details.
+MIT License, see [LICENSE](../../LICENSE).
