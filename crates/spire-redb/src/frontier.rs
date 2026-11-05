@@ -73,10 +73,20 @@ fn enqueue(txn: &redb::WriteTransaction, priority: i32, bytes: &[u8]) -> Result<
     Ok(())
 }
 
+/// Records `now` as the latest time the frontier saw, unless a later one is.
+/// Callers read the clock before their transaction, so they may commit out of
+/// order.
+fn record_seen(txn: &redb::WriteTransaction, now: u64) -> Result<(), redb::Error> {
+    let mut meta = txn.open_table(META)?;
+    let last_seen = meta.get(LAST_SEEN)?.map_or(0, |guard| guard.value());
+    meta.insert(LAST_SEEN, last_seen.max(now))?;
+    Ok(())
+}
+
 /// Moves the revisits and retries due by `now` to the queue, in the order they
 /// came due. Seeds that cannot be decoded are dropped, as when popped.
 fn release_due(txn: &redb::WriteTransaction, now: u64) -> Result<(), redb::Error> {
-    txn.open_table(META)?.insert(LAST_SEEN, now)?;
+    record_seen(txn, now)?;
     let mut due = Vec::new();
     {
         let mut schedule = txn.open_table(SCHEDULE)?;
@@ -198,7 +208,7 @@ impl Frontier for RedbFrontier {
                     Then::Forget => {}
                     Then::Queue(priority, bytes) => enqueue(txn, priority, &bytes)?,
                     Then::Hold(due, bytes) => {
-                        txn.open_table(META)?.insert(LAST_SEEN, now)?;
+                        record_seen(txn, now)?;
                         let sequence = next_sequence(txn)?;
                         txn.open_table(RETRIES)?
                             .insert((due, sequence), bytes.as_slice())?;
@@ -226,7 +236,7 @@ impl Schedule for RedbFrontier {
         let now = self.store.clock().now();
         self.store
             .write(move |txn| {
-                txn.open_table(META)?.insert(LAST_SEEN, now)?;
+                record_seen(txn, now)?;
                 let mut scheduled = txn.open_table(SCHEDULED)?;
                 let mut schedule = txn.open_table(SCHEDULE)?;
                 // One revisit per page: the new one replaces any other.
@@ -537,5 +547,29 @@ pub(crate) mod tests {
         };
         let wait = at - tokio::time::Instant::now();
         assert!(wait <= Duration::from_mins(1), "{wait:?}");
+    }
+
+    #[tokio::test]
+    async fn an_earlier_time_does_not_replace_the_latest_seen() {
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+        // As committed by a concurrent call that read the clock later.
+        let later = store.clock().now() + 60_000;
+        store
+            .write(move |txn| {
+                txn.open_table(META)?.insert(LAST_SEEN, later)?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        store.frontier().pop().await.unwrap();
+        let last_seen = store
+            .read(|txn| {
+                let meta = txn.open_table(META)?;
+                Ok(meta.get(LAST_SEEN)?.map(|guard| guard.value()))
+            })
+            .unwrap();
+        assert_eq!(last_seen, Some(later));
     }
 }
