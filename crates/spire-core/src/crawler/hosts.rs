@@ -164,13 +164,13 @@ impl Hosts {
     }
 
     /// Tracks hosts from now on, e.g. once one is throttled, returning the
-    /// key of `seed`'s host. Its request began at `started`, before anything
-    /// recorded it, so the host's gap counts from then.
-    pub(crate) fn track(&mut self, seed: &Seed, started: Instant) -> String {
+    /// key of `seed`'s host. Requests to it that started before were not
+    /// recorded, but all started by `now`, so its gap counts from then.
+    pub(crate) fn track(&mut self, seed: &Seed, now: Instant) -> String {
         self.tracked = true;
         let key = key(seed);
         let host = self.host(&key);
-        host.last_start = host.last_start.max(Some(started));
+        host.last_start = host.last_start.max(Some(now));
         key
     }
 
@@ -434,26 +434,37 @@ mod tests {
     fn a_host_first_tracked_when_throttled_waits_out_its_gap() {
         use crate::crawler::concurrency::Signal;
 
-        let started = Instant::now();
+        let ms = Duration::from_millis;
+        let first = Instant::now();
         let mut hosts = Hosts::new(policy(0, 0), false);
+        // Two requests start untracked, the second one later; the first is
+        // throttled after both started.
         let throttled = seed("https://a.com/1");
-        assert!(hosts.start(&throttled, started).is_none());
+        assert!(hosts.start(&throttled, first).is_none());
+        assert!(
+            hosts
+                .start(&seed("https://a.com/2"), first + ms(900))
+                .is_none()
+        );
 
-        let key = hosts.track(&throttled, started);
+        let finished = first + ms(1000);
+        let key = hosts.track(&throttled, finished);
         let feedback = Feedback {
-            started,
+            started: first,
             latency: None,
             unchanged: false,
             signal: Signal::Throttled,
         };
-        hosts.finished(&key, Some(feedback), started);
+        hosts.finished(&key, Some(feedback), finished);
 
+        // The gap counts from no earlier than the latest start.
+        assert!(!gap(&hosts).is_zero());
         assert!(matches!(
-            hosts.admit(seed("https://a.com/2"), started),
+            hosts.admit(seed("https://a.com/3"), finished),
             Admit::Parked
         ));
-        assert_eq!(hosts.earliest(), Some(started + gap(&hosts)));
-        assert!(!gap(&hosts).is_zero());
+        assert!(hosts.take_ready(first + ms(900) + gap(&hosts)).is_none());
+        assert!(hosts.take_ready(finished + gap(&hosts)).is_some());
     }
 
     #[test]
