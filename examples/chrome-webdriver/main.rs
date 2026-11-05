@@ -1,9 +1,9 @@
 //! Browser automation: rendering pages in Chrome over WebDriver.
 //!
-//! `ThirtyfourTab` navigates the browser and hands the handler the request's tab;
-//! the page is parsed with `tab.snapshot()` once the handler is done
-//! interacting, so it includes whatever scripts rendered. Links are followed as with any other
-//! backend.
+//! `ThirtyfourTab` navigates the browser and hands the handler the request's
+//! tab; the page is parsed with `tab.snapshot()` once the handler is done
+//! interacting, so it includes whatever scripts rendered. Links are followed as
+//! with any other backend.
 //!
 //! Needs a WebDriver server on port 4444 matching the installed Chrome, e.g.
 //! from Chrome for Testing:

@@ -170,7 +170,7 @@ impl<B: Backend> Run<B> {
         // Hosts are tracked as soon as one is throttled, so it slows down
         // even in a crawl without limits or gaps.
         let throttled = signal == Signal::Throttled || pause.is_some();
-        let Some(host) = host.or_else(|| throttled.then(|| self.hosts.track(seed))) else {
+        let Some(host) = host.or_else(|| throttled.then(|| self.hosts.track(seed, now))) else {
             return;
         };
         let feedback = Feedback {

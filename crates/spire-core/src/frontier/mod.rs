@@ -18,7 +18,8 @@
 //! too deep is refused before it is marked as seen.
 //!
 //! - [`Filter`] refuses seeds outside the crawl's scope, e.g. other hosts.
-//! - [`Dedup`] refuses seeds whose [`Fingerprint`](seed::Fingerprint) was seen before.
+//! - [`Dedup`] refuses seeds whose [`Fingerprint`](seed::Fingerprint) was seen
+//!   before.
 //! - [`MaxDepth`] refuses seeds deeper than a limit.
 //! - [`Retry`] re-queues seeds after [`Report::Retry`], with a delay, in
 //!   storage that handles [`Report::Requeue`].
@@ -31,9 +32,10 @@
 //! Without a [`Retry`] facade, retries are refused and the seeds fail;
 //! without a [`TagBackoff`] facade, backoffs only delay the retried request.
 //!
-//! A retry or revisit that comes due joins the queue, and the storage's order
-//! decides when it runs, as for any other seed: by priority on a priority
-//! frontier, behind what is queued on a FIFO one, and next on a LIFO one.
+//! A retry or revisit that has come due joins the queue the next time a seed
+//! is popped, and the storage's order decides when it runs, as for any other
+//! seed: by priority on a priority frontier, behind what is queued by then on
+//! a FIFO one, and next on a LIFO one.
 
 pub(crate) mod dynamic;
 pub mod facade;
@@ -106,7 +108,8 @@ pub trait Frontier: Send + Sync + 'static {
     /// the crawl and resume it later; `None` if the frontier cannot, e.g.
     /// because it persists seeds itself.
     ///
-    /// Facades add the seeds they hold, such as seeds waiting for a retry.
+    /// Storage includes the seeds it holds back, such as those waiting for a
+    /// retry, and facades add the seeds they hold, such as parked ones.
     fn snapshot(&self) -> Option<Vec<Seed>> {
         None
     }
@@ -115,14 +118,13 @@ pub trait Frontier: Send + Sync + 'static {
 /// Storage that can hold seeds back until a time, for
 /// [`FrontierExt::revisit`].
 ///
-/// [`InMemFrontier`] keeps scheduled seeds in
-/// memory, and a redb frontier in its file, so they survive a restart. It is
-/// storage, not a facade: revisits sit directly on it, so every facade above
-/// sees them as it sees queued seeds.
+/// [`InMemFrontier`] keeps scheduled seeds in memory, and a redb frontier in
+/// its file, so they survive a restart. It is storage, not a facade: revisits
+/// sit directly on it, so every facade above sees them as it sees queued seeds.
 pub trait Schedule: Frontier {
-    /// Holds `seed` back until `due`, when it joins the queue. A seed with the same
-    /// [fingerprint](seed::Seed::fingerprint) scheduled before is replaced,
-    /// so a page has at most one revisit.
+    /// Holds `seed` back until `due`, when it joins the queue. A seed with the
+    /// same [fingerprint](seed::Seed::fingerprint) scheduled before is
+    /// replaced, so a page has at most one revisit.
     ///
     /// # Errors
     ///
@@ -189,7 +191,8 @@ pub enum Admission {
     OutOfScope,
     /// The seed was refused because its URL prefix looks like a scraper trap.
     SuspectedTrap,
-    /// The seed was refused because its URL prefix exhausted a configured budget.
+    /// The seed was refused because its URL prefix exhausted a configured
+    /// budget.
     PrefixBudgetExceeded,
 }
 
@@ -233,13 +236,14 @@ pub enum Report {
         /// Delay before the next attempt; `None` defers to the frontier.
         after: Option<Duration>,
     },
-    /// Storage should hold `seed` until `due`, when it joins the queue.
+    /// Storage should hold `seed` until `due`, then queue it on the next
+    /// [`pop`](Frontier::pop).
     ///
     /// [`Retry`] sends this inwards, so it passes admission facades without
     /// being refused. Storage that does not handle it answers
-    /// [`Ack::RetryRefused`], and the seed fails. Unlike
-    /// [`Schedule::schedule`], requeued seeds of one fingerprint do not replace
-    /// each other.
+    /// [`Ack::RetryRefused`], and [`Retry`] reports the seed
+    /// [failed](Report::Failed). Unlike [`Schedule::schedule`], requeued seeds
+    /// of one fingerprint do not replace each other.
     Requeue {
         /// The seed to crawl again.
         seed: Seed,

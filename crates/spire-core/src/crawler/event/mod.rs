@@ -182,8 +182,7 @@ pub enum OutcomeKind {
     Abort,
     /// [`Outcome::Stop`].
     Stop,
-    /// [`Outcome::Fail`], including a
-    /// timeout or a panic.
+    /// [`Outcome::Fail`], including a timeout or a panic.
     Fail,
     /// [`Outcome::Fatal`].
     Fatal,
@@ -272,7 +271,7 @@ impl fmt::Display for SkipReason {
 #[non_exhaustive]
 pub enum Slowdown {
     /// Its adaptive concurrency was lowered, see
-    /// [`HostConcurrency::adaptive`](crate::crawler::HostConcurrency::adaptive).
+    /// [`HostConcurrency::adaptive`](super::HostConcurrency::adaptive).
     Concurrency {
         /// Requests in flight to it at most, from now on.
         limit: usize,
@@ -300,8 +299,7 @@ pub enum StopReason {
     RequestBudget,
     /// A handler returned [`Outcome::Stop`].
     Requested,
-    /// A handler returned [`Outcome::Fatal`],
-    /// or the frontier failed.
+    /// A handler returned [`Outcome::Fatal`], or the frontier failed.
     Failed,
 }
 

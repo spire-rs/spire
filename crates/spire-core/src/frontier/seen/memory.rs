@@ -9,9 +9,9 @@ use crate::sync::lock;
 
 /// A [`SeenSet`] kept in memory for the lifetime of the crawl.
 ///
-/// It holds every fingerprint pushed, about 16 bytes each: a million URLs
-/// take roughly 16 MB. Capping it would let duplicates through; for larger
-/// crawls use [`BloomSeen`](crate::frontier::seen::BloomSeen), which takes fixed
+/// It holds every fingerprint pushed, about 16 bytes each: a million URLs take
+/// roughly 16 MB. Capping it would let duplicates through; for larger crawls
+/// use [`BloomSeen`](crate::frontier::seen::BloomSeen), which takes fixed
 /// memory at the cost of rarely skipping a new URL, or a persistent
 /// [`SeenSet`].
 #[derive(Debug, Default)]

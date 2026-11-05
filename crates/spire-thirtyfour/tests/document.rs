@@ -1,5 +1,5 @@
-//! Browser-computed link observations against a local site.
-//! Set `SPIRE_WEBDRIVER` to run against a WebDriver server with BiDi.
+//! Browser-computed link observations against a local site. Set
+//! `SPIRE_WEBDRIVER` to run against a WebDriver server with BiDi.
 
 use spire_core::backend::document::{LinkKind, Visibility};
 use spire_core::backend::{Backend, Session};

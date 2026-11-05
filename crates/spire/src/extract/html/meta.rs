@@ -111,7 +111,11 @@ fn flatten(value: Value, nodes: &mut Vec<Value>) {
 /// async fn article(meta: Meta) {
 ///     let title = meta.properties.get("og:title").or(meta.title.as_ref());
 ///     println!("{title:?}: {:?}", meta.description);
-///     if meta.robots.as_deref().is_some_and(|robots| robots.contains("noindex")) {
+///     if meta
+///         .robots
+///         .as_deref()
+///         .is_some_and(|robots| robots.contains("noindex"))
+///     {
 ///         return;
 ///     }
 /// }
@@ -165,7 +169,10 @@ where
 /// #[derive(Deserialize)]
 /// #[serde(tag = "@type")]
 /// enum Node {
-///     Product { name: String, sku: Option<String> },
+///     Product {
+///         name: String,
+///         sku: Option<String>,
+///     },
 ///     #[serde(other)]
 ///     Other,
 /// }

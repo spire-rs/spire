@@ -1,6 +1,4 @@
 use std::fmt;
-use std::future::{Future, ready};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use redb::ReadableTable;
 use spire_core::Result;
@@ -10,7 +8,7 @@ use tokio::time::Instant;
 
 use crate::codec;
 use crate::store::{
-    IN_FLIGHT, META, NEXT_SEQUENCE, QUEUE, RETRIES, RedbStore, SCHEDULE, SCHEDULED,
+    IN_FLIGHT, LAST_SEEN, META, NEXT_SEQUENCE, QUEUE, RETRIES, RedbStore, SCHEDULE, SCHEDULED,
 };
 
 /// A [`Frontier`] stored in a [`RedbStore`], crawling by priority, then in
@@ -25,6 +23,12 @@ use crate::store::{
 /// waiting for a retry is kept in the store with its attempt and when it is
 /// due, so it survives a crash too. Due retries and revisits join the queue,
 /// and compete by priority; equal priorities run in the order they joined.
+///
+/// Due times follow a monotonic clock while the store is open, and the wall
+/// clock across a restart. The store records the latest time it saw when it
+/// pops or holds a seed. After a wall clock is moved back between runs, a retry
+/// waits no longer than it had left at that record. A clock moved forward
+/// brings due times forward, as that cannot be told from time passing.
 pub struct RedbFrontier {
     store: RedbStore,
 }
@@ -40,8 +44,8 @@ impl RedbFrontier {
     ///
     /// Returns a [`Frontier`](spire_core::ErrorKind::Frontier) error if the
     /// store cannot be read.
-    pub fn in_flight(&self) -> Result<usize> {
-        self.store.count(IN_FLIGHT)
+    pub async fn in_flight(&self) -> Result<usize> {
+        self.store.blocking(|store| store.count(IN_FLIGHT)).await
     }
 }
 
@@ -69,9 +73,20 @@ fn enqueue(txn: &redb::WriteTransaction, priority: i32, bytes: &[u8]) -> Result<
     Ok(())
 }
 
+/// Records `now` as the latest time the frontier saw, unless a later one is.
+/// Callers read the clock before their transaction, so they may commit out of
+/// order.
+fn record_seen(txn: &redb::WriteTransaction, now: u64) -> Result<(), redb::Error> {
+    let mut meta = txn.open_table(META)?;
+    let last_seen = meta.get(LAST_SEEN)?.map_or(0, |guard| guard.value());
+    meta.insert(LAST_SEEN, last_seen.max(now))?;
+    Ok(())
+}
+
 /// Moves the revisits and retries due by `now` to the queue, in the order they
 /// came due. Seeds that cannot be decoded are dropped, as when popped.
 fn release_due(txn: &redb::WriteTransaction, now: u64) -> Result<(), redb::Error> {
+    record_seen(txn, now)?;
     let mut due = Vec::new();
     {
         let mut schedule = txn.open_table(SCHEDULE)?;
@@ -110,15 +125,18 @@ fn release_due(txn: &redb::WriteTransaction, now: u64) -> Result<(), redb::Error
     Ok(())
 }
 
-/// Converts milliseconds since the Unix epoch to an [`Instant`].
-fn instant_at(due: u64) -> Instant {
-    let wait = due.saturating_sub(unix_millis(SystemTime::now()));
-    Instant::now() + Duration::from_millis(wait)
+/// What a pop found, with due times still as stored.
+enum Popped {
+    Seed(Seed),
+    Waiting(u64),
+    Empty,
 }
 
-/// Converts an [`Instant`] to milliseconds since the Unix epoch.
-fn millis_at(due: Instant) -> u64 {
-    unix_millis(SystemTime::now() + due.saturating_duration_since(Instant::now()))
+/// What happens to a reported seed once it is no longer in flight.
+enum Then {
+    Forget,
+    Queue(i32, Vec<u8>),
+    Hold(u64, Vec<u8>),
 }
 
 impl Frontier for RedbFrontier {
@@ -135,7 +153,7 @@ impl Frontier for RedbFrontier {
     /// It waits for retries, but not for scheduled seeds; see
     /// [`Schedule::next_due`].
     async fn pop(&self) -> Result<NextSeed> {
-        let now = unix_millis(SystemTime::now());
+        let now = self.store.clock().now();
         let popped = self
             .store
             .write(move |txn| {
@@ -146,61 +164,55 @@ impl Frontier for RedbFrontier {
                     let bytes = bytes.value().to_vec();
                     if let Some(seed) = codec::decode(&bytes) {
                         in_flight.insert(seed.fingerprint().get(), bytes.as_slice())?;
-                        return Ok(Some(seed));
+                        return Ok(Popped::Seed(seed));
                     }
                 }
-                Ok(None)
+                let retries = txn.open_table(RETRIES)?;
+                let earliest = retries.first()?.map(|(key, _)| key.value().0);
+                Ok(earliest.map_or(Popped::Empty, Popped::Waiting))
             })
             .await?;
-        if let Some(seed) = popped {
-            return Ok(NextSeed::Ready(seed));
-        }
 
-        let earliest = self.store.read(|txn| {
-            let retries = txn.open_table(RETRIES)?;
-            Ok(retries.first()?.map(|(key, _)| key.value().0))
-        })?;
-        Ok(earliest.map_or(NextSeed::Empty, |due| NextSeed::Wait(instant_at(due))))
+        Ok(match popped {
+            Popped::Seed(seed) => NextSeed::Ready(seed),
+            Popped::Waiting(due) => NextSeed::Wait(self.store.clock().instant_at(due)),
+            Popped::Empty => NextSeed::Empty,
+        })
     }
 
     async fn report(&self, report: Report) -> Result<Ack> {
-        if let Report::Requeue { seed, due } = report {
-            let fingerprint = seed.fingerprint().get();
-            let bytes = codec::encode(&seed)?;
-            let due = millis_at(due);
-            self.store
-                .write(move |txn| {
-                    txn.open_table(IN_FLIGHT)?.remove(fingerprint)?;
-                    let sequence = next_sequence(txn)?;
-                    txn.open_table(RETRIES)?
-                        .insert((due, sequence), bytes.as_slice())?;
-                    Ok(())
-                })
-                .await?;
-            return Ok(Ack::Applied);
-        }
-
-        let (seed, requeue, ack) = match report {
+        let (seed, then, ack) = match report {
             Report::Done(seed) | Report::Failed(seed) | Report::Skipped(seed) => {
-                (seed, false, Ack::Applied)
+                (seed, Then::Forget, Ack::Applied)
             }
-            Report::Cancelled(seed) => (seed, true, Ack::Applied),
+            Report::Cancelled(seed) => {
+                let then = Then::Queue(seed.priority(), codec::encode(&seed)?);
+                (seed, then, Ack::Applied)
+            }
+            Report::Requeue { seed, due } => {
+                let due = self.store.clock().millis_at(due);
+                let then = Then::Hold(due, codec::encode(&seed)?);
+                (seed, then, Ack::Applied)
+            }
             // Retries are left to a `Retry` facade; without one the seed fails.
-            Report::Retry { seed, .. } => (seed, false, Ack::RetryRefused),
+            Report::Retry { seed, .. } => (seed, Then::Forget, Ack::RetryRefused),
             _ => return Ok(Ack::Applied),
         };
 
         let fingerprint = seed.fingerprint().get();
-        let requeued = if requeue {
-            Some((seed.priority(), codec::encode(&seed)?))
-        } else {
-            None
-        };
+        let now = self.store.clock().now();
         self.store
             .write(move |txn| {
                 txn.open_table(IN_FLIGHT)?.remove(fingerprint)?;
-                if let Some((priority, bytes)) = requeued {
-                    enqueue(txn, priority, &bytes)?;
+                match then {
+                    Then::Forget => {}
+                    Then::Queue(priority, bytes) => enqueue(txn, priority, &bytes)?,
+                    Then::Hold(due, bytes) => {
+                        record_seen(txn, now)?;
+                        let sequence = next_sequence(txn)?;
+                        txn.open_table(RETRIES)?
+                            .insert((due, sequence), bytes.as_slice())?;
+                    }
                 }
                 Ok(())
             })
@@ -217,12 +229,14 @@ impl Frontier for RedbFrontier {
 /// Keeps scheduled seeds in the store, so revisits survive a restart.
 impl Schedule for RedbFrontier {
     async fn schedule(&self, seed: Seed, due: Instant) -> Result<()> {
-        let due = millis_at(due);
+        let due = self.store.clock().millis_at(due);
         let fingerprint = seed.fingerprint().get();
         let mut entry = due.to_le_bytes().to_vec();
         entry.extend(codec::encode(&seed)?);
+        let now = self.store.clock().now();
         self.store
             .write(move |txn| {
+                record_seen(txn, now)?;
                 let mut scheduled = txn.open_table(SCHEDULED)?;
                 let mut schedule = txn.open_table(SCHEDULE)?;
                 // One revisit per page: the new one replaces any other.
@@ -238,25 +252,24 @@ impl Schedule for RedbFrontier {
             .await
     }
 
-    fn next_due(&self) -> impl Future<Output = Result<Option<Instant>>> + Send {
-        let first = self.store.read(|txn| match txn.open_table(SCHEDULE) {
-            Ok(schedule) => Ok(schedule.first()?.map(|(key, _)| key.value().0)),
-            Err(redb::TableError::TableDoesNotExist(_)) => Ok(None),
-            Err(error) => Err(error.into()),
-        });
-        ready(first.map(|due| due.map(instant_at)))
+    async fn next_due(&self) -> Result<Option<Instant>> {
+        let first = self
+            .store
+            .blocking(|store| {
+                store.read(|txn| match txn.open_table(SCHEDULE) {
+                    Ok(schedule) => Ok(schedule.first()?.map(|(key, _)| key.value().0)),
+                    Err(redb::TableError::TableDoesNotExist(_)) => Ok(None),
+                    Err(error) => Err(error.into()),
+                })
+            })
+            .await?;
+        Ok(first.map(|due| self.store.clock().instant_at(due)))
     }
 }
 
 /// When a scheduled entry is due: its first 8 bytes.
 fn scheduled_due(entry: &[u8]) -> Option<u64> {
     entry.first_chunk::<8>().map(|due| u64::from_le_bytes(*due))
-}
-
-/// Milliseconds since the Unix epoch, zero before it.
-fn unix_millis(time: SystemTime) -> u64 {
-    let since = time.duration_since(UNIX_EPOCH).unwrap_or_default();
-    u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]
@@ -312,7 +325,7 @@ pub(crate) mod tests {
             order.push(name);
         }
         assert_eq!(order, ["high", "first", "second", "low"]);
-        assert_eq!(frontier.in_flight().unwrap(), 4);
+        assert_eq!(frontier.in_flight().await.unwrap(), 4);
     }
 
     #[tokio::test]
@@ -338,7 +351,7 @@ pub(crate) mod tests {
         }
 
         let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
-        assert_eq!(frontier.in_flight().unwrap(), 0);
+        assert_eq!(frontier.in_flight().await.unwrap(), 0);
         let mut left = Vec::new();
         while let NextSeed::Ready(seed) = frontier.pop().await.unwrap() {
             left.push(seed.tag().map(ToString::to_string).unwrap());
@@ -361,7 +374,7 @@ pub(crate) mod tests {
             after: None,
         };
         assert_eq!(frontier.report(retry).await.unwrap(), Ack::RetryRefused);
-        assert_eq!(frontier.in_flight().unwrap(), 0);
+        assert_eq!(frontier.in_flight().await.unwrap(), 0);
     }
 
     #[tokio::test]
@@ -458,7 +471,7 @@ pub(crate) mod tests {
         }
 
         let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
-        assert_eq!(frontier.in_flight().unwrap(), 0);
+        assert_eq!(frontier.in_flight().await.unwrap(), 0);
         let NextSeed::Ready(due) = frontier.pop().await.unwrap() else {
             panic!()
         };
@@ -469,5 +482,94 @@ pub(crate) mod tests {
         };
         let wait = at - Instant::now();
         assert!(wait > Duration::from_mins(59), "{wait:?}");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn due_times_follow_the_monotonic_clock_while_open() {
+        use std::time::Duration;
+
+        use spire_core::frontier::{FrontierExt, Schedule};
+        use tokio::time::{Instant, advance};
+
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+        let storage = store.frontier();
+        let frontier = store.frontier().retry(3);
+        let later = Instant::now() + Duration::from_hours(2);
+        storage.schedule(seed("revisit"), later).await.unwrap();
+        frontier.push(seed("retried")).await.unwrap();
+        let NextSeed::Ready(popped) = frontier.pop().await.unwrap() else {
+            panic!()
+        };
+        let retry = Report::Retry {
+            seed: popped,
+            after: Some(Duration::from_hours(1)),
+        };
+        frontier.report(retry).await.unwrap();
+
+        // The wall clock barely moves here, so only the monotonic clock can
+        // bring these due.
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Wait(_)));
+        advance(Duration::from_hours(1)).await;
+        assert_eq!(pop_path(&storage).await.as_deref(), Some("retried"));
+        assert_eq!(storage.next_due().await.unwrap(), Some(later));
+        advance(Duration::from_hours(1)).await;
+        assert_eq!(pop_path(&storage).await.as_deref(), Some("revisit"));
+    }
+
+    #[tokio::test]
+    async fn a_clock_moved_back_between_runs_does_not_delay_a_retry() {
+        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+        let path = TempPath::new();
+        let ahead = SystemTime::now() + Duration::from_hours(10);
+        let ahead = ahead.duration_since(UNIX_EPOCH).unwrap().as_millis();
+        let last_seen = u64::try_from(ahead).unwrap();
+        {
+            // As left by a run whose clock was ten hours ahead of this one's,
+            // with a retry due a minute after it stopped.
+            let store = RedbStore::open(&path.0).await.unwrap();
+            let bytes = codec::encode(&seed("retried")).unwrap();
+            store
+                .write(move |txn| {
+                    txn.open_table(META)?.insert(LAST_SEEN, last_seen)?;
+                    txn.open_table(RETRIES)?
+                        .insert((last_seen + 60_000, 0), bytes.as_slice())?;
+                    Ok(())
+                })
+                .await
+                .unwrap();
+        }
+
+        let frontier = RedbStore::open(&path.0).await.unwrap().frontier();
+        let NextSeed::Wait(at) = frontier.pop().await.unwrap() else {
+            panic!("expected a wait for the retry");
+        };
+        let wait = at - tokio::time::Instant::now();
+        assert!(wait <= Duration::from_mins(1), "{wait:?}");
+    }
+
+    #[tokio::test]
+    async fn an_earlier_time_does_not_replace_the_latest_seen() {
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+        // As committed by a concurrent call that read the clock later.
+        let later = store.clock().now() + 60_000;
+        store
+            .write(move |txn| {
+                txn.open_table(META)?.insert(LAST_SEEN, later)?;
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        store.frontier().pop().await.unwrap();
+        let last_seen = store
+            .read(|txn| {
+                let meta = txn.open_table(META)?;
+                Ok(meta.get(LAST_SEEN)?.map(|guard| guard.value()))
+            })
+            .unwrap();
+        assert_eq!(last_seen, Some(later));
     }
 }

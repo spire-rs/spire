@@ -72,9 +72,8 @@ where
 ///     println!("{} bytes", body.len());
 /// }
 ///
-/// let router: Router<spire::backend::Noop> = Router::new()
-///     .route("list", list)
-///     .route("item", item);
+/// let router: Router<spire::backend::Noop> =
+///     Router::new().route("list", list).route("item", item);
 /// ```
 #[must_use]
 pub struct Router<C, S = ()> {

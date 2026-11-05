@@ -167,14 +167,14 @@ pub mod worker {
     pub mod middleware {
         //! Middleware, which runs around a [`Worker`] for every request.
         //!
-        //! A [`Middleware`] receives the [`Context`] before any handler, and the
-        //! [`Next`] worker to pass it on to. Before passing it on, it can change the
-        //! request, e.g. add headers, or answer without fetching. Around, it can
-        //! check the response's head: fetched once, it is shared with the handlers.
-        //! After, it can change the [`Outcome`].
+        //! A [`Middleware`] receives the [`Context`] before any handler, and
+        //! the [`Next`] worker to pass it on to. Before passing it on, it can
+        //! change the request, e.g. add headers, or answer without fetching.
+        //! Around, it can check the response's head: fetched once, it is shared
+        //! with the handlers. After, it can change the [`Outcome`].
         //!
-        //! [`WorkerExt::layer`] wraps a worker, such as a router, in middleware. The
-        //! middleware added last runs first.
+        //! [`WorkerExt::layer`] wraps a worker, such as a router, in
+        //! middleware. The middleware added last runs first.
         //!
         //! # Examples
         //!
@@ -191,14 +191,19 @@ pub mod worker {
         //! /// Retries pages that answer with a captcha instead of content.
         //! async fn captcha(cx: Context<Noop>, next: Next<Noop>) -> Result<Outcome> {
         //!     if cx.response().await?.headers().contains_key("x-captcha") {
-        //!         return Ok(Outcome::Retry { after: Some(Duration::from_secs(60)) });
+        //!         return Ok(Outcome::Retry {
+        //!             after: Some(Duration::from_secs(60)),
+        //!         });
         //!     }
         //!     Ok(next.run(cx).await)
         //! }
         //!
         //! let worker = from_fn(|_: Context<Noop>| async {})
         //!     .layer(middleware::from_fn(captcha))
-        //!     .layer(SetHeader::new(USER_AGENT, HeaderValue::from_static("MyBot/1.0")));
+        //!     .layer(SetHeader::new(
+        //!         USER_AGENT,
+        //!         HeaderValue::from_static("MyBot/1.0"),
+        //!     ));
         //! let crawler = Crawler::new(Noop, worker);
         //! ```
         //!

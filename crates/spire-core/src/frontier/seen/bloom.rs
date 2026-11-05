@@ -49,9 +49,8 @@ pub struct BloomSnapshot {
     inserted: usize,
 }
 
-/// The number of 64-bit words and of hashes for `expected` items at
-/// `rate`, from the standard formulas `m = -n ln p / (ln 2)²` and
-/// `k = (m / n) ln 2`.
+/// The number of 64-bit words and of hashes for `expected` items at `rate`,
+/// from the standard formulas `m = -n ln p / (ln 2)²` and `k = (m / n) ln 2`.
 #[expect(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,

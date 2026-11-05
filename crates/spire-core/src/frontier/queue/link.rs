@@ -3,7 +3,8 @@ use ::http::Uri;
 use crate::crawler::Tag;
 use crate::frontier::seed::Seed;
 
-/// A link to follow with [`Queue::follow`](crate::frontier::queue::Queue::follow).
+/// A link to follow with
+/// [`Queue::follow`](crate::frontier::queue::Queue::follow).
 ///
 /// A link is either an `href`, absolute or relative to the page it was found
 /// on, or a complete [`Seed`]. Strings, URIs and seeds convert into links.

@@ -10,6 +10,11 @@ and this project adheres to
 
 ### Changed
 
+- **Breaking:** `len` and `is_empty` on `RedbSeen`, `RedbValidator` and
+  `RedbDataset`, and `RedbFrontier::in_flight`, are now `async`, and read on the
+  blocking pool rather than the async runtime, as SQLite's `len` and `is_empty`
+  already do.
+
 - **Breaking:** Storage now holds retries, through a new `Report::Requeue`. The
   `retry` facade sends it inwards, and storage that does not handle it refuses
   it, so custom storage must handle it or its retried seeds fail.
@@ -22,6 +27,7 @@ and this project adheres to
 - `RedbFrontier` and `SqliteFrontier` now store seeds waiting for a retry, with
   their attempt and due time, so a restart keeps both, and caller-attached `Seed`
   extensions on a retried seed are discarded like any other stored seed's.
+  SQLite adds the migration `0002_frontier_retries.sql`.
 
 - **Breaking:** `RedbStore::read` and `RedbStore::write` callbacks now return
   `RedbTxnError`, a new type that `?` produces from redb's errors and spire's. A
@@ -43,6 +49,20 @@ and this project adheres to
   `union` keyword whatever precedes it, rather than the first token of the item.
 
 ### Fixed
+
+- A host first throttled in a crawl without limits or gaps now waits out its
+  widened gap before the next request, rather than starting one immediately.
+
+- `RedbValidator::get` and `RedbFrontier`'s `next_due` no longer block the async
+  runtime, so `Revalidate` over redb no longer holds up other requests.
+
+- `RedbFrontier` due times now follow a monotonic clock while the store is open,
+  so a system clock change no longer moves revisits.
+
+- `RedbFrontier` and `SqliteFrontier` now record the latest time they saw. After
+  a wall clock is moved back between runs, a retry waits no longer than it had
+  left at that record. A clock moved forward between runs still brings due times
+  forward.
 
 - Due retries no longer bypass priority order, and neither do `InMemFrontier` and
   `RedbFrontier` revisits.

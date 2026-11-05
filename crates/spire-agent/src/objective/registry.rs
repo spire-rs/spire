@@ -35,7 +35,8 @@ pub struct Progress {
     pub relevant_pages: u64,
     /// Records reported after successful writes; duplicates count again.
     pub items: u64,
-    /// Evidence retained for completion judgments, bounded to 128 items and 32 KiB.
+    /// Evidence retained for completion judgments, bounded to 128 items and 32
+    /// KiB.
     pub record: Vec<Value>,
     /// Records omitted from evidence after its bounds were reached.
     pub omitted: u64,

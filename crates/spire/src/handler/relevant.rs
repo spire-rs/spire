@@ -13,9 +13,11 @@ use crate::{Context, Error};
 
 /// Follows visible links accepted by any active objective.
 ///
-/// Requires an [`Agent`] registered with [`with_agent`](spire_agent::AgentCrawlerExt::with_agent)
-/// and the [`ObjectiveRegistry`] supplied by
-/// [`with_objective`](spire_agent::objective::ObjectiveExt::with_objective) middleware.
+/// Requires an [`Agent`] registered with
+/// [`with_agent`](spire_agent::AgentCrawlerExt::with_agent) and the
+/// [`ObjectiveRegistry`] supplied by
+/// [`with_objective`](spire_agent::objective::ObjectiveExt::with_objective)
+/// middleware.
 ///
 /// Ratings are merged by maximum accepted score, then each candidate is
 /// queued once. Use a priority frontier for best-first order; scope and

@@ -22,10 +22,14 @@ use crate::worker::{IntoOutcome, Outcome};
 /// #[derive(Deserialize, JsonSchema)]
 /// #[serde(crate = "spire::agent::serde")]
 /// #[schemars(crate = "spire::agent::schemars")]
-/// struct Product { name: String }
+/// struct Product {
+///     name: String,
+/// }
 ///
 /// async fn products(AgentExtract(products): AgentExtract<Vec<Product>>) {
-///     for product in products { println!("{}", product.name); }
+///     for product in products {
+///         println!("{}", product.name);
+///     }
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]

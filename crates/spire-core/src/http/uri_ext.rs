@@ -9,8 +9,8 @@ use url::Url;
 pub trait UriExt {
     /// Returns this URI's canonical form for crawling and deduplication.
     ///
-    /// - scheme and host lowercase, default ports removed, `.` and `..` segments
-    ///   resolved, and an empty path made `/`;
+    /// - scheme and host lowercase, default ports removed, `.` and `..`
+    ///   segments resolved, and an empty path made `/`;
     /// - percent-escapes uppercase, and escaped unreserved characters decoded;
     /// - query parameters sorted, empty queries and tracking parameters such as
     ///   `utm_*` or `fbclid` removed;
@@ -19,9 +19,11 @@ pub trait UriExt {
     /// URIs that cannot be parsed as URLs are returned unchanged.
     ///
     /// ```
-    /// use spire_core::http::{UriExt, http::Uri};
+    /// use spire_core::http::UriExt;
+    /// use spire_core::http::http::Uri;
     ///
-    /// let uri: Uri = "https://Example.com:443/a?b=2&utm_source=mail&a=1".parse()?;
+    /// let uri: Uri =
+    ///     "https://Example.com:443/a?b=2&utm_source=mail&a=1".parse()?;
     /// assert_eq!(uri.canonical(), "https://example.com/a?a=1&b=2");
     /// # Ok::<_, spire_core::http::http::uri::InvalidUri>(())
     /// ```

@@ -1,4 +1,5 @@
-//! Objective middleware composes ordinary handlers without changing the crawler.
+//! Objective middleware composes ordinary handlers without changing the
+//! crawler.
 #![cfg(all(feature = "agent", feature = "testing"))]
 
 #[path = "fixtures/objectives.rs"]

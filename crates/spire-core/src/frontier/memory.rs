@@ -166,6 +166,29 @@ impl PartialEq for Prioritized {
 impl Eq for Prioritized {}
 
 impl Store {
+    fn insert(&mut self, seed: Seed) {
+        match self {
+            Self::Fifo(seeds) | Self::Lifo(seeds) => seeds.push_back(seed),
+            Self::Priority(seeds, sequence) => {
+                *sequence += 1;
+                let priority = seed.priority();
+                seeds.push(Prioritized {
+                    priority,
+                    sequence: *sequence,
+                    seed,
+                });
+            }
+        }
+    }
+
+    fn pop(&mut self) -> Option<Seed> {
+        match self {
+            Self::Fifo(seeds) => seeds.pop_front(),
+            Self::Lifo(seeds) => seeds.pop_back(),
+            Self::Priority(seeds, _) => seeds.pop().map(|prioritized| prioritized.seed),
+        }
+    }
+
     fn len(&self) -> usize {
         match self {
             Self::Fifo(seeds) | Self::Lifo(seeds) => seeds.len(),
@@ -213,8 +236,9 @@ impl InMemFrontier {
         }
     }
 
-    /// Moves the seeds that have come due to the queue, in the order they did.
-    fn release_due(&self, now: Instant) {
+    /// Moves the seeds that have come due to `store`, in the order they did.
+    /// The caller holds the lock on `store`, so they are never out of sight.
+    fn release_due(&self, store: &mut Store, now: Instant) {
         let mut due = Vec::new();
         if let Some(scheduled) = lock(&self.scheduled).as_mut() {
             due.extend(std::iter::from_fn(|| scheduled.pop_due(now)));
@@ -225,23 +249,12 @@ impl InMemFrontier {
 
         due.sort_by_key(|(due, _)| *due);
         for (_, seed) in due {
-            self.insert(seed);
+            store.insert(seed);
         }
     }
 
     fn insert(&self, seed: Seed) {
-        match &mut *lock(&self.seeds) {
-            Store::Fifo(seeds) | Store::Lifo(seeds) => seeds.push_back(seed),
-            Store::Priority(seeds, sequence) => {
-                *sequence += 1;
-                let priority = seed.priority();
-                seeds.push(Prioritized {
-                    priority,
-                    sequence: *sequence,
-                    seed,
-                });
-            }
-        }
+        lock(&self.seeds).insert(seed);
     }
 }
 
@@ -275,18 +288,15 @@ impl Frontier for InMemFrontier {
     /// Moves seeds that have come due to the queue, then hands out the next.
     /// Only requeued seeds are waited for; see [`Schedule::next_due`].
     fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
-        self.release_due(Instant::now());
-        let seed = match &mut *lock(&self.seeds) {
-            Store::Fifo(seeds) => seeds.pop_front(),
-            Store::Lifo(seeds) => seeds.pop_back(),
-            Store::Priority(seeds, _) => seeds.pop().map(|prioritized| prioritized.seed),
-        };
-        let next = match seed {
+        let mut store = lock(&self.seeds);
+        self.release_due(&mut store, Instant::now());
+        let next = match store.pop() {
             Some(seed) => NextSeed::Ready(seed),
             None => lock(&self.requeued)
                 .earliest()
                 .map_or(NextSeed::Empty, NextSeed::Wait),
         };
+        drop(store);
         ready(Ok(next))
     }
 
@@ -310,8 +320,9 @@ impl Frontier for InMemFrontier {
 
     /// Counts queued and requeued seeds.
     fn size_hint(&self) -> Option<usize> {
-        let queued = lock(&self.seeds).len();
-        Some(queued + lock(&self.requeued).seeds.len())
+        let store = lock(&self.seeds);
+        let requeued = lock(&self.requeued).seeds.len();
+        Some(store.len() + requeued)
     }
 
     /// Lists queued, requeued and scheduled seeds, the latter two without when
@@ -405,5 +416,44 @@ mod tests {
             order.push(path);
         }
         assert_eq!(order, ["high", "first", "second", "low"]);
+    }
+
+    #[test]
+    fn seeds_being_released_stay_visible_to_other_threads() {
+        use std::sync::Barrier;
+
+        use futures::FutureExt;
+
+        const SEEDS: usize = 256;
+
+        for _ in 0..200 {
+            let frontier = InMemFrontier::fifo();
+            let due = Instant::now();
+            for i in 0..SEEDS {
+                let seed = seed(&i.to_string());
+                let requeue = frontier.report(Report::Requeue { seed, due });
+                requeue.now_or_never().unwrap().unwrap();
+            }
+
+            // One pop releases every seed and takes one, so another thread
+            // must see the rest at any moment, and a second pop must find one.
+            let barrier = Barrier::new(2);
+            std::thread::scope(|scope| {
+                scope.spawn(|| {
+                    barrier.wait();
+                    let next = frontier.pop().now_or_never().unwrap().unwrap();
+                    assert!(matches!(next, NextSeed::Ready(_)));
+                });
+                scope.spawn(|| {
+                    barrier.wait();
+                    for _ in 0..16 {
+                        let held = frontier.snapshot().unwrap().len();
+                        assert!(held >= SEEDS - 1, "snapshot saw {held} seeds");
+                        let hint = frontier.size_hint().unwrap();
+                        assert!(hint >= SEEDS - 1, "size_hint saw {hint} seeds");
+                    }
+                });
+            });
+        }
     }
 }

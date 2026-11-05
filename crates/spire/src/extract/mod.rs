@@ -5,17 +5,17 @@
 //! read the response: the request is fetched once, by the first that needs
 //! it, and body extractors share the cached response snapshot.
 //!
-//! - Request and crawl: [`Uri`](crate::http::http::Uri), [`Query`],
-//!   [`Tag`], an enum deriving [`Tags`], [`Depth`], [`Attempt`], [`Queue`]
-//!   and [`Data`].
-//! - Response: [`Head`] for the status and headers, and for the body
-//!   [`Body`], [`Text`] and [`Json`].
+//! - Request and crawl: [`Uri`](crate::http::http::Uri), [`Query`], [`Tag`], an
+//!   enum deriving [`Tags`], [`Depth`], [`Attempt`], [`Queue`] and [`Data`].
+//! - Response: [`Head`] for the status and headers, and for the body [`Body`],
+//!   [`Text`] and [`Json`].
 //! - HTML, with the `html` feature, in [`html`]: the parsed [`Html`],
 //!   [`Element`]s extracted with [`Select`], [`Meta`] and [`JsonLd`].
 //! - Sitemaps, with the `sitemap` feature, in [`sitemap`]; and a browser
 //!   [`ThirtyfourTab`] with the `thirtyfour` feature.
 //! - Model selection, with the `agent` feature: `AgentExtract<T>`.
-//! - Application state: [`State`]; crawler and middleware services: [`Extension`].
+//! - Application state: [`State`]; crawler and middleware services:
+//!   [`Extension`].
 //!
 //! Wrapping an extractor in `Option` or `Result` makes it infallible.
 //!

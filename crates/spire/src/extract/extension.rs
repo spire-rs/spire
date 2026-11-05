@@ -7,16 +7,21 @@ use crate::{Context, Error};
 
 /// A service attached to the request by the crawler or middleware.
 ///
-/// Register services with [`Crawler::with_extension`](crate::Crawler::with_extension).
-/// Unlike [`State`](super::State), extensions are looked up by type at runtime.
-/// Missing values fail extraction; use `Option<Extension<T>>` for optional services.
+/// Register services with
+/// [`Crawler::with_extension`](crate::Crawler::with_extension). Unlike
+/// [`State`](super::State), extensions are looked up by type at runtime.
+/// Missing values fail extraction; use `Option<Extension<T>>` for optional
+/// services.
 ///
 /// ```
+/// use spire::backend::Noop;
 /// use spire::extract::{Extension, State};
 /// use spire::{Crawler, Router};
-/// use spire::backend::Noop;
 ///
-/// async fn page(State(prefix): State<String>, Extension(limit): Extension<usize>) {
+/// async fn page(
+///     State(prefix): State<String>,
+///     Extension(limit): Extension<usize>,
+/// ) {
 ///     println!("{prefix}: {limit}");
 /// }
 ///

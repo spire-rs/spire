@@ -13,8 +13,8 @@ pub enum StatusPolicy {
     /// `4xx` and `5xx` responses become errors, so the crawler retries or
     /// fails them without a handler having to check:
     ///
-    /// - `408`, `429` and `5xx` are retryable [`Http`] errors; `429` and
-    ///   `503` honour `Retry-After` by pausing the request's host.
+    /// - `408`, `429` and `5xx` are retryable [`Http`] errors; `429` and `503`
+    ///   honour `Retry-After` by pausing the request's host.
     /// - Other `4xx` are [`Rejected`] errors, which are not retried.
     ///
     /// [`Http`]: ErrorKind::Http

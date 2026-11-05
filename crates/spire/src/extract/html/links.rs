@@ -111,7 +111,9 @@ impl From<&PageLink> for Link {
 ///
 /// async fn page(links: Links, queue: Queue) -> Result<()> {
 ///     // The next page of a listing, if the site says which it is.
-///     queue.follow_all(links.followable().same_host().with_rel("next")).await?;
+///     queue
+///         .follow_all(links.followable().same_host().with_rel("next"))
+///         .await?;
 ///     Ok(())
 /// }
 /// ```
@@ -306,8 +308,8 @@ impl Html {
     }
 }
 
-/// Resolves the links of a page as a browser does: against its
-/// `<base href>`, itself resolved against the URI the page was served from.
+/// Resolves the links of a page as a browser does: against its `<base href>`,
+/// itself resolved against the URI the page was served from.
 struct Resolver {
     base: Option<Url>,
 }

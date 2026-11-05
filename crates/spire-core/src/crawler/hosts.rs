@@ -164,10 +164,15 @@ impl Hosts {
     }
 
     /// Tracks hosts from now on, e.g. once one is throttled, returning the
-    /// key of `seed`'s host.
-    pub(crate) fn track(&mut self, seed: &Seed) -> String {
+    /// key of `seed`'s host. Requests to it that started before were not
+    /// recorded, but all started by `now`, so without a recorded start its gap
+    /// counts from then. A recorded start came after tracking began, so after
+    /// all of them.
+    pub(crate) fn track(&mut self, seed: &Seed, now: Instant) -> String {
         self.tracked = true;
-        key(seed)
+        let key = key(seed);
+        self.host(&key).last_start.get_or_insert(now);
+        key
     }
 
     /// Records that a request to `key` started.
@@ -424,6 +429,61 @@ mod tests {
 
     fn gap(hosts: &Hosts) -> Duration {
         hosts.by_key["a.com"].gap
+    }
+
+    #[test]
+    fn a_host_first_tracked_when_throttled_waits_out_its_gap() {
+        use crate::crawler::concurrency::Signal;
+
+        let ms = Duration::from_millis;
+        let first = Instant::now();
+        let mut hosts = Hosts::new(policy(0, 0), false);
+        // Two requests start untracked, the second one later; the first is
+        // throttled after both started.
+        let throttled = seed("https://a.com/1");
+        assert!(hosts.start(&throttled, first).is_none());
+        assert!(
+            hosts
+                .start(&seed("https://a.com/2"), first + ms(900))
+                .is_none()
+        );
+
+        let finished = first + ms(1000);
+        let key = hosts.track(&throttled, finished);
+        let feedback = Feedback {
+            started: first,
+            latency: None,
+            unchanged: false,
+            signal: Signal::Throttled,
+        };
+        hosts.finished(&key, Some(feedback), finished);
+
+        // The gap counts from no earlier than the latest start.
+        assert!(!gap(&hosts).is_zero());
+        assert!(matches!(
+            hosts.admit(seed("https://a.com/3"), finished),
+            Admit::Parked
+        ));
+        assert!(hosts.take_ready(first + ms(900) + gap(&hosts)).is_none());
+        assert!(hosts.take_ready(finished + gap(&hosts)).is_some());
+    }
+
+    #[test]
+    fn a_late_untracked_throttle_keeps_the_recorded_start() {
+        let ms = Duration::from_millis;
+        let first = Instant::now();
+        let mut hosts = Hosts::new(policy(0, 0), false);
+        let early = seed("https://a.com/1");
+        let late = seed("https://a.com/2");
+        assert!(hosts.start(&early, first).is_none());
+        assert!(hosts.start(&late, first).is_none());
+
+        // The first throttle starts tracking, and a tracked request starts.
+        let key = hosts.track(&early, first + ms(100));
+        hosts.started(&key, first + ms(200));
+        // An untracked request reports later; the recorded start stands.
+        hosts.track(&late, first + ms(300));
+        assert_eq!(hosts.by_key["a.com"].last_start, Some(first + ms(200)));
     }
 
     #[test]

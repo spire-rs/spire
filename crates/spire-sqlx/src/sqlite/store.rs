@@ -164,8 +164,8 @@ impl SqliteStore {
     ///
     /// This is explicit schema initialization, not an application migration
     /// runner. The `spire_dataset_*`, `spire_seen`, `spire_page_versions`,
-    /// `spire_frontier_*` and `spire_frontier_scheduled*` names are reserved for this crate.
-    /// Application tables are not altered or repurposed.
+    /// `spire_frontier_*` and `spire_frontier_scheduled*` names are reserved
+    /// for this crate. Application tables are not altered or repurposed.
     /// Applications control when this runs and must grant schema permissions.
     /// Migration history is isolated in `_spire_sqlx_migrations`; the
     /// application's `_sqlx_migrations` table is untouched. Repeated calls are
@@ -173,7 +173,8 @@ impl SqliteStore {
     ///
     /// # Errors
     /// Returns a dataset error on SQL, schema or lock failures, including
-    /// untracked reserved tables, changed migration checksums or unknown versions.
+    /// untracked reserved tables, changed migration checksums or unknown
+    /// versions.
     pub async fn initialize(&self) -> Result<()> {
         super::migration::run(&self.pool).await
     }

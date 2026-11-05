@@ -45,11 +45,12 @@ tracking parameters such as `utm_source`, so
 A redb store's frontier orders by priority too, see
 [Persistence with redb](redb.md).
 
-A retry or revisit waits for its delay, then joins the queue and takes its turn
-under the same order. It keeps its priority, and goes behind queued seeds of
-equal priority. On a FIFO frontier that means behind everything queued, and on
-a LIFO frontier it runs next. It is not pushed again, so `dedup` and other
-facades do not refuse it.
+A retry or revisit waits for its delay, then joins the queue the next time a
+seed is popped, and takes its turn under the same order. It keeps its priority,
+and goes behind seeds of equal priority queued by then, including any pushed
+after its delay ended. On a FIFO frontier that means behind everything queued,
+and on a LIFO frontier it runs next. It is not pushed again, so `dedup` and
+other facades do not refuse it.
 
 Priorities can be scored for every link, so the crawl reaches the pages
 that matter first: see [Best-first crawling](best-first.md).

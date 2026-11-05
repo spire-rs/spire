@@ -2,7 +2,7 @@ use std::error::Error as StdError;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use redb::{
     Database, Durability, ReadTransaction, ReadableDatabase, ReadableTable, ReadableTableMetadata,
@@ -43,6 +43,9 @@ pub(crate) const META: TableDefinition<&str, u64> = TableDefinition::new("spire/
 
 /// The key of the next insertion sequence in [`META`].
 pub(crate) const NEXT_SEQUENCE: &str = "next_sequence";
+/// The key of the latest time the frontier saw in [`META`], in milliseconds
+/// since the Unix epoch.
+pub(crate) const LAST_SEEN: &str = "last_seen";
 
 /// A redb database holding a crawl's [`RedbFrontier`], [`RedbSeen`] and
 /// [`RedbDataset`]s.
@@ -80,9 +83,50 @@ pub struct RedbStore {
     inner: Arc<Inner>,
 }
 
+/// Converts between stored due times, in milliseconds since the Unix epoch, and
+/// the instants the frontier works with.
+///
+/// Reads the wall clock once, on opening, so due times carry over a restart,
+/// and is monotonic from there, so a clock change does not move them while the
+/// store is open. It starts no earlier than the latest time the store recorded,
+/// which limits how far a wall clock moved back between runs can delay them.
+pub(crate) struct Clock {
+    opened_at: u64,
+    opened: tokio::time::Instant,
+}
+
+impl Clock {
+    fn new(last_seen: u64) -> Self {
+        let since = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default();
+        let wall = u64::try_from(since.as_millis()).unwrap_or(u64::MAX);
+        Self {
+            opened_at: wall.max(last_seen),
+            opened: tokio::time::Instant::now(),
+        }
+    }
+
+    pub(crate) fn now(&self) -> u64 {
+        self.millis_at(tokio::time::Instant::now())
+    }
+
+    pub(crate) fn millis_at(&self, at: tokio::time::Instant) -> u64 {
+        let elapsed = at.saturating_duration_since(self.opened).as_millis();
+        self.opened_at
+            .saturating_add(u64::try_from(elapsed).unwrap_or(u64::MAX))
+    }
+
+    pub(crate) fn instant_at(&self, millis: u64) -> tokio::time::Instant {
+        let wait = millis.saturating_sub(self.now());
+        tokio::time::Instant::now() + Duration::from_millis(wait)
+    }
+}
+
 struct Inner {
     db: Database,
     path: PathBuf,
+    clock: Clock,
     sync_interval: Option<Duration>,
     last_sync: Mutex<Instant>,
 }
@@ -141,7 +185,7 @@ impl RedbStoreBuilder {
                     .with_message(message)
                     .with_source(error)
             })?;
-            let recovered = recover(&db).map_err(storage_error)?;
+            let (recovered, last_seen) = recover(&db).map_err(storage_error)?;
             if recovered > 0 {
                 tracing::info!(
                     target: crate::TRACING_TARGET,
@@ -154,6 +198,7 @@ impl RedbStoreBuilder {
             let inner = Inner {
                 db,
                 path,
+                clock: Clock::new(last_seen),
                 sync_interval,
                 last_sync: Mutex::new(Instant::now()),
             };
@@ -167,9 +212,11 @@ impl RedbStoreBuilder {
 }
 
 /// Creates every table, and moves the in-flight seeds back to the queue.
-fn recover(db: &Database) -> Result<usize, redb::Error> {
+/// Returns how many it moved, and the latest time the frontier saw.
+fn recover(db: &Database) -> Result<(usize, u64), redb::Error> {
     let txn = db.begin_write()?;
     let mut recovered = 0;
+    let last_seen;
     {
         let mut queue = txn.open_table(QUEUE)?;
         let mut in_flight = txn.open_table(IN_FLIGHT)?;
@@ -177,6 +224,7 @@ fn recover(db: &Database) -> Result<usize, redb::Error> {
         txn.open_table(SEEN)?;
         txn.open_table(RETRIES)?;
 
+        last_seen = meta.get(LAST_SEEN)?.map_or(0, |guard| guard.value());
         let mut sequence = meta.get(NEXT_SEQUENCE)?.map_or(0, |guard| guard.value());
         while let Some((_, bytes)) = in_flight.pop_first()? {
             let bytes = bytes.value().to_vec();
@@ -189,7 +237,7 @@ fn recover(db: &Database) -> Result<usize, redb::Error> {
         meta.insert(NEXT_SEQUENCE, sequence)?;
     }
     txn.commit()?;
-    Ok(recovered)
+    Ok((recovered, last_seen))
 }
 
 impl RedbStore {
@@ -293,6 +341,22 @@ impl RedbStore {
     ) -> Result<T> {
         let txn = self.inner.db.begin_read().map_err(storage_error)?;
         Ok(f(&txn)?)
+    }
+
+    /// Runs `f` on the blocking pool, for reads made from async code.
+    pub(crate) async fn blocking<T, F>(&self, f: F) -> Result<T>
+    where
+        T: Send + 'static,
+        F: FnOnce(&Self) -> Result<T> + Send + 'static,
+    {
+        let store = self.clone();
+        tokio::task::spawn_blocking(move || f(&store))
+            .await
+            .map_err(join_error)?
+    }
+
+    pub(crate) fn clock(&self) -> &Clock {
+        &self.inner.clock
     }
 
     /// Returns the number of entries in `table`, zero if it was never

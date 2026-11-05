@@ -20,8 +20,10 @@ use crate::worker::Outcome;
 /// use spire_core::http::http::header::{ACCEPT_LANGUAGE, FROM};
 /// use spire_core::worker::middleware::SetHeader;
 ///
-/// let language = SetHeader::new(ACCEPT_LANGUAGE, HeaderValue::from_static("en"));
-/// let contact = SetHeader::new(FROM, HeaderValue::from_static("crawler@example.com"));
+/// let language =
+///     SetHeader::new(ACCEPT_LANGUAGE, HeaderValue::from_static("en"));
+/// let contact =
+///     SetHeader::new(FROM, HeaderValue::from_static("crawler@example.com"));
 /// ```
 #[derive(Debug, Clone)]
 pub struct SetHeader {

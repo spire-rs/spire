@@ -52,16 +52,16 @@ const DEFAULT_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 /// gets its own client from the backend and is handed to the worker, whose
 /// [`Outcome`] is reported back to the frontier.
 ///
-/// The run ends once the frontier is empty and no request is in flight, when
-/// a worker returns [`Outcome::Stop`], the request or time budget is spent,
-/// or the [`shutdown_token`](Self::shutdown_token) is cancelled. Stopping
-/// lets requests in flight finish, for at most the
-/// [shutdown grace period](Self::with_shutdown_grace) if one is set.
+/// The run ends once the frontier is empty and no request is in flight, when a
+/// worker returns [`Outcome::Stop`], the request or time budget is spent, or
+/// the [`shutdown_token`](Self::shutdown_token) is cancelled. Stopping lets
+/// requests in flight finish, for at most the [shutdown grace
+/// period](Self::with_shutdown_grace) if one is set.
 ///
-/// Politeness is per host: [`with_host_concurrency`](Self::with_host_concurrency)
-/// and [`with_host_delay`](Self::with_host_delay) limit how hard a single
-/// host is crawled, and with the `robots` feature, `with_robots` obeys
-/// robots.txt.
+/// Politeness is per host:
+/// [`with_host_concurrency`](Self::with_host_concurrency) and
+/// [`with_host_delay`](Self::with_host_delay) limit how hard a single host is
+/// crawled, and with the `robots` feature, `with_robots` obeys robots.txt.
 ///
 /// # Examples
 ///
@@ -69,10 +69,10 @@ const DEFAULT_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 /// use std::time::Duration;
 ///
 /// use spire_core::backend::Noop;
+/// use spire_core::crawler::Crawler;
 /// use spire_core::frontier::seed::Seed;
 /// use spire_core::frontier::{FrontierExt, InMemFrontier};
 /// use spire_core::worker::from_fn;
-/// use spire_core::crawler::Crawler;
 /// use spire_core::{Context, Result};
 ///
 /// async fn handle(cx: Context<Noop>) -> Result<()> {
@@ -82,7 +82,9 @@ const DEFAULT_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 ///
 /// # async fn example() -> Result<()> {
 /// let crawler = Crawler::new(Noop, from_fn(handle))
-///     .with_frontier(InMemFrontier::fifo().dedup().allow_hosts(["example.com"]))
+///     .with_frontier(
+///         InMemFrontier::fifo().dedup().allow_hosts(["example.com"]),
+///     )
 ///     .with_max_requests(100)
 ///     .with_host_concurrency(2)
 ///     .with_request_timeout(Duration::from_secs(30))
@@ -246,9 +248,9 @@ impl<B, W> Crawler<B, W> {
         self
     }
 
-    /// Sets how many requests to the same host are in flight at once:
-    /// a fixed number, at least one, or a limit per host adapted to how it
-    /// responds with [`HostConcurrency::adaptive`]. Unlimited by default.
+    /// Sets how many requests to the same host are in flight at once: a fixed
+    /// number, at least one, or a limit per host adapted to how it responds
+    /// with [`HostConcurrency::adaptive`]. Unlimited by default.
     #[must_use]
     pub fn with_host_concurrency(mut self, limit: impl Into<HostConcurrency>) -> Self {
         self.settings.hosts.concurrency = Some(limit.into());
@@ -274,18 +276,18 @@ impl<B, W> Crawler<B, W> {
     /// [`Report::Skipped`](crate::frontier::Report::Skipped).
     ///
     /// ```
-    /// use spire_core::backend::Noop;
-    /// use spire_core::crawler::Robots;
-    /// use spire_core::worker::from_fn;
-    /// use spire_core::crawler::Crawler;
     /// use spire_core::Context;
+    /// use spire_core::backend::Noop;
+    /// use spire_core::crawler::{Crawler, Robots};
+    /// use spire_core::worker::from_fn;
     ///
     /// let worker = from_fn(|_: Context<Noop>| async {});
     /// let crawler = Crawler::new(Noop, worker).with_robots("MyBot");
     ///
     /// // robots.txt through another backend, e.g. HTTP for a browser crawl.
     /// let worker = from_fn(|_: Context<Noop>| async {});
-    /// let crawler = Crawler::new(Noop, worker).with_robots(Robots::new("MyBot").with_backend(Noop));
+    /// let crawler = Crawler::new(Noop, worker)
+    ///     .with_robots(Robots::new("MyBot").with_backend(Noop));
     /// ```
     #[cfg(feature = "robots")]
     #[cfg_attr(docsrs, doc(cfg(feature = "robots")))]
@@ -320,11 +322,11 @@ impl<B, W> Crawler<B, W> {
     /// failing are taken out of use, see [`Identities`].
     ///
     /// ```
+    /// use spire_core::Context;
     /// use spire_core::backend::Noop;
+    /// use spire_core::crawler::Crawler;
     /// use spire_core::identity::{Identities, Identity};
     /// use spire_core::worker::from_fn;
-    /// use spire_core::crawler::Crawler;
-    /// use spire_core::Context;
     ///
     /// let identities = Identities::new([Identity::new("a"), Identity::new("b")]);
     /// let worker = from_fn(|_: Context<Noop>| async {});
@@ -402,7 +404,8 @@ impl<B, W> Crawler<B, W> {
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> Result<()> {
     /// let worker = from_fn(|_: Context<Noop>| async {});
-    /// let crawler = Crawler::new(Noop, worker).with_seed(Seed::get("https://example.com/")?);
+    /// let crawler = Crawler::new(Noop, worker)
+    ///     .with_seed(Seed::get("https://example.com/")?);
     ///
     /// let mut events = crawler.events();
     /// let watch = tokio::spawn(async move {

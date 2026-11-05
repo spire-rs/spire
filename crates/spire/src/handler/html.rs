@@ -15,15 +15,15 @@ use crate::{Context, TRACING_TARGET};
 
 /// A handler that follows the links of a page, queueing them with a tag.
 ///
-/// By default it follows visible `<a href>` and `<area href>` links; [`select`](Self::select)
-/// narrows it to the elements matching a CSS selector, e.g. a pagination
-/// link. Which links are crawled is still up to the frontier: its scope,
-/// deduplication and depth limits apply. Combine it with other handlers in a
-/// tuple to do more with the same page.
+/// By default it follows visible `<a href>` and `<area href>` links;
+/// [`select`](Self::select) narrows it to the elements matching a CSS selector,
+/// e.g. a pagination link. Which links are crawled is still up to the frontier:
+/// its scope, deduplication and depth limits apply. Combine it with other
+/// handlers in a tuple to do more with the same page.
 ///
 /// ```
-/// use spire::handler::FollowLinks;
 /// use spire::Router;
+/// use spire::handler::FollowLinks;
 ///
 /// let router: Router<spire::backend::Noop> = Router::new()
 ///     .route("listing", FollowLinks::new("listing").select("a.next"))
@@ -99,8 +99,9 @@ impl FollowLinks {
     /// use spire::handler::FollowLinks;
     ///
     /// let keywords = Keywords::new(["laptop", "review"]);
-    /// let follow = FollowLinks::new("page")
-    ///     .score_page(move |page| 10 * keywords.matches(&page.title().unwrap_or_default()));
+    /// let follow = FollowLinks::new("page").score_page(move |page| {
+    ///     10 * keywords.matches(&page.title().unwrap_or_default())
+    /// });
     /// ```
     pub fn score_page<F>(mut self, scorer: F) -> Self
     where
@@ -212,9 +213,9 @@ where
 ///
 /// ```
 /// # #[cfg(feature = "macros")] {
+/// use spire::Router;
 /// use spire::extract::html::Select;
 /// use spire::handler::{Collect, FollowLinks};
-/// use spire::Router;
 ///
 /// #[derive(Debug, Select)]
 /// #[select("article.product")]
@@ -226,7 +227,10 @@ where
 /// // Collect the products of a listing, then follow its next page.
 /// let router: Router<spire::backend::Noop> = Router::new().route(
 ///     "listing",
-///     (Collect::<Product>::new(), FollowLinks::new("listing").select("a.next")),
+///     (
+///         Collect::<Product>::new(),
+///         FollowLinks::new("listing").select("a.next"),
+///     ),
 /// );
 /// # }
 /// ```

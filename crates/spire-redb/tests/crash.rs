@@ -95,7 +95,7 @@ async fn resumes_after_a_crash() {
     assert_eq!(first, [0, 1, 2]);
     assert_eq!(second, [3, 4, 5, 6, 7, 8, 9]);
     assert_eq!(stats.requests, 7);
-    assert_eq!(store.frontier().in_flight().unwrap(), 0);
+    assert_eq!(store.frontier().in_flight().await.unwrap(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -122,7 +122,7 @@ async fn datasets_in_the_store_resume_after_an_aborted_crawl() {
     // Second run: the same dataset, so the file ends up with every page.
     let store = reopen(&path.0).await;
     let pages = store.dataset::<u32>("pages");
-    assert_eq!(pages.len().unwrap(), 3);
+    assert_eq!(pages.len().await.unwrap(), 3);
     let crawler = Crawler::new(Noop, chain(None, Arc::new(Notify::new())))
         .with_frontier(store.frontier().dedup_with(store.seen()))
         .with_dataset(pages.clone())

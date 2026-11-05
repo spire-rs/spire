@@ -17,10 +17,10 @@ use crate::{Context, TRACING_TARGET};
 /// Objective middleware automatically accepts successfully stored records
 /// for a matching `Objective<T>`; ordinary collection needs no objective.
 ///
-/// Register an [`Agent`](spire_agent::Agent) with [`with_agent`](spire_agent::AgentCrawlerExt::with_agent)
-/// and the dataset on the crawler. Extraction, budget and dataset
-/// errors propagate as they do in a handler using [`AgentExtract`] and
-/// [`Data`](crate::extract::Data).
+/// Register an [`Agent`](spire_agent::Agent) with
+/// [`with_agent`](spire_agent::AgentCrawlerExt::with_agent) and the dataset on
+/// the crawler. Extraction, budget and dataset errors propagate as they do in a
+/// handler using [`AgentExtract`] and [`Data`](crate::extract::Data).
 ///
 /// ```
 /// use spire::agent::{Agent, AgentCrawlerExt};

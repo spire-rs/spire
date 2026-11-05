@@ -56,8 +56,11 @@ impl<T: Clone> FromRef<T> for T {
 ///     println!("{}", state.api_key);
 /// }
 ///
-/// let state = AppState { api_key: "secret".to_owned() };
-/// let router: Router<(), AppState> = Router::with_state(state).route("page", handler);
+/// let state = AppState {
+///     api_key: "secret".to_owned(),
+/// };
+/// let router: Router<(), AppState> =
+///     Router::with_state(state).route("page", handler);
 /// ```
 #[derive(Debug, Default, Clone, Copy, Deref, DerefMut)]
 pub struct State<T>(pub T);

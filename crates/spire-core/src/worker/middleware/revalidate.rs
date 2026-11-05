@@ -109,14 +109,15 @@ impl Validator for InMemValidator {
 /// is meant for HTTP backends.
 ///
 /// ```
+/// use spire_core::Context;
 /// use spire_core::backend::Noop;
+/// use spire_core::crawler::Crawler;
 /// use spire_core::worker::middleware::{InMemValidator, Revalidate};
 /// use spire_core::worker::{WorkerExt, from_fn};
-/// use spire_core::crawler::Crawler;
-/// use spire_core::Context;
 ///
-/// let worker = from_fn(|cx: Context<Noop>| async move { cx.body().await.map(drop) })
-///     .layer(Revalidate::new(InMemValidator::new()));
+/// let worker =
+///     from_fn(|cx: Context<Noop>| async move { cx.body().await.map(drop) })
+///         .layer(Revalidate::new(InMemValidator::new()));
 /// let crawler = Crawler::new(Noop, worker);
 /// ```
 #[derive(Clone)]

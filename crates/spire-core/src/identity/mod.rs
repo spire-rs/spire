@@ -7,10 +7,10 @@
 //! one proxy is not sent through another.
 //!
 //! [`Identities`] are defined once, on the
-//! [`Crawler`](crate::crawler::Crawler::with_identities), which picks one for every
-//! request, applies its headers, and connects as it, see
-//! [`Backend::connect_as`](crate::backend::Backend::connect_as). Identities that
-//! keep failing are set aside, or replaced by new ones.
+//! [`Crawler`](crate::crawler::Crawler::with_identities), which picks one for
+//! every request, applies its headers, and connects as it, see
+//! [`Backend::connect_as`](crate::backend::Backend::connect_as). Identities
+//! that keep failing are set aside, or replaced by new ones.
 //!
 //! ```
 //! use spire_core::Result;
@@ -22,7 +22,9 @@
 //! // A rotating gateway: each session id is a different exit IP.
 //! let identities = Identities::from_fn(|n| {
 //!     Ok(Identity::new(format!("session-{n}"))
-//!         .with_proxy(format!("http://user-session-{n}:secret@gate.example:7000"))?
+//!         .with_proxy(format!(
+//!             "http://user-session-{n}:secret@gate.example:7000"
+//!         ))?
 //!         .with_header(USER_AGENT, HeaderValue::from_static("MyBot/1.0")))
 //! })
 //! .max_active(100)
@@ -208,7 +210,8 @@ impl Identity {
         if let Some(profile) = self.profile() {
             for header in profile.headers() {
                 if !headers.contains_key(header.name) {
-                    // uagent generates validated names and values from its captures.
+                    // uagent generates validated names and values from its
+                    // captures.
                     let name = ::http::HeaderName::from_static(header.name);
                     let value = HeaderValue::from_str(&header.value)
                         .expect("uagent profile headers are valid HTTP headers");

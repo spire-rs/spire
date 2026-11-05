@@ -48,7 +48,7 @@ tracing = { workspace = true, features = [] }
 criterion = { workspace = true, features = [] }
 
 # Testing
-tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
 
 [[bench]]
 name = "redb"

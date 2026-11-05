@@ -38,7 +38,12 @@ use crate::store::RedbStore;
 /// # async fn example() -> spire_core::Result<()> {
 /// let store = RedbStore::open("crawl.redb").await?;
 /// let products = store.dataset::<Product>("products");
-/// products.write(Product { name: "Lamp".into(), price: 20.0 }).await?;
+/// products
+///     .write(Product {
+///         name: "Lamp".into(),
+///         price: 20.0,
+///     })
+///     .await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -63,9 +68,11 @@ impl<T> RedbDataset<T> {
     ///
     /// Returns a [`Dataset`](ErrorKind::Dataset) error if the store cannot be
     /// read.
-    pub fn len(&self) -> Result<usize> {
+    pub async fn len(&self) -> Result<usize> {
+        let table = self.table.clone();
         self.store
-            .count(definition(&self.table))
+            .blocking(move |store| store.count(definition(&table)))
+            .await
             .map_err(dataset_error)
     }
 
@@ -75,8 +82,8 @@ impl<T> RedbDataset<T> {
     ///
     /// Returns a [`Dataset`](ErrorKind::Dataset) error if the store cannot be
     /// read.
-    pub fn is_empty(&self) -> Result<bool> {
-        self.len().map(|len| len == 0)
+    pub async fn is_empty(&self) -> Result<bool> {
+        Ok(self.len().await? == 0)
     }
 }
 
@@ -143,7 +150,7 @@ where
     async fn read(&self) -> Result<Option<T>> {
         // A read transaction is enough to find the table empty, as the last
         // read of a drain does, without committing a write.
-        if self.len()? == 0 {
+        if self.len().await? == 0 {
             return Ok(None);
         }
         let name = Arc::clone(&self.table);
@@ -164,7 +171,7 @@ where
     /// decodes ends the batch before it, so no item decoded before it is
     /// lost; taking it first, the next batch returns it as an error.
     async fn read_batch(&self, max: usize) -> Result<Vec<T>> {
-        if max == 0 || self.len()? == 0 {
+        if max == 0 || self.len().await? == 0 {
             return Ok(Vec::new());
         }
         let name = Arc::clone(&self.table);
@@ -195,7 +202,7 @@ where
     }
 
     fn size_hint(&self) -> Option<usize> {
-        self.len().ok()
+        self.store.count(definition(&self.table)).ok()
     }
 }
 
@@ -250,10 +257,10 @@ mod tests {
 
         let store = RedbStore::open(&path.0).await.unwrap();
         let pages = store.dataset::<Page>("pages");
-        assert_eq!(pages.len().unwrap(), 2);
+        assert_eq!(pages.len().await.unwrap(), 2);
         let all = Data::new(pages.clone()).read_all().await.unwrap();
         assert_eq!(all, [page("/b", 5), page("/c", 8)]);
-        assert!(pages.is_empty().unwrap());
+        assert!(pages.is_empty().await.unwrap());
         assert_eq!(pages.read().await.unwrap(), None);
     }
 
@@ -267,7 +274,7 @@ mod tests {
         assert_eq!(store.dataset::<u32>("a").read().await.unwrap(), Some(1));
         assert_eq!(store.dataset::<u32>("b").read().await.unwrap(), Some(2));
         // The frontier's tables are untouched.
-        assert_eq!(store.frontier().in_flight().unwrap(), 0);
+        assert_eq!(store.frontier().in_flight().await.unwrap(), 0);
     }
 
     #[tokio::test]
@@ -349,6 +356,6 @@ mod tests {
         let maps = store.dataset::<HashMap<(u8, u8), u8>>("maps");
         let bad = HashMap::from([((1, 2), 3)]);
         assert!(maps.write_batch(vec![HashMap::new(), bad]).await.is_err());
-        assert_eq!(maps.len().unwrap(), 0);
+        assert_eq!(maps.len().await.unwrap(), 0);
     }
 }

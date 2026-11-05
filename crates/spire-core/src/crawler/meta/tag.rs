@@ -52,10 +52,9 @@ impl fmt::Display for Tag {
 /// names each unit variant in `snake_case`, so tags are checked by the
 /// compiler while plain string tags keep working:
 ///
-/// - `#[tag(rename_all = "...")]` on the enum picks another case, with
-///   serde's names: `lowercase`, `UPPERCASE`, `PascalCase`, `camelCase`,
-///   `snake_case`, `SCREAMING_SNAKE_CASE`, `kebab-case` or
-///   `SCREAMING-KEBAB-CASE`.
+/// - `#[tag(rename_all = "...")]` on the enum picks another case, with serde's
+///   names: `lowercase`, `UPPERCASE`, `PascalCase`, `camelCase`, `snake_case`,
+///   `SCREAMING_SNAKE_CASE`, `kebab-case` or `SCREAMING-KEBAB-CASE`.
 /// - `#[tag(rename = "...")]` on a variant names it outright.
 ///
 /// Persistent frontiers store tags as strings: renaming a tag strands the
