@@ -88,8 +88,8 @@ pub struct RedbStore {
 ///
 /// Reads the wall clock once, on opening, so due times carry over a restart,
 /// and is monotonic from there, so a clock change does not move them while the
-/// store is open. It starts no earlier than the latest time the store saw, so
-/// a wall clock moved back between runs does not delay them either.
+/// store is open. It starts no earlier than the latest time the store recorded,
+/// which limits how far a wall clock moved back between runs can delay them.
 pub(crate) struct Clock {
     opened_at: u64,
     opened: tokio::time::Instant,

@@ -164,10 +164,14 @@ impl Hosts {
     }
 
     /// Tracks hosts from now on, e.g. once one is throttled, returning the
-    /// key of `seed`'s host.
-    pub(crate) fn track(&mut self, seed: &Seed) -> String {
+    /// key of `seed`'s host. Its request began at `started`, before anything
+    /// recorded it, so the host's gap counts from then.
+    pub(crate) fn track(&mut self, seed: &Seed, started: Instant) -> String {
         self.tracked = true;
-        key(seed)
+        let key = key(seed);
+        let host = self.host(&key);
+        host.last_start = host.last_start.max(Some(started));
+        key
     }
 
     /// Records that a request to `key` started.
@@ -424,6 +428,32 @@ mod tests {
 
     fn gap(hosts: &Hosts) -> Duration {
         hosts.by_key["a.com"].gap
+    }
+
+    #[test]
+    fn a_host_first_tracked_when_throttled_waits_out_its_gap() {
+        use crate::crawler::concurrency::Signal;
+
+        let started = Instant::now();
+        let mut hosts = Hosts::new(policy(0, 0), false);
+        let throttled = seed("https://a.com/1");
+        assert!(hosts.start(&throttled, started).is_none());
+
+        let key = hosts.track(&throttled, started);
+        let feedback = Feedback {
+            started,
+            latency: None,
+            unchanged: false,
+            signal: Signal::Throttled,
+        };
+        hosts.finished(&key, Some(feedback), started);
+
+        assert!(matches!(
+            hosts.admit(seed("https://a.com/2"), started),
+            Admit::Parked
+        ));
+        assert_eq!(hosts.earliest(), Some(started + gap(&hosts)));
+        assert!(!gap(&hosts).is_zero());
     }
 
     #[test]

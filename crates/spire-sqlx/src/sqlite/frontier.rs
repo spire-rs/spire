@@ -18,9 +18,10 @@ use crate::error::frontier_error;
 /// remain stored until reported, and abandoned seeds are recovered on the next
 /// exclusive open. Cancellation requeues immediately. Seeds waiting for a retry
 /// are stored with their attempt and due time, and survive a restart. The
-/// frontier keeps the latest time it saw, so a wall clock moved back between
-/// runs does not delay due times; one moved forward brings them forward, as
-/// that cannot be told from time passing.
+/// frontier records the latest time it saw when it pops or holds a seed. After
+/// a wall clock is moved back between runs, a retry waits no longer than it had
+/// left at that record. A clock moved forward brings due times forward, as that
+/// cannot be told from time passing.
 /// Reports must carry the popped seed or its clone so they acknowledge the
 /// exact occurrence, including when identical seeds are queued together.
 ///

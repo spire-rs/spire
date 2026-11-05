@@ -21,7 +21,10 @@ use crate::{Context, Error, Result};
 /// [`snapshot`](Self::snapshot) parses a copy of the page as currently
 /// rendered, including what scripts and interaction changed since it loaded; an
 /// [`Html`] argument takes one too, but before the handler runs. Relative links
-/// followed through the queue resolve against the URI the browser ended up on.
+/// followed through the queue resolve against the URI the request ended up on
+/// after redirects. Navigating further in the handler does not change that: use
+/// `current_url` for the links, and pass it to
+/// [`Queue::rebase`](crate::frontier::queue::Queue::rebase).
 ///
 /// Error statuses are rejected by the backend's status policy before the
 /// handler runs; [`status`](Self::status) and [`headers`](Self::headers)
@@ -42,7 +45,7 @@ use crate::{Context, Error, Result};
 ///     if let Ok(more) = tab.find(By::Css("button.more")).await {
 ///         let _ = more.click().await;
 ///     }
-///     // The page as it is after the click.
+///     // The page as it is after the click, which stays on the same URI.
 ///     let page = tab.snapshot().await?;
 ///     queue.follow_all(page.links(&head.uri)).await?;
 ///     Ok(())

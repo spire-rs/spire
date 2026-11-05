@@ -49,15 +49,19 @@ and this project adheres to
 
 ### Fixed
 
+- A host first throttled in a crawl without limits or gaps now waits out its
+  widened gap before the next request, rather than starting one immediately.
+
 - `RedbValidator::get` and `RedbFrontier`'s `next_due` no longer block the async
   runtime, so `Revalidate` over redb no longer holds up other requests.
 
 - `RedbFrontier` due times now follow a monotonic clock while the store is open,
   so a system clock change no longer moves revisits.
 
-- `RedbFrontier` and `SqliteFrontier` now keep the latest time they saw, so a
-  wall clock moved back between runs no longer delays due times. A clock moved
-  forward between runs still brings them forward. SQLite adds the migration
+- `RedbFrontier` and `SqliteFrontier` now record the latest time they saw. After
+  a wall clock is moved back between runs, a retry waits no longer than it had
+  left at that record. A clock moved forward between runs still brings due times
+  forward. SQLite adds the migration
   `0003_frontier_clock.sql`.
 
 - Due retries no longer bypass priority order, and neither do `InMemFrontier` and

@@ -25,9 +25,10 @@ use crate::store::{
 /// and compete by priority; equal priorities run in the order they joined.
 ///
 /// Due times follow a monotonic clock while the store is open, and the wall
-/// clock across a restart. The store keeps the latest time it saw, so a wall
-/// clock moved back between runs does not delay them; one moved forward brings
-/// them forward, as that cannot be told from time passing.
+/// clock across a restart. The store records the latest time it saw when it
+/// pops or holds a seed. After a wall clock is moved back between runs, a retry
+/// waits no longer than it had left at that record. A clock moved forward
+/// brings due times forward, as that cannot be told from time passing.
 pub struct RedbFrontier {
     store: RedbStore,
 }
