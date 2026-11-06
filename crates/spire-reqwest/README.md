@@ -66,8 +66,9 @@ configuration, which a crawl with identities builds one client per identity
 from:
 
 ```rust
-use spire_reqwest::ReqwestBackend;
 use std::time::Duration;
+
+use spire_reqwest::{ReqwestBackend, reqwest};
 
 let backend = ReqwestBackend::from_builder(|| {
     reqwest::Client::builder()

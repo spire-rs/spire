@@ -18,6 +18,10 @@ and this project adheres to
   `insert`. Pushes of the same seed at once wait for each other, so it is
   queued once.
 
+- `Dedup` no longer records a seed that the facades it wraps refuse. With
+  `.max_depth(1).dedup()`, a link found too deep was recorded as seen, so it
+  was refused as a duplicate when found again at an allowed depth.
+
 - **Breaking:** `len` and `is_empty` on `RedbSeen`, `RedbValidator` and
   `RedbDataset`, and `RedbFrontier::in_flight`, are now `async`, and read on the
   blocking pool rather than the async runtime, as SQLite's `len` and `is_empty`

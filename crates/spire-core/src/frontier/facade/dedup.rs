@@ -17,7 +17,9 @@ use crate::sync::lock;
 ///
 /// A seed is checked with [`SeenSet::contains`], queued, and only then
 /// recorded with [`SeenSet::insert`], so a crash in between queues it again
-/// when it is found again, rather than refusing it as seen and losing it. If
+/// when it is found again, rather than refusing it as seen and losing it. A
+/// seed the facades it wraps refuse, e.g. as too deep, is not recorded, so
+/// found again where they admit it, it is queued. If
 /// recording fails after the seed is queued, the push returns the error, and
 /// pushing the seed again queues it a second time.
 ///
@@ -127,7 +129,11 @@ impl<F: Frontier, S: SeenSet> Frontier for Dedup<F, S> {
         // when the page that found it is crawled again, rather than refusing
         // it as seen and losing it.
         let admission = self.inner.push(seed).await?;
-        self.seen.insert(fingerprint).await?;
+        // Refused further in, e.g. too deep, it may be admitted when found
+        // again, so it is not seen.
+        if admission.is_queued() {
+            self.seen.insert(fingerprint).await?;
+        }
         Ok(admission)
     }
 
@@ -209,6 +215,44 @@ mod tests {
         // Found again, e.g. when its page is crawled again after a crash.
         assert_eq!(frontier.push(seed("a")).await.unwrap(), Admission::Queued);
         assert_eq!(pop_path(&frontier).await.as_deref(), Some("a"));
+    }
+
+    /// Refuses its first push, as an inner facade such as `max_depth` would.
+    #[derive(Default)]
+    struct RefusesOnce {
+        inner: InMemFrontier,
+        refused: AtomicBool,
+    }
+
+    impl Frontier for RefusesOnce {
+        async fn push(&self, seed: Seed) -> Result<Admission> {
+            if self.refused.swap(true, Ordering::SeqCst) {
+                self.inner.push(seed).await
+            } else {
+                Ok(Admission::TooDeep)
+            }
+        }
+
+        async fn pop(&self) -> Result<NextSeed> {
+            self.inner.pop().await
+        }
+
+        async fn report(&self, report: Report) -> Result<Ack> {
+            self.inner.report(report).await
+        }
+    }
+
+    #[tokio::test]
+    async fn a_seed_refused_further_in_is_not_recorded() {
+        let frontier = Dedup::new(RefusesOnce::default(), InMemSeen::default());
+        assert_eq!(frontier.push(seed("a")).await.unwrap(), Admission::TooDeep);
+
+        // Found again where the inner facade admits it, e.g. less deep.
+        assert_eq!(frontier.push(seed("a")).await.unwrap(), Admission::Queued);
+        assert_eq!(
+            frontier.push(seed("a")).await.unwrap(),
+            Admission::Duplicate
+        );
     }
 
     #[tokio::test]
