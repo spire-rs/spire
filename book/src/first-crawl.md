@@ -1,7 +1,10 @@
 # Your first crawl
 
 This chapter builds a small crawler for an online shop: it walks the
-product listing page by page, and extracts every product it links to.
+product listing page by page, and extracts every product it links to. The
+shop at `example.com` is a stand-in: point the seed at a real listing to run
+it, or run the handlers against fixed pages, as
+[Testing handlers](testing.md) shows.
 
 ## Tags
 
@@ -107,7 +110,40 @@ Step by step:
    statistics. The products are then read back from the dataset.
 
 Relative links resolve against the page they were found on, after
-redirects. Error statuses fail the request: `5xx` and `429` are retried,
-honouring `Retry-After`, and other `4xx` are not.
+redirects. Error statuses fail the request: `408`, `429` and `5xx` are
+retried, honouring `Retry-After`, and other `4xx` are not.
+
+## Before crawling a real site
+
+The crawl above runs up to 8 requests at once, with no gap between requests
+to the same host, and does not read robots.txt. Before pointing it at a site
+you do not run, slow it down per host and, with the `robots` feature, obey
+the site's robots.txt:
+
+```rust,no_run
+use std::time::Duration;
+
+use spire::backend::ReqwestBackend;
+use spire::frontier::seed::Seed;
+use spire::{Crawler, Result, Router};
+# async fn page() {}
+
+# async fn crawl() -> Result<()> {
+# let router = Router::new().fallback(page);
+let crawler = Crawler::new(ReqwestBackend::default(), router)
+    // One request at a time per host, half a second apart.
+    .with_host_concurrency(1)
+    .with_host_delay(Duration::from_millis(500))
+    // Skips what robots.txt disallows for this user agent, and waits its
+    // `Crawl-delay`.
+    .with_robots("MyShopBot")
+    .with_seed(Seed::get("https://example.com/products")?);
+crawler.run().await?;
+# Ok(())
+# }
+```
+
+A host that answers `429` or `503`, or times out, is slowed down further on
+its own; see [Limits and politeness](politeness.md).
 
 The rest of this book goes through each of these pieces in turn.
