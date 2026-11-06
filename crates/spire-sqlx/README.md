@@ -38,10 +38,11 @@ Enable the `sqlite` feature of `spire`, for `spire::store::SqliteStore`:
 spire = { version = "0.11", features = ["sqlite"] }
 ```
 
-Or depend on this crate directly to use the store with `spire-core`:
+Or depend on this crate and `spire-core` directly, as the examples below do:
 
 ```toml
 [dependencies]
+spire-core = { version = "0.11" }
 spire-sqlx = { version = "0.11", features = ["sqlite"] }
 ```
 
@@ -101,9 +102,9 @@ seen sets, validators and caches remain shareable across pools.
 
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup and
-guidelines.
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
 
 ## License
 
-MIT License, see [LICENSE](../../LICENSE).
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).

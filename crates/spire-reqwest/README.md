@@ -38,10 +38,11 @@ Enable the `reqwest` feature of `spire`, for `spire::backend::ReqwestBackend`:
 spire = { version = "0.11", features = ["reqwest"] }
 ```
 
-Or depend on this crate directly to use the backend with `spire-core`:
+Or depend on this crate and `spire-core` directly, as the examples below do:
 
 ```toml
 [dependencies]
+spire-core = { version = "0.11" }
 spire-reqwest = { version = "0.11", features = ["gzip", "cookies"] }
 ```
 
@@ -54,7 +55,7 @@ spire-reqwest = { version = "0.11", features = ["gzip", "cookies"] }
 | `http2` | HTTP/2 negotiation over TLS |
 | `system-proxy` | Proxies from the environment and system settings |
 | `gzip`, `brotli`, `zstd`, `deflate` | Transparent response decompression |
-| `cookies` | A cookie store shared by every request of the crawl, or one per identity |
+| `cookies` | A cookie store per identity; without identities, add `.cookie_store(true)` in `from_builder` |
 | `socks` | SOCKS5 proxies |
 | `hickory-dns` | DNS resolution through hickory instead of the system resolver |
 
@@ -107,9 +108,9 @@ through `spire_core::http::ResponseExt::final_uri`.
 
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup and
-guidelines.
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
 
 ## License
 
-MIT License, see [LICENSE](../../LICENSE).
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).

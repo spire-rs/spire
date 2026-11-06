@@ -103,12 +103,12 @@ async fn example() -> Result<()> {
 
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup and
-guidelines.
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
 
 ## License
 
-MIT License, see [LICENSE](../../LICENSE).
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).
 
 [`Backend`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Backend.html
 [`Session`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Session.html

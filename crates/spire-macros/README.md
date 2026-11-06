@@ -26,9 +26,6 @@ router state.
   after.
 - **`FromRef`** lets a handler take only the parts of a router state it needs.
 
-Their errors point at the code at fault, and malformed attributes are
-rejected rather than ignored.
-
 ## Installation
 
 This crate is not used directly. Enable the `macros` feature of `spire`:
@@ -173,9 +170,9 @@ async fn page(State(db): State<Db>) {}
 
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup and
-guidelines.
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
 
 ## License
 
-MIT License, see [LICENSE](../../LICENSE).
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).

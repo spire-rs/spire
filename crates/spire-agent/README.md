@@ -57,7 +57,8 @@ No feature is enabled by default:
 
 ## Usage
 
-Supply a provider and extract typed answers from text:
+Supply a provider and extract typed answers from text. Through `spire`, the
+same items are at `spire::agent`, e.g. `use spire::agent::{Agent, Budget};`:
 
 ```rust,no_run
 use spire_agent::{Agent, Budget, Provider, Result};
@@ -118,9 +119,9 @@ demonstrates multiple goals on the same router.
 
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup and
-guidelines.
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
 
 ## License
 
-MIT License, see [LICENSE](../../LICENSE).
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).

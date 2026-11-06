@@ -35,7 +35,9 @@ waiting on the page.
   instead, e.g. for a logged-in crawl.
 - **Identities**: with `Crawler::with_identities`, each identity gets a
   browser profile of its own, with its proxy, user agent and headers, and
-  cookies kept between its requests; proxies asking for credentials get them.
+  cookies kept between its requests. HTTP proxies asking for credentials get
+  them; a SOCKS proxy with credentials is rejected, as browsers do not
+  support it.
 - **Endpoints**: remote WebDriver servers (chromedriver, geckodriver, Selenium
   grids), rotated between in turn, or drivers downloaded and spawned
   automatically with the `manager` feature.
@@ -52,10 +54,11 @@ Enable the `thirtyfour` feature of `spire`, for
 spire = { version = "0.11", features = ["thirtyfour"] }
 ```
 
-Or depend on this crate directly to use the backend with `spire-core`:
+Or depend on this crate and `spire-core` directly, as the examples below do:
 
 ```toml
 [dependencies]
+spire-core = { version = "0.11" }
 spire-thirtyfour = { version = "0.11", features = ["manager"] }
 ```
 
@@ -118,9 +121,9 @@ names a WebDriver server, e.g. `SPIRE_WEBDRIVER=http://127.0.0.1:4444`.
 
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup and
-guidelines.
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
 
 ## License
 
-MIT License, see [LICENSE](../../LICENSE).
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).
