@@ -1,7 +1,9 @@
 //! `#[derive(Revisit)]`.
 
 use quote::quote;
-use syn::{Data, DeriveInput, Error, Fields, LitStr, Result};
+use syn::{DeriveInput, Error, LitStr, Result};
+
+use crate::input;
 
 /// Parses an interval such as `90s`, `30m`, `1h30m` or `1d` into seconds.
 fn seconds(value: &LitStr) -> Result<u64> {
@@ -46,53 +48,17 @@ fn seconds(value: &LitStr) -> Result<u64> {
 }
 
 pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
-    if let Some(attr) = input
-        .attrs
-        .iter()
-        .find(|attr| attr.path().is_ident("revisit"))
-    {
-        return Err(Error::new_spanned(
-            attr,
-            "`#[revisit]` is only allowed on variants",
-        ));
-    }
+    input::forbid(&input.attrs, "revisit", "variants")?;
+    let variants = input::unit_enum(input, "Revisit")?;
 
-    let Data::Enum(data) = &input.data else {
-        return Err(Error::new(
-            crate::item_keyword(input),
-            "`Revisit` can only be derived for enums",
-        ));
-    };
-    if !input.generics.params.is_empty() {
-        return Err(Error::new_spanned(
-            &input.generics,
-            "`Revisit` cannot be derived for generic enums",
-        ));
-    }
-
-    let mut arms = Vec::with_capacity(data.variants.len());
-    for variant in &data.variants {
-        if !matches!(variant.fields, Fields::Unit) {
-            return Err(Error::new_spanned(
-                &variant.fields,
-                "`Revisit` variants cannot have fields",
-            ));
-        }
-        let mut interval = None;
-        for attr in variant
-            .attrs
-            .iter()
-            .filter(|attr| attr.path().is_ident("revisit"))
-        {
-            if interval.is_some() {
-                return Err(Error::new_spanned(attr, "duplicate `#[revisit]` attribute"));
-            }
-            interval = Some(seconds(&attr.parse_args::<LitStr>()?)?);
-        }
+    let mut arms = Vec::with_capacity(variants.len());
+    for variant in variants {
+        let interval = input::single(&variant.attrs, "revisit", |attr| {
+            seconds(&attr.parse_args::<LitStr>()?)
+        })?;
         let ident = &variant.ident;
-        let value = interval.map_or_else(
-            || quote!(::core::option::Option::None),
-            |seconds| quote!(::core::option::Option::Some(::core::time::Duration::from_secs(#seconds))),
+        let value = input::option(
+            interval.map(|(_, seconds)| quote!(::core::time::Duration::from_secs(#seconds))),
         );
         arms.push(quote!(Self::#ident => #value));
     }

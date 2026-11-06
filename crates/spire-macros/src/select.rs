@@ -3,9 +3,11 @@
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::{
-    Attribute, Data, DeriveInput, Error, Field, Fields, GenericArgument, Ident, LitStr,
-    PathArguments, Result, Token, Type,
+    Attribute, DeriveInput, Error, Field, GenericArgument, Ident, LitStr, PathArguments, Result,
+    Token, Type,
 };
+
+use crate::input;
 
 /// The arguments of `#[select("css", attr = "name")]`, both optional.
 struct SelectArgs {
@@ -45,15 +47,8 @@ impl Parse for SelectArgs {
 }
 
 /// Parses the `#[select(...)]` attribute among `attrs`, if any.
-fn select_args(attrs: &[Attribute]) -> Result<Option<SelectArgs>> {
-    let mut found = None;
-    for attr in attrs.iter().filter(|attr| attr.path().is_ident("select")) {
-        if found.is_some() {
-            return Err(Error::new_spanned(attr, "duplicate `#[select]` attribute"));
-        }
-        found = Some(attr.parse_args::<SelectArgs>()?);
-    }
-    Ok(found)
+fn select_args(attrs: &[Attribute]) -> Result<Option<(&Attribute, SelectArgs)>> {
+    input::single(attrs, "select", Attribute::parse_args::<SelectArgs>)
 }
 
 /// How many matches a field takes.
@@ -86,27 +81,15 @@ fn arity(ty: &Type) -> Arity<'_> {
     }
 }
 
-/// Quotes `Some(value)` or `None`.
-fn option(value: Option<&LitStr>) -> proc_macro2::TokenStream {
-    value.map_or_else(
-        || quote!(::core::option::Option::None),
-        |value| quote!(::core::option::Option::Some(#value)),
-    )
-}
-
 /// Generates the binding that extracts one field into a variable of its name.
 fn expand_field(owner: &str, name: &Ident, field: &Field) -> Result<proc_macro2::TokenStream> {
-    let Some(args) = select_args(&field.attrs)? else {
+    let Some((attr, args)) = select_args(&field.attrs)? else {
         return Err(Error::new(
             name.span(),
             "every field needs `#[select(\"css\")]` or `#[select(attr = \"...\")]`",
         ));
     };
     if args.css.is_none() && args.attr.is_none() {
-        let attr = field
-            .attrs
-            .iter()
-            .find(|attr| attr.path().is_ident("select"));
         return Err(Error::new_spanned(
             attr,
             "`#[select]` needs a selector or `attr`",
@@ -115,7 +98,7 @@ fn expand_field(owner: &str, name: &Ident, field: &Field) -> Result<proc_macro2:
 
     let field_name = name.to_string();
     let values = format_ident!("__{}_values", name);
-    let attr = option(args.attr.as_ref());
+    let attr = input::option(args.attr.as_ref());
     let (selector, label) = match &args.css {
         Some(css) => (
             quote! {{
@@ -165,27 +148,20 @@ fn expand_field(owner: &str, name: &Ident, field: &Field) -> Result<proc_macro2:
 }
 
 pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
-    let Data::Struct(data) = &input.data else {
-        return Err(Error::new(
-            crate::item_keyword(input),
-            "`Select` can only be derived for structs",
-        ));
-    };
-    let Fields::Named(fields) = &data.fields else {
-        return Err(Error::new(
-            crate::item_keyword(input),
-            "`Select` needs a struct with named fields",
-        ));
-    };
+    let fields = input::named_struct(input, "Select")?;
 
+    // The container's selector, if any, picks the elements to extract from.
     let root = match select_args(&input.attrs)? {
-        Some(SelectArgs {
-            attr: Some(attr), ..
-        }) => {
+        Some((
+            _,
+            SelectArgs {
+                attr: Some(attr), ..
+            },
+        )) => {
             return Err(Error::new(attr.span(), "`attr` is only allowed on fields"));
         }
-        Some(SelectArgs { css, .. }) => option(css.as_ref()),
-        None => option(None),
+        Some((_, SelectArgs { css, .. })) => input::option(css.as_ref()),
+        None => input::option(None::<&LitStr>),
     };
 
     let owner = input.ident.to_string();
