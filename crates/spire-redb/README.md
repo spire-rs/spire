@@ -86,7 +86,9 @@ async fn example() -> spire_core::Result<()> {
 Every change is a committed transaction. Commits are synced to disk at most
 once a second: a crash rolls the store back to its last synced commit, a
 consistent earlier state, so it repeats at most a second of work and loses
-none, since a link is never committed after the page that found it.
+none: a link is committed before the page that found it, and recorded as seen
+only once it is queued, so a crash in between may queue it twice but never
+loses it.
 
 `RedbStore::builder().sync_always()` syncs every commit instead, repeating
 only the requests in flight, at a large cost in throughput. In the `redb`

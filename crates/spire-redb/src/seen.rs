@@ -47,6 +47,20 @@ impl fmt::Debug for RedbSeen {
 }
 
 impl SeenSet for RedbSeen {
+    async fn contains(&self, fingerprint: Fingerprint) -> Result<bool> {
+        let key = fingerprint.get();
+        self.store
+            .blocking(move |store| {
+                store.read(|txn| match txn.open_table(SEEN) {
+                    Ok(seen) => Ok(seen.get(key)?.is_some()),
+                    // Tables are created by their first write.
+                    Err(redb::TableError::TableDoesNotExist(_)) => Ok(false),
+                    Err(error) => Err(error.into()),
+                })
+            })
+            .await
+    }
+
     async fn insert(&self, fingerprint: Fingerprint) -> Result<bool> {
         let key = fingerprint.get();
         self.store
@@ -68,7 +82,9 @@ mod tests {
         let path = TempPath::new();
         {
             let seen = RedbStore::open(&path.0).await.unwrap().seen();
+            assert!(!seen.contains(seed("a").fingerprint()).await.unwrap());
             assert!(seen.insert(seed("a").fingerprint()).await.unwrap());
+            assert!(seen.contains(seed("a").fingerprint()).await.unwrap());
             assert!(!seen.insert(seed("a").fingerprint()).await.unwrap());
         }
 

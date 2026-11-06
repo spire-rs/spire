@@ -37,6 +37,10 @@ impl FromIterator<Fingerprint> for InMemSeen {
 }
 
 impl SeenSet for InMemSeen {
+    fn contains(&self, fingerprint: Fingerprint) -> impl Future<Output = Result<bool>> + Send {
+        ready(Ok(lock(&self.seen).contains(&fingerprint)))
+    }
+
     fn insert(&self, fingerprint: Fingerprint) -> impl Future<Output = Result<bool>> + Send {
         ready(Ok(lock(&self.seen).insert(fingerprint)))
     }

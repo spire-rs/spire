@@ -1,4 +1,5 @@
-//! The crash-safe frontier and seen set, with batched and per-commit syncs.
+//! The crash-safe frontier and seen set, alone and deduplicating together,
+//! with batched and per-commit syncs.
 
 use std::future::Future;
 use std::path::PathBuf;
@@ -8,7 +9,7 @@ use std::time::{Duration, Instant};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use spire_core::frontier::seed::Seed;
 use spire_core::frontier::seen::SeenSet;
-use spire_core::frontier::{Frontier, NextSeed};
+use spire_core::frontier::{Frontier, FrontierExt, NextSeed};
 use spire_redb::RedbStore;
 
 /// Seeds per round: per-commit syncs take milliseconds each.
@@ -81,6 +82,17 @@ fn redb(c: &mut Criterion) {
             b.to_async(&runtime).iter_custom(|iters| {
                 timed(iters, sync_always, |store| async move {
                     let frontier = store.frontier();
+                    for seed in seeds() {
+                        frontier.push(seed).await.unwrap();
+                    }
+                    while let NextSeed::Ready(_) = frontier.pop().await.unwrap() {}
+                })
+            });
+        });
+        group.bench_function(BenchmarkId::new("dedup", name), |b| {
+            b.to_async(&runtime).iter_custom(|iters| {
+                timed(iters, sync_always, |store| async move {
+                    let frontier = store.frontier().dedup_with(store.seen());
                     for seed in seeds() {
                         frontier.push(seed).await.unwrap();
                     }

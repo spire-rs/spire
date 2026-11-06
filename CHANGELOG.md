@@ -12,6 +12,12 @@ and this project adheres to
 
 ### Changed
 
+- **Breaking:** `SeenSet` gains a required `contains`, whether a fingerprint
+  was recorded, without recording it, and `Dedup::new` is no longer `const`.
+  `Dedup` checks `contains`, queues the seed, and only then records it with
+  `insert`. Pushes of the same seed at once wait for each other, so it is
+  queued once.
+
 - **Breaking:** `len` and `is_empty` on `RedbSeen`, `RedbValidator` and
   `RedbDataset`, and `RedbFrontier::in_flight`, are now `async`, and read on the
   blocking pool rather than the async runtime, as SQLite's `len` and `is_empty`
@@ -51,6 +57,12 @@ and this project adheres to
   `union` keyword whatever precedes it, rather than the first token of the item.
 
 ### Fixed
+
+- A crash between `dedup` recording a link as seen and queueing it no longer
+  loses the link. The page that found it was crawled again and found it, but
+  it was refused as seen. It is now recorded only once it is queued, so a crash
+  in between may queue it twice instead. This affected every persistent seen
+  set, including with `sync_always`.
 
 - A host first throttled in a crawl without limits or gaps now waits out its
   widened gap before the next request, rather than starting one immediately.
