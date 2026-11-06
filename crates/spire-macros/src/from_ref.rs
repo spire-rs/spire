@@ -3,7 +3,8 @@
 use quote::quote;
 use syn::{Data, DeriveInput, Error, Fields, Result};
 
-/// Whether `field` has `#[from_ref(skip)]`, rejecting any other argument.
+/// Whether `field` has `#[from_ref(skip)]`, rejecting any other argument and
+/// a repeated `skip`.
 fn skipped(field: &syn::Field) -> Result<bool> {
     let mut skip = false;
     for attr in field
@@ -15,6 +16,9 @@ fn skipped(field: &syn::Field) -> Result<bool> {
         attr.parse_nested_meta(|meta| {
             empty = false;
             if meta.path.is_ident("skip") {
+                if skip {
+                    return Err(meta.error("duplicate `skip`"));
+                }
                 skip = true;
                 Ok(())
             } else {

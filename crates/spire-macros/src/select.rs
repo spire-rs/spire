@@ -33,6 +33,9 @@ impl Parse for SelectArgs {
             if key != "attr" {
                 return Err(Error::new(key.span(), "expected `attr = \"...\"`"));
             }
+            if attr.is_some() {
+                return Err(Error::new(key.span(), "duplicate `attr`"));
+            }
             input.parse::<Token![=]>()?;
             attr = Some(input.parse()?);
         }

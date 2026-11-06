@@ -1,0 +1,5 @@
+error: duplicate `attr`
+ --> tests/ui/select_duplicate_key.rs:5:34
+  |
+5 |     #[select("a", attr = "href", attr = "title")]
+  |                                  ^^^^

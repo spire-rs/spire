@@ -47,9 +47,11 @@ and this project adheres to
   neither read nor reported: a crawl file from an earlier version looks empty,
   so its crawl starts over.
 
-- **Breaking:** `#[derive(FromRef)]` now rejects `#[from_ref()]` and
-  `#[from_ref]` on the type, and `#[derive(Revisit)]` rejects `#[revisit]` on
-  the type. All of these were silently ignored.
+- **Breaking:** `#[derive(FromRef)]` now rejects `#[from_ref()]`, `#[from_ref]`
+  on the type and a repeated `skip`. `#[derive(Revisit)]` rejects `#[revisit]`
+  on the type. `#[derive(Select)]` rejects a repeated `attr`, such as
+  `#[select("a", attr = "href", attr = "title")]`, which used the last one. All
+  of these were silently accepted.
 
 - Errors from `#[derive(FromRef)]`, `#[derive(Revisit)]`, `#[derive(Select)]`
   and `#[derive(Tags)]` now point at the code at fault: the whole attribute,
