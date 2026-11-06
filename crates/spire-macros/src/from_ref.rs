@@ -1,63 +1,39 @@
 //! `#[derive(FromRef)]`.
 
 use quote::quote;
-use syn::{Data, DeriveInput, Error, Fields, Result};
+use syn::{Attribute, Error, Field, Result};
 
-/// Whether `field` has `#[from_ref(skip)]`, rejecting any other argument.
-fn skipped(field: &syn::Field) -> Result<bool> {
+use crate::input;
+
+/// Parses `#[from_ref(skip)]`, the only argument, given once.
+fn parse_skip(attr: &Attribute) -> Result<()> {
     let mut skip = false;
-    for attr in field
-        .attrs
-        .iter()
-        .filter(|attr| attr.path().is_ident("from_ref"))
-    {
-        let mut empty = true;
-        attr.parse_nested_meta(|meta| {
-            empty = false;
-            if meta.path.is_ident("skip") {
-                skip = true;
-                Ok(())
-            } else {
-                Err(meta.error("expected `skip`"))
-            }
-        })?;
-        if empty {
-            return Err(Error::new_spanned(attr, "expected `skip`"));
+    attr.parse_nested_meta(|meta| {
+        if !meta.path.is_ident("skip") {
+            return Err(meta.error("expected `skip`"));
         }
+        if skip {
+            return Err(meta.error("duplicate `skip`"));
+        }
+        skip = true;
+        Ok(())
+    })?;
+    if skip {
+        Ok(())
+    } else {
+        Err(Error::new_spanned(attr, "expected `skip`"))
     }
-    Ok(skip)
 }
 
-pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
-    if let Some(attr) = input
-        .attrs
-        .iter()
-        .find(|attr| attr.path().is_ident("from_ref"))
-    {
-        return Err(Error::new_spanned(
-            attr,
-            "`#[from_ref]` is only allowed on fields",
-        ));
-    }
+/// Whether `field` has `#[from_ref(skip)]`.
+fn skipped(field: &Field) -> Result<bool> {
+    Ok(input::single(&field.attrs, "from_ref", parse_skip)?.is_some())
+}
 
-    let Data::Struct(data) = &input.data else {
-        return Err(Error::new(
-            crate::item_keyword(input),
-            "`FromRef` can only be derived for structs",
-        ));
-    };
-    let Fields::Named(fields) = &data.fields else {
-        return Err(Error::new(
-            crate::item_keyword(input),
-            "`FromRef` can only be derived for structs with named fields",
-        ));
-    };
-    if !input.generics.params.is_empty() {
-        return Err(Error::new_spanned(
-            &input.generics,
-            "`FromRef` cannot be derived for generic structs",
-        ));
-    }
+pub fn expand(input: &syn::DeriveInput) -> Result<proc_macro2::TokenStream> {
+    input::forbid(&input.attrs, "from_ref", "fields")?;
+    let fields = input::named_struct(input, "FromRef")?;
+    input::no_generics(input, "FromRef", "structs")?;
 
     let state = &input.ident;
     let mut impls = Vec::with_capacity(fields.named.len());

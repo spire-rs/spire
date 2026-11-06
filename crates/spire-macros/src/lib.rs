@@ -3,23 +3,13 @@
 #![doc = include_str!("../README.md")]
 
 mod from_ref;
+mod input;
 mod revisit;
 mod select;
 mod tags;
 
 use proc_macro::TokenStream;
-use proc_macro2::Span;
-use syn::{Data, DeriveInput, Error, parse_macro_input};
-
-/// The `struct`, `enum` or `union` keyword of `input`. Unlike `input.span()`,
-/// neither doc comments nor a visibility move it.
-fn item_keyword(input: &DeriveInput) -> Span {
-    match &input.data {
-        Data::Struct(data) => data.struct_token.span,
-        Data::Enum(data) => data.enum_token.span,
-        Data::Union(data) => data.union_token.span,
-    }
-}
+use syn::{DeriveInput, Error, parse_macro_input};
 
 /// Derives `spire::extract::html::Select` from CSS selectors.
 ///

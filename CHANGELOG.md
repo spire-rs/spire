@@ -8,7 +8,19 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-06
+
 ### Changed
+
+- **Breaking:** `SeenSet` gains a required `contains`, whether a fingerprint
+  was recorded, without recording it, and `Dedup::new` is no longer `const`.
+  `Dedup` checks `contains`, queues the seed, and only then records it with
+  `insert`. Pushes of the same seed at once wait for each other, so it is
+  queued once.
+
+- `Dedup` no longer records a seed that the facades it wraps refuse. With
+  `.max_depth(1).dedup()`, a link found too deep was recorded as seen, so it
+  was refused as a duplicate when found again at an allowed depth.
 
 - **Breaking:** `len` and `is_empty` on `RedbSeen`, `RedbValidator` and
   `RedbDataset`, and `RedbFrontier::in_flight`, are now `async`, and read on the
@@ -39,9 +51,11 @@ and this project adheres to
   neither read nor reported: a crawl file from an earlier version looks empty,
   so its crawl starts over.
 
-- **Breaking:** `#[derive(FromRef)]` now rejects `#[from_ref()]` and
-  `#[from_ref]` on the type, and `#[derive(Revisit)]` rejects `#[revisit]` on
-  the type. All of these were silently ignored.
+- **Breaking:** `#[derive(FromRef)]` now rejects `#[from_ref()]`, `#[from_ref]`
+  on the type and a repeated `skip`. `#[derive(Revisit)]` rejects `#[revisit]`
+  on the type. `#[derive(Select)]` rejects a repeated `attr`, such as
+  `#[select("a", attr = "href", attr = "title")]`, which used the last one. All
+  of these were silently accepted.
 
 - Errors from `#[derive(FromRef)]`, `#[derive(Revisit)]`, `#[derive(Select)]`
   and `#[derive(Tags)]` now point at the code at fault: the whole attribute,
@@ -49,6 +63,12 @@ and this project adheres to
   `union` keyword whatever precedes it, rather than the first token of the item.
 
 ### Fixed
+
+- A crash between `dedup` recording a link as seen and queueing it no longer
+  loses the link. The page that found it was crawled again and found it, but
+  it was refused as seen. It is now recorded only once it is queued, so a crash
+  in between may queue it twice instead. This affected every persistent seen
+  set, including with `sync_always`.
 
 - A host first throttled in a crawl without limits or gaps now waits out its
   widened gap before the next request, rather than starting one immediately.
@@ -668,7 +688,8 @@ Rust 1.95.
 
 - Initial placeholder release for name reservation
 
-[Unreleased]: https://github.com/spire-rs/spire/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/spire-rs/spire/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/spire-rs/spire/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/spire-rs/spire/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/spire-rs/spire/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/spire-rs/spire/compare/v0.7.0...v0.8.0

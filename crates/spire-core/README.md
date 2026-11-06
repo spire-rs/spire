@@ -30,19 +30,31 @@ crawler, its frontier, backends, workers and datasets.
 
 Crawls are bounded and polite: crawl scope (`allow_hosts`, `filter`), request
 and time budgets, per-request deadlines, per-host concurrency and delays, and
-robots.txt with the `robots` feature. With the `serde` feature, seeds are
-serializable, so a stopped crawl's frontier and seen set can be snapshotted
-and restored. `JsonlDataset` and `CsvDataset`, with the `json` and `csv`
-features, write results to files.
+robots.txt with the `robots` feature.
 
-See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#using-spire-core-directly)
-page for configuration.
+## Installation
 
 Most users depend on `spire`, which adds a router, handlers and extractors on
 top of this crate. Depend on `spire-core` directly to implement a backend, a
-frontier or a dataset.
+frontier or a dataset:
 
-## Example
+```toml
+[dependencies]
+spire-core = { version = "0.11", features = ["robots"] }
+```
+
+No feature is enabled by default:
+
+| Feature | Enables |
+|---|---|
+| `robots` | Fetching and obeying robots.txt, see `Crawler::with_robots` |
+| `serde` | Serializable seeds, fingerprints and Bloom filters, for snapshots |
+| `json` | `JsonlDataset`, writing results as JSON Lines |
+| `csv` | `CsvDataset`, writing results as CSV |
+| `testing` | `MockSite` and `Visit`, to test handlers without a network |
+| `user-agents` | Browser user agents with matching navigation headers |
+
+## Usage
 
 ```rust
 use spire_core::backend::Noop;
@@ -82,10 +94,26 @@ async fn example() -> Result<()> {
 }
 ```
 
+## Learn more
+
+- The book's [Custom backends](https://spire-rs.github.io/spire/custom-backends.html)
+  and [Custom storage](https://spire-rs.github.io/spire/custom-storage.html)
+  pages, and [Feature flags](https://spire-rs.github.io/spire/features.html#using-spire-core-directly)
+- The [API documentation](https://docs.rs/spire-core)
+
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
+
+## License
+
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).
+
 [`Backend`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Backend.html
 [`Session`]: https://docs.rs/spire-core/latest/spire_core/backend/trait.Session.html
 [`Worker`]: https://docs.rs/spire-core/latest/spire_core/worker/trait.Worker.html
 [`Outcome`]: https://docs.rs/spire-core/latest/spire_core/worker/enum.Outcome.html
 [`Frontier`]: https://docs.rs/spire-core/latest/spire_core/frontier/trait.Frontier.html
-[`Seed`]: https://docs.rs/spire-core/latest/spire_core/frontier/struct.Seed.html
+[`Seed`]: https://docs.rs/spire-core/latest/spire_core/frontier/seed/struct.Seed.html
 [`Crawler`]: https://docs.rs/spire-core/latest/spire_core/crawler/struct.Crawler.html

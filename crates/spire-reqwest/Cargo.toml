@@ -41,7 +41,7 @@ brotli = ["reqwest/brotli"]
 zstd = ["reqwest/zstd"]
 deflate = ["reqwest/deflate"]
 
-# A cookie store shared by every request of the crawl, or one per identity
+# A cookie store per identity; a client without identities needs `.cookie_store(true)` too
 cookies = ["reqwest/cookies"]
 # SOCKS5 proxies
 socks = ["reqwest/socks"]

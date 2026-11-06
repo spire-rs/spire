@@ -114,7 +114,15 @@ as well lets [revisits](recrawls.md) sit on it.
 
 ## Seen sets and validators
 
-A `SeenSet` has one method, `insert`, returning whether the fingerprint is
-new. `Validator` has `get` and `set`, by the fingerprint of the request.
+A `SeenSet` has two methods: `contains`, whether a fingerprint was recorded,
+and `insert`, recording it and returning whether it is new. `dedup` checks
+`contains`, queues the seed, and only then calls `insert`, so a crash in
+between queues the seed again when it is found again, rather than losing it.
+A seed refused further in, e.g. by `max_depth`, is not recorded, so it is
+queued if found again where it is admitted.
+Keep a seen set no longer than its frontier's queue: one that survives a
+restart its queue did not loses the seeds that were queued, as they stay
+recorded as seen. `Validator` has `get` and `set`, by the fingerprint of the
+request.
 Both are shared by every request, so they take `&self` and synchronize
 inside.

@@ -46,6 +46,14 @@ impl SqliteSeen {
 }
 
 impl SeenSet for SqliteSeen {
+    async fn contains(&self, fingerprint: Fingerprint) -> Result<bool> {
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM spire_seen WHERE fingerprint = $1)")
+            .bind(fingerprint.get().to_be_bytes().to_vec())
+            .fetch_one(&self.pool)
+            .await
+            .map_err(frontier_error)
+    }
+
     async fn insert(&self, fingerprint: Fingerprint) -> Result<bool> {
         let result = sqlx::query(
             "INSERT INTO spire_seen (fingerprint) VALUES ($1) ON CONFLICT(fingerprint) DO NOTHING",
@@ -99,6 +107,7 @@ mod tests {
         let a = store.seen();
         let b = SqliteStore::new(second.clone()).seen();
         assert!(a.is_empty().await.unwrap());
+        assert!(!a.contains(key).await.unwrap());
         let (a_new, b_new) = tokio::join!(a.insert(key), b.insert(key));
         assert_ne!(a_new.unwrap(), b_new.unwrap());
         assert_eq!(a.len().await.unwrap(), 1);
@@ -110,6 +119,7 @@ mod tests {
             .await
             .unwrap();
         let seen = SqliteStore::new(reopened.clone()).seen();
+        assert!(seen.contains(key).await.unwrap());
         assert!(!seen.insert(key).await.unwrap());
         reopened.close().await;
     }

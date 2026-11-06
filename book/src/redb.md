@@ -56,7 +56,9 @@ Every change is a committed transaction, and nothing is lost:
   queued again on reopening: a request may run twice, never zero times.
 - **No link is lost.** A page's links are committed before the page is
   reported done, so a crash either keeps them, or keeps the page in flight,
-  to be crawled again and find them again.
+  to be crawled again and find them again. A link is recorded as seen only
+  once it is queued, so a crash in between queues it again rather than
+  refusing it: it may be crawled twice, never zero times.
 - **Items may be written twice.** Items and the frontier are committed
   separately, so a page whose items were committed just before a crash may be
   crawled again and write them again: deduplicate by a key such as the URL

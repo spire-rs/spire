@@ -26,8 +26,8 @@ waiting on the page.
 
 - **Real responses**: navigation goes through WebDriver BiDi, so responses
   carry the page's real status and headers, after redirects. Error statuses
-  follow the same `StatusPolicy` as HTTP backends: `5xx`, `408` and `429`
-  are retried, honouring `Retry-After`, and other `4xx` are rejected.
+  follow the same `StatusPolicy` as HTTP backends: `5xx`, `408` and `429` are
+  retried, honouring `Retry-After`, and other `4xx` are rejected.
 - **Any request**: requests are sent with their method, headers and body, so
   `POST` forms and custom headers work.
 - **Isolation**: every request gets a tab in a fresh browser profile, so no
@@ -35,23 +35,42 @@ waiting on the page.
   instead, e.g. for a logged-in crawl.
 - **Identities**: with `Crawler::with_identities`, each identity gets a
   browser profile of its own, with its proxy, user agent and headers, and
-  cookies kept between its requests; proxies asking for credentials get
-  them.
+  cookies kept between its requests. HTTP proxies asking for credentials get
+  them; a SOCKS proxy with credentials is rejected, as browsers do not
+  support it.
 - **Endpoints**: remote WebDriver servers (chromedriver, geckodriver, Selenium
   grids), rotated between in turn, or drivers downloaded and spawned
   automatically with the `manager` feature.
 - **Errors**: WebDriver failures map to `spire_core::ErrorKind`s, so timeouts
   and navigation failures are retried while page bugs are not.
 
-## Usage
+## Installation
 
-Enable the `thirtyfour` feature of the main `spire` crate, or depend on this
-crate directly to use the backend with `spire-core`:
+Enable the `thirtyfour` feature of `spire`, for
+`spire::backend::ThirtyfourBackend`:
 
 ```toml
 [dependencies]
-spire = { version = "0.10.0", features = ["thirtyfour"] }
+spire = { version = "0.11", features = ["thirtyfour"] }
 ```
+
+Or depend on this crate and `spire-core` directly, as the examples below do:
+
+```toml
+[dependencies]
+spire-core = { version = "0.11" }
+spire-thirtyfour = { version = "0.11", features = ["manager"] }
+```
+
+`rustls-tls` is enabled by default:
+
+| Feature | Enables |
+|---|---|
+| `rustls-tls` | TLS to the WebDriver server through rustls, with no system dependencies |
+| `native-tls` | TLS to the WebDriver server through the platform's native library |
+| `manager` | Managed endpoints: drivers are downloaded, cached and spawned automatically |
+
+## Usage
 
 ```rust,no_run
 use std::time::Duration;
@@ -84,9 +103,6 @@ let builder = ThirtyfourBackend::builder()
     .capabilities(DesiredCapabilities::firefox());
 ```
 
-See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#browser-backend)
-page for configuration.
-
 ## Requirements
 
 The WebDriver server must support WebDriver BiDi, as current chromedriver and
@@ -97,12 +113,17 @@ is the rendered document serialized as HTML, so its content type is always
 The tests in `tests/bidi.rs` run against a real browser when `SPIRE_WEBDRIVER`
 names a WebDriver server, e.g. `SPIRE_WEBDRIVER=http://127.0.0.1:4444`.
 
+## Learn more
+
+- The book's [Browsers](https://spire-rs.github.io/spire/browsers.html) page,
+  and [Feature flags](https://spire-rs.github.io/spire/features.html#browser-backend)
+- The [API documentation](https://docs.rs/spire-thirtyfour)
+
 ## Contributing
 
-This crate follows the same contribution guidelines as the main spire project.
-Please see [CONTRIBUTING.md](../../CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
 
 ## License
 
-This project is licensed under the MIT License; see the
-[LICENSE](../../LICENSE) file for details.
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).

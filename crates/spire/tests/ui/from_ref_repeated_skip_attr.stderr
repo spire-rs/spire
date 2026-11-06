@@ -1,0 +1,5 @@
+error: duplicate `#[from_ref]` attribute
+ --> tests/ui/from_ref_repeated_skip_attr.rs:6:5
+  |
+6 |     #[from_ref(skip)]
+  |     ^^^^^^^^^^^^^^^^^

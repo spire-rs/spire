@@ -1,0 +1,5 @@
+error: duplicate `skip`
+ --> tests/ui/from_ref_duplicate_skip.rs:5:22
+  |
+5 |     #[from_ref(skip, skip)]
+  |                      ^^^^

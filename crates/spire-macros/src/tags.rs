@@ -4,7 +4,9 @@ use std::collections::HashMap;
 
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{Attribute, Data, DeriveInput, Error, Fields, Ident, LitStr, Result, Token};
+use syn::{Attribute, DeriveInput, Error, Ident, LitStr, Result, Token};
+
+use crate::input;
 
 /// The argument of `#[tag(rename_all = "...")]` or `#[tag(rename = "...")]`.
 struct TagArg {
@@ -24,19 +26,16 @@ impl Parse for TagArg {
 
 /// Parses the `#[tag(key = "...")]` attribute among `attrs`, if any.
 fn tag_arg(attrs: &[Attribute], expected: &str) -> Result<Option<LitStr>> {
-    let mut found = None;
-    for attr in attrs.iter().filter(|attr| attr.path().is_ident("tag")) {
-        if found.is_some() {
-            return Err(Error::new_spanned(attr, "duplicate `#[tag]` attribute"));
-        }
+    let found = input::single(attrs, "tag", |attr| {
         let arg = attr.parse_args::<TagArg>()?;
-        if arg.key != expected {
+        if arg.key == expected {
+            Ok(arg.value)
+        } else {
             let message = format!("expected `{expected} = \"...\"`");
-            return Err(Error::new(arg.key.span(), message));
+            Err(Error::new(arg.key.span(), message))
         }
-        found = Some(arg.value);
-    }
-    Ok(found)
+    })?;
+    Ok(found.map(|(_, value)| value))
 }
 
 /// How variant names become tags, as in serde's `rename_all`.
@@ -149,21 +148,10 @@ fn capitalize(word: &str) -> String {
 }
 
 pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
-    let Data::Enum(data) = &input.data else {
+    let variants = input::unit_enum(input, "Tags")?;
+    if variants.is_empty() {
         return Err(Error::new(
-            crate::item_keyword(input),
-            "`Tags` can only be derived for enums",
-        ));
-    };
-    if !input.generics.params.is_empty() {
-        return Err(Error::new_spanned(
-            &input.generics,
-            "`Tags` cannot be derived for generic enums",
-        ));
-    }
-    if data.variants.is_empty() {
-        return Err(Error::new(
-            crate::item_keyword(input),
+            input::item_keyword(input),
             "`Tags` needs at least one variant",
         ));
     }
@@ -174,15 +162,9 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
     };
 
     let mut seen = HashMap::new();
-    let mut variants = Vec::with_capacity(data.variants.len());
-    let mut names = Vec::with_capacity(data.variants.len());
-    for variant in &data.variants {
-        if !matches!(variant.fields, Fields::Unit) {
-            return Err(Error::new_spanned(
-                &variant.fields,
-                "`Tags` variants cannot have fields",
-            ));
-        }
+    let mut idents = Vec::with_capacity(variants.len());
+    let mut names = Vec::with_capacity(variants.len());
+    for variant in variants {
         let rename = tag_arg(&variant.attrs, "rename")?;
         let span = rename
             .as_ref()
@@ -198,7 +180,7 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
             let message = format!("`{other}` and `{}` are both tagged `{name}`", variant.ident);
             return Err(Error::new(span, message));
         }
-        variants.push(&variant.ident);
+        idents.push(&variant.ident);
         names.push(name);
     }
 
@@ -207,17 +189,17 @@ pub fn expand(input: &DeriveInput) -> Result<proc_macro2::TokenStream> {
         impl ::core::convert::From<#ident> for ::spire::crawler::Tag {
             fn from(tag: #ident) -> Self {
                 ::spire::crawler::Tag::from_static(match tag {
-                    #(#ident::#variants => #names,)*
+                    #(#ident::#idents => #names,)*
                 })
             }
         }
 
         impl ::spire::crawler::Tags for #ident {
-            const ALL: &'static [Self] = &[#(Self::#variants),*];
+            const ALL: &'static [Self] = &[#(Self::#idents),*];
 
             fn from_tag(tag: &::spire::crawler::Tag) -> ::core::option::Option<Self> {
                 match tag.as_str() {
-                    #(#names => ::core::option::Option::Some(Self::#variants),)*
+                    #(#names => ::core::option::Option::Some(Self::#idents),)*
                     _ => ::core::option::Option::None,
                 }
             }

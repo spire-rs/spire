@@ -43,7 +43,7 @@ Depend on it next to `spire` to turn them on:
 
 ```toml
 [dependencies]
-spire-reqwest = { version = "0.10", features = ["gzip", "brotli", "cookies"] }
+spire-reqwest = { version = "0.11", features = ["gzip", "brotli", "cookies"] }
 ```
 
 | Feature | Enables |
@@ -52,7 +52,7 @@ spire-reqwest = { version = "0.10", features = ["gzip", "brotli", "cookies"] }
 | `http2` (default) | HTTP/2 negotiation |
 | `system-proxy` (default) | Proxies from the environment and system settings |
 | `gzip`, `brotli`, `zstd`, `deflate` | Transparent response decompression |
-| `cookies` | A cookie store shared by the whole crawl |
+| `cookies` | A cookie store per identity; without identities, add `.cookie_store(true)` in `ReqwestBackend::from_builder` |
 | `socks` | SOCKS5 proxies |
 | `hickory-dns` | DNS through hickory instead of the system resolver |
 
@@ -66,8 +66,8 @@ cache and start a driver; the browser itself must already be installed.
 
 ```toml
 [dependencies]
-spire = { version = "0.10", features = ["thirtyfour"] }
-spire-thirtyfour = { version = "0.10", features = ["manager"] }
+spire = { version = "0.11", features = ["thirtyfour"] }
+spire-thirtyfour = { version = "0.11", features = ["manager"] }
 ```
 
 | Feature | Enables |

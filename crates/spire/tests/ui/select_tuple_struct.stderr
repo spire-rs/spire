@@ -1,4 +1,4 @@
-error: `Select` needs a struct with named fields
+error: `Select` can only be derived for structs with named fields
  --> tests/ui/select_tuple_struct.rs:4:1
   |
 4 | struct Product(#[select("h2")] String);

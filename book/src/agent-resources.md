@@ -63,7 +63,7 @@ For persistence, enable Spire's `agent` and `redb` features and use
 
 ```toml
 [dependencies]
-spire = { version = "0.10.0", features = ["agent", "redb"] }
+spire = { version = "0.11.0", features = ["agent", "redb"] }
 ```
 
 ```rust,no_run

@@ -172,8 +172,7 @@ impl BloomSeen {
     }
 
     /// Whether `fingerprint` may have been recorded, without recording it.
-    #[cfg(test)]
-    fn contains(&self, fingerprint: Fingerprint) -> bool {
+    fn may_contain(&self, fingerprint: Fingerprint) -> bool {
         let bits = lock(&self.bits);
         self.positions(fingerprint, bits.words.len())
             .all(|(word, mask)| bits.words[word] & mask != 0)
@@ -203,6 +202,10 @@ impl BloomSeen {
 }
 
 impl SeenSet for BloomSeen {
+    fn contains(&self, fingerprint: Fingerprint) -> impl Future<Output = Result<bool>> + Send {
+        ready(Ok(self.may_contain(fingerprint)))
+    }
+
     fn insert(&self, fingerprint: Fingerprint) -> impl Future<Output = Result<bool>> + Send {
         ready(Ok(self.record(fingerprint)))
     }
@@ -255,7 +258,7 @@ mod tests {
         }
 
         let false_positives = (10_000..20_000)
-            .filter(|i| filter.contains(fingerprint(*i)))
+            .filter(|i| filter.may_contain(fingerprint(*i)))
             .count();
         // 1% of 10 000, with headroom for chance.
         assert!(false_positives < 150, "{false_positives} false positives");

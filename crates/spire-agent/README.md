@@ -27,21 +27,38 @@ providers independent of the facade's router and HTML extractors.
 - **`Agent`** shares token usage, budgets and a model-call concurrency limit.
   Structured answers are validated against JSON Schema.
 
+## Installation
 
-The `agent` feature on `spire` re-exports this crate as `spire::agent` and
-adds `AgentExtract<T>`, `AgentCollect<T>` and `FollowRelevantLinks` to ordinary crawls.
-
-## Usage
-
-For a Spire crawl, enable the facade integration:
+Enable the `agent` feature of `spire`, which re-exports this crate as
+`spire::agent` and adds `AgentExtract<T>`, `AgentCollect<T>` and
+`FollowRelevantLinks` to ordinary crawls:
 
 ```toml
 [dependencies]
-spire = { version = "0.10.0", features = ["agent", "reqwest"] }
+spire = { version = "0.11", features = ["agent", "reqwest"] }
 ```
 
-For text extraction without the router or an HTTP backend, use this crate
-and supply a provider:
+Or depend on this crate directly for text extraction without the router or an
+HTTP backend:
+
+```toml
+[dependencies]
+spire-agent = { version = "0.11", features = ["rig"] }
+```
+
+No feature is enabled by default:
+
+| Feature | Enables |
+|---|---|
+| `rig` | Rig completion models as providers |
+| `redb` | Answer caching in the crawl's `RedbStore` |
+| `sqlite` | Answer caching in the crawl's SQLite store |
+| `testing` | Scripted providers for offline tests and examples |
+
+## Usage
+
+Supply a provider and extract typed answers from text. Through `spire`, the
+same items are at `spire::agent`, e.g. `use spire::agent::{Agent, Budget};`:
 
 ```rust,no_run
 use spire_agent::{Agent, Budget, Provider, Result};
@@ -58,17 +75,14 @@ println!("{names:?}: {:?}", agent.usage());
 
 Budget admission uses settled usage; calls already in flight can cross a
 limit. A budget requiring unknown token counts fails closed. Use `Vec<T>` or
-`Option<T>` when data may be absent. Schema validation checks structure,
-not whether a model's statements are true.
+`Option<T>` when data may be absent. Schema validation checks structure, not
+whether a model's statements are true.
 
-See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#ai-driven-crawling)
-page for configuration.
-
-### Offline testing
+## Offline testing
 
 With `testing`, `Script` records requests and serves fixed responses. Use
-`Script::from_fn` for request-dependent replies, or `from_async_fn` to
-control completion timing:
+`Script::from_fn` for request-dependent replies, or `from_async_fn` to control
+completion timing:
 
 ```rust
 # #[cfg(feature = "testing")] {
@@ -95,7 +109,19 @@ Run `cargo run -p model-extraction` for typed extraction with a scripted
 provider, without a network or API key. `cargo run -p objective-crawl`
 demonstrates multiple goals on the same router.
 
-See the book pages on [Model extraction](https://spire-rs.github.io/spire/model-extraction.html),
-[Providers](https://spire-rs.github.io/spire/agent-providers.html),
-and [Budgets and caches](https://spire-rs.github.io/spire/agent-resources.html)
-in the book, or the [API documentation](https://docs.rs/spire-agent).
+## Learn more
+
+- The book's [Model extraction](https://spire-rs.github.io/spire/model-extraction.html),
+  [Model providers](https://spire-rs.github.io/spire/agent-providers.html) and
+  [Model budgets and caches](https://spire-rs.github.io/spire/agent-resources.html)
+  pages, and [Feature flags](https://spire-rs.github.io/spire/features.html#ai-driven-crawling)
+- The [API documentation](https://docs.rs/spire-agent)
+
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
+
+## License
+
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).

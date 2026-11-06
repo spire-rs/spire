@@ -13,59 +13,62 @@
 [docs-badge]: https://img.shields.io/docsrs/spire-reqwest?logo=Docs.rs&style=flat-square
 [docs-url]: http://docs.rs/spire-reqwest
 
-Reqwest-based HTTP client backend for Spire.
-
-This crate provides [`ReqwestBackend`], an HTTP backend implementation that
-integrates with the Spire web scraping framework using the popular
-[reqwest](https://github.com/seanmonstar/reqwest) library.
+HTTP backend for Spire, built on
+[reqwest](https://github.com/seanmonstar/reqwest).
 
 ## Overview
-
-`spire-reqwest` provides an HTTP client backend implementation for Spire on top
-of the popular [reqwest](https://github.com/seanmonstar/reqwest) library. This
-backend enables high-performance HTTP-based web scraping with support for
-cookies, headers, redirects, and other HTTP features.
 
 `ReqwestBackend` implements `Backend`, and `ReqwestSession` implements
 `Session`, from `spire-core`: requests share the backend's connection pool.
 
-## Features
+- **Configurable client**: the backend builds its reqwest client from a
+  function you pass, with your timeouts, user agent and other options.
+- **Identities**: with `Crawler::with_identities`, each identity's requests go
+  through a client of its own, with its proxy and, with the `cookies` feature,
+  its own cookie store. SOCKS proxies need the `socks` feature.
+- **Errors and statuses**: failures are classified so only what may succeed is
+  retried, and error statuses follow a `StatusPolicy`.
 
-- **Built on Reqwest**: Leverages the popular reqwest HTTP client library
-- **Spire Integration**: Seamlessly integrates with the Spire web scraping
-  framework
-- **Async/Await**: Fully async implementation for better performance
-- **TLS Support**: Choose between rustls (default) and native TLS
-  implementations
+## Installation
 
-## Usage
-
-This crate is typically not used directly. Instead, enable the `reqwest` feature
-in the main `spire` crate and refer to the
-[spire documentation](https://docs.rs/spire) for usage examples and guides.
+Enable the `reqwest` feature of `spire`, for `spire::backend::ReqwestBackend`:
 
 ```toml
 [dependencies]
-spire = { version = "0.10.0", features = ["reqwest"] }
+spire = { version = "0.11", features = ["reqwest"] }
 ```
 
-See the book’s [Feature flags](https://spire-rs.github.io/spire/features.html#http-backend)
-page for configuration.
+Or depend on this crate and `spire-core` directly, as the examples below do:
 
-For advanced usage and custom configurations, see the
-[API documentation](https://docs.rs/spire-reqwest).
+```toml
+[dependencies]
+spire-core = { version = "0.11" }
+spire-reqwest = { version = "0.11", features = ["gzip", "cookies"] }
+```
 
-## Advanced Usage Examples
+`rustls-tls`, `http2` and `system-proxy` are enabled by default:
 
-### Configuring the client
+| Feature | Enables |
+|---|---|
+| `rustls-tls` | TLS through rustls, with no system dependencies |
+| `native-tls` | TLS through the platform's native library |
+| `http2` | HTTP/2 negotiation over TLS |
+| `system-proxy` | Proxies from the environment and system settings |
+| `gzip`, `brotli`, `zstd`, `deflate` | Transparent response decompression |
+| `cookies` | A cookie store per identity; without identities, add `.cookie_store(true)` in `from_builder` |
+| `socks` | SOCKS5 proxies |
+| `hickory-dns` | DNS resolution through hickory instead of the system resolver |
+
+## Usage
 
 `ReqwestBackend::from_builder` takes a function that makes the reqwest
 configuration, which a crawl with identities builds one client per identity
 from:
 
 ```rust
-use spire_reqwest::ReqwestBackend;
 use std::time::Duration;
+
+use spire_reqwest::{ReqwestBackend, reqwest};
 
 let backend = ReqwestBackend::from_builder(|| {
     reqwest::Client::builder()
@@ -75,16 +78,7 @@ let backend = ReqwestBackend::from_builder(|| {
 # Ok::<_, spire_core::Error>(())
 ```
 
-### Identities
-
-With `Crawler::with_identities`, each
-identity's requests go through a reqwest client of its own, with the
-identity's proxy and, with the `cookies` feature, its own cookie store.
-SOCKS proxies need the `socks` feature. See the
-[identities chapter](https://spire-rs.github.io/spire/identities.html) of
-the book.
-
-## Error Handling
+## Errors and statuses
 
 Failed transfers are classified so the crawler retries only what may succeed
 next time: timeouts and connection errors are retried, invalid requests and
@@ -106,19 +100,18 @@ let backend = ReqwestBackend::new().with_status_policy(StatusPolicy::Accept);
 Responses record the URL they were served from after redirects, available
 through `spire_core::http::ResponseExt::final_uri`.
 
-## Performance Considerations
+## Learn more
 
-- The reqwest client maintains connection pools automatically.
-- Cookies and session state are maintained per reqwest client instance.
-- Consider reusing `ReqwestBackend` instances when possible to benefit from
-  connection pooling.
+- The book's [HTTP](https://spire-rs.github.io/spire/http.html)
+  and [Identities](https://spire-rs.github.io/spire/identities.html) pages,
+  and [Feature flags](https://spire-rs.github.io/spire/features.html#http-backend)
+- The [API documentation](https://docs.rs/spire-reqwest)
 
 ## Contributing
 
-This crate follows the same contribution guidelines as the main spire project.
-Please see [CONTRIBUTING.md](../../CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](https://github.com/spire-rs/spire/blob/main/CONTRIBUTING.md)
+for development setup and guidelines.
 
 ## License
 
-This project is licensed under the MIT License; see the
-[LICENSE](../../LICENSE) file for details.
+MIT License, see [LICENSE](https://github.com/spire-rs/spire/blob/main/LICENSE).
