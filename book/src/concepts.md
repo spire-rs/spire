@@ -29,7 +29,7 @@ A crawl moves *seeds* from a *frontier*, through a *backend* and a
   [Limits and politeness](politeness.md).
 - **A backend** hands out a session for each request. `ReqwestBackend` fetches
   over HTTP, and `ThirtyfourBackend` loads the page in a browser. See
-  [Browsers](browsers.md).
+  [HTTP](http.md) and [Browsers](browsers.md).
 - **The worker** handles each request. It is usually a `Router`, which
   picks handlers by the request's tag. See [Routing and handlers](routing.md).
 - **Datasets** store what the handlers extract, one per item type. See
@@ -48,20 +48,15 @@ A crawl moves *seeds* from a *frontier*, through a *backend* and a
    the response fetches it, and the others share it: a page is fetched once
    however many handlers and extractors read it.
 6. The handler queues links, writes items, and returns an `Outcome`.
-7. The crawler reports the outcome to the frontier: done, retry, pause a
-   tag, skip a tag, stop the crawl, or failed.
+7. The crawler acts on the outcome and reports it to the frontier: the
+   request is done, is retried, pauses its tag, skips the rest of its tag,
+   stops the crawl, failed, or fails the whole crawl.
 
 The crawl ends when the frontier is empty and no request is in flight, when
 a handler returns `Outcome::Stop`, when a limit is reached, or when it is
 shut down.
 
-Handlers report success, failure or scheduling decisions through an
-`Outcome`. See [Errors and retries](errors.md) for their meanings and how
-failures affect the crawl.
-
-## `spire` and `spire-core`
-
-The crawler, frontier, backends, workers and datasets live in `spire-core`.
-`spire` adds the router, handlers and extractors on top, and re-exports
-everything. Depend on `spire-core` directly only to implement your own
-backend, frontier or dataset.
+A handler returning `Result<()>` is done on `Ok`, and failed on `Err`; it
+returns an `Outcome` to decide anything else. See
+[Errors and retries](errors.md) for each outcome and how failures affect the
+crawl.

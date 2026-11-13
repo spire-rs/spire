@@ -1,7 +1,10 @@
 # Your first crawl
 
 This chapter builds a small crawler for an online shop: it walks the
-product listing page by page, and extracts every product it links to.
+product listing page by page, and extracts every product it links to. The
+shop at `example.com` is a stand-in: point the seed at a real listing to run
+it, or run the handlers against fixed pages, as
+[Testing handlers](testing.md) shows.
 
 ## Tags
 
@@ -107,7 +110,77 @@ Step by step:
    statistics. The products are then read back from the dataset.
 
 Relative links resolve against the page they were found on, after
-redirects. Error statuses fail the request: `5xx` and `429` are retried,
-honouring `Retry-After`, and other `4xx` are not.
+redirects. Error statuses fail the request: `408`, `429` and `5xx` are
+retried, with `429` and `503` honouring `Retry-After`; other `4xx` are not.
+
+## Before crawling a real site
+
+The crawl above runs up to 16 requests at once, with no gap between requests
+to the same host, and does not read robots.txt. Before pointing it at a site
+you do not run, slow it down per host and, with the `robots` feature, obey
+the site's robots.txt. Keep the router above and replace its crawler setup,
+before the first `run`, with:
+
+```rust,no_run
+use std::time::Duration;
+
+use spire::backend::reqwest;
+# use spire::backend::ReqwestBackend;
+# use spire::dataset::InMemDataset;
+# use spire::extract::html::Select;
+# use spire::frontier::seed::Seed;
+# use spire::frontier::{FrontierExt, InMemFrontier};
+# use spire::handler::{Collect, FollowLinks};
+# use spire::crawler::Tags;
+# use spire::{Crawler, Result, Router};
+#
+# #[derive(Debug, Clone, Copy, Tags)]
+# enum Page {
+#     Listing,
+#     Product,
+# }
+#
+# #[derive(Debug, Select)]
+# #[select("main.product")]
+# struct Product {
+#     #[select("h1")]
+#     name: String,
+#     #[select(".price")]
+#     price: Option<f64>,
+# }
+# async fn crawl() -> Result<()> {
+# let router = Router::new()
+#     // Two handlers on one listing page, fetched once: follow the next
+#     // page and every product.
+#     .route(Page::Listing, (
+#         FollowLinks::new(Page::Listing).select("a.next"),
+#         FollowLinks::new(Page::Product).select("article.product a"),
+#     ))
+#     .route(Page::Product, Collect::<Product>::new())
+#     .require::<Page>();
+let backend = ReqwestBackend::from_builder(|| {
+    reqwest::Client::builder().user_agent("MyShopBot")
+})?;
+let crawler = Crawler::new(backend, router)
+    .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3).tag_backoff())
+    .with_dataset(InMemDataset::<Product>::new())
+    .with_concurrency(16)
+    // One request at a time per host, half a second apart.
+    .with_host_concurrency(1)
+    .with_host_delay(Duration::from_millis(500))
+    // Skips what robots.txt disallows for this user agent, and waits its
+    // `Crawl-delay`.
+    .with_robots("MyShopBot")
+    .with_seed(Seed::get("https://example.com/products")?.with_tag(Page::Listing));
+# crawler.run().await?;
+# Ok(())
+# }
+```
+
+The backend follows redirects internally. Redirect targets are not checked
+against robots.txt or subject to the destination host's crawl delay.
+
+A host that answers `429` or `503`, or times out, is slowed down further on
+its own; see [Limits and politeness](politeness.md).
 
 The rest of this book goes through each of these pieces in turn.
