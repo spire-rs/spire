@@ -66,9 +66,10 @@ bounds how deep indexes are followed too.
 
 A page's `<priority>`, from 0.0 to 1.0, ranks it against the other pages of
 its site, not against the rest of the crawl. So `FollowSitemap` queues a
-sitemap's pages highest priority first, all at the default seed priority: a
-FIFO or priority frontier crawls a site's most important pages first, and a
-LIFO frontier pops them in reverse.
+sitemap's pages highest priority first, all at the default seed priority.
+This orders pages within each sitemap, not across the site: a FIFO frontier
+keeps their insertion order, while a LIFO frontier pops them in reverse.
+Pages from different sitemaps are not ranked together.
 
 ## Your own handler
 

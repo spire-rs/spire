@@ -23,11 +23,12 @@ async fn page(html: Html, links: Links, queue: Queue) -> Result<()> {
 
 # async fn crawl() -> Result<()> {
 let router = Router::new().fallback(page);
-// Each URL once, two links deep, on one site.
+// Each URL once, two links deep, with queued hosts limited to example.com.
 let frontier = InMemFrontier::fifo()
     .dedup()
     .max_depth(2)
-    .allow_hosts(["example.com"]);
+    .allow_hosts(["example.com"])
+    .retry(3);
 let crawler = Crawler::new(ReqwestBackend::default(), router)
     .with_frontier(frontier)
     .with_seed(Seed::get("https://example.com/")?);
@@ -35,6 +36,9 @@ crawler.run().await?;
 # Ok(())
 # }
 ```
+
+`allow_hosts` filters seeds and queued links. It does not restrict hosts
+reached through redirects followed by the backend.
 
 Handlers are async functions, and their arguments are *extractors*: typed
 values taken from the request or the page, such as its parsed HTML or the

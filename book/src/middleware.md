@@ -13,7 +13,10 @@ the `Next` worker into middleware. It can act at three moments:
 - **Before** passing the request on, it can change the request, or answer
   without fetching it at all.
 - **Around** the handlers, it can check the response's head. The response is
-  fetched once and shared with the handlers, so this costs no extra request.
+  fetched once and shared with the handlers, so this avoids an extra request
+  when the remaining handler chain would otherwise fetch it. If it is not
+  cached, `cx.response()` fetches the complete response, even when the
+  remaining chain uses an `|| async {}` handler that needs no response.
 - **After** the handlers, it can change the `Outcome` they returned.
 
 ```rust,no_run

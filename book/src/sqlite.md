@@ -53,14 +53,18 @@ model answer cache can share the database too; see
 
 ## What survives a crash
 
-Every change is a committed transaction, and nothing is lost:
+Recovery preserves committed frontier state. Dataset reads commit deletion
+before returning items, so a crash or cancellation after that commit can
+lose those items to the caller (see [Datasets](#datasets)).
 
 - **Requests in flight are crawled again.** A popped seed stays recorded
   until its outcome is reported, so the requests running at a crash are
   queued again on reopening: a request may run twice, never zero times.
-- **No link is lost.** A page's links are committed before the page is
-  reported done, and a link is recorded as seen only once it is queued, so a
-  crash in between queues it again rather than refusing it.
+- **Queued links survive.** Each link is committed when it is queued, and
+  recorded as seen only once it is queued. `Queue::follow_all` queues links
+  individually, so a crash can leave some discovered links unqueued. The
+  parent page is crawled again, but recovering those links depends on them
+  still appearing in its next response.
 - **Items may be written twice.** Items and the frontier are committed
   separately, so a page whose items were committed just before a crash may be
   crawled again and write them again: deduplicate by a key such as the URL
