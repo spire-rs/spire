@@ -111,7 +111,7 @@ Step by step:
 
 Relative links resolve against the page they were found on, after
 redirects. Error statuses fail the request: `408`, `429` and `5xx` are
-retried, with `429` and `503` honouring `Retry-After`; other `4xx` are not.
+retried, honouring a valid `Retry-After` on any of them; other `4xx` are not.
 
 ## Before crawling a real site
 
@@ -177,8 +177,8 @@ let crawler = Crawler::new(backend, router)
 # }
 ```
 
-The backend follows redirects internally. Redirect targets are not checked
-against robots.txt or subject to the destination host's crawl delay.
+Each redirect target passes the frontier's scope filters and robots.txt admission, and waits for the destination host's
+concurrency limit and crawl delay before it is fetched.
 
 A host that answers `429` or `503`, or times out, is slowed down further on
 its own; see [Limits and politeness](politeness.md).

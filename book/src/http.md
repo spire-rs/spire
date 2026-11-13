@@ -38,8 +38,8 @@ downloaded:
 
 - `StatusPolicy::Classify`, the default, turns error statuses into errors,
   so the crawler retries or fails them without a handler checking: `408`,
-  `429` and `5xx` are retried, `429` and `503` honouring `Retry-After`, and
-  other `4xx` are not. See [Errors and retries](errors.md).
+  `429` and `5xx` are retried, honouring a valid `Retry-After` on any of
+  them; other `4xx` are not. See [Errors and retries](errors.md).
 - `StatusPolicy::Accept` hands every response to the handlers, whatever its
   status, e.g. to record `404`s. The `Head` extractor reads the status.
 
@@ -61,9 +61,23 @@ whether trying again may help:
 | A request reqwest cannot build, e.g. an invalid header | `Invalid` | No |
 | Too many redirects | `Rejected` | No |
 
-Redirects are followed by reqwest, and the response records the URI it was
-served from, which links resolve against: see
-[Following links](links.md).
+Spire follows redirects itself, up to 10 hops. During a crawl, every target
+passes frontier scope, robots.txt and the destination host's concurrency and
+delay limits before it is fetched. Depth is preserved; `301`, `302` and `303`
+apply HTTP method changes, while `307` and `308` retain the method and body.
+Cross-origin hops suppress source credentials and select the destination's
+applicable cookies. The final URI is recorded for resolving relative links.
+
+The backend disables reqwest's automatic redirect policy and, with `cookies`,
+uses one owned jar for direct requests and one for each identity. Builder
+redirect policies and cookie providers are replaced. `as_reqwest()` shares
+the direct client and its jar, but fetches a single hop. Builder timeouts apply
+to each transfer; `Crawler::with_request_timeout` bounds the whole request,
+including redirects and admission waits. Other backends must expose hops
+through `backend::redirect::Redirects` to support these checks: call `check`
+before each transfer, including the initial one, and hold its permit until
+the transfer finishes. Adaptive host limits use the destination transfer
+time, excluding earlier hops and admission waits.
 
 ## Proxies
 

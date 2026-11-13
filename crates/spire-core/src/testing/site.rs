@@ -235,7 +235,39 @@ impl MockSession {
                 .with_message("the proxy refused the connection")
                 .with_uri(request.uri().clone()));
         }
-        let (page, served_from) = self.site.serve(request.uri())?;
+        let mut transfer = None;
+        let (page, served_from) = if let Some(redirects) = request
+            .extensions()
+            .get::<crate::backend::redirect::Redirects>(
+        ) {
+            let mut target = request.clone();
+            let mut hops = 0;
+            loop {
+                transfer = Some(redirects.check(&target).await?);
+                let page = self
+                    .site
+                    .pages
+                    .get(target.uri())
+                    .cloned()
+                    .unwrap_or_else(|| MockPage::status(StatusCode::NOT_FOUND));
+                let Some(location) = page.location.clone() else {
+                    break (page, target.uri().clone());
+                };
+                hops += 1;
+                if hops > MAX_REDIRECTS {
+                    return Err(
+                        Error::new(crate::ErrorKind::Rejected).with_message("too many redirects")
+                    );
+                }
+                if !page.latency.is_zero() {
+                    tokio::time::sleep(page.latency).await;
+                }
+                *target.uri_mut() = location;
+                drop(transfer.take());
+            }
+        } else {
+            self.site.serve(request.uri())?
+        };
         if !page.latency.is_zero() {
             tokio::time::sleep(page.latency).await;
         }
@@ -251,6 +283,7 @@ impl MockSession {
 
         // As the real backends, an error status is rejected with no body.
         let head = self.site.status_policy.check(head)?;
+        drop(transfer);
         Ok(head.map(|()| if unchanged { Bytes::new() } else { page.body }))
     }
 }

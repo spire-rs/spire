@@ -10,7 +10,7 @@ use tokio::time::Instant;
 
 use crate::Result;
 use crate::frontier::seed::{Fingerprint, Seed};
-use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report, Schedule};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report, Schedule};
 use crate::sync::lock;
 
 /// An in-memory [`Frontier`] that crawls in insertion, reverse or priority
@@ -238,9 +238,11 @@ impl InMemFrontier {
 
     /// Moves the seeds that have come due to `store`, in the order they did.
     /// The caller holds the lock on `store`, so they are never out of sight.
-    fn release_due(&self, store: &mut Store, now: Instant) {
+    fn release_due(&self, store: &mut Store, now: Instant, mode: PopMode) {
         let mut due = Vec::new();
-        if let Some(scheduled) = lock(&self.scheduled).as_mut() {
+        if mode == PopMode::All
+            && let Some(scheduled) = lock(&self.scheduled).as_mut()
+        {
             due.extend(std::iter::from_fn(|| scheduled.pop_due(now)));
         }
         let mut requeued = lock(&self.requeued);
@@ -287,9 +289,9 @@ impl Frontier for InMemFrontier {
 
     /// Moves seeds that have come due to the queue, then hands out the next.
     /// Only requeued seeds are waited for; see [`Schedule::next_due`].
-    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
+    fn pop_with(&self, mode: PopMode) -> impl Future<Output = Result<NextSeed>> + Send {
         let mut store = lock(&self.seeds);
-        self.release_due(&mut store, Instant::now());
+        self.release_due(&mut store, Instant::now(), mode);
         let next = match store.pop() {
             Some(seed) => NextSeed::Ready(seed),
             None => lock(&self.requeued)

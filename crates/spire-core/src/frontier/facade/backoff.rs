@@ -8,7 +8,7 @@ use tokio::time::Instant;
 use crate::Result;
 use crate::crawler::Tag;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report};
 use crate::sync::lock;
 
 /// A facade that holds back seeds of tags paused by [`Report::Backoff`].
@@ -109,7 +109,11 @@ impl<F: Frontier> Frontier for TagBackoff<F> {
         self.inner.push(seed)
     }
 
-    async fn pop(&self) -> Result<NextSeed> {
+    fn permits(&self, seed: &Seed) -> bool {
+        self.inner.permits(seed)
+    }
+
+    async fn pop_with(&self, mode: PopMode) -> Result<NextSeed> {
         let now = Instant::now();
         if let Some(seed) = lock(&self.state).release(now) {
             return Ok(NextSeed::Ready(seed));
@@ -125,7 +129,7 @@ impl<F: Frontier> Frontier for TagBackoff<F> {
                 }
             }
 
-            let next = self.inner.pop().await?;
+            let next = self.inner.pop_with(mode).await?;
             let mut state = lock(&self.state);
             return Ok(match next {
                 NextSeed::Ready(seed) if state.is_paused(seed.tag(), now) => {

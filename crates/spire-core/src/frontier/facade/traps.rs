@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use ::http::Uri;
 
 use crate::frontier::seed::{Fingerprint, Seed};
-use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report};
 use crate::sync::lock;
 use crate::{Result, TRACING_TARGET};
 
@@ -194,9 +194,13 @@ impl<F: Frontier> Frontier for AvoidTraps<F> {
         self.inner.push(seed).await
     }
 
-    async fn pop(&self) -> Result<NextSeed> {
+    fn permits(&self, seed: &Seed) -> bool {
+        !self.is_blocked(seed) && self.inner.permits(seed)
+    }
+
+    async fn pop_with(&self, mode: PopMode) -> Result<NextSeed> {
         loop {
-            match self.inner.pop().await? {
+            match self.inner.pop_with(mode).await? {
                 NextSeed::Ready(seed) if self.refusal(&seed).is_some() => {
                     self.count_refusal(&seed);
                     self.inner.report(Report::Skipped(seed)).await?;

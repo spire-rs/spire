@@ -9,7 +9,7 @@ use crate::crawler::Crawler;
 use crate::dataset::InMemDataset;
 use crate::frontier::facade::RetryPolicy;
 use crate::frontier::seed::Seed;
-use crate::frontier::{FrontierExt, InMemFrontier};
+use crate::frontier::{FrontierExt, InMemFrontier, PopMode};
 use crate::http::RequestExt;
 use crate::worker::{Outcome, from_fn};
 use crate::{Context, Error, ErrorKind};
@@ -324,12 +324,12 @@ mod limits {
             self.inner.push(seed)
         }
 
-        fn pop(&self) -> impl Future<Output = crate::Result<NextSeed>> + Send {
+        fn pop_with(&self, mode: PopMode) -> impl Future<Output = crate::Result<NextSeed>> + Send {
             let pops = self.pops.fetch_add(1, Ordering::SeqCst);
             if self.fail_after.is_some_and(|after| pops >= after) {
                 return futures::future::Either::Left(ready(Err(Error::new(ErrorKind::Frontier))));
             }
-            futures::future::Either::Right(self.inner.pop())
+            futures::future::Either::Right(self.inner.pop_with(mode))
         }
 
         fn report(&self, report: Report) -> impl Future<Output = crate::Result<Ack>> + Send {
@@ -940,20 +940,22 @@ async fn retry_after_pauses_the_whole_host() {
 
     use crate::testing::{MockPage, MockSite};
 
-    let limited = MockPage::status(StatusCode::TOO_MANY_REQUESTS)
-        .with_header(RETRY_AFTER, HeaderValue::from_static("5"));
-    let site = MockSite::new()
-        .page("https://example.com/limited", limited)
-        .page("https://example.com/other", MockPage::text(""));
-    let seeds = [
-        seed("limited").with_tag("search"),
-        seed("other").with_tag("page"),
-    ];
-    let times = fetch_times(site, seeds).await;
+    for status in [408, 429, 500, 502, 503, 504] {
+        let limited = MockPage::status(StatusCode::from_u16(status).unwrap())
+            .with_header(RETRY_AFTER, HeaderValue::from_static("5"));
+        let site = MockSite::new()
+            .page("https://example.com/limited", limited)
+            .page("https://example.com/other", MockPage::text(""));
+        let seeds = [
+            seed("limited").with_tag("search"),
+            seed("other").with_tag("page"),
+        ];
+        let times = fetch_times(site, seeds).await;
 
-    // The host asked for 5 s, so the other tag's request waits too.
-    let other = times.iter().find(|(path, _)| path == "/other").unwrap();
-    assert_eq!(other.1, Duration::from_secs(5));
+        // Every retryable status can ask the other tag's request to wait.
+        let other = times.iter().find(|(path, _)| path == "/other").unwrap();
+        assert_eq!(other.1, Duration::from_secs(5), "status {status}");
+    }
 }
 
 #[tokio::test(start_paused = true)]
@@ -1345,3 +1347,38 @@ async fn seed_extensions_override_crawler_defaults_through_retries() {
     assert_eq!(stats.failed, 0);
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
+
+#[tokio::test]
+async fn failed_response_recording_stops_the_crawl_without_losing_the_seed() {
+    use crate::backend::replay::{ResponseRecorder, ResponseReplay};
+    use crate::frontier::Frontier;
+    use crate::http::Response;
+
+    struct Unavailable;
+    impl ResponseRecorder for Unavailable {
+        fn record(
+            &self,
+            _response: Response,
+        ) -> impl std::future::Future<Output = crate::Result<()>> + Send {
+            std::future::ready(Err(
+                Error::new(ErrorKind::Frontier).with_message("storage is unavailable")
+            ))
+        }
+    }
+    let frontier = Arc::new(InMemFrontier::fifo());
+    let mut pending = seed("page");
+    pending
+        .extensions_mut()
+        .insert(ResponseReplay::new(None, Unavailable));
+    let worker = from_fn(|cx: Context<Noop>| async move { cx.body().await.map(drop) });
+    let error = Crawler::new(Noop, worker)
+        .with_frontier(frontier.clone())
+        .with_seed(pending)
+        .run()
+        .await
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Frontier);
+    assert_eq!(frontier.snapshot().unwrap().len(), 1);
+}
+
+mod redirect;

@@ -72,6 +72,15 @@ pub trait Frontier: Send + Sync + 'static {
     /// Returns an error if the underlying storage fails.
     fn push(&self, seed: Seed) -> impl Future<Output = Result<Admission>> + Send;
 
+    /// Whether a request is within the frontier's scope, without queueing it.
+    ///
+    /// Redirect admission uses this to apply filters without marking a target
+    /// as seen or charging enqueue budgets. Custom scope facades should check
+    /// their own predicate and forward to the inner frontier.
+    fn permits(&self, _seed: &Seed) -> bool {
+        true
+    }
+
     /// Takes the next seed that is ready to be crawled.
     ///
     /// Storage returns [`NextSeed::Wait`] when only seeds held by
@@ -80,7 +89,17 @@ pub trait Frontier: Send + Sync + 'static {
     /// # Errors
     ///
     /// Returns an error if the underlying storage fails.
-    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send;
+    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
+        self.pop_with(PopMode::All)
+    }
+
+    /// Takes the next seed, optionally leaving scheduled revisits for a later
+    /// crawl wave. Facades must forward `mode`; queued retries are always
+    /// eligible.
+    ///
+    /// # Errors
+    /// Returns an error if the underlying storage fails.
+    fn pop_with(&self, mode: PopMode) -> impl Future<Output = Result<NextSeed>> + Send;
 
     /// Tells the frontier how a popped seed ended.
     ///
@@ -148,8 +167,12 @@ impl<F: Frontier> Frontier for std::sync::Arc<F> {
         F::push(self, seed)
     }
 
-    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
-        F::pop(self)
+    fn permits(&self, seed: &Seed) -> bool {
+        F::permits(self, seed)
+    }
+
+    fn pop_with(&self, mode: PopMode) -> impl Future<Output = Result<NextSeed>> + Send {
+        F::pop_with(self, mode)
     }
 
     fn report(&self, report: Report) -> impl Future<Output = Result<Ack>> + Send {
@@ -202,6 +225,15 @@ impl Admission {
     pub const fn is_queued(self) -> bool {
         matches!(self, Self::Queued)
     }
+}
+
+/// Which work a dequeue operation may release into the queue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PopMode {
+    /// Queued seeds and retries, leaving scheduled revisits untouched.
+    Queued,
+    /// Queued seeds, retries, and scheduled revisits.
+    All,
 }
 
 /// The result of [`Frontier::pop`].

@@ -6,8 +6,8 @@ use spire_core::http::{Request, Response};
 use spire_core::identity::Identity;
 use spire_core::{Error, ErrorKind, Result};
 
-use crate::clients::Clients;
-use crate::conversion::{head_from_reqwest, request_to_reqwest};
+use crate::clients::{Client, Clients};
+use crate::conversion::head_from_reqwest;
 
 /// An HTTP [`Backend`] built on [`reqwest::Client`].
 ///
@@ -21,6 +21,11 @@ use crate::conversion::{head_from_reqwest, request_to_reqwest};
 /// [identities](spire_core::identity) gets a client per identity from it,
 /// with the identity's proxy and, with the `cookies` feature, a cookie store
 /// of its own. An identity's client is dropped once the identity is gone.
+///
+/// Spire resolves redirects itself, checking crawl admission before every
+/// target. Builder redirect policies are replaced with `Policy::none()`.
+/// With `cookies`, each client uses a backend-owned jar. `as_reqwest()` shares
+/// that client and jar, but bypasses Spire's redirect resolution.
 ///
 /// # Examples
 ///
@@ -88,7 +93,7 @@ impl ReqwestBackend {
 
     /// Returns the [`reqwest::Client`] requests without an identity use.
     #[must_use]
-    pub const fn as_reqwest(&self) -> &reqwest::Client {
+    pub fn as_reqwest(&self) -> &reqwest::Client {
         self.clients.direct()
     }
 
@@ -117,7 +122,7 @@ impl Backend for ReqwestBackend {
 }
 
 impl ReqwestBackend {
-    fn session(&self, client: reqwest::Client) -> ReqwestSession {
+    fn session(&self, client: Client) -> ReqwestSession {
         ReqwestSession {
             http: self.clone(),
             client,
@@ -131,7 +136,7 @@ impl ReqwestBackend {
 pub struct ReqwestSession {
     http: ReqwestBackend,
     /// The reqwest client it sends with: the crawl's, or its identity's.
-    client: reqwest::Client,
+    pub(crate) client: Client,
 }
 
 impl ReqwestSession {
@@ -144,14 +149,8 @@ impl ReqwestSession {
 
 impl Session for ReqwestSession {
     async fn fetch(&self, request: &Request) -> Result<Response> {
-        let uri = request.uri().clone();
-        let failed = |error: Error| error.with_uri(uri.clone());
-        let converted = request_to_reqwest(request).map_err(failed)?;
-        let response = self
-            .client
-            .execute(converted)
-            .await
-            .map_err(|error| failed(classify(error)))?;
+        let failed = |error: Error| error.with_uri(request.uri().clone());
+        let (response, _transfer) = self.send(request).await?;
 
         // An error status is rejected before its body is downloaded.
         let head = self
@@ -168,7 +167,7 @@ impl Session for ReqwestSession {
 
 /// Classifies a failed transfer, so the crawler only retries what may
 /// succeed on another attempt.
-fn classify(error: reqwest::Error) -> Error {
+pub(crate) fn classify(error: reqwest::Error) -> Error {
     let kind = if error.is_timeout() {
         ErrorKind::Timeout
     } else if error.is_builder() {

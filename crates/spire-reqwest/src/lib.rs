@@ -8,6 +8,7 @@ compile_error!("At least one TLS feature must be enabled: 'rustls-tls' or 'nativ
 mod client;
 mod clients;
 mod conversion;
+mod redirect;
 
 #[doc(no_inline)]
 pub use reqwest;

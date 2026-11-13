@@ -18,25 +18,64 @@ pub(crate) type Builder = dyn Fn() -> reqwest::ClientBuilder + Send + Sync;
 pub(crate) struct Clients {
     builder: Arc<Builder>,
     /// For requests without an identity.
-    direct: reqwest::Client,
+    direct: Client,
     /// One per identity, kept while the identity is in use.
     identities: Arc<Mutex<HashMap<Box<str>, Built>>>,
+}
+
+/// The HTTP client and the cookie jar that belongs to that exact client.
+#[derive(Clone)]
+pub(crate) struct Client {
+    http: reqwest::Client,
+    #[cfg(feature = "cookies")]
+    pub(crate) cookies: Arc<reqwest::cookie::Jar>,
+}
+
+impl Client {
+    fn build(builder: reqwest::ClientBuilder) -> Result<Self> {
+        let builder = builder.redirect(reqwest::redirect::Policy::none());
+        #[cfg(feature = "cookies")]
+        let cookies = Arc::new(reqwest::cookie::Jar::default());
+        #[cfg(feature = "cookies")]
+        let builder = builder.cookie_provider(cookies.clone());
+        let http = builder
+            .build()
+            .map_err(|error| Error::backend("failed to build HTTP client").with_source(error))?;
+        Ok(Self {
+            http,
+            #[cfg(feature = "cookies")]
+            cookies,
+        })
+    }
+}
+
+impl std::ops::Deref for Client {
+    type Target = reqwest::Client;
+
+    fn deref(&self) -> &reqwest::Client {
+        &self.http
+    }
+}
+
+impl fmt::Debug for Client {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Client")
+            .field("http", &self.http)
+            .finish_non_exhaustive()
+    }
 }
 
 /// The client of an identity.
 struct Built {
     identity: WeakIdentity,
-    client: reqwest::Client,
+    client: Client,
 }
 
 /// reqwest's defaults.
 impl Default for Clients {
     fn default() -> Self {
-        Self {
-            builder: Arc::new(reqwest::Client::builder),
-            direct: reqwest::Client::default(),
-            identities: Arc::default(),
-        }
+        Self::new(Arc::new(reqwest::Client::builder))
+            .unwrap_or_else(|error| panic!("failed to build HTTP client: {error}"))
     }
 }
 
@@ -49,9 +88,7 @@ impl Clients {
     /// Returns a [`Backend`](spire_core::ErrorKind::Backend) error if
     /// reqwest cannot build it, e.g. when TLS fails to initialize.
     pub(crate) fn new(builder: Arc<Builder>) -> Result<Self> {
-        let direct = builder().build().map_err(|error| {
-            Error::backend("failed to build the HTTP client").with_source(error)
-        })?;
+        let direct = Client::build(builder())?;
         Ok(Self {
             builder,
             direct,
@@ -60,7 +97,7 @@ impl Clients {
     }
 
     /// Returns the client for requests without an identity.
-    pub(crate) const fn direct(&self) -> &reqwest::Client {
+    pub(crate) const fn direct(&self) -> &Client {
         &self.direct
     }
 
@@ -72,7 +109,7 @@ impl Clients {
     /// reqwest does not support the identity's proxy, e.g. `socks5` without
     /// the `socks` feature, or a [`Backend`](spire_core::ErrorKind::Backend)
     /// error if the client cannot be built.
-    pub(crate) fn of(&self, identity: &Identity) -> Result<reqwest::Client> {
+    pub(crate) fn of(&self, identity: &Identity) -> Result<Client> {
         let mut identities = self
             .identities
             .lock()
@@ -83,19 +120,16 @@ impl Clients {
             return Ok(built.client.clone());
         }
 
-        let client = self.build_for(identity)?;
+        let built = self.build_for(identity)?;
+        let client = built.client.clone();
         // Identities the crawl retired are gone once their last request
         // ended, and their clients with them.
         identities.retain(|_, built| built.identity.is_alive());
-        let built = Built {
-            identity: identity.downgrade(),
-            client: client.clone(),
-        };
         identities.insert(identity.name().into(), built);
         Ok(client)
     }
 
-    fn build_for(&self, identity: &Identity) -> Result<reqwest::Client> {
+    fn build_for(&self, identity: &Identity) -> Result<Built> {
         let mut builder = (self.builder)();
         if let Some(proxy) = identity.proxy() {
             // reqwest takes a SOCKS URL without its `socks` feature, and
@@ -115,16 +149,10 @@ impl Clients {
             })?;
             builder = builder.proxy(proxy);
         }
-        // A jar of its own, replacing any the builder shares, so cookies
-        // set for one identity are never sent by another.
-        #[cfg(feature = "cookies")]
-        let builder = builder.cookie_store(true);
-        builder.build().map_err(|error| {
-            let message = format!(
-                "failed to build the client of identity `{}`",
-                identity.name()
-            );
-            Error::backend(message).with_source(error)
+        let client = Client::build(builder)?;
+        Ok(Built {
+            identity: identity.downgrade(),
+            client,
         })
     }
 

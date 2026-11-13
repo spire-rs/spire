@@ -45,7 +45,9 @@ pub use crate::routing::Router;
 /// Backends and the clients they hand out, plus the enabled HTTP and browser
 /// backends.
 pub mod backend {
-    pub use spire_core::backend::{Backend, Noop, Session, StatusPolicy, document};
+    pub use spire_core::backend::{
+        Backend, Noop, Session, StatusPolicy, document, redirect, replay,
+    };
     #[cfg(feature = "reqwest")]
     #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
     #[doc(no_inline)]
@@ -93,14 +95,14 @@ pub mod dataset {
     pub use spire_redb::RedbDataset;
     #[cfg(feature = "sqlite")]
     #[cfg_attr(docsrs, doc(cfg(feature = "sqlite")))]
-    pub use spire_sqlx::sqlite::SqliteDataset;
+    pub use spire_sqlx::sqlite::{SqliteDataset, SqliteRead};
 }
 
 /// The frontier: requests waiting to be crawled.
 pub mod frontier {
     pub use spire_core::frontier::{
-        Ack, Admission, Frontier, FrontierExt, FrontierLayer, InMemFrontier, NextSeed, Report,
-        Schedule, facade, queue, score, seed,
+        Ack, Admission, Frontier, FrontierExt, FrontierLayer, InMemFrontier, NextSeed, PopMode,
+        Report, Schedule, facade, queue, score, seed,
     };
     #[cfg(feature = "redb")]
     #[cfg_attr(docsrs, doc(cfg(feature = "redb")))]

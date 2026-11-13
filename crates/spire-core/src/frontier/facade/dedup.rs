@@ -8,7 +8,7 @@ use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 use crate::Result;
 use crate::frontier::seed::{Fingerprint, Seed};
 use crate::frontier::seen::{InMemSeen, SeenSet};
-use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report};
 use crate::sync::lock;
 
 /// A facade that refuses seeds seen before, see [`Seed::fingerprint`].
@@ -137,8 +137,12 @@ impl<F: Frontier, S: SeenSet> Frontier for Dedup<F, S> {
         Ok(admission)
     }
 
-    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
-        self.inner.pop()
+    fn permits(&self, seed: &Seed) -> bool {
+        self.inner.permits(seed)
+    }
+
+    fn pop_with(&self, mode: PopMode) -> impl Future<Output = Result<NextSeed>> + Send {
+        self.inner.pop_with(mode)
     }
 
     fn report(&self, report: Report) -> impl Future<Output = Result<Ack>> + Send {
@@ -179,8 +183,8 @@ mod tests {
             }
         }
 
-        async fn pop(&self) -> Result<NextSeed> {
-            self.inner.pop().await
+        async fn pop_with(&self, mode: PopMode) -> Result<NextSeed> {
+            self.inner.pop_with(mode).await
         }
 
         async fn report(&self, report: Report) -> Result<Ack> {
@@ -198,8 +202,8 @@ mod tests {
             self.0.push(seed).await
         }
 
-        async fn pop(&self) -> Result<NextSeed> {
-            self.0.pop().await
+        async fn pop_with(&self, mode: PopMode) -> Result<NextSeed> {
+            self.0.pop_with(mode).await
         }
 
         async fn report(&self, report: Report) -> Result<Ack> {
@@ -233,8 +237,8 @@ mod tests {
             }
         }
 
-        async fn pop(&self) -> Result<NextSeed> {
-            self.inner.pop().await
+        async fn pop_with(&self, mode: PopMode) -> Result<NextSeed> {
+            self.inner.pop_with(mode).await
         }
 
         async fn report(&self, report: Report) -> Result<Ack> {

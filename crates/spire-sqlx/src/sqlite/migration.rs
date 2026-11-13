@@ -70,7 +70,7 @@ mod tests {
                 .fetch_all(store.pool())
                 .await
                 .unwrap();
-        assert_eq!(versions, [1, 2]);
+        assert_eq!(versions, [1, 2, 3]);
         let app: String = sqlx::query_scalar("SELECT application FROM _sqlx_migrations")
             .fetch_one(store.pool())
             .await
@@ -91,6 +91,7 @@ mod tests {
         sqlx::raw_sql(
             "DROP TABLE spire_frontier_retries;
             DROP TABLE spire_frontier_clock;
+            DROP TABLE spire_frontier_responses;
             DELETE FROM _spire_sqlx_migrations WHERE version >= 2;",
         )
         .execute(store.pool())

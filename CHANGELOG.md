@@ -8,6 +8,38 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `Crawler::with_discovery_tag` finishes sitemap discovery before starting
+  its deferred pages in priority order, including on a FIFO frontier.
+- `SqliteDataset::read_with_ack` returns an owned batch whose deletion commits
+  after acknowledgment. Dropping it or losing the process restores its items.
+  Outstanding batches hold SQLite's writer lock.
+
+### Changed
+
+- **Breaking:** `ReqwestBackend` always resolves redirects through Spire,
+  checking scope, robots.txt and host limits for each hop during a crawl.
+  Builder redirect policies are disabled. With `cookies`, clients use owned
+  jars instead of builder providers. `as_reqwest()` fetches a single hop.
+- **Breaking:** `SqliteFrontier` always records complete responses before
+  handlers can read them and replays interrupted requests from those snapshots.
+  Adds `0003_response_replay.sql`.
+- **Breaking:** `FollowSitemap` assigns seed priorities from 0 to 1,000,000
+  from sitemap priorities, with 500,000 for an absent priority.
+- **Breaking:** Frontiers implement `pop_with(PopMode)` to keep scheduled
+  revisits out of the initial discovery wave while still admitting retries.
+  `pop()` remains the convenience method that includes revisits.
+- Backends can expose redirect hops through `backend::redirect::Redirects`;
+  hold a transfer permit for each fetch, including the initial request.
+  Custom frontier scope facades should forward `Frontier::permits`.
+
+### Fixed
+
+- `StatusPolicy` honors valid `Retry-After` on all retryable statuses (`408`,
+  `429`, and `5xx`). Redirect continuations own their admission reply channels
+  and pass through the same host and robots queues as frontier requests.
+
 ## [0.11.0] - 2026-11-06
 
 ### Changed

@@ -99,8 +99,8 @@ A request that fails for good, or runs out of retries, is counted in
 
 ## Pausing a tag
 
-When a site answers `429 Too Many Requests` or `503 Service Unavailable`
-with a `Retry-After` header, the crawler pauses every request to that host
+When a site answers a retryable status (`408`, `429` or `5xx`)
+with a valid `Retry-After` header, the crawler pauses every request to that host
 for as long as it asks, then tries the request again; see
 [Limits and politeness](politeness.md). A handler pauses a tag itself with
 `Outcome::backoff(duration)`, which `tag_backoff` applies to every request

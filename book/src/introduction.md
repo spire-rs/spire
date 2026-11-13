@@ -38,8 +38,9 @@ crawler.run().await?;
 ```
 
 `allow_hosts` filters seeds and queued links, allowing the listed hosts and
-their subdomains. It does not restrict hosts reached through redirects
-followed by the backend.
+their subdomains. With `ReqwestBackend`, redirects pass the same host filters
+before their targets are fetched. Backends that follow redirects internally,
+including WebDriver, must expose each hop to enforce these filters.
 
 Handlers are async functions, and their arguments are *extractors*: typed
 values taken from the request or the page, such as its parsed HTML or the

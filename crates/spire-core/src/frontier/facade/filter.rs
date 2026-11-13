@@ -3,7 +3,7 @@ use std::future::Future;
 
 use crate::Result;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report};
 
 /// A facade that refuses seeds a predicate rejects, see
 /// [`FrontierExt::filter`](crate::frontier::FrontierExt::filter).
@@ -40,8 +40,12 @@ where
         }
     }
 
-    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
-        self.inner.pop()
+    fn permits(&self, seed: &Seed) -> bool {
+        (self.predicate)(seed) && self.inner.permits(seed)
+    }
+
+    fn pop_with(&self, mode: PopMode) -> impl Future<Output = Result<NextSeed>> + Send {
+        self.inner.pop_with(mode)
     }
 
     fn report(&self, report: Report) -> impl Future<Output = Result<Ack>> + Send {
