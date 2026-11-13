@@ -177,6 +177,9 @@ let crawler = Crawler::new(backend, router)
 # }
 ```
 
+The backend follows redirects internally. Redirect targets are not checked
+against robots.txt or subject to the destination host's crawl delay.
+
 A host that answers `429` or `503`, or times out, is slowed down further on
 its own; see [Limits and politeness](politeness.md).
 

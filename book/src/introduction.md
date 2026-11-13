@@ -23,7 +23,7 @@ async fn page(html: Html, links: Links, queue: Queue) -> Result<()> {
 
 # async fn crawl() -> Result<()> {
 let router = Router::new().fallback(page);
-// Each URL once, two links deep, with queued hosts limited to example.com.
+// Each URL once, two links deep, on example.com and its subdomains.
 let frontier = InMemFrontier::fifo()
     .dedup()
     .max_depth(2)
@@ -37,8 +37,9 @@ crawler.run().await?;
 # }
 ```
 
-`allow_hosts` filters seeds and queued links. It does not restrict hosts
-reached through redirects followed by the backend.
+`allow_hosts` filters seeds and queued links, allowing the listed hosts and
+their subdomains. It does not restrict hosts reached through redirects
+followed by the backend.
 
 Handlers are async functions, and their arguments are *extractors*: typed
 values taken from the request or the page, such as its parsed HTML or the
