@@ -15,7 +15,7 @@ use tracing::Instrument;
 use crate::backend::Backend;
 use crate::backend::redirect::{RedirectRequest, Redirects, TransferEvent, cancelled};
 use crate::context::{Context, FETCH, Fetch, FetchScope};
-use crate::crawler::admission::Pending;
+use crate::crawler::admission::{Candidate, Pending, Ready};
 use crate::crawler::concurrency::{Feedback, Signal};
 use crate::crawler::connector::Connector;
 use crate::crawler::discovery::Discovery;
@@ -34,8 +34,8 @@ use crate::sync::lock;
 use crate::worker::{Outcome, Scope, Worker};
 use crate::{Error, ErrorKind, Result, TRACING_TARGET};
 
-/// Seeds parked for busy hosts at most, before the frontier stops being
-/// read; bounds memory when one host dominates the frontier.
+/// Waiting seeds at most before reading more from the frontier; bounds
+/// memory when one host or paused tag dominates the queue.
 const MAX_PARKED: usize = 4096;
 
 /// The robots.txt state of a run.
@@ -117,6 +117,8 @@ struct Run<B> {
     in_flight: HashMap<Id, InFlight>,
     robots: Option<RobotsRun>,
     hosts: Hosts,
+    ready: Ready,
+    next_order: usize,
     /// Connects for requests and robots.txt, as an identity or plainly.
     connector: Arc<Connector<B>>,
     events: Emitter,
@@ -279,6 +281,30 @@ impl<B: Backend> Run<B> {
         }
     }
 
+    /// Pauses `scope` for `duration`, returning the report that retries
+    /// `seed` once the pause ends.
+    fn backoff(&mut self, seed: Seed, scope: Scope, duration: Duration) -> Report {
+        let tag = match scope {
+            Scope::SameTag => seed.tag().cloned(),
+            Scope::Tag(tag) => Some(tag),
+        };
+        tracing::debug!(
+            target: TRACING_TARGET,
+            tag = tag.as_ref().map(tracing::field::display),
+            duration_ms = duration.as_millis(),
+            "backing off",
+        );
+
+        let until = Instant::now() + duration;
+        if !self.aborted.contains(&tag) {
+            self.ready.pause(tag, until);
+        }
+        Report::Retry {
+            seed,
+            after: Some(duration),
+        }
+    }
+
     fn stop(&mut self, reason: StopReason, grace: Option<Duration>) {
         if self.stopping {
             return;
@@ -354,7 +380,25 @@ impl<B: Backend> Run<B> {
         None
     }
 
-    /// The number of seeds parked for hosts or robots.txt.
+    fn candidate(&mut self, seed: Seed) -> Candidate {
+        let candidate = Candidate::new(seed, self.next_order);
+        self.next_order += 1;
+        candidate
+    }
+
+    /// Queues a robots-approved occurrence, or resumes an admitted hop.
+    fn release(&mut self, pending: Pending) {
+        match pending {
+            Pending::Seed(seed) => {
+                if let Some(seed) = self.discovery.admit(seed) {
+                    self.ready.push(seed);
+                }
+            }
+            Pending::Redirect(redirect) => self.resume_redirect(redirect),
+        }
+    }
+
+    /// The number of seeds waiting for admission, hosts or robots.txt.
     fn parked(&self) -> usize {
         #[cfg(feature = "robots")]
         let robots = self
@@ -363,12 +407,13 @@ impl<B: Backend> Run<B> {
             .map_or(0, |robots| robots.cache.parked());
         #[cfg(not(feature = "robots"))]
         let robots = 0;
-        self.hosts.parked() + robots
+        self.hosts.parked() + self.ready.len() + robots
     }
 
     /// Takes every parked seed, e.g. when the run stops.
     fn drain(&mut self) -> Vec<Pending> {
         let mut seeds = self.hosts.drain();
+        seeds.extend(self.ready.drain().map(Pending::Seed));
         seeds.extend(self.discovery.drain().into_iter().map(Pending::Seed));
         #[cfg(feature = "robots")]
         let seeds = match &mut self.robots {
@@ -502,7 +547,7 @@ where
         for pending in run.drain() {
             match pending {
                 Pending::Seed(seed) => {
-                    self.report(run, Report::Cancelled(seed)).await;
+                    self.report(run, Report::Cancelled(seed.seed)).await;
                 }
                 Pending::Redirect(redirect) => {
                     let _ = redirect.answer.send(Err(cancelled()));
@@ -530,6 +575,8 @@ where
             in_flight: HashMap::new(),
             robots,
             hosts,
+            ready: Ready::default(),
+            next_order: 0,
             connector,
             events: self.events.clone(),
             aborted: HashSet::new(),
@@ -549,17 +596,29 @@ where
         self.resume_redirects(run).await;
 
         while run.tasks.len() < settings.concurrency.get() {
+            if run.stopping {
+                return None;
+            }
             if settings.max_requests.is_some_and(|max| run.started >= max) {
                 run.stop(StopReason::RequestBudget, settings.shutdown_grace);
                 return None;
             }
 
-            if let Some(seed) = run.discovery.pop() {
-                self.admit(run, seed.into()).await;
+            if let Some(seed) = run.ready.pop(Instant::now()) {
+                if run.is_aborted(&seed) {
+                    self.skip(run, seed.into(), SkipReason::TagAborted).await;
+                } else if let Admit::Start(pending) = run.hosts.admit(seed, Instant::now()) {
+                    self.start(run, pending).await;
+                }
                 continue;
             }
             if let Some(seed) = run.hosts.take_ready(Instant::now()) {
                 self.start(run, seed).await;
+                continue;
+            }
+            if let Some(seed) = run.discovery.pop() {
+                let seed = run.candidate(seed.seed);
+                self.admit(run, seed.into()).await;
                 continue;
             }
             if run.parked() >= MAX_PARKED {
@@ -567,7 +626,10 @@ where
             }
 
             match self.frontier.pop_with(run.discovery.mode()).await {
-                Ok(NextSeed::Ready(seed)) => self.admit(run, seed.into()).await,
+                Ok(NextSeed::Ready(seed)) => {
+                    let seed = run.candidate(seed);
+                    self.admit(run, seed.into()).await;
+                }
                 Ok(NextSeed::Wait(at)) => {
                     wait = wait.min(Some(at)).or(Some(at));
                     break;
@@ -590,10 +652,16 @@ where
         }
 
         let robots = run.robots_tick();
-        [wait, robots, run.hosts.earliest()]
-            .into_iter()
-            .flatten()
-            .min()
+        [
+            wait,
+            robots,
+            run.hosts.earliest(),
+            run.ready
+                .earliest(Instant::now(), run.tasks.len() < settings.concurrency.get()),
+        ]
+        .into_iter()
+        .flatten()
+        .min()
     }
 
     /// Redirect hops belong to already-running work, including during graceful
@@ -673,15 +741,17 @@ where
     async fn admit(&self, run: &mut Run<B>, seed: Pending) {
         if run.stopping && !seed.is_redirect() {
             if let Pending::Seed(seed) = seed {
-                self.report(run, Report::Cancelled(seed)).await;
+                self.report(run, Report::Cancelled(seed.seed)).await;
             }
             return;
         }
         match run.robots_access(seed) {
-            Access::Allow(seed) => match run.hosts.admit(seed, Instant::now()) {
-                Admit::Start(seed) => self.start(run, seed).await,
-                Admit::Parked => {}
-            },
+            Access::Allow(seed) if seed.is_redirect() => {
+                if let Admit::Start(seed) = run.hosts.admit(seed, Instant::now()) {
+                    run.release(seed);
+                }
+            }
+            Access::Allow(seed) => run.release(seed),
             Access::Disallow(seed) => self.skip(run, seed, SkipReason::Disallowed).await,
             Access::Parked => {}
         }
@@ -766,7 +836,7 @@ where
     /// Skips `seed` without crawling it.
     async fn skip(&self, run: &mut Run<B>, pending: Pending, reason: SkipReason) {
         let seed = match pending {
-            Pending::Seed(seed) => seed,
+            Pending::Seed(seed) => seed.seed,
             Pending::Redirect(redirect) => {
                 let _ = redirect.answer.send(Err(Error::new(ErrorKind::Rejected)
                     .with_message(format!("redirect target skipped: {reason}"))
@@ -783,7 +853,7 @@ where
         self.report(run, Report::Skipped(seed)).await;
     }
 
-    /// Skips `seed` if its tag was aborted, and otherwise spawns the request.
+    /// Starts a host-admitted request, or resumes an existing redirect hop.
     async fn start(&self, run: &mut Run<B>, pending: Pending) {
         let seed = match pending {
             Pending::Seed(seed) => seed,
@@ -792,14 +862,17 @@ where
                 return;
             }
         };
-        let Some(seed) = run.discovery.admit(seed) else {
-            return;
-        };
         if run.is_aborted(&seed) {
             self.skip(run, seed.into(), SkipReason::TagAborted).await;
             return;
         }
-
+        // Host waiters already hold their place in the host queue. Only
+        // recheck tag admission here; fresh host admission would requeue
+        // the head behind its own waiters indefinitely.
+        let Some(seed) = run.ready.admit(seed, Instant::now()) else {
+            return;
+        };
+        let seed = seed.seed;
         run.started += 1;
         let now = Instant::now();
         let host = run.hosts.start(&seed, now);
@@ -1007,12 +1080,13 @@ where
                     Scope::Tag(tag) => Some(tag),
                 };
                 tracing::info!(target: TRACING_TARGET, tag = tag.as_ref().map(tracing::field::display), "aborting tag");
+                run.ready.unpause(tag.as_ref());
                 run.aborted.insert(tag);
                 self.tally(|stats| stats.succeeded += 1);
                 Report::Done(seed)
             }
             Outcome::Retry { after } => Report::Retry { seed, after },
-            Outcome::Backoff { scope, duration } => self.backoff(run, seed, scope, duration).await,
+            Outcome::Backoff { scope, duration } => run.backoff(seed, scope, duration),
             Outcome::Fatal(error) => {
                 failed = true;
                 run.fail(error.with_uri(uri.clone()), self.settings.shutdown_grace);
@@ -1071,34 +1145,6 @@ where
             self.tally(|stats| stats.failed += 1);
             run.events
                 .emit_for(request.as_ref(), |request| Event::Failed { request });
-        }
-    }
-
-    /// Pauses `scope` for `duration`, returning the report that retries
-    /// `seed` once the pause ends.
-    async fn backoff(
-        &self,
-        run: &mut Run<B>,
-        seed: Seed,
-        scope: Scope,
-        duration: Duration,
-    ) -> Report {
-        let tag = match scope {
-            Scope::SameTag => seed.tag().cloned(),
-            Scope::Tag(tag) => Some(tag),
-        };
-        tracing::debug!(
-            target: TRACING_TARGET,
-            tag = tag.as_ref().map(tracing::field::display),
-            duration_ms = duration.as_millis(),
-            "backing off",
-        );
-
-        let until = Instant::now() + duration;
-        self.report(run, Report::Backoff { tag, until }).await;
-        Report::Retry {
-            seed,
-            after: Some(duration),
         }
     }
 

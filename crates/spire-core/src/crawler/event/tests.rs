@@ -244,8 +244,8 @@ async fn robots_txt_fetches_and_disallows_are_reported() {
         [
             "started",
             "robots https://example.com ok",
-            "start / #0",
             "skip /private disallowed by robots.txt",
+            "start / #0",
             "fetch / 200",
             "handle / continue",
             "finish 1",

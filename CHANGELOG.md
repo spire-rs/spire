@@ -18,6 +18,13 @@ and this project adheres to
 
 ### Changed
 
+- **Breaking:** Minimum Rust version is now 1.99. Update `html-to-markdown-rs`
+  to 3.22, replacing the unmaintained `astral-tl` dependency with `astral-html`.
+- **Breaking:** Handler tag backoff is now enforced by the scheduler with any
+  frontier. Remove `TagBackoff`, `FrontierExt::tag_backoff`, and `Report::Backoff`.
+  Fresh, deferred and host-waiting requests share one ready queue; running
+  requests continue. Retry support remains a frontier concern.
+
 - **Breaking:** `ReqwestBackend` always resolves redirects through Spire,
   checking scope, robots.txt and host limits for each hop during a crawl.
   Builder redirect policies are disabled. With `cookies`, clients use owned
@@ -35,6 +42,12 @@ and this project adheres to
   Custom frontier scope facades should forward `Frontier::permits`.
 
 ### Fixed
+
+- Requests released by robots.txt now obey global concurrency and request
+  budgets through the scheduler ready queue.
+
+- Deferred discovery pages now honor tag backoff without being re-enqueued;
+  their priority order and persistent occurrence identity are preserved.
 
 - `StatusPolicy` honors valid `Retry-After` on all retryable statuses (`408`,
   `429`, and `5xx`). Redirect continuations own their admission reply channels

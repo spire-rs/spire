@@ -163,7 +163,7 @@ async fn backoff_pauses_the_tag_and_retries() {
     });
     let crawler = Crawler::new(Noop, worker)
         .with_concurrency(1)
-        .with_frontier(InMemFrontier::fifo().retry(1).tag_backoff())
+        .with_frontier(InMemFrontier::fifo().retry(1))
         .with_dataset(order.clone())
         .with_seeds([
             seed("limited").with_tag("api"),
@@ -279,7 +279,7 @@ async fn retry_after_errors_back_off() {
         Ok(())
     });
     let crawler = Crawler::new(Noop, worker)
-        .with_frontier(InMemFrontier::fifo().retry(1).tag_backoff())
+        .with_frontier(InMemFrontier::fifo().retry(1))
         .with_seed(seed("limited"));
 
     let started = Instant::now();
@@ -340,7 +340,6 @@ mod limits {
                 Report::Cancelled(seed) => format!("cancelled {}", seed.uri().path()),
                 Report::Retry { seed, .. } => format!("retry {}", seed.uri().path()),
                 Report::Requeue { seed, .. } => format!("requeue {}", seed.uri().path()),
-                Report::Backoff { .. } => "backoff".to_owned(),
             };
             lock(&self.reports).push(entry);
             self.inner.report(report)
@@ -1382,3 +1381,365 @@ async fn failed_response_recording_stops_the_crawl_without_losing_the_seed() {
 }
 
 mod redirect;
+
+#[tokio::test(start_paused = true)]
+async fn deferred_discovery_pages_observe_tag_backoff_and_priority() {
+    use std::sync::Mutex;
+
+    let started = Instant::now();
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let recorded = seen.clone();
+    let worker = from_fn(move |cx: Context<Noop>| {
+        let seen = recorded.clone();
+        async move {
+            let path = path(&cx);
+            if path == "map" {
+                for (path, priority) in [("low", 1), ("high", 3), ("middle", 2)] {
+                    cx.queue()
+                        .push(seed(path).with_tag("page").with_priority(priority))
+                        .await?;
+                }
+            } else {
+                seen.lock().unwrap().push((path.clone(), started.elapsed()));
+                if path == "high" && cx.request().attempt().get() == 0 {
+                    return Ok(Outcome::backoff(Duration::from_secs(10)));
+                }
+            }
+            Ok::<_, Error>(Outcome::Continue)
+        }
+    });
+    let stats = Crawler::new(Noop, worker)
+        .with_frontier(InMemFrontier::fifo().retry(1))
+        .with_discovery_tag("map")
+        .with_concurrency(1)
+        .with_seed(seed("map").with_tag("map"))
+        .run()
+        .await
+        .unwrap();
+    assert_eq!(stats.failed, 0);
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen[0], ("high".to_owned(), Duration::ZERO));
+    let deferred: Vec<_> = seen.iter().filter(|(path, _)| path != "high").collect();
+    assert_eq!(
+        deferred,
+        [
+            &("middle".to_owned(), Duration::from_secs(10)),
+            &("low".to_owned(), Duration::from_secs(10))
+        ]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn tag_backoff_applies_to_requests_already_waiting_for_a_host() {
+    use std::sync::Mutex;
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let recorded = seen.clone();
+    let started = Instant::now();
+    let worker = from_fn(move |cx: Context<Noop>| {
+        let seen = recorded.clone();
+        async move {
+            let path = path(&cx);
+            seen.lock().unwrap().push((path.clone(), started.elapsed()));
+            if path == "limited" && cx.request().attempt().get() == 0 {
+                sleep(Duration::from_secs(1)).await;
+                return Outcome::backoff(Duration::from_secs(10));
+            }
+            Outcome::Continue
+        }
+    });
+    let stats = Crawler::new(Noop, worker)
+        .with_frontier(InMemFrontier::fifo().retry(1))
+        .with_concurrency(3)
+        .with_host_concurrency(1)
+        .with_seeds([
+            seed("limited").with_tag("a"),
+            seed("same").with_tag("a"),
+            seed("other").with_tag("b"),
+        ])
+        .run()
+        .await
+        .unwrap();
+    assert_eq!((stats.succeeded, stats.failed, stats.retried), (3, 0, 1));
+    assert_eq!(
+        *seen.lock().unwrap(),
+        [
+            ("limited".to_owned(), Duration::ZERO),
+            ("other".to_owned(), Duration::from_secs(1)),
+            ("same".to_owned(), Duration::from_secs(11)),
+            ("limited".to_owned(), Duration::from_secs(11)),
+        ]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pause_expiring_during_another_tag_does_not_reverse_deferred_priority() {
+    use std::sync::Mutex;
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let recorded = seen.clone();
+    let started = Instant::now();
+    let worker = from_fn(move |cx: Context<Noop>| {
+        let seen = recorded.clone();
+        async move {
+            let path = path(&cx);
+            if path == "map" {
+                for (path, tag, priority) in [
+                    ("low", "a", 1),
+                    ("long", "b", 2),
+                    ("high", "a", 3),
+                    ("trigger", "a", 4),
+                ] {
+                    cx.queue()
+                        .push(seed(path).with_tag(tag).with_priority(priority))
+                        .await?;
+                }
+            } else {
+                seen.lock().unwrap().push((path.clone(), started.elapsed()));
+                if path == "trigger" && cx.request().attempt().get() == 0 {
+                    return Ok(Outcome::backoff(Duration::from_secs(5)));
+                }
+                if path == "long" {
+                    sleep(Duration::from_secs(10)).await;
+                }
+            }
+            Ok::<_, Error>(Outcome::Continue)
+        }
+    });
+    let stats = Crawler::new(Noop, worker)
+        .with_frontier(InMemFrontier::fifo().retry(1))
+        .with_discovery_tag("map")
+        .with_concurrency(1)
+        .with_seed(seed("map").with_tag("map"))
+        .run()
+        .await
+        .unwrap();
+    assert_eq!(stats.failed, 0);
+    assert_eq!(
+        *seen.lock().unwrap(),
+        [
+            ("trigger".to_owned(), Duration::ZERO),
+            ("long".to_owned(), Duration::ZERO),
+            ("high".to_owned(), Duration::from_secs(10)),
+            ("low".to_owned(), Duration::from_secs(10)),
+            ("trigger".to_owned(), Duration::from_secs(10)),
+        ]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn stopping_returns_tag_paused_occurrences_to_the_frontier() {
+    use crate::frontier::Frontier;
+    let frontier = Arc::new(InMemFrontier::fifo());
+    let worker = from_fn(|cx: Context<Noop>| async move {
+        match path(&cx).as_str() {
+            "limited" => Outcome::backoff(Duration::from_hours(1)),
+            "stop" => Outcome::Stop,
+            _ => panic!("paused request must not start"),
+        }
+    });
+    let stats = Crawler::new(Noop, worker)
+        .with_frontier(frontier.clone().retry(1))
+        .with_concurrency(1)
+        .with_seeds([
+            seed("limited").with_tag("a"),
+            seed("paused").with_tag("a"),
+            seed("stop").with_tag("b"),
+        ])
+        .run()
+        .await
+        .unwrap();
+    assert_eq!(stats.requests, 2);
+    let snapshot = frontier.snapshot().unwrap();
+    assert_eq!(snapshot.len(), 2);
+    assert!(
+        snapshot
+            .iter()
+            .any(|seed| seed.uri().path() == "/paused" && seed.attempt().get() == 0)
+    );
+    assert!(
+        snapshot
+            .iter()
+            .any(|seed| seed.uri().path() == "/limited" && seed.attempt().get() == 1)
+    );
+}
+
+#[cfg(feature = "robots")]
+#[tokio::test(start_paused = true)]
+async fn robots_releases_obey_global_concurrency_and_request_budget() {
+    use crate::frontier::Frontier;
+    use crate::testing::{MockPage, MockSession, MockSite};
+
+    for limit in [None, Some(1)] {
+        let site = MockSite::new().page(
+            "https://example.com/robots.txt",
+            MockPage::text("User-agent: *\nAllow: /\n").with_latency(Duration::from_secs(1)),
+        );
+        let active = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+        let observed = peak.clone();
+        let worker = from_fn(move |_: Context<MockSession>| {
+            let active = active.clone();
+            let peak = peak.clone();
+            async move {
+                let count = active.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(count, Ordering::SeqCst);
+                sleep(Duration::from_secs(1)).await;
+                active.fetch_sub(1, Ordering::SeqCst);
+            }
+        });
+        let frontier = Arc::new(InMemFrontier::fifo());
+        let crawler = Crawler::new(site, worker)
+            .with_frontier(frontier.clone())
+            .with_concurrency(2)
+            .with_robots("bot")
+            .with_seeds([seed("a"), seed("b"), seed("c"), seed("d")]);
+        let crawler = match limit {
+            Some(max) => crawler.with_max_requests(max),
+            None => crawler,
+        };
+        let stats = crawler.run().await.unwrap();
+        assert_eq!(stats.succeeded, limit.unwrap_or(4));
+        assert_eq!(observed.load(Ordering::SeqCst), limit.unwrap_or(2));
+        assert_eq!(
+            frontier.snapshot().unwrap().len(),
+            limit.map_or(0, |max| 4 - max)
+        );
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_older_host_waiter_does_not_lose_its_order_when_tag_backoff_parks_it_again() {
+    use futures::StreamExt;
+
+    use crate::crawler::event::Event;
+
+    let worker = from_fn(|cx: Context<Noop>| async move {
+        match path(&cx).as_str() {
+            "block" => sleep(Duration::from_secs(2)).await,
+            "trigger" if cx.request().attempt().get() == 0 => {
+                sleep(Duration::from_secs(1)).await;
+                return Outcome::backoff(Duration::from_secs(10));
+            }
+            _ => {}
+        }
+        Outcome::Continue
+    });
+    let crawler = Crawler::new(Noop, worker)
+        .with_frontier(InMemFrontier::fifo().retry(1))
+        .with_concurrency(2)
+        .with_host_concurrency(1)
+        .with_seeds([
+            Seed::get("https://wait.test/block").unwrap().with_tag("b"),
+            Seed::get("https://wait.test/high").unwrap().with_tag("a"),
+            Seed::get("https://trigger.test/trigger")
+                .unwrap()
+                .with_tag("a"),
+            Seed::get("https://free.test/low").unwrap().with_tag("a"),
+        ]);
+    let mut events = crawler.events();
+    let stats = crawler.run().await.unwrap();
+    assert_eq!((stats.succeeded, stats.failed, stats.retried), (4, 0, 1));
+    let mut started = Vec::new();
+    while let Some(event) = events.next().await {
+        match event {
+            Event::RequestStarted { request } => started.push(request.uri.path().to_owned()),
+            Event::Finished { .. } => break,
+            _ => {}
+        }
+    }
+    assert_eq!(started, ["/block", "/trigger", "/high", "/low", "/trigger"]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_host_waiter_returning_after_tag_backoff_stays_ahead_of_later_host_waiters() {
+    use futures::StreamExt;
+
+    use crate::crawler::event::Event;
+
+    let worker = from_fn(|cx: Context<Noop>| async move {
+        match path(&cx).as_str() {
+            "block" => sleep(Duration::from_secs(1)).await,
+            "b" => sleep(Duration::from_secs(10)).await,
+            "trigger" if cx.request().attempt().get() == 0 => {
+                return Outcome::backoff(Duration::from_secs(5));
+            }
+            _ => {}
+        }
+        Outcome::Continue
+    });
+    let crawler = Crawler::new(Noop, worker)
+        .with_frontier(InMemFrontier::fifo().retry(1))
+        .with_concurrency(3)
+        .with_host_concurrency(1)
+        .with_seeds([
+            seed("block").with_tag("b"),
+            seed("a1").with_tag("a"),
+            seed("b").with_tag("b"),
+            seed("a2").with_tag("a"),
+            Seed::get("https://other.test/trigger")
+                .unwrap()
+                .with_tag("a"),
+        ]);
+    let mut events = crawler.events();
+    let stats = crawler.run().await.unwrap();
+    assert_eq!((stats.succeeded, stats.failed, stats.retried), (5, 0, 1));
+    let mut started = Vec::new();
+    while let Some(event) = events.next().await {
+        match event {
+            Event::RequestStarted { request } if matches!(request.uri.path(), "/a1" | "/a2") => {
+                started.push(request.uri.path().to_owned());
+            }
+            Event::Finished { .. } => break,
+            _ => {}
+        }
+    }
+    assert_eq!(started, ["/a1", "/a2"]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_pause_expiring_during_frontier_io_does_not_cancel_eligible_work() {
+    use std::future::Future;
+    use std::sync::atomic::AtomicBool;
+
+    use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
+
+    #[derive(Default)]
+    struct SlowEmpty {
+        inner: InMemFrontier,
+        delayed: AtomicBool,
+    }
+
+    impl Frontier for SlowEmpty {
+        fn push(&self, seed: Seed) -> impl Future<Output = crate::Result<Admission>> + Send {
+            self.inner.push(seed)
+        }
+
+        async fn pop_with(&self, mode: PopMode) -> crate::Result<NextSeed> {
+            let next = self.inner.pop_with(mode).await?;
+            if matches!(next, NextSeed::Empty) && !self.delayed.swap(true, Ordering::SeqCst) {
+                sleep(Duration::from_secs(5)).await;
+            }
+            Ok(next)
+        }
+
+        fn report(&self, report: Report) -> impl Future<Output = crate::Result<Ack>> + Send {
+            self.inner.report(report)
+        }
+    }
+
+    let worker = from_fn(|cx: Context<Noop>| async move {
+        if path(&cx) == "limited" {
+            Outcome::backoff(Duration::from_secs(2))
+        } else {
+            Outcome::Continue
+        }
+    });
+    // No retry facade: there is no retry timer that could hide the lost wakeup.
+    let stats = Crawler::new(Noop, worker)
+        .with_frontier(SlowEmpty::default())
+        .with_concurrency(1)
+        .with_seeds([seed("limited").with_tag("a"), seed("after").with_tag("a")])
+        .run()
+        .await
+        .unwrap();
+    assert_eq!((stats.requests, stats.succeeded, stats.failed), (2, 1, 1));
+}

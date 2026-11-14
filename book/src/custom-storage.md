@@ -6,7 +6,7 @@ database, a queue service, or memory shared with something else.
 | Trait | Keeps | Built in |
 |---|---|---|
 | `Frontier` | Seeds waiting to be crawled, and what to do when one ends | `InMemFrontier`, `RedbFrontier`, `SqliteFrontier` |
-| `FrontierLayer` | A facade wrapping a frontier with behavior | `dedup`, `filter`, `max_depth`, `retry`, `tag_backoff`, `revisit` |
+| `FrontierLayer` | A facade wrapping a frontier with behavior | `dedup`, `filter`, `max_depth`, `retry`, `revisit` |
 | `SeenSet` | Fingerprints of seeds seen before | `InMemSeen`, `BloomSeen`, `RedbSeen`, `SqliteSeen` |
 | `Schedule` | Seeds held back until a time, for revisits | `InMemFrontier`, `RedbFrontier`, `SqliteFrontier` |
 | `Dataset<T>` | Scraped items | `InMemDataset`, `JsonlDataset`, `CsvDataset`, `RedbDataset`, `SqliteDataset` |

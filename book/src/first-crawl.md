@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
         .require::<Page>();
 
     let crawler = Crawler::new(ReqwestBackend::default(), router)
-        .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3).tag_backoff())
+        .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3))
         .with_dataset(InMemDataset::<Product>::new())
         .with_concurrency(16)
         .with_seed(Seed::get("https://example.com/products")?.with_tag(Page::Listing));
@@ -102,8 +102,8 @@ Step by step:
 2. **The frontier** holds the requests waiting to be crawled, in first-in,
    first-out order. On top of it, `dedup` skips URLs already seen,
    `max_depth` stops five links away from the seed, `retry` tries failed
-   requests three more times, and `tag_backoff` pauses a tag when a
-   handler backs off.
+   requests three more times. The scheduler pauses a tag automatically when
+   a handler backs off.
 3. **The dataset** stores what `Collect` extracts, in memory.
 4. **The seed** is the first request: the listing, tagged as one.
 5. **`run`** crawls until nothing is queued or in flight, then returns
@@ -162,7 +162,7 @@ let backend = ReqwestBackend::from_builder(|| {
     reqwest::Client::builder().user_agent("MyShopBot")
 })?;
 let crawler = Crawler::new(backend, router)
-    .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3).tag_backoff())
+    .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3))
     .with_dataset(InMemDataset::<Product>::new())
     .with_concurrency(16)
     // One request at a time per host, half a second apart.

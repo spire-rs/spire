@@ -4,11 +4,11 @@ use std::cmp::Reverse;
 use std::collections::VecDeque;
 
 use crate::crawler::Tag;
-use crate::frontier::seed::Seed;
+use crate::crawler::admission::Candidate;
 
 pub(super) enum Discovery {
-    Gathering { tag: Tag, pages: Vec<Seed> },
-    Ready(VecDeque<Seed>),
+    Gathering { tag: Tag, pages: Vec<Candidate> },
+    Ready(VecDeque<Candidate>),
 }
 
 impl Discovery {
@@ -22,7 +22,7 @@ impl Discovery {
         )
     }
 
-    pub(super) fn admit(&mut self, seed: Seed) -> Option<Seed> {
+    pub(super) fn admit(&mut self, seed: Candidate) -> Option<Candidate> {
         if let Self::Gathering { tag, pages } = self
             && seed.tag() != Some(tag)
         {
@@ -39,7 +39,7 @@ impl Discovery {
         }
     }
 
-    pub(super) fn pop(&mut self) -> Option<Seed> {
+    pub(super) fn pop(&mut self) -> Option<Candidate> {
         match self {
             Self::Gathering { .. } => None,
             Self::Ready(pages) => pages.pop_front(),
@@ -55,7 +55,7 @@ impl Discovery {
         true
     }
 
-    pub(super) fn drain(&mut self) -> Vec<Seed> {
+    pub(super) fn drain(&mut self) -> Vec<Candidate> {
         match self {
             Self::Gathering { pages, .. } => std::mem::take(pages),
             Self::Ready(pages) => pages.drain(..).collect(),

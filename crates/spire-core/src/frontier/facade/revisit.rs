@@ -157,7 +157,7 @@ mod tests {
             })
             .await
             .unwrap();
-        let frontier = storage.revisit::<Page>().retry(3).dedup().tag_backoff();
+        let frontier = storage.revisit::<Page>().retry(3).dedup();
         let NextSeed::Ready(retry) = frontier.pop_with(PopMode::Queued).await.unwrap() else {
             panic!("expected retry");
         };

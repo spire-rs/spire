@@ -67,8 +67,7 @@ let frontier = InMemFrontier::fifo()
     .allow_hosts(["example.com"])
     .filter(|seed| !seed.uri().path().ends_with(".pdf"))
     .max_depth(5)
-    .retry(3)
-    .tag_backoff();
+    .retry(3);
 ```
 
 | Facade | Does |
@@ -80,7 +79,9 @@ let frontier = InMemFrontier::fifo()
 | `max_depth(depth)` | Refuses seeds further than `depth` links from a seed |
 | `retry(times)` | Retries failed requests, with exponential backoff |
 | `retry_with(policy)` | The same, with a `RetryPolicy` |
-| `tag_backoff()` | Pauses a tag when a handler backs off |
+
+The scheduler applies handler tag backoff automatically, including to pages
+deferred during discovery and requests waiting for a host.
 
 A crawler without `with_frontier` uses `InMemFrontier::fifo()` with the
 default retries, and no deduplication. Add `dedup` to any crawl that follows

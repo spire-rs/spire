@@ -135,7 +135,7 @@ mod tests {
         for status in [408, 429, 500, 502, 503, 504, 599] {
             let error = classify(status, Some("120"));
             assert!(error.is_retryable());
-            assert_eq!(error.retry_after(), Some(Duration::from_secs(120)));
+            assert_eq!(error.retry_after(), Some(Duration::from_mins(2)));
         }
         // A header does not make a permanent failure retryable.
         for status in [400, 401, 403, 404] {

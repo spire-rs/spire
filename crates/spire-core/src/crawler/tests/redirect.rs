@@ -46,8 +46,7 @@ async fn redirects_cannot_escape_host_filters_nested_inside_other_facades() {
                 .allow_hosts(["example.com"])
                 .dedup()
                 .max_depth(2)
-                .retry(3)
-                .tag_backoff(),
+                .retry(3),
         )
         .with_seed(seed("start"))
         .run()
@@ -228,7 +227,7 @@ async fn timed_out_redirects_do_not_keep_the_crawl_waiting_for_host_delay() {
         .with_frontier(InMemFrontier::fifo())
         .with_concurrency(1)
         .with_host_concurrency(1)
-        .with_host_delay(Duration::from_secs(3600))
+        .with_host_delay(Duration::from_hours(1))
         .with_request_timeout(Duration::from_secs(1))
         .with_seed(seed("start"))
         .run()
@@ -254,7 +253,7 @@ async fn timed_out_redirects_do_not_wait_for_an_orphaned_robots_fetch() {
         )
         .page(
             "https://target.test/robots.txt",
-            MockPage::text("User-agent: *\nAllow: /\n").with_latency(Duration::from_secs(3600)),
+            MockPage::text("User-agent: *\nAllow: /\n").with_latency(Duration::from_hours(1)),
         )
         .page("https://target.test/page", MockPage::text("done"));
     let worker = from_fn(|cx: Context<MockSession>| async move { cx.body().await.map(drop) });
@@ -288,7 +287,7 @@ async fn a_parked_redirect_timeout_neither_releases_another_host_slot_nor_keeps_
         )
         .page(
             "https://target.test/robots.txt",
-            MockPage::text("User-agent: *\nAllow: /\n").with_latency(Duration::from_secs(3600)),
+            MockPage::text("User-agent: *\nAllow: /\n").with_latency(Duration::from_hours(1)),
         )
         .page(
             "https://example.com/a",
@@ -349,7 +348,7 @@ async fn orphaned_robots_fetches_are_cancelled_while_another_origin_is_still_par
         )
         .page(
             "https://target.test/robots.txt",
-            MockPage::text("User-agent: *\nAllow: /\n").with_latency(Duration::from_secs(3600)),
+            MockPage::text("User-agent: *\nAllow: /\n").with_latency(Duration::from_hours(1)),
         )
         .page(
             "https://other.test/robots.txt",

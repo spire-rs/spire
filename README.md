@@ -43,7 +43,7 @@ in.
 
 ## Requirements
 
-- **Rust + Cargo**: 1.95+, Edition 2024
+- **Rust + Cargo**: 1.99+, Edition 2024
 - **A WebDriver server**, such as chromedriver, for the browser backend only.
 
 ## Quick start

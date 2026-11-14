@@ -79,8 +79,7 @@ async fn example() -> Result<()> {
     let frontier = InMemFrontier::fifo()
         .dedup()
         .max_depth(3)
-        .retry(3)
-        .tag_backoff();
+        .retry(3);
 
     let stats = Crawler::new(Noop, from_fn(handle))
         .with_frontier(frontier)

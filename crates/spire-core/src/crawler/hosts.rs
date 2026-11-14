@@ -138,7 +138,13 @@ impl Hosts {
             return Admit::Start(seed);
         }
 
-        host.parked.push_back(seed);
+        let index = match &seed {
+            Pending::Seed(candidate) => host.parked.iter().position(|queued| {
+                matches!(queued, Pending::Seed(queued) if queued.order > candidate.order)
+            }).unwrap_or(host.parked.len()),
+            Pending::Redirect(_) => host.parked.len(),
+        };
+        host.parked.insert(index, seed);
         self.parked += 1;
         Admit::Parked
     }

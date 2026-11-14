@@ -466,6 +466,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn deferred_discovery_backoff_keeps_sqlite_occurrences_acknowledgeable() {
+        use std::sync::Mutex;
+
+        use spire_core::Context;
+        use spire_core::backend::Noop;
+        use spire_core::crawler::Crawler;
+        use spire_core::http::RequestExt;
+        use spire_core::worker::{Outcome, from_fn};
+
+        let directory = TempDir::new().unwrap();
+        let store = store(&directory.path().join("discovery.sqlite")).await;
+        let frontier = Arc::new(store.frontier().await.unwrap());
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let recorded = seen.clone();
+        let pause = Duration::from_millis(50);
+        let worker = from_fn(move |cx: Context<Noop>| {
+            let seen = recorded.clone();
+            async move {
+                let path = cx.request().uri().path().to_owned();
+                if path == "/map" {
+                    for (path, priority) in [("low", 1), ("high", 3), ("middle", 2)] {
+                        cx.queue()
+                            .push(seed(path, priority).with_tag("page"))
+                            .await?;
+                    }
+                } else {
+                    seen.lock().unwrap().push((path.clone(), Instant::now()));
+                    if path == "/high" && cx.request().attempt().get() == 0 {
+                        return Ok(Outcome::backoff(pause));
+                    }
+                }
+                Ok::<_, Error>(Outcome::Continue)
+            }
+        });
+        let stats = Crawler::new(Noop, worker)
+            .with_frontier(frontier.clone().retry(1))
+            .with_discovery_tag("map")
+            .with_concurrency(1)
+            .with_seed(seed("map", 0).with_tag("map"))
+            .run()
+            .await
+            .unwrap();
+        assert_eq!((stats.succeeded, stats.failed, stats.retried), (4, 0, 1));
+        assert_eq!(frontier.in_flight().await.unwrap(), 0);
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
+        let seen = seen.lock().unwrap();
+        let started = seen[0].1;
+        let deferred: Vec<_> = seen.iter().filter(|(path, _)| path != "/high").collect();
+        assert_eq!(
+            deferred
+                .iter()
+                .map(|(path, _)| path.as_str())
+                .collect::<Vec<_>>(),
+            ["/middle", "/low"]
+        );
+        assert!(deferred.iter().all(|(_, at)| *at >= started + pause));
+    }
+
+    #[tokio::test]
     async fn replay_recovers_original_links_after_the_live_page_changes() {
         use spire_core::Context;
         use spire_core::backend::{Backend, Noop};

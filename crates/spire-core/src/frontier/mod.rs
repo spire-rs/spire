@@ -7,11 +7,7 @@
 //! ```
 //! use spire_core::frontier::{FrontierExt, InMemFrontier};
 //!
-//! let frontier = InMemFrontier::fifo()
-//!     .dedup()
-//!     .max_depth(5)
-//!     .retry(3)
-//!     .tag_backoff();
+//! let frontier = InMemFrontier::fifo().dedup().max_depth(5).retry(3);
 //! ```
 //!
 //! Pushes flow from the outermost facade inwards, so above, a seed that is
@@ -23,14 +19,14 @@
 //! - [`MaxDepth`] refuses seeds deeper than a limit.
 //! - [`Retry`] re-queues seeds after [`Report::Retry`], with a delay, in
 //!   storage that handles [`Report::Requeue`].
-//! - [`TagBackoff`] holds back a tag's seeds after [`Report::Backoff`].
 //! - [`Revisits`] crawls seeds again on a schedule, kept by storage that
 //!   implements [`Schedule`].
 //! - [`Scored`] adds a [`Score`] to every pushed seed's priority, for
 //!   best-first crawling.
 //!
-//! Without a [`Retry`] facade, retries are refused and the seeds fail;
-//! without a [`TagBackoff`] facade, backoffs only delay the retried request.
+//! Without a [`Retry`] facade, retries are refused and the seeds fail.
+//! The crawler applies handler tag backoff automatically, independently of
+//! frontier storage and facades.
 //!
 //! A retry or revisit that has come due joins the queue the next time a seed
 //! is popped, and the storage's order decides when it runs, as for any other
@@ -54,14 +50,14 @@ use tokio::time::Instant;
 
 use self::facade::{
     AllowedHosts, AvoidTraps, Dedup, Filter, MaxDepth, Retry, RetryPolicy, Revisits, Scored,
-    TagBackoff, TrapPolicy,
+    TrapPolicy,
 };
 pub use self::memory::InMemFrontier;
 use self::score::Score;
 use self::seed::Seed;
 use self::seen::{InMemSeen, SeenSet};
 use crate::Result;
-use crate::crawler::{Revisit, Tag};
+use crate::crawler::Revisit;
 
 /// Stores [`Seed`]s and decides which one is crawled next.
 pub trait Frontier: Send + Sync + 'static {
@@ -282,13 +278,6 @@ pub enum Report {
         /// When it joins the queue.
         due: Instant,
     },
-    /// Seeds with `tag` should not be crawled before `until`.
-    Backoff {
-        /// The tag to pause; `None` pauses untagged seeds.
-        tag: Option<Tag>,
-        /// The earliest instant at which the tag may be crawled again.
-        until: Instant,
-    },
 }
 
 /// What a frontier did with a [`Report`].
@@ -372,11 +361,6 @@ pub trait FrontierExt: Frontier + Sized {
     /// Retries failed seeds according to `policy`.
     fn retry_with(self, policy: RetryPolicy) -> Retry<Self> {
         Retry::new(self, policy)
-    }
-
-    /// Holds back seeds of paused tags.
-    fn tag_backoff(self) -> TagBackoff<Self> {
-        TagBackoff::new(self)
     }
 
     /// Crawls pages again on a schedule: a seed reported done or failed is
