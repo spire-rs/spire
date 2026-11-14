@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use spire_core::Result;
 use spire_core::dataset::Dataset;
-use sqlx::{Row, SqlitePool};
+use sqlx::{Row, Sqlite, SqlitePool, Transaction};
 
 use crate::error::dataset_error;
 
@@ -27,6 +27,59 @@ pub struct SqliteDataset<T> {
     pool: SqlitePool,
     name: Arc<str>,
     marker: PhantomData<fn(T) -> T>,
+}
+
+/// A batch held in a SQLite transaction until the consumer acknowledges it.
+///
+/// Dropping the batch, cancelling its task, or losing the process rolls back
+/// the deletion, so another consumer can read the items again. The transaction
+/// holds SQLite's writer lock: process and acknowledge batches promptly, and
+/// do not write through another connection while holding one.
+#[must_use = "acknowledge the batch after processing, or drop it to restore its items"]
+pub struct SqliteRead<T> {
+    items: Vec<T>,
+    transaction: Option<Transaction<'static, Sqlite>>,
+}
+
+impl<T> SqliteRead<T> {
+    /// Returns the items awaiting acknowledgment, in insertion order.
+    #[must_use]
+    pub fn items(&self) -> &[T] {
+        &self.items
+    }
+
+    /// Commits removal after the caller has processed the items.
+    ///
+    /// # Errors
+    /// Returns a dataset error if the transaction cannot commit. A failed
+    /// acknowledgment can leave already processed items available again;
+    /// consumers should make their processing idempotent.
+    pub async fn acknowledge(self) -> Result<()> {
+        if let Some(transaction) = self.transaction {
+            transaction.commit().await.map_err(dataset_error)?;
+        }
+        Ok(())
+    }
+
+    /// Rolls back removal so the items can be delivered again.
+    ///
+    /// # Errors
+    /// Returns a dataset error if the rollback fails.
+    pub async fn release(self) -> Result<()> {
+        if let Some(transaction) = self.transaction {
+            transaction.rollback().await.map_err(dataset_error)?;
+        }
+        Ok(())
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for SqliteRead<T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SqliteRead")
+            .field("items", &self.items)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<T> SqliteDataset<T> {
@@ -122,8 +175,32 @@ impl<T: Serialize + DeserializeOwned + Send + 'static> Dataset<T> for SqliteData
     }
 
     async fn read_batch(&self, max: usize) -> Result<Vec<T>> {
+        let mut batch = self.read_with_ack(max).await?;
+        let items = std::mem::take(&mut batch.items);
+        batch.acknowledge().await?;
+        Ok(items)
+    }
+}
+
+impl<T: DeserializeOwned> SqliteDataset<T> {
+    /// Takes up to `max` items, deferring their removal until acknowledgment.
+    ///
+    /// Process [`SqliteRead::items`] before calling
+    /// [`SqliteRead::acknowledge`]. A dropped batch is restored even after
+    /// a process crash. This provides at-least-once delivery; a crash after
+    /// processing but before acknowledgment can deliver items twice. Unlike
+    /// `Dataset::read_batch`, it holds a writer transaction until
+    /// acknowledged or released, blocking other writers.
+    ///
+    /// # Errors
+    /// Returns a dataset error if the query or decoding fails. Failed decoding
+    /// leaves the entire batch stored.
+    pub async fn read_with_ack(&self, max: usize) -> Result<SqliteRead<T>> {
         if max == 0 {
-            return Ok(Vec::new());
+            return Ok(SqliteRead {
+                items: Vec::new(),
+                transaction: None,
+            });
         }
         let limit = i64::try_from(max).unwrap_or(i64::MAX);
         // Reserve the writer lock before reading, avoiding a deferred
@@ -156,8 +233,10 @@ impl<T: Serialize + DeserializeOwned + Send + 'static> Dataset<T> for SqliteData
                 .await
                 .map_err(dataset_error)?;
         }
-        transaction.commit().await.map_err(dataset_error)?;
-        Ok(items)
+        Ok(SqliteRead {
+            items,
+            transaction: Some(transaction),
+        })
     }
 }
 
@@ -192,6 +271,56 @@ mod tests {
         let store = SqliteStore::new(pool(&directory.path().join("test.sqlite")).await);
         store.initialize().await.unwrap();
         (directory, store)
+    }
+
+    #[tokio::test]
+    async fn unacknowledged_reads_are_restored_and_acknowledged_reads_are_removed() {
+        let (_directory, store) = store().await;
+        let data = store.dataset::<u32>("items");
+        data.write_batch(vec![1, 2, 3]).await.unwrap();
+        let batch = data.read_with_ack(2).await.unwrap();
+        assert_eq!(batch.items(), [1, 2]);
+        drop(batch);
+        let batch = data.read_with_ack(2).await.unwrap();
+        assert_eq!(batch.items(), [1, 2]);
+        batch.release().await.unwrap();
+        let batch = data.read_with_ack(2).await.unwrap();
+        assert_eq!(batch.items(), [1, 2]);
+        batch.acknowledge().await.unwrap();
+        assert_eq!(data.read_batch(10).await.unwrap(), [3]);
+        data.read_with_ack(0)
+            .await
+            .unwrap()
+            .acknowledge()
+            .await
+            .unwrap();
+        store.close().await;
+    }
+
+    #[tokio::test]
+    async fn cancelling_a_consumer_restores_its_batch_after_reopening() {
+        let (directory, store) = store().await;
+        let data = store.dataset::<u32>("items");
+        data.write(42).await.unwrap();
+        let (ready, received) = tokio::sync::oneshot::channel();
+        let consumer = tokio::spawn(async move {
+            let batch = data.read_with_ack(1).await.unwrap();
+            ready.send(()).unwrap();
+            std::future::pending::<()>().await;
+            batch.acknowledge().await.unwrap();
+        });
+        received.await.unwrap();
+        consumer.abort();
+        assert!(consumer.await.unwrap_err().is_cancelled());
+        store.close().await;
+        let reopened = SqliteStore::open(directory.path().join("test.sqlite"))
+            .await
+            .unwrap();
+        assert_eq!(
+            reopened.dataset::<u32>("items").read().await.unwrap(),
+            Some(42)
+        );
+        reopened.close().await;
     }
 
     #[tokio::test]

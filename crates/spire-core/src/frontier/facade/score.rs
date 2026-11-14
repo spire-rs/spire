@@ -4,7 +4,7 @@ use std::future::Future;
 use crate::Result;
 use crate::frontier::score::Score;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report};
 
 /// A facade that adds a score to the priority of every seed pushed, see
 /// [`FrontierExt::score`](crate::frontier::FrontierExt::score).
@@ -34,8 +34,12 @@ impl<F: Frontier, S: Score> Frontier for Scored<F, S> {
         self.inner.push(seed.with_priority(priority))
     }
 
-    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
-        self.inner.pop()
+    fn permits(&self, seed: &Seed) -> bool {
+        self.inner.permits(seed)
+    }
+
+    fn pop_with(&self, mode: PopMode) -> impl Future<Output = Result<NextSeed>> + Send {
+        self.inner.pop_with(mode)
     }
 
     fn report(&self, report: Report) -> impl Future<Output = Result<Ack>> + Send {

@@ -61,7 +61,7 @@ error statuses fail the fetch as they do over HTTP.
 depend on the server can be tested too:
 
 - **Error statuses** go through the same `StatusPolicy` as the real
-  backends: a `404` is rejected, and a `429` or `503` with `Retry-After` is
+  backends: a `404` is rejected, and a retryable status with `Retry-After` is
   retried after it. `with_status_policy(StatusPolicy::Accept)` hands every
   status to the handlers instead.
 - **Redirects** with `MockPage::redirect` are followed, and the final URI is

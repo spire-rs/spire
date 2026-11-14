@@ -28,6 +28,12 @@ enum Page {
     Product,
 }
 
+impl spire::crawler::Revisit for Page {
+    fn interval(self) -> Option<std::time::Duration> {
+        matches!(self, Self::Sitemap).then_some(std::time::Duration::from_secs(1))
+    }
+}
+
 fn gzip(text: &str) -> Vec<u8> {
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(text.as_bytes()).unwrap();
@@ -130,4 +136,80 @@ async fn follows_untagged_sitemaps_by_path() {
         .unwrap();
     products.sort();
     assert_eq!(products, ["/private/2", "/products/1", "/products/4"]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn discovers_the_whole_sitemap_graph_before_spending_the_page_budget() {
+    use std::time::Duration;
+
+    async fn product(uri: Uri, data: Data<String>) -> Result<()> {
+        data.write(uri.path().to_owned()).await
+    }
+    let index = r#"<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <sitemap><loc>https://shop.test/low.xml</loc></sitemap>
+        <sitemap><loc>https://shop.test/high.xml</loc></sitemap>
+    </sitemapindex>"#;
+    let low = r#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <url><loc>https://shop.test/low</loc><priority>0.2</priority></url>
+    </urlset>"#;
+    let high = r#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <url><loc>https://shop.test/high</loc><priority>0.9</priority></url>
+    </urlset>"#;
+    let site = MockSite::new()
+        .page("https://shop.test/index.xml", MockPage::xml(index))
+        .page("https://shop.test/low.xml", MockPage::xml(low))
+        .page(
+            "https://shop.test/high.xml",
+            MockPage::xml(high).with_latency(Duration::from_secs(2)),
+        );
+    let router = Router::new()
+        .route(Page::Sitemap, FollowSitemap::new(Page::Product))
+        .route(Page::Product, product);
+    let crawler = Crawler::new(site, router)
+        .with_frontier(InMemFrontier::fifo().revisit::<Page>().dedup())
+        .with_discovery_tag(Page::Sitemap)
+        .with_concurrency(2)
+        .with_max_requests(4)
+        .with_dataset(InMemDataset::<String>::new())
+        .with_seed(
+            Seed::get("https://shop.test/index.xml")
+                .unwrap()
+                .with_tag(Page::Sitemap),
+        );
+    let stats = crawler.run().await.unwrap();
+    assert_eq!(stats.requests, 4);
+    assert_eq!(
+        crawler
+            .dataset::<String>()
+            .unwrap()
+            .read_all()
+            .await
+            .unwrap(),
+        ["/high"]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn discovery_finishes_before_the_next_sitemap_revisit() {
+    use std::time::Duration;
+    let sitemap = r#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        <url><loc>https://shop.test/product</loc></url>
+    </urlset>"#;
+    let site = MockSite::new().page("https://shop.test/map.xml", MockPage::xml(sitemap));
+    let router = Router::new()
+        .route(Page::Sitemap, FollowSitemap::new(Page::Product))
+        .route(Page::Product, || async {});
+    let crawler = Crawler::new(site, router)
+        .with_frontier(InMemFrontier::fifo().revisit::<Page>().dedup())
+        .with_discovery_tag(Page::Sitemap)
+        .with_max_requests(2)
+        .with_seed(
+            Seed::get("https://shop.test/map.xml")
+                .unwrap()
+                .with_tag(Page::Sitemap),
+        );
+    let started = tokio::time::Instant::now();
+    let stats = crawler.run().await.unwrap();
+    assert_eq!(stats.succeeded, 2);
+    assert_eq!(started.elapsed(), Duration::ZERO);
 }

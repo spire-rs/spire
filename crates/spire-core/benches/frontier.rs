@@ -51,8 +51,7 @@ fn frontiers(c: &mut Criterion) {
                     .dedup()
                     .allow_hosts(["example.test"])
                     .max_depth(5)
-                    .retry(3)
-                    .tag_backoff();
+                    .retry(3);
                 (frontier, seeds())
             },
             |(frontier, seeds)| round(frontier, seeds),

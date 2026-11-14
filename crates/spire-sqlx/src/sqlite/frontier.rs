@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use spire_core::frontier::seed::Seed;
-use spire_core::frontier::{Ack, Admission, Frontier, NextSeed, Report, Schedule};
+use spire_core::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report, Schedule};
 use spire_core::{Error, ErrorKind, Result};
 use sqlx::{Sqlite, SqlitePool};
 use tokio::time::Instant;
@@ -24,6 +24,12 @@ use crate::error::frontier_error;
 /// cannot be told from time passing.
 /// Reports must carry the popped seed or its clone so they acknowledge the
 /// exact occurrence, including when identical seeds are queued together.
+///
+/// Complete responses are committed before handlers can read them. Interrupted
+/// requests replay their original responses, so link discovery does not depend
+/// on the live page remaining unchanged. Completion, failure and retries remove
+/// snapshots; cancellation preserves them. Replay restores response data, not
+/// a browser's live document.
 ///
 /// Enqueueing or scheduling serializes the seed and discards caller-attached
 /// runtime extensions, even without a restart. Register shared runtime services
@@ -220,7 +226,7 @@ impl Frontier for SqliteFrontier {
         Ok(Admission::Queued)
     }
 
-    async fn pop(&self) -> Result<NextSeed> {
+    async fn pop_with(&self, mode: PopMode) -> Result<NextSeed> {
         let mut transaction = self
             .inner
             .pool
@@ -233,18 +239,20 @@ impl Frontier for SqliteFrontier {
             "INSERT INTO spire_frontier_items (fingerprint, priority, payload)
             SELECT fingerprint, priority, payload FROM (
                 SELECT fingerprint, priority, payload, due, 0 AS source, rowid AS position
-                    FROM spire_frontier_scheduled
+                    FROM spire_frontier_scheduled WHERE $2
                 UNION ALL
                 SELECT fingerprint, priority, payload, due, 1 AS source, id AS position
                     FROM spire_frontier_retries
             ) WHERE due <= $1 ORDER BY due, source, position",
         )
         .bind(now)
+        .bind(mode == PopMode::All)
         .execute(&mut *transaction)
         .await
         .map_err(frontier_error)?;
-        sqlx::query("DELETE FROM spire_frontier_scheduled WHERE due <= $1")
+        sqlx::query("DELETE FROM spire_frontier_scheduled WHERE due <= $1 AND $2")
             .bind(now)
+            .bind(mode == PopMode::All)
             .execute(&mut *transaction)
             .await
             .map_err(frontier_error)?;
@@ -275,6 +283,9 @@ impl Frontier for SqliteFrontier {
             id,
             owner: self.inner.owner.clone(),
         });
+        let replay =
+            super::replay::load(&mut transaction, &self.inner.pool, id, &self.inner).await?;
+        seed.extensions_mut().insert(replay);
         sqlx::query("UPDATE spire_frontier_items SET in_flight = 1 WHERE id = $1")
             .bind(id)
             .execute(&mut *transaction)
@@ -317,7 +328,11 @@ impl Frontier for SqliteFrontier {
         if deleted.rows_affected() == 1 {
             match then {
                 Then::Forget => {}
-                Then::Queue => enqueue(&mut transaction, &seed).await?,
+                Then::Queue => {
+                    enqueue(&mut transaction, &seed).await?;
+                    sqlx::query("UPDATE spire_frontier_responses SET frontier_id = last_insert_rowid() WHERE frontier_id = $1")
+                        .bind(occurrence.id).execute(&mut *transaction).await.map_err(frontier_error)?;
+                }
                 Then::Hold(due) => {
                     mark_seen(&mut transaction, self.now()).await?;
                     sqlx::query(
@@ -333,6 +348,13 @@ impl Frontier for SqliteFrontier {
                     .map_err(frontier_error)?;
                 }
             }
+        }
+        if deleted.rows_affected() == 1 {
+            sqlx::query("DELETE FROM spire_frontier_responses WHERE frontier_id = $1")
+                .bind(occurrence.id)
+                .execute(&mut *transaction)
+                .await
+                .map_err(frontier_error)?;
         }
         transaction.commit().await.map_err(frontier_error)?;
         Ok(ack)
@@ -404,6 +426,181 @@ mod tests {
             NextSeed::Ready(seed) => seed,
             other => panic!("expected a seed, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn queued_mode_releases_retries_but_preserves_due_revisits() {
+        use spire_core::frontier::Schedule;
+        use tokio::time::Instant;
+        let directory = TempDir::new().unwrap();
+        let store = store(&directory.path().join("queued.sqlite")).await;
+        let frontier = store.frontier().await.unwrap();
+        frontier.push(seed("retry", 0)).await.unwrap();
+        let NextSeed::Ready(retry) = frontier.pop().await.unwrap() else {
+            panic!("expected queued seed");
+        };
+        frontier
+            .report(Report::Requeue {
+                seed: retry,
+                due: Instant::now(),
+            })
+            .await
+            .unwrap();
+        frontier
+            .schedule(seed("revisit", 0), Instant::now())
+            .await
+            .unwrap();
+        let NextSeed::Ready(retry) = frontier.pop_with(PopMode::Queued).await.unwrap() else {
+            panic!("expected retry");
+        };
+        assert_eq!(retry.uri().path(), "/retry");
+        frontier.report(Report::Done(retry)).await.unwrap();
+        assert!(matches!(
+            frontier.pop_with(PopMode::Queued).await.unwrap(),
+            NextSeed::Empty
+        ));
+        let NextSeed::Ready(revisit) = frontier.pop().await.unwrap() else {
+            panic!("expected revisit");
+        };
+        assert_eq!(revisit.uri().path(), "/revisit");
+    }
+
+    #[tokio::test]
+    async fn deferred_discovery_backoff_keeps_sqlite_occurrences_acknowledgeable() {
+        use std::sync::Mutex;
+
+        use spire_core::Context;
+        use spire_core::backend::Noop;
+        use spire_core::crawler::Crawler;
+        use spire_core::http::RequestExt;
+        use spire_core::worker::{Outcome, from_fn};
+
+        let directory = TempDir::new().unwrap();
+        let store = store(&directory.path().join("discovery.sqlite")).await;
+        let frontier = Arc::new(store.frontier().await.unwrap());
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let recorded = seen.clone();
+        let pause = Duration::from_millis(50);
+        let worker = from_fn(move |cx: Context<Noop>| {
+            let seen = recorded.clone();
+            async move {
+                let path = cx.request().uri().path().to_owned();
+                if path == "/map" {
+                    for (path, priority) in [("low", 1), ("high", 3), ("middle", 2)] {
+                        cx.queue()
+                            .push(seed(path, priority).with_tag("page"))
+                            .await?;
+                    }
+                } else {
+                    seen.lock().unwrap().push((path.clone(), Instant::now()));
+                    if path == "/high" && cx.request().attempt().get() == 0 {
+                        return Ok(Outcome::backoff(pause));
+                    }
+                }
+                Ok::<_, Error>(Outcome::Continue)
+            }
+        });
+        let stats = Crawler::new(Noop, worker)
+            .with_frontier(frontier.clone().retry(1))
+            .with_discovery_tag("map")
+            .with_concurrency(1)
+            .with_seed(seed("map", 0).with_tag("map"))
+            .run()
+            .await
+            .unwrap();
+        assert_eq!((stats.succeeded, stats.failed, stats.retried), (4, 0, 1));
+        assert_eq!(frontier.in_flight().await.unwrap(), 0);
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
+        let seen = seen.lock().unwrap();
+        let started = seen[0].1;
+        let deferred: Vec<_> = seen.iter().filter(|(path, _)| path != "/high").collect();
+        assert_eq!(
+            deferred
+                .iter()
+                .map(|(path, _)| path.as_str())
+                .collect::<Vec<_>>(),
+            ["/middle", "/low"]
+        );
+        assert!(deferred.iter().all(|(_, at)| *at >= started + pause));
+    }
+
+    #[tokio::test]
+    async fn replay_recovers_original_links_after_the_live_page_changes() {
+        use spire_core::Context;
+        use spire_core::backend::{Backend, Noop};
+        use spire_core::frontier::queue::Queue;
+        use spire_core::http::ResponseExt;
+        use spire_core::testing::{MockPage, MockSite};
+
+        let directory = TempDir::new().unwrap();
+        let path = directory.path().join("replay.sqlite");
+        let store = store(&path).await;
+        let frontier = store.frontier().await.unwrap();
+        frontier.push(seed("index", 0)).await.unwrap();
+        let popped = pop(&frontier).await;
+        let site = MockSite::new().page("https://example.com/index", MockPage::text("/a /b"));
+        let cx = Context::new(popped.into_request(), site.connect().await.unwrap());
+        assert_eq!(cx.body().await.unwrap().as_ref(), b"/a /b");
+        // The process dies before the handler queues any of the links.
+        drop(cx);
+        drop(frontier);
+        store.close().await;
+        let store = SqliteStore::open(&path).await.unwrap();
+        let frontier = store.frontier().await.unwrap();
+        let popped = pop(&frontier).await;
+        // Noop returns an empty response: recovery must use the stored one.
+        let queue = Queue::new(frontier.clone());
+        let cx = Context::new(popped.clone().into_request(), Noop).with_queue(&queue);
+        let response = cx.response().await.unwrap();
+        assert_eq!(response.body().as_ref(), b"/a /b");
+        assert_eq!(response.final_uri().unwrap(), "https://example.com/index");
+        for link in std::str::from_utf8(response.body())
+            .unwrap()
+            .split_whitespace()
+        {
+            cx.queue().follow(link).await.unwrap();
+        }
+        frontier.report(Report::Done(popped)).await.unwrap();
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM spire_frontier_responses")
+            .fetch_one(store.pool())
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+        assert_eq!(pop(&frontier).await.uri().path(), "/a");
+        assert_eq!(pop(&frontier).await.uri().path(), "/b");
+        drop(cx);
+        drop(queue);
+        drop(frontier);
+        store.close().await;
+    }
+
+    #[tokio::test]
+    async fn cancelled_occurrences_keep_their_snapshot_without_accepting_stale_reports() {
+        use spire_core::Context;
+        use spire_core::backend::{Backend, Noop};
+        use spire_core::testing::{MockPage, MockSite};
+
+        let directory = TempDir::new().unwrap();
+        let store = store(&directory.path().join("replay.sqlite")).await;
+        let frontier = store.frontier().await.unwrap();
+        frontier.push(seed("index", 0)).await.unwrap();
+        let popped = pop(&frontier).await;
+        let site = MockSite::new().page("https://example.com/index", MockPage::text("saved"));
+        let cx = Context::new(popped.clone().into_request(), site.connect().await.unwrap());
+        cx.response().await.unwrap();
+        frontier
+            .report(Report::Cancelled(popped.clone()))
+            .await
+            .unwrap();
+        let next = pop(&frontier).await;
+        frontier.report(Report::Done(popped)).await.unwrap();
+        let recovered = Context::new(next.clone().into_request(), Noop);
+        assert_eq!(recovered.body().await.unwrap().as_ref(), b"saved");
+        frontier.report(Report::Done(next)).await.unwrap();
+        drop(recovered);
+        drop(cx);
+        drop(frontier);
+        store.close().await;
     }
 
     #[tokio::test]
@@ -785,6 +982,10 @@ mod tests {
 
     #[tokio::test]
     async fn process_exit_releases_ownership_and_recovers_in_flight() {
+        use spire_core::Context;
+        use spire_core::backend::Noop;
+        use spire_core::dataset::Dataset;
+
         let directory = TempDir::new().unwrap();
         let path = directory.path().join("test.sqlite");
         let executable = std::env::current_exe().unwrap();
@@ -805,7 +1006,16 @@ mod tests {
         assert!(status.success());
         let store = store(&path).await;
         let frontier = store.frontier().await.unwrap();
-        assert_eq!(pop(&frontier).await.uri().path(), "/abandoned");
+        let recovered = pop(&frontier).await;
+        assert_eq!(recovered.uri().path(), "/abandoned");
+        let cx = Context::new(recovered.into_request(), Noop);
+        assert_eq!(cx.body().await.unwrap().as_ref(), b"/not-yet-queued");
+        // The child exited with an open read transaction, without Drop.
+        assert_eq!(
+            store.dataset::<u32>("delivery").read().await.unwrap(),
+            Some(42)
+        );
+        drop(cx);
         drop(frontier);
         store.pool().close().await;
     }
@@ -940,6 +1150,11 @@ mod tests {
 
     #[tokio::test]
     async fn crash_child() {
+        use spire_core::Context;
+        use spire_core::backend::Backend;
+        use spire_core::dataset::Dataset;
+        use spire_core::testing::{MockPage, MockSite};
+
         let Some(path) = std::env::var_os("SPIRE_SQLITE_CRASH_TEST_PATH") else {
             return;
         };
@@ -949,7 +1164,17 @@ mod tests {
         }
         let frontier = store.frontier().await.unwrap();
         frontier.push(seed("abandoned", 0)).await.unwrap();
-        let _ = pop(&frontier).await;
+        let popped = pop(&frontier).await;
+        let site = MockSite::new().page(
+            "https://example.com/abandoned",
+            MockPage::text("/not-yet-queued"),
+        );
+        let cx = Context::new(popped.into_request(), site.connect().await.unwrap());
+        cx.response().await.unwrap();
+        let data = store.dataset::<u32>("delivery");
+        data.write(42).await.unwrap();
+        let batch = data.read_with_ack(1).await.unwrap();
+        assert_eq!(batch.items(), [42]);
         std::process::exit(0); // Deliberately skip Rust destructors.
     }
 }

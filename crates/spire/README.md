@@ -94,7 +94,7 @@ async fn crawl() -> Result<()> {
         .require::<Page>();
 
     let crawler = Crawler::new(ReqwestBackend::default(), router)
-        .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3).tag_backoff())
+        .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3))
         .with_dataset(InMemDataset::<Product>::new())
         .with_concurrency(16)
         .with_seed(Seed::get("https://example.com/products")?.with_tag(Page::Listing));

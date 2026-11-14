@@ -6,7 +6,7 @@ use tokio::time::Instant;
 use crate::Result;
 use crate::crawler::Attempt;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report};
 
 /// How often and how fast a [`Retry`] facade retries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,8 +110,12 @@ impl<F: Frontier> Frontier for Retry<F> {
         self.inner.push(seed)
     }
 
-    fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
-        self.inner.pop()
+    fn permits(&self, seed: &Seed) -> bool {
+        self.inner.permits(seed)
+    }
+
+    fn pop_with(&self, mode: PopMode) -> impl Future<Output = Result<NextSeed>> + Send {
+        self.inner.pop_with(mode)
     }
 
     async fn report(&self, report: Report) -> Result<Ack> {
@@ -356,7 +360,7 @@ mod tests {
                 std::future::ready(Ok(Admission::Queued))
             }
 
-            fn pop(&self) -> impl Future<Output = Result<NextSeed>> + Send {
+            fn pop_with(&self, _mode: PopMode) -> impl Future<Output = Result<NextSeed>> + Send {
                 std::future::ready(Ok(NextSeed::Empty))
             }
 

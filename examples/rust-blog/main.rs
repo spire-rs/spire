@@ -67,8 +67,7 @@ async fn main() -> Result<()> {
         .allow_hosts(["blog.rust-lang.org"])
         .filter(scope::in_scope)
         .max_depth(2)
-        .retry(3)
-        .tag_backoff();
+        .retry(3);
 
     let crawler = Crawler::new(ReqwestBackend::default(), router)
         .with_frontier(frontier)
