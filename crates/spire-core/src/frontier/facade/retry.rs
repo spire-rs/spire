@@ -73,7 +73,8 @@ impl RetryPolicy {
             .wrapping_add(u64::from(seed.attempt().get()))
             .wrapping_mul(0x9E37_79B9_7F4A_7C15);
         let fraction = u32::try_from((mix >> 40) % 1000).unwrap_or_default();
-        let cut = delay * self.jitter / 100 * fraction / 1000;
+        // Divide before multiplying so even Duration::MAX stays in range.
+        let cut = delay / 100 * self.jitter / 1000 * fraction;
         delay.saturating_sub(cut)
     }
 }
@@ -204,6 +205,36 @@ mod tests {
         assert_eq!(policy.jittered(&seed("0").next_attempt()), delays[0]);
     }
 
+    #[test]
+    fn jitter_handles_the_largest_duration() {
+        for percent in [0, 20, 100] {
+            let policy = RetryPolicy::new(1)
+                .with_base_delay(Duration::MAX)
+                .with_max_delay(Duration::MAX)
+                .with_jitter(percent);
+            for i in 0..100 {
+                let delay = policy.jittered(&seed(&i.to_string()).next_attempt());
+                assert!(delay >= Duration::MAX / 100 * (100 - percent));
+                if percent == 0 {
+                    assert_eq!(delay, Duration::MAX);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn jitter_does_not_round_a_small_delay_down_to_zero() {
+        let policy = RetryPolicy::new(1)
+            .with_base_delay(Duration::from_nanos(1))
+            .with_jitter(60);
+        for i in 0..100 {
+            assert_eq!(
+                policy.jittered(&seed(&i.to_string()).next_attempt()),
+                Duration::from_nanos(1),
+            );
+        }
+    }
+
     #[tokio::test(start_paused = true)]
     async fn retried_seed_waits_for_its_delay() {
         let frontier = InMemFrontier::fifo().retry(1);
@@ -263,8 +294,7 @@ mod tests {
     async fn an_unrepresentable_policy_delay_refuses_the_retry() {
         let policy = RetryPolicy::new(1)
             .with_base_delay(Duration::from_secs(u64::MAX))
-            .with_max_delay(Duration::from_secs(u64::MAX))
-            .with_jitter(0);
+            .with_max_delay(Duration::from_secs(u64::MAX));
         let frontier = InMemFrontier::fifo().retry_with(policy);
         frontier.push(seed("retried")).await.unwrap();
         let NextSeed::Ready(seed) = frontier.pop().await.unwrap() else {
