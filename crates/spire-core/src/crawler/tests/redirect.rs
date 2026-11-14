@@ -3,6 +3,51 @@
 use super::*;
 
 #[tokio::test(start_paused = true)]
+async fn an_expired_root_wait_does_not_hide_a_redirect_deadline_at_capacity() {
+    use crate::testing::{MockPage, MockSession, MockSite};
+
+    let site = MockSite::new()
+        .page("https://a.test/first", MockPage::text(""))
+        .page("https://a.test/second", MockPage::text(""))
+        .page("https://c.test/slow", MockPage::text(""))
+        .page(
+            "https://b.test/start",
+            MockPage::redirect("https://b.test/target"),
+        )
+        .page("https://b.test/target", MockPage::text(""));
+    let started = Instant::now();
+    let worker = from_fn(move |cx: Context<MockSession>| async move {
+        match cx.request().uri().path() {
+            "/first" => sleep(Duration::from_secs(1)).await,
+            "/slow" => sleep(Duration::from_secs(5)).await,
+            _ => {}
+        }
+        cx.body().await?;
+        if cx.request().uri().path() == "/start" {
+            assert_eq!(started.elapsed(), Duration::from_secs(3));
+        }
+        Ok::<_, Error>(())
+    });
+    let stats = Crawler::new(site, worker)
+        .with_concurrency(2)
+        .with_host_delay(Duration::from_secs(2))
+        .with_seeds(
+            [
+                "https://a.test/first",
+                "https://a.test/second",
+                "https://c.test/slow",
+                "https://b.test/start",
+            ]
+            .map(|uri| Seed::get(uri).unwrap()),
+        )
+        .run()
+        .await
+        .unwrap();
+    assert_eq!((stats.succeeded, stats.failed), (4, 0));
+    assert_eq!(started.elapsed(), Duration::from_secs(5));
+}
+
+#[tokio::test(start_paused = true)]
 async fn redirect_targets_wait_for_host_delay_even_when_all_global_slots_are_occupied() {
     use crate::testing::{MockPage, MockSession, MockSite};
 

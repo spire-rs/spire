@@ -92,6 +92,8 @@ impl Default for RetryPolicy {
 /// it. Once due it joins the queue, and the storage's order decides when it
 /// runs. Seeds out of retries, or refused by the storage, are reported inwards
 /// as [`Report::Failed`] and refused with [`Ack::RetryRefused`].
+/// Delays beyond the clock's range fall back to the policy; if its delay
+/// also cannot be scheduled, the retry is refused.
 #[derive(Debug)]
 pub struct Retry<F> {
     inner: F,
@@ -135,8 +137,14 @@ impl<F: Frontier> Frontier for Retry<F> {
         }
 
         let retried = seed.clone().next_attempt();
-        let delay = after.unwrap_or_else(|| self.policy.jittered(&retried));
-        let due = Instant::now() + delay;
+        let now = Instant::now();
+        let due = after
+            .and_then(|delay| now.checked_add(delay))
+            .or_else(|| now.checked_add(self.policy.jittered(&retried)));
+        let Some(due) = due else {
+            self.inner.report(Report::Failed(seed)).await?;
+            return Ok(Ack::RetryRefused);
+        };
         let ack = self
             .inner
             .report(Report::Requeue { seed: retried, due })
@@ -229,6 +237,41 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(pop_path(&frontier).await, None);
+        assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_unrepresentable_hint_falls_back_to_the_policy() {
+        let policy = RetryPolicy::new(1).with_jitter(0);
+        let frontier = InMemFrontier::fifo().retry_with(policy);
+        frontier
+            .report(Report::Retry {
+                seed: seed("retried"),
+                after: Some(Duration::from_secs(u64::MAX)),
+            })
+            .await
+            .unwrap();
+        let NextSeed::Wait(at) = frontier.pop().await.unwrap() else {
+            panic!("expected the policy's delay");
+        };
+        assert_eq!(at - Instant::now(), Duration::from_millis(500));
+        advance(Duration::from_millis(500)).await;
+        assert_eq!(pop_path(&frontier).await.as_deref(), Some("retried"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_unrepresentable_policy_delay_refuses_the_retry() {
+        let policy = RetryPolicy::new(1)
+            .with_base_delay(Duration::from_secs(u64::MAX))
+            .with_max_delay(Duration::from_secs(u64::MAX))
+            .with_jitter(0);
+        let frontier = InMemFrontier::fifo().retry_with(policy);
+        frontier.push(seed("retried")).await.unwrap();
+        let NextSeed::Ready(seed) = frontier.pop().await.unwrap() else {
+            panic!("expected a seed");
+        };
+        let ack = frontier.report(Report::Retry { seed, after: None }).await;
+        assert_eq!(ack.unwrap(), Ack::RetryRefused);
         assert!(matches!(frontier.pop().await.unwrap(), NextSeed::Empty));
     }
 

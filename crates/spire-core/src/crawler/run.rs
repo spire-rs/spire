@@ -247,7 +247,8 @@ impl<B: Backend> Run<B> {
         let pause = match outcome {
             Outcome::Fail(error) if error.is_retryable() => error.retry_after(),
             _ => None,
-        };
+        }
+        .and_then(|delay| now.checked_add(delay).map(|until| (delay, until)));
         let signal = if pause.is_some() {
             Signal::Failed
         } else {
@@ -271,13 +272,10 @@ impl<B: Backend> Run<B> {
                 slowdown,
             });
         }
-        if let Some(pause) = pause
-            && self.hosts.pause(&host, now + pause)
+        if let Some((duration, until)) = pause
+            && self.hosts.pause(&host, until)
         {
-            self.events.emit(|| Event::HostPaused {
-                host,
-                duration: pause,
-            });
+            self.events.emit(|| Event::HostPaused { host, duration });
         }
     }
 
@@ -652,16 +650,19 @@ where
         }
 
         let robots = run.robots_tick();
-        [
-            wait,
-            robots,
-            run.hosts.earliest(),
-            run.ready
-                .earliest(Instant::now(), run.tasks.len() < settings.concurrency.get()),
-        ]
-        .into_iter()
-        .flatten()
-        .min()
+        let now = Instant::now();
+        let has_slot = run.tasks.len() < settings.concurrency.get();
+        // Redirects continue existing tasks and can run even at capacity.
+        // Ordinary host waits need no timer until a task frees a slot.
+        let hosts = if has_slot {
+            run.hosts.earliest()
+        } else {
+            run.hosts.earliest_where(Pending::is_redirect)
+        };
+        [wait, robots, hosts, run.ready.earliest(now, has_slot)]
+            .into_iter()
+            .flatten()
+            .min()
     }
 
     /// Redirect hops belong to already-running work, including during graceful

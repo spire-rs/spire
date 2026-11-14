@@ -461,6 +461,30 @@ mod limits {
         assert_eq!(started.elapsed(), Duration::from_secs(2));
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn an_expired_host_gap_waits_for_a_global_slot() {
+        let worker = from_fn(|cx: Context<Noop>| async move {
+            if cx.request().uri().host() != Some("a.com") {
+                sleep(Duration::from_secs(5)).await;
+            }
+        });
+        let crawler = Crawler::new(Noop, worker)
+            .with_concurrency(2)
+            .with_host_delay(Duration::from_secs(1))
+            .with_seeds([
+                host_seed("a.com", "1"),
+                host_seed("a.com", "2"),
+                host_seed("b.com", "1"),
+                host_seed("c.com", "1"),
+            ]);
+
+        let started = Instant::now();
+        let stats = crawler.run().await.unwrap();
+        assert_eq!(stats.requests, 4);
+        assert_eq!(stats.succeeded, 4);
+        assert_eq!(started.elapsed(), Duration::from_secs(5));
+    }
+
     #[tokio::test]
     async fn abort_skips_the_rest_of_the_tag() {
         let worker = from_fn(|cx: Context<Noop>| async move {
@@ -955,6 +979,22 @@ async fn retry_after_pauses_the_whole_host() {
         let other = times.iter().find(|(path, _)| path == "/other").unwrap();
         assert_eq!(other.1, Duration::from_secs(5), "status {status}");
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_unrepresentable_retry_after_does_not_pause_the_host() {
+    let worker = from_fn(|_: Context<Noop>| async {
+        Error::new(ErrorKind::Http).with_retry_after(Duration::from_secs(u64::MAX))
+    });
+    let crawler = Crawler::new(Noop, worker)
+        .with_frontier(InMemFrontier::fifo())
+        .with_concurrency(1)
+        .with_seeds([seed("limited"), seed("other")]);
+    let started = Instant::now();
+    let stats = crawler.run().await.unwrap();
+    assert_eq!(stats.requests, 2);
+    assert_eq!(stats.failed, 2);
+    assert_eq!(started.elapsed(), Duration::ZERO);
 }
 
 #[tokio::test(start_paused = true)]

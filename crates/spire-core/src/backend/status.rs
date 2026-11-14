@@ -14,7 +14,8 @@ pub enum StatusPolicy {
     /// fails them without a handler having to check:
     ///
     /// - `408`, `429` and `5xx` are retryable [`Http`] errors. A valid
-    ///   `Retry-After` on any of them pauses the request's host.
+    ///   `Retry-After` on any of them pauses the request's host. Delays beyond
+    ///   the scheduler's clock range are ignored when scheduling.
     /// - Other `4xx` are [`Rejected`] errors, which are not retried.
     ///
     /// [`Http`]: ErrorKind::Http
@@ -136,6 +137,9 @@ mod tests {
             let error = classify(status, Some("120"));
             assert!(error.is_retryable());
             assert_eq!(error.retry_after(), Some(Duration::from_mins(2)));
+            let oversized = classify(status, Some("18446744073709551615"));
+            assert!(oversized.is_retryable());
+            assert_eq!(oversized.retry_after(), Some(Duration::from_secs(u64::MAX)));
         }
         // A header does not make a permanent failure retryable.
         for status in [400, 401, 403, 404] {
