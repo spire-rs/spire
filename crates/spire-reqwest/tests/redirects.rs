@@ -9,17 +9,25 @@ use spire_core::crawler::Crawler;
 use spire_core::frontier::seed::Seed;
 use spire_core::frontier::{FrontierExt, InMemFrontier};
 use spire_core::http::http::header::{
-    AUTHORIZATION, CONTENT_TYPE, PROXY_AUTHORIZATION, WWW_AUTHENTICATE,
+    AUTHORIZATION, CONTENT_ENCODING, CONTENT_TYPE, PROXY_AUTHORIZATION, WWW_AUTHENTICATE,
 };
 use spire_core::http::http::{HeaderMap, HeaderValue, Method};
 use spire_core::worker::from_fn;
-use spire_reqwest::{ReqwestBackend, ReqwestSession, reqwest};
+use spire_reqwest::{ClientConfig, ReqwestBackend, ReqwestSession, reqwest};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 type Received = Arc<Mutex<Vec<(String, Instant)>>>;
 
 async fn server(reply: impl Fn(&str) -> String + Send + Sync + 'static) -> (String, Received) {
+    delayed_server(Duration::ZERO, Duration::ZERO, reply).await
+}
+
+async fn delayed_server(
+    head_delay: Duration,
+    body_delay: Duration,
+    reply: impl Fn(&str) -> String + Send + Sync + 'static,
+) -> (String, Received) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     let received = Arc::new(Mutex::new(Vec::new()));
@@ -57,7 +65,18 @@ async fn server(reply: impl Fn(&str) -> String + Send + Sync + 'static) -> (Stri
                 }
                 let request = String::from_utf8(bytes).unwrap();
                 seen.lock().unwrap().push((request.clone(), Instant::now()));
-                stream.write_all(reply(&request).as_bytes()).await.unwrap();
+                let response = reply(&request);
+                let split = response.find("\r\n\r\n").unwrap() + 4;
+                tokio::time::sleep(head_delay).await;
+                if stream
+                    .write_all(&response.as_bytes()[..split])
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+                tokio::time::sleep(body_delay).await;
+                let _ = stream.write_all(&response.as_bytes()[split..]).await;
             });
         }
     });
@@ -66,6 +85,108 @@ async fn server(reply: impl Fn(&str) -> String + Send + Sync + 'static) -> (Stri
 
 fn answer(status: &str, headers: &str) -> String {
     format!("HTTP/1.1 {status}\r\n{headers}Content-Length: 0\r\nConnection: close\r\n\r\n")
+}
+
+#[tokio::test]
+async fn a_single_timeout_covers_redirect_hops_and_the_final_body() {
+    use spire_core::ErrorKind;
+
+    for delayed_body in [false, true] {
+        let pause = Duration::from_millis(200);
+        let (target, received) = delayed_server(
+            if delayed_body { Duration::ZERO } else { pause },
+            if delayed_body { pause } else { Duration::ZERO },
+            |_| "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ndone".to_owned(),
+        )
+        .await;
+        let (source, _) = delayed_server(pause, Duration::ZERO, move |_| {
+            answer("302 Found", &format!("Location: {target}/target\r\n"))
+        })
+        .await;
+        let backend = ReqwestBackend::from_builder(|| {
+            ClientConfig::new().timeout(Duration::from_millis(350))
+        })
+        .unwrap();
+        if delayed_body {
+            // No crawler timeout or retries: the backend must bound body
+            // consumption.
+            let worker = from_fn(|cx: Context<ReqwestSession>| async move {
+                let error = cx.body().await.unwrap_err();
+                assert_eq!(error.kind(), ErrorKind::Timeout);
+                Err::<(), _>(error)
+            });
+            let stats = Crawler::new(backend, worker)
+                .with_frontier(InMemFrontier::fifo())
+                .with_seed(Seed::get(source).unwrap())
+                .run()
+                .await
+                .unwrap();
+            assert_eq!((stats.failed, stats.retried), (1, 0));
+        } else {
+            let session = backend.connect().await.unwrap();
+            let error = session
+                .fetch(&Seed::get(source).unwrap().into_request())
+                .await
+                .unwrap_err();
+            assert_eq!(error.kind(), ErrorKind::Timeout);
+        }
+        assert_eq!(received.lock().unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn cross_origin_redirects_keep_transport_proxy_authentication() {
+    for explicit_header in [false, true] {
+        let (proxy, received) = server(|request| {
+            if request.starts_with("GET http://source.test/start ") {
+                answer("302 Found", "Location: http://target.test/target\r\n")
+            } else if request.contains("proxy-authorization: Basic dXNlcjpwYXNz\r\n") {
+                answer("200 OK", "")
+            } else {
+                answer("407 Proxy Authentication Required", "")
+            }
+        })
+        .await;
+        let backend = ReqwestBackend::from_builder(move || {
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                PROXY_AUTHORIZATION,
+                HeaderValue::from_static("Basic default-secret"),
+            );
+            ClientConfig::new()
+                .default_headers(headers)
+                .transport(|builder| {
+                    builder.proxy(
+                        reqwest::Proxy::http(&proxy)
+                            .unwrap()
+                            .basic_auth("user", "pass"),
+                    )
+                })
+        })
+        .unwrap();
+        let mut seed = Seed::get("http://source.test/start").unwrap();
+        if explicit_header {
+            seed = seed.with_header(
+                PROXY_AUTHORIZATION,
+                HeaderValue::from_static("Basic seed-secret"),
+            );
+        }
+        let session = backend.connect().await.unwrap();
+        session.fetch(&seed.into_request()).await.unwrap();
+        let received = received.lock().unwrap();
+        assert_eq!(received.len(), 2);
+        assert!(received[0].0.contains(if explicit_header {
+            "seed-secret"
+        } else {
+            "default-secret"
+        }));
+        assert!(
+            received[1]
+                .0
+                .contains("proxy-authorization: Basic dXNlcjpwYXNz\r\n")
+        );
+        assert!(!received[1].0.contains("secret"));
+    }
 }
 
 #[tokio::test]
@@ -135,7 +256,7 @@ async fn cross_origin_redirects_do_not_restore_sensitive_client_defaults() {
             WWW_AUTHENTICATE,
             HeaderValue::from_static("challenge-secret"),
         );
-        reqwest::Client::builder().default_headers(headers)
+        ClientConfig::new().default_headers(headers)
     })
     .unwrap();
     let worker = from_fn(|cx: Context<ReqwestSession>| async move { cx.body().await.map(drop) });
@@ -165,6 +286,7 @@ async fn sessions_follow_redirects_and_the_raw_client_fetches_one_hop() {
             .unwrap()
             .with_body("payload")
             .with_header(CONTENT_TYPE, HeaderValue::from_static("text/plain"))
+            .with_header(CONTENT_ENCODING, HeaderValue::from_static("gzip"))
             .into_request();
         session.fetch(&request).await.unwrap();
         let received = received.lock().unwrap();
@@ -172,9 +294,11 @@ async fn sessions_follow_redirects_and_the_raw_client_fetches_one_hop() {
         if status.starts_with("303") {
             assert!(received[1].0.starts_with("GET /target "));
             assert!(!received[1].0.contains("content-type: text/plain"));
+            assert!(!received[1].0.contains("content-encoding:"));
         } else {
             assert!(received[1].0.starts_with("POST /target "));
             assert!(received[1].0.contains("content-type: text/plain"));
+            assert!(received[1].0.contains("content-encoding: gzip"));
             assert!(received[1].0.ends_with("payload"));
         }
     }
@@ -187,7 +311,7 @@ async fn sessions_follow_redirects_and_the_raw_client_fetches_one_hop() {
     })
     .await;
     let backend = ReqwestBackend::from_builder(|| {
-        reqwest::Client::builder().redirect(reqwest::redirect::Policy::none())
+        ClientConfig::new().transport(|builder| builder.redirect(reqwest::redirect::Policy::none()))
     })
     .unwrap();
     let request = Seed::get(format!("{source}/start")).unwrap().into_request();
@@ -233,7 +357,7 @@ async fn cross_origin_redirects_send_the_destination_jars_cookies() {
     let backend = ReqwestBackend::from_builder(|| {
         let mut headers = HeaderMap::new();
         headers.insert(COOKIE, HeaderValue::from_static("source=secret"));
-        reqwest::Client::builder().default_headers(headers)
+        ClientConfig::new().default_headers(headers)
     })
     .unwrap();
     let worker = from_fn(|cx: Context<ReqwestSession>| async move { cx.body().await.map(drop) });
@@ -288,7 +412,8 @@ async fn method_rewrites_suppress_default_body_headers() {
         headers.insert("content-length", HeaderValue::from_static("7"));
         headers.insert("transfer-encoding", HeaderValue::from_static("chunked"));
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
-        reqwest::Client::builder()
+        headers.insert(CONTENT_ENCODING, HeaderValue::from_static("gzip"));
+        ClientConfig::new()
             .default_headers(headers)
             .timeout(Duration::from_secs(2))
     })
@@ -309,6 +434,7 @@ async fn method_rewrites_suppress_default_body_headers() {
     assert!(received[1].0.starts_with("GET /target "));
     assert!(!received[1].0.contains("content-length: 7"));
     assert!(!received[1].0.contains("text/plain"));
+    assert!(!received[1].0.contains("content-encoding:"));
     assert!(!received[1].0.contains("transfer-encoding:"));
 }
 

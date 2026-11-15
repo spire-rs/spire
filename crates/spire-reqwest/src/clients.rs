@@ -9,8 +9,10 @@ use std::sync::{Arc, Mutex};
 use spire_core::identity::{Identity, WeakIdentity};
 use spire_core::{Error, Result};
 
+use crate::ClientConfig;
+
 /// Makes the builder every client starts from.
-pub(crate) type Builder = dyn Fn() -> reqwest::ClientBuilder + Send + Sync;
+pub(crate) type Builder = dyn Fn() -> ClientConfig + Send + Sync;
 
 /// Every reqwest client of an [`ReqwestBackend`](crate::ReqwestBackend), all
 /// from one configuration.
@@ -27,12 +29,13 @@ pub(crate) struct Clients {
 #[derive(Clone)]
 pub(crate) struct Client {
     http: reqwest::Client,
-    #[cfg(feature = "cookies")]
-    pub(crate) cookies: Arc<reqwest::cookie::Jar>,
+    pub(crate) timeout: Option<std::time::Duration>,
+    pub(crate) headers: reqwest::header::HeaderMap,
 }
 
 impl Client {
-    fn build(builder: reqwest::ClientBuilder) -> Result<Self> {
+    fn build(config: ClientConfig) -> Result<Self> {
+        let builder = config.transport;
         let builder = builder.redirect(reqwest::redirect::Policy::none());
         #[cfg(feature = "cookies")]
         let cookies = Arc::new(reqwest::cookie::Jar::default());
@@ -43,8 +46,8 @@ impl Client {
             .map_err(|error| Error::backend("failed to build HTTP client").with_source(error))?;
         Ok(Self {
             http,
-            #[cfg(feature = "cookies")]
-            cookies,
+            timeout: config.timeout,
+            headers: config.headers,
         })
     }
 }
@@ -74,7 +77,7 @@ struct Built {
 /// reqwest's defaults.
 impl Default for Clients {
     fn default() -> Self {
-        Self::new(Arc::new(reqwest::Client::builder))
+        Self::new(Arc::new(ClientConfig::new))
             .unwrap_or_else(|error| panic!("failed to build HTTP client: {error}"))
     }
 }
@@ -147,7 +150,7 @@ impl Clients {
                 let message = format!("unsupported proxy for identity `{}`", identity.name());
                 Error::invalid(message).with_source(error)
             })?;
-            builder = builder.proxy(proxy);
+            builder.transport = builder.transport.proxy(proxy);
         }
         let client = Client::build(builder)?;
         Ok(Built {

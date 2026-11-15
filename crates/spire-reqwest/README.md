@@ -61,19 +61,19 @@ spire-reqwest = { version = "0.11", features = ["gzip", "cookies"] }
 
 ## Usage
 
-`ReqwestBackend::from_builder` takes a function that makes the reqwest
+`ReqwestBackend::from_builder` takes a function that makes a `ClientConfig`
 configuration, which a crawl with identities builds one client per identity
 from:
 
 ```rust
 use std::time::Duration;
 
-use spire_reqwest::{ReqwestBackend, reqwest};
+use spire_reqwest::{ClientConfig, ReqwestBackend};
 
 let backend = ReqwestBackend::from_builder(|| {
-    reqwest::Client::builder()
+    ClientConfig::new()
         .timeout(Duration::from_secs(30))
-        .user_agent("MyBot/1.0")
+        .transport(|builder| builder.user_agent("MyBot/1.0"))
 })?;
 # Ok::<_, spire_core::Error>(())
 ```

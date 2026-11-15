@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use spire::backend::{ReqwestBackend, reqwest};
+use spire::backend::{ClientConfig, ReqwestBackend, reqwest};
 use spire::crawler::Robots;
 use spire::frontier::facade::TrapPolicy;
 use spire::frontier::seed::Seed;
@@ -160,8 +160,10 @@ async fn avoids_a_real_miasma_instance_with_robots_hidden_and_visible_links() {
                 .dedup()
                 .avoid_traps_with(TrapPolicy::default().with_max_urls(8)),
         );
-        let backend =
-            ReqwestBackend::from_builder(|| reqwest::Client::builder().no_proxy()).unwrap();
+        let backend = ReqwestBackend::from_builder(|| {
+            ClientConfig::new().transport(reqwest::ClientBuilder::no_proxy)
+        })
+        .unwrap();
         let stats = Crawler::new(backend, Router::new().fallback(FollowLinks::new("page")))
             .with_frontier(frontier.clone())
             .with_concurrency(1)

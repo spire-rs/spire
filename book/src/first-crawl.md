@@ -125,7 +125,7 @@ before the first `run`, with:
 use std::time::Duration;
 
 use spire::backend::reqwest;
-# use spire::backend::ReqwestBackend;
+# use spire::backend::{ClientConfig, ReqwestBackend};
 # use spire::dataset::InMemDataset;
 # use spire::extract::html::Select;
 # use spire::frontier::seed::Seed;
@@ -159,7 +159,7 @@ use spire::backend::reqwest;
 #     .route(Page::Product, Collect::<Product>::new())
 #     .require::<Page>();
 let backend = ReqwestBackend::from_builder(|| {
-    reqwest::Client::builder().user_agent("MyShopBot")
+    ClientConfig::new().transport(|builder| builder.user_agent("MyShopBot"))
 })?;
 let crawler = Crawler::new(backend, router)
     .with_frontier(InMemFrontier::fifo().dedup().max_depth(5).retry(3))

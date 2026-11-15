@@ -18,6 +18,11 @@ and this project adheres to
 
 ### Changed
 
+- **Breaking:** `ReqwestBackend::from_builder` now takes a `ClientConfig`
+  factory. Configure total fetch timeouts and default headers there; use
+  `ClientConfig::transport` for reqwest transport options. One timeout covers
+  redirect admission, every hop and the final body. `as_reqwest()` bypasses
+  Spire's timeout and default headers as well as its redirects.
 - **Breaking:** Minimum Rust version is now 1.99. Update `html-to-markdown-rs`
   to 3.22, replacing the unmaintained `astral-tl` dependency with `astral-html`.
 - **Breaking:** Handler tag backoff is now enforced by the scheduler with any
@@ -31,7 +36,9 @@ and this project adheres to
   jars instead of builder providers. `as_reqwest()` fetches a single hop.
 - **Breaking:** `SqliteFrontier` always records complete responses before
   handlers can read them and replays interrupted requests from those snapshots.
-  Adds `0003_response_replay.sql`.
+  Adds `0003_response_replay.sql`. Persisted
+  session tokens reject delayed response writes from a previous owner,
+  including writes surviving runtime shutdown.
 - **Breaking:** `FollowSitemap` assigns seed priorities from 0 to 1,000,000
   from sitemap priorities, with 500,000 for an absent priority.
 - **Breaking:** Frontiers implement `pop_with(PopMode)` to keep scheduled

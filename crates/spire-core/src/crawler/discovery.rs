@@ -50,7 +50,7 @@ impl Discovery {
         let Self::Gathering { pages, .. } = self else {
             return false;
         };
-        pages.sort_by_key(|seed| Reverse(seed.priority()));
+        pages.sort_by_key(|seed| (Reverse(seed.priority()), seed.order));
         *self = Self::Ready(std::mem::take(pages).into());
         true
     }

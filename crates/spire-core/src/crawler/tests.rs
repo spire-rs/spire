@@ -1422,6 +1422,48 @@ async fn failed_response_recording_stops_the_crawl_without_losing_the_seed() {
 
 mod redirect;
 
+#[cfg(feature = "robots")]
+#[tokio::test(start_paused = true)]
+async fn discovery_priority_ties_keep_pop_order_across_robots_fetches() {
+    use std::sync::Mutex;
+
+    use crate::testing::{MockPage, MockSession, MockSite};
+
+    let site = MockSite::new()
+        .page("https://slow.test/page", MockPage::text(""))
+        .page("https://fast.test/page", MockPage::text(""))
+        .page(
+            "https://slow.test/robots.txt",
+            MockPage::text("User-agent: *\nAllow: /\n").with_latency(Duration::from_secs(2)),
+        )
+        .page(
+            "https://fast.test/robots.txt",
+            MockPage::text("User-agent: *\nAllow: /\n").with_latency(Duration::from_secs(1)),
+        );
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let recorded = seen.clone();
+    let worker = from_fn(move |cx: Context<MockSession>| {
+        recorded
+            .lock()
+            .unwrap()
+            .push(cx.request().uri().host().unwrap().to_owned());
+        async { Ok::<_, Error>(()) }
+    });
+    let stats = Crawler::new(site, worker)
+        .with_frontier(InMemFrontier::fifo())
+        .with_discovery_tag("map")
+        .with_robots("bot")
+        .with_concurrency(2)
+        .with_seeds(
+            ["https://slow.test/page", "https://fast.test/page"].map(|uri| Seed::get(uri).unwrap()),
+        )
+        .run()
+        .await
+        .unwrap();
+    assert_eq!(stats.succeeded, 2);
+    assert_eq!(*seen.lock().unwrap(), ["slow.test", "fast.test"]);
+}
+
 #[tokio::test(start_paused = true)]
 async fn deferred_discovery_pages_observe_tag_backoff_and_priority() {
     use std::sync::Mutex;

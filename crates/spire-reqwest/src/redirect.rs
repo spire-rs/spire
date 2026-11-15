@@ -3,8 +3,8 @@
 use spire_core::backend::redirect::{Redirects, Transfer};
 use spire_core::http::Request;
 use spire_core::http::http::header::{
-    AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST, LOCATION, PROXY_AUTHORIZATION,
-    REFERER, TRANSFER_ENCODING, WWW_AUTHENTICATE,
+    AUTHORIZATION, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST, LOCATION,
+    PROXY_AUTHORIZATION, REFERER, TRANSFER_ENCODING, WWW_AUTHENTICATE,
 };
 use spire_core::http::http::{HeaderName, HeaderValue, Method, StatusCode};
 use spire_core::{Error, ErrorKind, Result};
@@ -21,7 +21,12 @@ impl ReqwestSession {
         let failed = |error: Error| error.with_uri(uri.clone());
         let mut converted = request_to_reqwest(request).map_err(failed)?;
         let mut hops = 0;
-        let mut stripped_credentials = false;
+        for (name, value) in &self.client.headers {
+            converted
+                .headers_mut()
+                .entry(name)
+                .or_insert_with(|| value.clone());
+        }
         loop {
             let permit = if let Some(redirects) = request.extensions().get::<Redirects>() {
                 let mut target_request = request.clone();
@@ -89,94 +94,46 @@ impl ReqwestSession {
                     .with_message("too many redirects")
                     .with_uri(uri));
             }
-            converted = self.redirect_request(
-                previous,
-                response.status(),
-                target.clone(),
-                &mut stripped_credentials,
-            )?;
+            converted = Self::redirect_request(previous, response.status(), target);
         }
     }
 
-    #[cfg_attr(
-        not(feature = "cookies"),
-        expect(
-            clippy::unused_self,
-            reason = "cookie-enabled builds consult this session's jar"
-        )
-    )]
     fn redirect_request(
-        &self,
         mut converted: reqwest::Request,
         status: StatusCode,
         target: reqwest::Url,
-        stripped_credentials: &mut bool,
-    ) -> Result<reqwest::Request> {
+    ) -> reqwest::Request {
         if status == StatusCode::SEE_OTHER && converted.method() != Method::HEAD
             || matches!(status, StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND)
                 && converted.method() == Method::POST
         {
             *converted.method_mut() = Method::GET;
             *converted.body_mut() = None;
-            // Absent headers would be restored by reqwest's client defaults.
-            // An empty body makes the transport remove Transfer-Encoding;
-            // explicitly zero Content-Length to suppress stale framing.
+            // Clear framing and metadata belonging to the removed body.
             converted
                 .headers_mut()
                 .insert(CONTENT_LENGTH, HeaderValue::from_static("0"));
-            for header in [CONTENT_TYPE, TRANSFER_ENCODING] {
-                converted
-                    .headers_mut()
-                    .insert(header, HeaderValue::from_static(""));
+            for header in [CONTENT_TYPE, CONTENT_ENCODING, TRANSFER_ENCODING] {
+                converted.headers_mut().remove(header);
             }
         }
         if target.origin() != converted.url().origin() {
-            *stripped_credentials = true;
             for header in [
                 AUTHORIZATION,
                 PROXY_AUTHORIZATION,
+                COOKIE,
+                HOST,
                 REFERER,
                 WWW_AUTHENTICATE,
                 HeaderName::from_static("cookie2"),
             ] {
-                // An absent header would be restored from client defaults
-                // on the next execute. An empty value suppresses those
-                // defaults as well as credentials on the original seed.
-                converted
-                    .headers_mut()
-                    .insert(header, HeaderValue::from_static(""));
+                // Defaults are applied once, before following redirects.
+                // Leaving proxy auth absent lets the transport authenticate
+                // to the destination's configured proxy.
+                converted.headers_mut().remove(header);
             }
         }
-        if *stripped_credentials {
-            // Suppress source/default cookies, while still consulting the
-            // destination's jar on every subsequent hop.
-            #[cfg(feature = "cookies")]
-            let cookie = {
-                use reqwest::cookie::CookieStore;
-                self.client
-                    .cookies
-                    .cookies(&target)
-                    .unwrap_or_else(|| HeaderValue::from_static(""))
-            };
-            #[cfg(not(feature = "cookies"))]
-            let cookie = HeaderValue::from_static("");
-            converted.headers_mut().insert(COOKIE, cookie);
-        }
-        if *stripped_credentials {
-            let target_uri: spire_core::http::http::Uri = target
-                .as_str()
-                .parse()
-                .map_err(|error| Error::invalid("invalid redirect URI").with_source(error))?;
-            let host = target_uri
-                .authority()
-                .ok_or_else(|| Error::invalid("redirect URL has no authority"))?;
-            converted.headers_mut().insert(
-                HOST,
-                HeaderValue::from_str(host.as_str())
-                    .map_err(|error| Error::invalid("invalid redirect host").with_source(error))?,
-            );
-        }
         *converted.url_mut() = target;
-        Ok(converted)
+        converted
     }
 }

@@ -92,6 +92,7 @@ mod tests {
             "DROP TABLE spire_frontier_retries;
             DROP TABLE spire_frontier_clock;
             DROP TABLE spire_frontier_responses;
+            DROP TABLE spire_frontier_session;
             DELETE FROM _spire_sqlx_migrations WHERE version >= 2;",
         )
         .execute(store.pool())

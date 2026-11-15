@@ -7,7 +7,7 @@ connection pool.
 ```rust,no_run
 use std::time::Duration;
 
-use spire::backend::{ReqwestBackend, reqwest};
+use spire::backend::{ClientConfig, ReqwestBackend};
 
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 // reqwest's defaults:
@@ -15,9 +15,9 @@ let backend = ReqwestBackend::default();
 
 // Or a configuration of your own, e.g. with a user agent and a timeout.
 let backend = ReqwestBackend::from_builder(|| {
-    reqwest::Client::builder()
-        .user_agent("MyBot/1.0 (+https://example.com/bot)")
+    ClientConfig::new()
         .timeout(Duration::from_secs(30))
+        .transport(|builder| builder.user_agent("MyBot/1.0 (+https://example.com/bot)"))
 })?;
 # Ok(())
 # }
@@ -70,9 +70,12 @@ applicable cookies. The final URI is recorded for resolving relative links.
 
 The backend disables reqwest's automatic redirect policy and, with `cookies`,
 uses one owned jar for direct requests and one for each identity. Builder
-redirect policies and cookie providers are replaced. `as_reqwest()` shares
-the direct client and its jar, but fetches a single hop. Builder timeouts apply
-to each transfer; `Crawler::with_request_timeout` bounds the whole request,
+redirect policies and cookie providers are replaced. Configure the total
+fetch timeout and initial default headers on `ClientConfig`, and transport
+options through `ClientConfig::transport`. The fetch timeout covers redirect
+admission, every hop and the final body. `as_reqwest()` shares the direct
+transport client and its jar, but bypasses Spire's redirects, total timeout
+and default headers. `Crawler::with_request_timeout` bounds the whole request,
 including redirects and admission waits. Other backends must expose hops
 through `backend::redirect::Redirects` to support these checks: call `check`
 before each transfer, including the initial one, and hold its permit until

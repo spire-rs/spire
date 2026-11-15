@@ -54,7 +54,7 @@ pub mod backend {
     pub use spire_reqwest::reqwest;
     #[cfg(feature = "reqwest")]
     #[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
-    pub use spire_reqwest::{ReqwestBackend, ReqwestSession};
+    pub use spire_reqwest::{ClientConfig, ReqwestBackend, ReqwestSession};
     #[cfg(feature = "thirtyfour")]
     #[cfg_attr(docsrs, doc(cfg(feature = "thirtyfour")))]
     #[doc(no_inline)]

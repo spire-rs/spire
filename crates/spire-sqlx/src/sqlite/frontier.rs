@@ -30,6 +30,8 @@ use crate::error::frontier_error;
 /// on the live page remaining unchanged. Completion, failure and retries remove
 /// snapshots; cancellation preserves them. Replay restores response data, not
 /// a browser's live document.
+/// Each exclusive open rotates a persisted session token, so delayed response
+/// writes from a previous owner cannot overwrite the current session's data.
 ///
 /// Enqueueing or scheduling serializes the seed and discards caller-attached
 /// runtime extensions, even without a restart. Register shared runtime services
@@ -51,7 +53,7 @@ pub(super) struct Inner {
     _lock: File,
     epoch: i64,
     started: Instant,
-    owner: Arc<()>,
+    session: Arc<[u8]>,
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -67,12 +69,12 @@ fn decode(payload: &str) -> Result<Seed> {
 }
 
 // The row ID follows one popped occurrence through clones and Retry. The
-// owner marker prevents seeds from an older frontier session acknowledging
+// session token prevents seeds from an older frontier session acknowledging
 // records after recovery, without retaining the frontier's file lock.
 #[derive(Debug, Clone)]
 struct Occurrence {
     id: i64,
-    owner: Arc<()>,
+    session: Arc<[u8]>,
 }
 
 impl SqliteFrontier {
@@ -111,6 +113,12 @@ impl SqliteFrontier {
             .begin_with("BEGIN IMMEDIATE")
             .await
             .map_err(frontier_error)?;
+        let session: Vec<u8> = sqlx::query_scalar(
+            "UPDATE spire_frontier_session SET token = randomblob(16) WHERE id = 1 RETURNING token",
+        )
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(frontier_error)?;
         sqlx::query("UPDATE spire_frontier_items SET in_flight = 0 WHERE in_flight = 1")
             .execute(&mut *transaction)
             .await
@@ -135,7 +143,7 @@ impl SqliteFrontier {
                 _lock: file,
                 epoch,
                 started: Instant::now(),
-                owner: Arc::new(()),
+                session: session.into(),
             }),
         })
     }
@@ -281,10 +289,15 @@ impl Frontier for SqliteFrontier {
         let mut seed = decode(&payload)?;
         seed.extensions_mut().insert(Occurrence {
             id,
-            owner: self.inner.owner.clone(),
+            session: self.inner.session.clone(),
         });
-        let replay =
-            super::replay::load(&mut transaction, &self.inner.pool, id, &self.inner).await?;
+        let replay = super::replay::load(
+            &mut transaction,
+            &self.inner.pool,
+            id,
+            self.inner.session.clone(),
+        )
+        .await?;
         seed.extensions_mut().insert(replay);
         sqlx::query("UPDATE spire_frontier_items SET in_flight = 1 WHERE id = $1")
             .bind(id)
@@ -308,7 +321,7 @@ impl Frontier for SqliteFrontier {
         let occurrence = seed.extensions().get::<Occurrence>().ok_or_else(|| {
             invalid("SQLite reports require the seed returned by pop, or its clone")
         })?;
-        if !Arc::ptr_eq(&occurrence.owner, &self.inner.owner) {
+        if occurrence.session != self.inner.session {
             return Err(invalid(
                 "SQLite report belongs to a different frontier session",
             ));
