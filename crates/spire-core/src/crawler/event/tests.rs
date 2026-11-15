@@ -243,12 +243,24 @@ async fn robots_txt_fetches_and_disallows_are_reported() {
         .with_robots("TestBot")
         .with_seeds([seed(""), seed("private")]);
 
+    let mut labels = events(crawler).await;
+    let skipped = labels
+        .iter()
+        .position(|label| label == "skip /private disallowed by robots.txt")
+        .unwrap();
+    let robots = labels
+        .iter()
+        .position(|label| label == "robots https://example.com ok")
+        .unwrap();
+    assert!(robots < skipped);
+    // The private page and the allowed page are independent. Keep their
+    // causal constraints without requiring one scheduler interleaving.
+    labels.remove(skipped);
     assert_eq!(
-        events(crawler).await,
+        labels,
         [
             "started",
             "robots https://example.com ok",
-            "skip /private disallowed by robots.txt",
             "start / attempt=0",
             "fetch / 200",
             "handle / continue",

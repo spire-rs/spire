@@ -532,6 +532,43 @@ mod limits {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn frontier_errors_preserve_redirect_wakeups_while_draining() {
+        use crate::testing::{MockPage, MockSession, MockSite};
+
+        let frontier = Arc::new(Recording {
+            fail_after: Some(2),
+            ..Recording::default()
+        });
+        let site = MockSite::new()
+            .page(
+                "https://a.test/start",
+                MockPage::redirect("https://a.test/target"),
+            )
+            .page("https://a.test/target", MockPage::text("done"))
+            .page("https://b.test/slow", MockPage::text("done"));
+        let worker = from_fn(|cx: Context<MockSession>| async move {
+            if cx.request().uri().path() == "/slow" {
+                sleep(Duration::from_secs(1)).await;
+            }
+            cx.body().await.map(drop)
+        });
+        let crawler = Crawler::new(site, worker)
+            .with_frontier(frontier)
+            .with_concurrency(2)
+            .with_host_delay(Duration::from_secs(2))
+            .with_seeds([
+                Seed::get("https://a.test/start").unwrap(),
+                Seed::get("https://b.test/slow").unwrap(),
+            ]);
+        let error = tokio::time::timeout(Duration::from_secs(5), crawler.run())
+            .await
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Frontier);
+        assert_eq!(crawler.stats().succeeded, 2);
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn stats_are_live() {
         let worker = from_fn(|cx: Context<Noop>| async move {
             sleep(Duration::from_secs(1)).await;
@@ -1422,6 +1459,104 @@ async fn failed_response_recording_stops_the_crawl_without_losing_the_seed() {
 
 mod redirect;
 
+#[tokio::test(start_paused = true)]
+async fn discovery_returns_control_for_time_limits_and_shutdown() {
+    use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report};
+
+    struct Slow(InMemFrontier);
+    impl Frontier for Slow {
+        async fn push(&self, seed: Seed) -> crate::Result<Admission> {
+            self.0.push(seed).await
+        }
+
+        async fn pop_with(&self, mode: PopMode) -> crate::Result<NextSeed> {
+            sleep(Duration::from_secs(1)).await;
+            self.0.pop_with(mode).await
+        }
+
+        async fn report(&self, report: Report) -> crate::Result<Ack> {
+            self.0.report(report).await
+        }
+    }
+
+    for shutdown in [false, true] {
+        let frontier = Arc::new(Slow(InMemFrontier::fifo()));
+        let worker = from_fn(|_: Context<Noop>| async {});
+        let crawler = Crawler::new(Noop, worker)
+            .with_frontier(frontier.clone())
+            .with_discovery_tag("map")
+            .with_seeds((0..10).map(|i| seed(&i.to_string())));
+        let crawler = if shutdown {
+            let token = crawler.shutdown_token();
+            tokio::spawn(async move {
+                sleep(Duration::from_secs(3)).await;
+                token.cancel();
+            });
+            crawler
+        } else {
+            crawler.with_time_limit(Duration::from_secs(3))
+        };
+        let stats = tokio::time::timeout(Duration::from_secs(5), crawler.run())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stats.requests, 0);
+        assert_eq!(frontier.0.snapshot().unwrap().len(), 10);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn eligible_host_and_tag_waiters_share_the_deferred_priority_order() {
+    use std::sync::Mutex;
+
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let recorded = seen.clone();
+    let worker = from_fn(move |cx: Context<Noop>| {
+        let seen = recorded.clone();
+        async move {
+            let path = path(&cx);
+            seen.lock().unwrap().push(path.clone());
+            match path.as_str() {
+                "block" => sleep(Duration::from_secs(9)).await,
+                "filler" => sleep(Duration::from_secs(12)).await,
+                "trigger" => return Outcome::backoff_tag("low", Duration::from_secs(5)),
+                _ => {}
+            }
+            Outcome::Continue
+        }
+    });
+    let stats = Crawler::new(Noop, worker)
+        .with_frontier(InMemFrontier::fifo())
+        .with_discovery_tag("map")
+        .with_concurrency(2)
+        .with_host_concurrency(1)
+        .with_max_requests(4)
+        .with_seeds([
+            Seed::get("https://a.test/block")
+                .unwrap()
+                .with_priority(100),
+            Seed::get("https://c.test/trigger")
+                .unwrap()
+                .with_priority(95),
+            Seed::get("https://a.test/high").unwrap().with_priority(90),
+            Seed::get("https://b.test/low")
+                .unwrap()
+                .with_priority(80)
+                .with_tag("low"),
+            Seed::get("https://d.test/filler")
+                .unwrap()
+                .with_priority(70),
+        ])
+        .run()
+        .await
+        .unwrap();
+    assert_eq!((stats.requests, stats.succeeded, stats.failed), (4, 3, 1));
+    assert_eq!(
+        *seen.lock().unwrap(),
+        ["block", "trigger", "filler", "high"]
+    );
+}
+
 #[cfg(feature = "robots")]
 #[tokio::test(start_paused = true)]
 async fn discovery_priority_ties_keep_pop_order_across_robots_fetches() {
@@ -1689,7 +1824,7 @@ async fn robots_releases_obey_global_concurrency_and_request_budget() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn an_older_host_waiter_does_not_lose_its_order_when_tag_backoff_parks_it_again() {
+async fn an_older_host_waiter_keeps_its_order_through_tag_backoff() {
     use futures::StreamExt;
 
     use crate::crawler::event::Event;
@@ -1732,7 +1867,7 @@ async fn an_older_host_waiter_does_not_lose_its_order_when_tag_backoff_parks_it_
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_host_waiter_returning_after_tag_backoff_stays_ahead_of_later_host_waiters() {
+async fn host_waiters_keep_their_order_when_a_tag_pause_expires() {
     use futures::StreamExt;
 
     use crate::crawler::event::Event;

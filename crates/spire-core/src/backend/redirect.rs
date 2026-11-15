@@ -7,7 +7,7 @@ use tokio::task::Id;
 use tokio::time::Instant;
 
 use crate::frontier::seed::Seed;
-use crate::http::{Request, RequestExt};
+use crate::http::Request;
 use crate::{Error, ErrorKind, Result};
 
 /// A request extension used by backends that expose redirect hops.
@@ -68,18 +68,7 @@ impl Redirects {
     /// Returns an error if scope or robots.txt disallows the target, the crawl
     /// stops, or the originating request task is no longer running.
     pub async fn check(&self, request: &Request) -> Result<Transfer> {
-        let mut seed = Seed::new(request.method().clone(), request.uri().clone())?
-            .with_depth(request.depth())
-            .with_body(request.body().clone());
-        if let Some(tag) = request.tag() {
-            seed = seed.with_tag(tag.clone());
-        }
-        if let Some(identity) = request.identity() {
-            seed = seed.with_identity(identity.name());
-        }
-        for (name, value) in request.headers() {
-            seed = seed.with_header(name.clone(), value.clone());
-        }
+        let seed = Seed::from_request(request)?;
         let (answer, received) = oneshot::channel();
         self.sender
             .send(TransferEvent::Admit(RedirectRequest {

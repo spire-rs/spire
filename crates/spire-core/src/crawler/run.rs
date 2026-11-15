@@ -477,7 +477,11 @@ where
             if run.tasks.is_empty() && (run.stopping || (!run.robots_busy() && wait.is_none())) {
                 break;
             }
+            // Admission progress needs another turn, without paying the
+            // timer wheel's millisecond granularity for an immediate wake.
+            let immediate = wait.is_some_and(|at| at <= Instant::now());
             if let Some(at) = wait
+                && !immediate
                 && armed_wait != wait
             {
                 wait_timer.as_mut().reset(at);
@@ -508,7 +512,10 @@ where
                 Some(event) = run.redirects.recv() => self.transfer(&mut run, event).await,
                 Some(joined) = run.tasks.join_next_with_id() => self.complete(&mut run, joined).await,
                 fetched = next_robots(&mut run.robots) => self.robots_fetched(&mut run, fetched).await,
-                () = &mut wait_timer, if wait.is_some() => {
+                () = tokio::task::yield_now(), if immediate => {
+                    armed_wait = None;
+                }
+                () = &mut wait_timer, if wait.is_some() && !immediate => {
                     armed_wait = None;
                 }
             }
@@ -586,97 +593,79 @@ where
         }
     }
 
-    /// Starts requests until the concurrency limit or budget is reached or
-    /// no seed is ready, returning when the next one will be.
+    /// Performs one admission step, then returns to the event loop so
+    /// discovery cannot delay shutdown, timers or running transfer events.
     async fn fill(&self, run: &mut Run<B>) -> Option<Instant> {
         let settings = &self.settings;
-        let mut wait = run.robots_tick();
         self.resume_redirects(run).await;
+        let mut wait = None;
 
-        while run.tasks.len() < settings.concurrency.get() {
-            if run.stopping {
-                return None;
-            }
-            if settings.max_requests.is_some_and(|max| run.started >= max) {
-                run.stop(StopReason::RequestBudget, settings.shutdown_grace);
-                return None;
-            }
-
-            if let Some(seed) = run.ready.pop(Instant::now()) {
-                if run.is_aborted(&seed) {
-                    self.skip(run, seed.into(), SkipReason::TagAborted).await;
-                } else if let Admit::Start(pending) = run.hosts.admit(seed, Instant::now()) {
-                    self.start(run, pending).await;
-                }
-                continue;
-            }
-            if let Some(seed) = run.hosts.take_ready(Instant::now()) {
-                self.start(run, seed).await;
-                continue;
-            }
-            if let Some(seed) = run.discovery.pop() {
+        if run.tasks.len() < settings.concurrency.get()
+            && settings.max_requests.is_none_or(|max| run.started < max)
+        {
+            let now = Instant::now();
+            let hosts = &run.hosts;
+            let aborted = &run.aborted;
+            if let Some(seed) = run.ready.pop(now, |seed| {
+                aborted.contains(&seed.tag().cloned())
+                    || hosts.ready_at(seed, now).is_some_and(|at| at <= now)
+            }) {
+                self.start(run, seed.into()).await;
+                wait = Some(Instant::now());
+            } else if let Some(seed) = run.discovery.pop() {
                 let seed = run.candidate(seed.seed);
                 self.admit(run, seed.into()).await;
-                continue;
-            }
-            if run.parked() >= MAX_PARKED {
-                break;
-            }
-
-            match self.frontier.pop_with(run.discovery.mode()).await {
-                Ok(NextSeed::Ready(seed)) => {
-                    let seed = run.candidate(seed);
-                    self.admit(run, seed.into()).await;
-                }
-                Ok(NextSeed::Wait(at)) => {
-                    wait = wait.min(Some(at)).or(Some(at));
-                    break;
-                }
-                Ok(NextSeed::Empty) => {
-                    if run.tasks.is_empty()
-                        && run.parked() == 0
-                        && !run.robots_busy()
-                        && run.discovery.finish()
-                    {
-                        continue;
+                wait = Some(Instant::now());
+            } else if run.parked() < MAX_PARKED {
+                match self.frontier.pop_with(run.discovery.mode()).await {
+                    Ok(NextSeed::Ready(seed)) => {
+                        let seed = run.candidate(seed);
+                        self.admit(run, seed.into()).await;
+                        wait = Some(Instant::now());
                     }
-                    break;
-                }
-                Err(error) => {
-                    run.fail(error, settings.shutdown_grace);
-                    return None;
+                    Ok(NextSeed::Wait(at)) => wait = Some(at),
+                    Ok(NextSeed::Empty) => {
+                        if run.tasks.is_empty()
+                            && run.parked() == 0
+                            && !run.robots_busy()
+                            && run.discovery.finish()
+                        {
+                            wait = Some(Instant::now());
+                        }
+                    }
+                    Err(error) => run.fail(error, settings.shutdown_grace),
                 }
             }
         }
+        if settings.max_requests.is_some_and(|max| run.started >= max) {
+            run.stop(StopReason::RequestBudget, settings.shutdown_grace);
+        }
 
-        let robots = run.robots_tick();
+        // Recompute after every path, including budget and storage failures:
+        // existing redirects still need their timers during graceful shutdown.
+        let redirects = self.resume_redirects(run).await;
+        if run.stopping {
+            return redirects;
+        }
         let now = Instant::now();
-        let has_slot = run.tasks.len() < settings.concurrency.get();
-        // Redirects continue existing tasks and can run even at capacity.
-        // Ordinary host waits need no timer until a task frees a slot.
-        let hosts = if has_slot {
-            run.hosts.earliest()
+        let ready = if run.tasks.len() < settings.concurrency.get() {
+            run.ready.earliest(|seed| run.hosts.ready_at(seed, now))
         } else {
-            run.hosts.earliest_where(Pending::is_redirect)
+            wait = None;
+            None
         };
-        [wait, robots, hosts, run.ready.earliest(now, has_slot)]
-            .into_iter()
-            .flatten()
-            .min()
+        [wait, redirects, ready].into_iter().flatten().min()
     }
 
     /// Redirect hops belong to already-running work, including during graceful
     /// shutdown. Resume them without starting new frontier requests.
     async fn resume_redirects(&self, run: &mut Run<B>) -> Option<Instant> {
         run.prune_admissions();
-        while let Some(seed) = run
-            .hosts
-            .take_ready_where(Instant::now(), Pending::is_redirect)
-        {
+        while let Some(seed) = run.hosts.take_ready(Instant::now()) {
             self.start(run, seed).await;
         }
         let robots = run.robots_tick();
-        let hosts = run.hosts.earliest_where(Pending::is_redirect);
+        let hosts = run.hosts.earliest();
         [robots, hosts].into_iter().flatten().min()
     }
 
@@ -708,6 +697,9 @@ where
             )));
             return;
         };
+        // Priority belongs to the logical frontier occurrence; HTTP requests
+        // carry the other metadata, but do not carry scheduling priority.
+        let seed = seed.with_priority(in_flight.seed.priority());
         // The first transfer uses the slot already admitted for this seed.
         // Every later transfer (including a fetch retried in one Context)
         // must re-enter host admission.
@@ -737,8 +729,8 @@ where
         .await;
     }
 
-    /// Starts a popped seed now, parks it until robots.txt and its host
-    /// allow it, or skips it if robots.txt disallows it.
+    /// Applies robots.txt, then queues a root occurrence or admits a hop
+    /// through its host. Disallowed requests are skipped.
     async fn admit(&self, run: &mut Run<B>, seed: Pending) {
         if run.stopping && !seed.is_redirect() {
             if let Pending::Seed(seed) = seed {
@@ -854,7 +846,7 @@ where
         self.report(run, Report::Skipped(seed)).await;
     }
 
-    /// Starts a host-admitted request, or resumes an existing redirect hop.
+    /// Starts an eligible request, or resumes an existing redirect hop.
     async fn start(&self, run: &mut Run<B>, pending: Pending) {
         let seed = match pending {
             Pending::Seed(seed) => seed,
@@ -867,12 +859,6 @@ where
             self.skip(run, seed.into(), SkipReason::TagAborted).await;
             return;
         }
-        // Host waiters already hold their place in the host queue. Only
-        // recheck tag admission here; fresh host admission would requeue
-        // the head behind its own waiters indefinitely.
-        let Some(seed) = run.ready.admit(seed, Instant::now()) else {
-            return;
-        };
         let seed = seed.seed;
         run.started += 1;
         let now = Instant::now();

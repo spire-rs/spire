@@ -3,6 +3,84 @@
 use super::*;
 
 #[tokio::test(start_paused = true)]
+async fn reaching_the_budget_with_a_parked_redirect_preserves_its_wakeup() {
+    use crate::testing::{MockPage, MockSession, MockSite};
+
+    let site = MockSite::new()
+        .page(
+            "https://a.test/start",
+            MockPage::redirect("https://a.test/target"),
+        )
+        .page("https://a.test/target", MockPage::text("done"))
+        .page("https://b.test/slow", MockPage::text("done"));
+    let worker = from_fn(|cx: Context<MockSession>| async move {
+        if cx.request().uri().path() == "/slow" {
+            sleep(Duration::from_secs(1)).await;
+        }
+        cx.body().await.map(drop)
+    });
+    let crawler = Crawler::new(site, worker)
+        .with_concurrency(2)
+        .with_max_requests(2)
+        .with_host_delay(Duration::from_secs(2))
+        .with_seeds([
+            Seed::get("https://a.test/start").unwrap(),
+            Seed::get("https://b.test/slow").unwrap(),
+        ]);
+    let stats = tokio::time::timeout(Duration::from_secs(5), crawler.run())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!((stats.succeeded, stats.failed, stats.cancelled), (2, 0, 0));
+}
+
+#[tokio::test(start_paused = true)]
+async fn redirect_scope_keeps_extensions_priority_and_the_retry_attempt() {
+    use crate::testing::{MockPage, MockSession, MockSite};
+
+    #[derive(Clone)]
+    struct Scope;
+
+    for global_extension in [false, true] {
+        let site = MockSite::new()
+            .page(
+                "https://example.com/start",
+                MockPage::redirect("https://example.com/target"),
+            )
+            .page("https://example.com/target", MockPage::text("done"));
+        let frontier = InMemFrontier::fifo()
+            .filter(|seed| {
+                seed.uri().path() == "/start"
+                    || seed.extensions().get::<Scope>().is_some()
+                        && seed.attempt().get() == 1
+                        && seed.priority() == 42
+            })
+            .retry(1);
+        let worker = from_fn(|cx: Context<MockSession>| async move {
+            if cx.request().attempt().get() == 0 {
+                return Ok(Outcome::retry());
+            }
+            cx.body().await?;
+            Ok::<_, Error>(Outcome::Continue)
+        });
+        let mut first = seed("start").with_priority(42);
+        if !global_extension {
+            first.extensions_mut().insert(Scope);
+        }
+        let crawler = Crawler::new(site, worker)
+            .with_frontier(frontier)
+            .with_seed(first);
+        let crawler = if global_extension {
+            crawler.with_extension(Scope)
+        } else {
+            crawler
+        };
+        let stats = crawler.run().await.unwrap();
+        assert_eq!((stats.succeeded, stats.failed, stats.retried), (1, 0, 1));
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn an_expired_root_wait_does_not_hide_a_redirect_deadline_at_capacity() {
     use crate::testing::{MockPage, MockSession, MockSite};
 

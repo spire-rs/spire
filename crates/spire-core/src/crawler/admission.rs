@@ -11,7 +11,7 @@ use crate::crawler::Tag;
 use crate::frontier::seed::Seed;
 
 /// An unchanged frontier occurrence with its stable scheduling order.
-/// The order survives host and tag waits; it is never stored in seed
+/// The order survives admission waits; it is never stored in seed
 /// extensions.
 #[derive(Debug)]
 pub(crate) struct Candidate {
@@ -82,7 +82,7 @@ impl Deref for Pending {
     }
 }
 
-/// Robots-approved occurrences waiting for a global slot and an unpaused tag.
+/// Robots-approved occurrences waiting for global, host and tag admission.
 /// Occurrences are moved intact, preserving persistent acknowledgment tokens.
 #[derive(Default)]
 pub(super) struct Ready {
@@ -104,22 +104,16 @@ impl Ready {
             .is_some_and(|until| *until > now)
     }
 
-    /// Host waiters must recheck pauses set after they left this queue.
-    pub(super) fn admit(&mut self, seed: Candidate, now: Instant) -> Option<Candidate> {
-        if self.is_paused(&seed, now) {
-            self.push(seed);
-            None
-        } else {
-            Some(seed)
-        }
-    }
-
-    pub(super) fn pop(&mut self, now: Instant) -> Option<Candidate> {
+    pub(super) fn pop(
+        &mut self,
+        now: Instant,
+        accepts: impl Fn(&Seed) -> bool,
+    ) -> Option<Candidate> {
         self.paused.retain(|_, until| *until > now);
         let index = self
             .queued
             .iter()
-            .position(|seed| !self.is_paused(seed, now))?;
+            .position(|seed| !self.is_paused(seed, now) && accepts(seed))?;
         self.queued.remove(index)
     }
 
@@ -134,15 +128,20 @@ impl Ready {
         self.paused.remove(&tag.cloned());
     }
 
-    /// Expired deadlines wake an idle scheduler, but must not spin it while
-    /// every global slot is occupied.
-    pub(super) fn earliest(&self, now: Instant, has_slot: bool) -> Option<Instant> {
+    /// The next occurrence eligible by time alone. Host capacity and tag
+    /// pauses must both permit it; global capacity is checked by the caller.
+    pub(super) fn earliest(&self, ready_at: impl Fn(&Seed) -> Option<Instant>) -> Option<Instant> {
         self.queued
             .iter()
-            .filter_map(|seed| self.paused.get(&seed.tag().cloned()))
-            .filter(|until| has_slot || **until > now)
+            .filter_map(|seed| {
+                let at = ready_at(seed)?;
+                Some(
+                    self.paused
+                        .get(&seed.tag().cloned())
+                        .map_or(at, |until| at.max(*until)),
+                )
+            })
             .min()
-            .copied()
     }
 
     pub(super) fn len(&self) -> usize {
@@ -186,35 +185,42 @@ mod tests {
         ready.push(first);
         ready.push(seed("second", Some("a")));
         ready.push(seed("free", Some("b")));
-        assert_eq!(ready.pop(now).unwrap().uri().path(), "/free");
-        assert_eq!(ready.earliest(now, true), Some(until));
-        assert!(ready.pop(until - Duration::from_nanos(1)).is_none());
-        assert_eq!(ready.earliest(until, false), None);
-        assert_eq!(ready.earliest(until, true), Some(until));
-        let first = ready.pop(until).unwrap();
+        assert_eq!(ready.pop(now, |_| true).unwrap().uri().path(), "/free");
+        assert_eq!(ready.earliest(|_| Some(now)), Some(until));
+        assert!(
+            ready
+                .pop(until - Duration::from_nanos(1), |_| true)
+                .is_none()
+        );
+        assert_eq!(ready.earliest(|_| None), None);
+        assert_eq!(ready.earliest(|_| Some(until)), Some(until));
+        let first = ready.pop(until, |_| true).unwrap();
         assert_eq!(first.uri().path(), "/first");
         assert!(Arc::ptr_eq(
             first.extensions().get::<Arc<u8>>().unwrap(),
             &marker
         ));
-        assert_eq!(ready.pop(until).unwrap().uri().path(), "/second");
+        assert_eq!(ready.pop(until, |_| true).unwrap().uri().path(), "/second");
     }
 
     #[test]
-    fn a_host_waiter_keeps_its_original_place_when_a_new_pause_parks_it_again() {
+    fn host_and_tag_waiters_share_one_order() {
         let now = Instant::now();
         let mut ready = Ready::default();
         let first = seed("first", Some("a"));
-        ready.push(first);
-        let first = ready.pop(now).unwrap();
-        let mut second = seed("second", Some("a"));
+        let mut second = seed("second", Some("b"));
         second.order = 1;
-        ready.pause(Some(Tag::from("a")), now + Duration::from_secs(5));
+        ready.push(first);
         ready.push(second);
-        assert!(ready.admit(first, now).is_none());
+        ready.pause(Some(Tag::from("b")), now + Duration::from_secs(1));
+        assert!(
+            ready
+                .pop(now, |seed| seed.uri().path() != "/first")
+                .is_none()
+        );
         assert_eq!(
             ready
-                .pop(now + Duration::from_secs(5))
+                .pop(now + Duration::from_secs(1), |_| true)
                 .unwrap()
                 .uri()
                 .path(),
@@ -222,7 +228,7 @@ mod tests {
         );
         assert_eq!(
             ready
-                .pop(now + Duration::from_secs(5))
+                .pop(now + Duration::from_secs(1), |_| true)
                 .unwrap()
                 .uri()
                 .path(),
@@ -236,10 +242,10 @@ mod tests {
         let mut ready = Ready::default();
         let tag = Some(Tag::from("a"));
         ready.pause(tag.clone(), now + Duration::from_hours(1));
-        assert_eq!(ready.earliest(now, true), None);
+        assert_eq!(ready.earliest(|_| Some(now)), None);
         ready.push(seed("page", Some("a")));
-        assert!(ready.pop(now).is_none());
+        assert!(ready.pop(now, |_| true).is_none());
         ready.unpause(tag.as_ref());
-        assert_eq!(ready.pop(now).unwrap().uri().path(), "/page");
+        assert_eq!(ready.pop(now, |_| true).unwrap().uri().path(), "/page");
     }
 }
