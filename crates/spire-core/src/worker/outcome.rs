@@ -17,8 +17,10 @@ pub enum Outcome {
         /// Delay before the next attempt; `None` defers to the frontier.
         after: Option<Duration>,
     },
-    /// Pause every request in `scope` for `duration`, then try this request
-    /// again. Typically returned on `429 Too Many Requests`.
+    /// Pause new requests in `scope` for `duration`, then try this request
+    /// again. The scheduler applies the pause with any frontier; in-flight
+    /// requests continue. Retrying this request requires frontier retry
+    /// support. Typically returned on `429 Too Many Requests`.
     Backoff {
         /// The requests to pause.
         scope: Scope,

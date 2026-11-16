@@ -63,8 +63,8 @@ lose those items to the caller (see [Datasets](#datasets)).
 - **Queued links survive.** Each link is committed when it is queued, and
   recorded as seen only once it is queued. `Queue::follow_all` queues links
   individually, so a crash can leave some discovered links unqueued. The
-  parent page is crawled again, but recovering those links depends on them
-  still appearing in its next response.
+  parent page is crawled again from its saved response, so recovery does not
+  depend on the live page still containing those links.
 - **Items may be written twice.** Items and the frontier are committed
   separately, so a page whose items were committed just before a crash may be
   crawled again and write them again: deduplicate by a key such as the URL
@@ -81,6 +81,19 @@ A seed is serialized when it is queued, so extensions attached to it at
 runtime are dropped, even without a restart. Register shared services with
 `Crawler::with_extension` instead, and keep per-request data in the seed's
 own fields, such as its tag.
+
+### Replaying interrupted handlers
+
+`SqliteFrontier` stores each complete response before handlers can read it.
+After an interruption, reopening reuses that response for the recovered
+request. Links not yet queued can therefore be extracted from the original body even if the live page has
+changed or disappeared. Already queued links still pass through deduplication.
+
+The snapshot belongs to one frontier occurrence, keeping identical URLs and
+identities separate. It is removed when the request is reported done, failed,
+or retried; cancellation retains it. Recording bodies increases database size
+and writes. Replay restores the response snapshot, not a browser's live DOM
+or external state, and handlers can still repeat side effects.
 
 ## Syncing
 
@@ -155,6 +168,35 @@ a batch read that cannot decode an item takes none, leaving the batch stored.
 Such an item blocks reads until it is repaired or removed through
 `store.pool()`. A read commits before it returns, so a crash or cancellation
 right after it can lose those items to the caller.
+
+### Acknowledged reads
+
+For delivery that survives a consumer crashing, use the concrete dataset's
+`read_with_ack(max)`. It keeps the deletion in an uncommitted transaction
+until you acknowledge the batch after processing it. Dropping the batch or
+losing the process rolls back the deletion, making its items available again:
+
+```rust,no_run
+use spire::store::SqliteStore;
+
+# async fn consume() -> spire::Result<()> {
+let store = SqliteStore::open("crawl.sqlite").await?;
+let titles = store.dataset::<String>("titles");
+let batch = titles.read_with_ack(100).await?;
+for title in batch.items() {
+    println!("{title}");
+}
+batch.acknowledge().await?;
+# Ok(())
+# }
+```
+
+Delivery is at least once: processing may repeat after a crash before
+acknowledgment, so use idempotent consumers. `release().await` explicitly
+returns the batch without consuming it. An outstanding batch holds SQLite's
+writer lock; keep processing short, and do not write to the database through
+another connection while holding it. Ordinary `read` and `read_batch` still
+commit deletion before returning.
 
 ## Schema migrations
 

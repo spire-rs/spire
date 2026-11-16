@@ -6,6 +6,8 @@
 
 pub mod document;
 mod noop;
+pub mod redirect;
+pub mod replay;
 mod status;
 
 use std::future::Future;

@@ -28,7 +28,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  RUST_TOOLCHAIN: "1.95.0"
+  RUST_TOOLCHAIN: "1.99.0"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

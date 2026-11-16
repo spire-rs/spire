@@ -24,7 +24,11 @@ fn label(event: &Event) -> String {
     match event {
         Event::Started => "started".to_owned(),
         Event::RequestStarted { request } => {
-            format!("start {} #{}", request.uri.path(), request.attempt.get())
+            format!(
+                "start {} attempt={}",
+                request.uri.path(),
+                request.attempt.get()
+            )
         }
         Event::Fetched {
             request, status, ..
@@ -46,7 +50,7 @@ fn label(event: &Event) -> String {
             format!("robots {origin} {result}")
         }
         Event::Stopping { reason } => format!("stop {reason}"),
-        Event::Finished { stats } => format!("finish {}", stats.requests),
+        Event::Finished { stats } => format!("finish requests={}", stats.requests),
         Event::Lagged { missed } => format!("lagged {missed}"),
     }
 }
@@ -105,21 +109,21 @@ async fn a_small_crawl_reports_events_in_order() {
         events(crawler).await,
         [
             "started",
-            "start / #0",
+            "start / attempt=0",
             "fetch / 200",
             "handle / continue",
-            "start /a #0",
+            "start /a attempt=0",
             "fetch /a 200",
             "handle /a continue",
-            "start /flaky #0",
+            "start /flaky attempt=0",
             "fetch /flaky 500",
             "handle /flaky fail",
             "retry /flaky",
-            "start /flaky #1",
+            "start /flaky attempt=1",
             "fetch /flaky 500",
             "handle /flaky fail",
             "fail /flaky",
-            "finish 4",
+            "finish requests=4",
         ]
     );
 }
@@ -135,10 +139,10 @@ async fn aborted_tags_are_skipped() {
         events(crawler).await,
         [
             "started",
-            "start /1 #0",
+            "start /1 attempt=0",
             "handle /1 abort",
             "skip /2 tag aborted",
-            "finish 1",
+            "finish requests=1",
         ]
     );
 }
@@ -155,11 +159,11 @@ async fn the_request_budget_stops_the_run() {
         events(crawler).await,
         [
             "started",
-            "start /start #0",
+            "start /start attempt=0",
             // The budget counts requests as they start.
             "stop request budget spent",
             "handle /start continue",
-            "finish 1",
+            "finish requests=1",
         ]
     );
 }
@@ -184,17 +188,17 @@ async fn throttled_hosts_are_slowed_down_or_paused() {
         events(crawler).await,
         [
             "started",
-            "start /limited #0",
+            "start /limited attempt=0",
             "fetch /limited 429",
             "handle /limited fail",
             "pause example.com 5s",
             "fail /limited",
-            "start /busy #0",
+            "start /busy attempt=0",
             "fetch /busy 503",
             "handle /busy fail",
             "slow example.com",
             "fail /busy",
-            "finish 2",
+            "finish requests=2",
         ]
     );
 }
@@ -217,10 +221,10 @@ async fn requests_past_the_grace_period_are_cancelled() {
         events(crawler).await,
         [
             "started",
-            "start /slow #0",
+            "start /slow attempt=0",
             "stop shutdown requested",
             "cancel /slow",
-            "finish 0",
+            "finish requests=0",
         ]
     );
 }
@@ -239,16 +243,28 @@ async fn robots_txt_fetches_and_disallows_are_reported() {
         .with_robots("TestBot")
         .with_seeds([seed(""), seed("private")]);
 
+    let mut labels = events(crawler).await;
+    let skipped = labels
+        .iter()
+        .position(|label| label == "skip /private disallowed by robots.txt")
+        .unwrap();
+    let robots = labels
+        .iter()
+        .position(|label| label == "robots https://example.com ok")
+        .unwrap();
+    assert!(robots < skipped);
+    // The private page and the allowed page are independent. Keep their
+    // causal constraints without requiring one scheduler interleaving.
+    labels.remove(skipped);
     assert_eq!(
-        events(crawler).await,
+        labels,
         [
             "started",
             "robots https://example.com ok",
-            "start / #0",
-            "skip /private disallowed by robots.txt",
+            "start / attempt=0",
             "fetch / 200",
             "handle / continue",
-            "finish 1",
+            "finish requests=1",
         ]
     );
 }
@@ -267,7 +283,10 @@ async fn slow_subscribers_miss_the_oldest_events() {
     // The stream ends once the emitter is dropped.
     drop(emitter);
     let labels: Vec<_> = events.map(|event| label(&event)).collect().await;
-    assert_eq!(labels, ["lagged 1", "start /2 #0", "start /3 #0"]);
+    assert_eq!(
+        labels,
+        ["lagged 1", "start /2 attempt=0", "start /3 attempt=0"]
+    );
 }
 
 #[tokio::test]
@@ -281,7 +300,12 @@ async fn events_end_with_their_crawler() {
     let labels: Vec<_> = events.map(|event| label(&event)).collect().await;
     assert_eq!(
         labels,
-        ["started", "start / #0", "handle / continue", "finish 1"]
+        [
+            "started",
+            "start / attempt=0",
+            "handle / continue",
+            "finish requests=1"
+        ]
     );
 }
 

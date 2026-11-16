@@ -65,11 +65,45 @@ bounds how deep indexes are followed too.
 ## Priorities
 
 A page's `<priority>`, from 0.0 to 1.0, ranks it against the other pages of
-its site, not against the rest of the crawl. So `FollowSitemap` queues a
-sitemap's pages highest priority first, all at the default seed priority.
-This orders pages within each sitemap, not across the site: a FIFO frontier
-keeps their insertion order, while a LIFO frontier pops them in reverse.
-Pages from different sitemaps are not ranked together.
+its site. `FollowSitemap` maps it to a seed priority from 0 to 1,000,000,
+using 500,000 when it is absent, and queues each sitemap's pages highest
+priority first. Priority frontiers compare the pages already queued across
+sitemaps. FIFO retains insertion order and LIFO reverses it.
+
+To rank pages across the discovered sitemap graph, combine
+`FollowSitemap` with `Crawler::with_discovery_tag`:
+
+```rust,no_run
+use spire::backend::ReqwestBackend;
+use spire::frontier::seed::Seed;
+use spire::frontier::{FrontierExt, InMemFrontier};
+use spire::handler::FollowSitemap;
+use spire::{Crawler, Result, Router};
+
+# async fn crawl() -> Result<()> {
+let router = Router::new()
+    .route("sitemap", FollowSitemap::new("page"))
+    .route("page", || async {});
+let crawler = Crawler::new(ReqwestBackend::default(), router)
+    .with_frontier(InMemFrontier::fifo().dedup().retry(3))
+    .with_discovery_tag("sitemap")
+    .with_seed(Seed::get("https://example.com/sitemap.xml")?.with_tag("sitemap"));
+crawler.run().await?;
+# Ok(())
+# }
+```
+
+Discovery finishes the tagged sitemap requests, including their indexes and
+retries, before starting their pages. Scheduled revisits belong to the next
+crawl wave and do not delay this boundary. Deferred pages then start
+highest priority first, even with a FIFO frontier; equal priorities keep their
+insertion order. Concurrent requests may finish in a different order.
+
+Discovery holds deferred seeds in memory; persistent frontiers keep their
+occurrences in flight for recovery. Request budgets include sitemap requests,
+so allow enough to finish discovery. Sitemaps found only by later page handlers
+cannot influence the initial order, and priorities remain relative to each
+site rather than measuring absolute importance across sites.
 
 ## Your own handler
 

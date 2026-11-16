@@ -23,7 +23,9 @@ The `sqlite` module provides `SqliteStore`, `SqliteFrontier`,
 database file, or uses a connection pool you configured; each named dataset
 stores JSON records and reads them destructively in FIFO order. Batch
 operations are transactional, including decoding: an incompatible record
-leaves the whole batch stored.
+leaves the whole batch stored. `read_with_ack(max)` defers removal until the
+consumer acknowledges the batch; dropping it or losing the process restores
+its items. Outstanding batches hold SQLite's writer lock.
 
 The frontier serializes seeds when enqueueing or scheduling them.
 Caller-attached seed extensions are discarded even within the same process;
@@ -92,6 +94,12 @@ versions are rejected.
 lock and requeues abandoned in-flight requests. Clones share ownership; other
 stores or processes cannot open a frontier until it is released. Datasets,
 seen sets, validators and caches remain shareable across pools.
+
+`SqliteFrontier` stores each response before handlers can
+read it. Recovered requests replay the original snapshot, so links not yet
+queued can be extracted even if the live page has changed. Snapshots are
+per occurrence, survive cancellation, and are removed on completion or retry.
+This stores complete bodies and does not restore live browser DOMs.
 
 ## Learn more
 

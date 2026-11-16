@@ -11,6 +11,7 @@ use tokio::sync::OnceCell;
 use tokio::time::Instant;
 
 use crate::backend::Session;
+use crate::backend::replay::ResponseReplay;
 use crate::crawler::event::Notify;
 use crate::dataset::{Data, Dataset, Datasets};
 use crate::frontier::InMemFrontier;
@@ -176,6 +177,19 @@ impl<C> Context<C> {
     {
         self.response
             .get_or_try_init(|| async {
+                let replay = self.request.extensions().get::<ResponseReplay>();
+                if let Some(response) = replay.and_then(ResponseReplay::recovered) {
+                    let _ = FETCH.try_with(|scope| {
+                        scope.record(Fetch {
+                            latency: None,
+                            status: Some(response.status()),
+                        });
+                    });
+                    if let Some(uri) = response.final_uri() {
+                        self.queue.rebase(uri.clone());
+                    }
+                    return Ok(response);
+                }
                 let started = Instant::now();
                 let response = self.session.fetch(&self.request).await;
                 // Outside a crawl, e.g. in a test, there is no scope to
@@ -188,6 +202,9 @@ impl<C> Context<C> {
                 };
                 let _ = FETCH.try_with(|scope| scope.record(fetch));
                 let response = response?;
+                if let Some(replay) = replay {
+                    replay.record(response.clone()).await?;
+                }
                 if let Some(uri) = response.final_uri() {
                     self.queue.rebase(uri.clone());
                 }

@@ -7,6 +7,7 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::TRACING_TARGET;
+use crate::crawler::admission::Pending;
 use crate::crawler::concurrency::{Feedback, HostConcurrency, Limit, Signal};
 use crate::crawler::delay::HostDelay;
 use crate::crawler::event::Slowdown;
@@ -24,7 +25,7 @@ pub(crate) struct HostPolicy {
 /// What to do with a seed that is allowed to be crawled.
 pub(crate) enum Admit {
     /// Start it now.
-    Start(Seed),
+    Start(Pending),
     /// Its host is busy; it waits in the host's queue.
     Parked,
 }
@@ -45,7 +46,7 @@ struct Host {
     /// When the host was last slowed down, so the requests already in
     /// flight then slow it down once, not once each.
     slowed: Option<Instant>,
-    parked: VecDeque<Seed>,
+    parked: VecDeque<Pending>,
 }
 
 impl Host {
@@ -112,21 +113,24 @@ impl Hosts {
             .unwrap_or_else(|| unreachable!("the host was just inserted"))
     }
 
-    fn is_free(policy: HostPolicy, host: &Host, now: Instant) -> bool {
-        let capacity = policy.concurrency.is_none_or(|concurrency| {
+    fn has_capacity(policy: HostPolicy, host: &Host) -> bool {
+        policy.concurrency.is_none_or(|concurrency| {
             let limit = if concurrency.is_adaptive() {
                 host.limit.get()
             } else {
                 concurrency.max()
             };
             host.in_flight < limit
-        });
-        let due = host.due().is_none_or(|at| at <= now);
-        capacity && due
+        })
+    }
+
+    fn is_free(policy: HostPolicy, host: &Host, now: Instant) -> bool {
+        Self::has_capacity(policy, host) && host.due().is_none_or(|at| at <= now)
     }
 
     /// Decides whether `seed` starts now or waits for its host.
-    pub(crate) fn admit(&mut self, seed: Seed, now: Instant) -> Admit {
+    pub(crate) fn admit(&mut self, seed: impl Into<Pending>, now: Instant) -> Admit {
+        let seed = seed.into();
         if !self.tracked {
             return Admit::Start(seed);
         }
@@ -141,15 +145,29 @@ impl Hosts {
         Admit::Parked
     }
 
-    /// Takes a parked seed whose host is free.
-    pub(crate) fn take_ready(&mut self, now: Instant) -> Option<Seed> {
+    /// When a root request may start by time alone. Root occurrences stay
+    /// in the scheduler's ordered queue; parked redirect hops go first.
+    pub(crate) fn ready_at(&self, seed: &Seed, now: Instant) -> Option<Instant> {
+        let Some(host) = self.by_key.get(&key(seed)) else {
+            return Some(now);
+        };
+        if !host.parked.is_empty() || !Self::has_capacity(self.policy, host) {
+            return None;
+        }
+        Some(host.due().unwrap_or(now).max(now))
+    }
+
+    /// Takes a parked hop whose host is free. Redirects already occupy a
+    /// global task slot, so they resume even at global capacity.
+    pub(crate) fn take_ready(&mut self, now: Instant) -> Option<Pending> {
         let policy = self.policy;
-        let host = self
-            .by_key
-            .values_mut()
-            .find(|host| !host.parked.is_empty() && Self::is_free(policy, host, now))?;
-        self.parked -= 1;
-        host.parked.pop_front()
+        for host in self.by_key.values_mut() {
+            if Self::is_free(policy, host, now) && !host.parked.is_empty() {
+                self.parked -= 1;
+                return host.parked.pop_front();
+            }
+        }
+        None
     }
 
     /// Records that a request for `seed` started, returning the key to pass
@@ -260,7 +278,7 @@ impl Hosts {
     pub(crate) fn earliest(&self) -> Option<Instant> {
         self.by_key
             .values()
-            .filter(|host| !host.parked.is_empty())
+            .filter(|host| !host.parked.is_empty() && Self::has_capacity(self.policy, host))
             .filter_map(Host::due)
             .min()
     }
@@ -270,8 +288,16 @@ impl Hosts {
         self.parked
     }
 
+    pub(crate) fn retain(&mut self, accepts: impl Fn(&Pending) -> bool) {
+        self.parked = 0;
+        for host in self.by_key.values_mut() {
+            host.parked.retain(&accepts);
+            self.parked += host.parked.len();
+        }
+    }
+
     /// Takes every parked seed, e.g. when the run stops.
-    pub(crate) fn drain(&mut self) -> Vec<Seed> {
+    pub(crate) fn drain(&mut self) -> Vec<Pending> {
         self.parked = 0;
         self.by_key
             .values_mut()

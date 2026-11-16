@@ -55,25 +55,25 @@ spire-reqwest = { version = "0.11", features = ["gzip", "cookies"] }
 | `http2` | HTTP/2 negotiation over TLS |
 | `system-proxy` | Proxies from the environment and system settings |
 | `gzip`, `brotli`, `zstd`, `deflate` | Transparent response decompression |
-| `cookies` | A cookie store per identity; without identities, add `.cookie_store(true)` in `from_builder` |
+| `cookies` | A cookie store for direct requests and a separate one per identity |
 | `socks` | SOCKS5 proxies |
 | `hickory-dns` | DNS resolution through hickory instead of the system resolver |
 
 ## Usage
 
-`ReqwestBackend::from_builder` takes a function that makes the reqwest
+`ReqwestBackend::from_builder` takes a function that makes a `ClientConfig`
 configuration, which a crawl with identities builds one client per identity
 from:
 
 ```rust
 use std::time::Duration;
 
-use spire_reqwest::{ReqwestBackend, reqwest};
+use spire_reqwest::{ClientConfig, ReqwestBackend};
 
 let backend = ReqwestBackend::from_builder(|| {
-    reqwest::Client::builder()
+    ClientConfig::new()
         .timeout(Duration::from_secs(30))
-        .user_agent("MyBot/1.0")
+        .transport(|builder| builder.user_agent("MyBot/1.0"))
 })?;
 # Ok::<_, spire_core::Error>(())
 ```
@@ -85,7 +85,7 @@ next time: timeouts and connection errors are retried, invalid requests and
 redirect loops are not.
 
 Error statuses follow the client's `StatusPolicy`. By default, `408`, `429`
-and `5xx` become retryable errors, with `429` and `503` pausing the request's
+and `5xx` become retryable errors, with a valid `Retry-After` pausing the request's
 host for as long as `Retry-After` asks, and other `4xx` become errors that are
 not retried. `StatusPolicy::Accept` returns every response to the handler
 instead:

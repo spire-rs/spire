@@ -1,8 +1,10 @@
 //! The [`Crawler`], which drives a crawl to completion.
 
+mod admission;
 mod concurrency;
 mod connector;
 mod delay;
+mod discovery;
 pub mod event;
 mod hosts;
 mod meta;
@@ -119,6 +121,7 @@ pub struct Crawler<B, W> {
 #[derive(Debug, Clone)]
 struct Settings {
     concurrency: NonZeroUsize,
+    discovery_tag: Option<Tag>,
     max_requests: Option<usize>,
     time_limit: Option<Duration>,
     request_timeout: Option<Duration>,
@@ -151,6 +154,7 @@ impl<B, W> Crawler<B, W> {
         let frontier = InMemFrontier::fifo().retry_with(RetryPolicy::default());
         let settings = Settings {
             concurrency: DEFAULT_CONCURRENCY,
+            discovery_tag: None,
             max_requests: None,
             time_limit: None,
             request_timeout: None,
@@ -173,6 +177,24 @@ impl<B, W> Crawler<B, W> {
             live: Arc::default(),
             events: Emitter::new(event::CAPACITY),
         }
+    }
+
+    /// Finishes requests tagged `tag` before starting other requests.
+    ///
+    /// Use a sitemap tag to discover the complete sitemap graph before
+    /// spending the remaining request budget on its pages. Deferred pages are
+    /// started by descending seed priority, preserving insertion order on
+    /// ties. Robots.txt admission still runs during discovery, so sitemaps
+    /// advertised there can join the graph. Deferred seeds remain in flight
+    /// in persistent storage and are returned on a clean stop.
+    ///
+    /// This holds deferred seeds in memory until discovery finishes. Sitemaps
+    /// found only by later page handlers belong to a later discovery wave;
+    /// their unknown pages cannot influence the initial ordering.
+    #[must_use]
+    pub fn with_discovery_tag(mut self, tag: impl Into<Tag>) -> Self {
+        self.settings.discovery_tag = Some(tag.into());
+        self
     }
 
     /// Adds a shared service to every request handled by this crawler.

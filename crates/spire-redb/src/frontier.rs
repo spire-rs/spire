@@ -3,7 +3,7 @@ use std::fmt;
 use redb::ReadableTable;
 use spire_core::Result;
 use spire_core::frontier::seed::Seed;
-use spire_core::frontier::{Ack, Admission, Frontier, NextSeed, Report, Schedule};
+use spire_core::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report, Schedule};
 use tokio::time::Instant;
 
 use crate::codec;
@@ -85,25 +85,26 @@ fn record_seen(txn: &redb::WriteTransaction, now: u64) -> Result<(), redb::Error
 
 /// Moves the revisits and retries due by `now` to the queue, in the order they
 /// came due. Seeds that cannot be decoded are dropped, as when popped.
-fn release_due(txn: &redb::WriteTransaction, now: u64) -> Result<(), redb::Error> {
+fn release_due(txn: &redb::WriteTransaction, now: u64, mode: PopMode) -> Result<(), redb::Error> {
     record_seen(txn, now)?;
     let mut due = Vec::new();
     {
-        let mut schedule = txn.open_table(SCHEDULE)?;
-        let mut scheduled = txn.open_table(SCHEDULED)?;
-        loop {
-            let first = schedule.first()?.map(|(key, _)| key.value());
-            let Some(key) = first.filter(|&(at, _)| at <= now) else {
-                break;
-            };
-            schedule.remove(key)?;
-            if let Some(entry) = scheduled.remove(key.1)?
-                && let Some(bytes) = entry.value().get(8..)
-            {
-                due.push((key.0, bytes.to_vec()));
+        if mode == PopMode::All {
+            let mut schedule = txn.open_table(SCHEDULE)?;
+            let mut scheduled = txn.open_table(SCHEDULED)?;
+            loop {
+                let first = schedule.first()?.map(|(key, _)| key.value());
+                let Some(key) = first.filter(|&(at, _)| at <= now) else {
+                    break;
+                };
+                schedule.remove(key)?;
+                if let Some(entry) = scheduled.remove(key.1)?
+                    && let Some(bytes) = entry.value().get(8..)
+                {
+                    due.push((key.0, bytes.to_vec()));
+                }
             }
         }
-
         let mut retries = txn.open_table(RETRIES)?;
         loop {
             let first = retries.first()?.map(|(key, _)| key.value());
@@ -152,12 +153,12 @@ impl Frontier for RedbFrontier {
     /// Moves seeds that have come due to the queue, then hands out the next.
     /// It waits for retries, but not for scheduled seeds; see
     /// [`Schedule::next_due`].
-    async fn pop(&self) -> Result<NextSeed> {
+    async fn pop_with(&self, mode: PopMode) -> Result<NextSeed> {
         let now = self.store.clock().now();
         let popped = self
             .store
             .write(move |txn| {
-                release_due(txn, now)?;
+                release_due(txn, now, mode)?;
                 let mut queue = txn.open_table(QUEUE)?;
                 let mut in_flight = txn.open_table(IN_FLIGHT)?;
                 while let Some((_, bytes)) = queue.pop_first()? {
@@ -306,6 +307,43 @@ pub(crate) mod tests {
             NextSeed::Ready(seed) => Some(seed.uri().path().trim_start_matches('/').to_owned()),
             NextSeed::Wait(_) | NextSeed::Empty => None,
         }
+    }
+
+    #[tokio::test]
+    async fn queued_mode_releases_retries_but_preserves_due_revisits() {
+        use spire_core::frontier::Schedule;
+        use tokio::time::Instant;
+        let path = TempPath::new();
+        let store = RedbStore::open(&path.0).await.unwrap();
+        let frontier = store.frontier();
+        frontier.push(seed("retry")).await.unwrap();
+        let NextSeed::Ready(retry) = frontier.pop().await.unwrap() else {
+            panic!("expected queued seed");
+        };
+        frontier
+            .report(Report::Requeue {
+                seed: retry,
+                due: Instant::now(),
+            })
+            .await
+            .unwrap();
+        frontier
+            .schedule(seed("revisit"), Instant::now())
+            .await
+            .unwrap();
+        let NextSeed::Ready(retry) = frontier.pop_with(PopMode::Queued).await.unwrap() else {
+            panic!("expected retry");
+        };
+        assert_eq!(retry.uri().path(), "/retry");
+        frontier.report(Report::Done(retry)).await.unwrap();
+        assert!(matches!(
+            frontier.pop_with(PopMode::Queued).await.unwrap(),
+            NextSeed::Empty
+        ));
+        let NextSeed::Ready(revisit) = frontier.pop().await.unwrap() else {
+            panic!("expected revisit");
+        };
+        assert_eq!(revisit.uri().path(), "/revisit");
     }
 
     #[tokio::test]

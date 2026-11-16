@@ -21,12 +21,12 @@ use crate::{Context, Result, TRACING_TARGET};
 /// pages are one level deeper than the sitemap, so a depth limit also bounds
 /// how deep indexes are followed.
 ///
-/// A page's `<priority>` ranks it against the other pages of its site, not
-/// against the rest of the crawl, so it orders the pages instead of becoming
-/// their seed priority: they are queued highest first, at the default seed
-/// priority, so a FIFO or priority frontier crawls a site's most important
-/// pages first. A LIFO frontier pops them in reverse. To map priorities onto
-/// a crawl's own scale, write a handler with the [`Sitemap`] extractor.
+/// Sitemap priorities become seed priorities from 0 to 1,000,000, with
+/// 500,000 for pages without an explicit priority. Pages are also queued in
+/// descending priority order for FIFO frontiers. Use
+/// `Crawler::with_discovery_tag` to discover the sitemap graph before starting
+/// its pages. Priorities are relative to a site; values from different sites
+/// are not absolute importance.
 ///
 /// ```
 /// use spire::Router;
@@ -70,6 +70,14 @@ impl FollowSitemap {
 
         for entry in &pages {
             if let Ok(seed) = Seed::get(entry.location.as_str()) {
+                // The protocol validates priorities as finite 0..=1.
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "validated priorities map to 0..=1,000,000"
+                )]
+                let priority = (f64::from(entry.priority.unwrap_or_default().get()) * 1_000_000.0)
+                    .round() as i32;
+                let seed = seed.with_priority(priority);
                 queue.follow(seed.with_tag(self.pages.clone())).await?;
             }
         }

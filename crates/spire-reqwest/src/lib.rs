@@ -7,9 +7,12 @@ compile_error!("At least one TLS feature must be enabled: 'rustls-tls' or 'nativ
 
 mod client;
 mod clients;
+mod config;
 mod conversion;
+mod redirect;
 
 #[doc(no_inline)]
 pub use reqwest;
 
 pub use crate::client::{ReqwestBackend, ReqwestSession};
+pub use crate::config::ClientConfig;

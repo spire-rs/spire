@@ -14,7 +14,7 @@ mod repr;
 pub use fingerprint::Fingerprint;
 
 use crate::crawler::{Attempt, Depth, Tag};
-use crate::http::{Request, RequestMeta, UriExt};
+use crate::http::{Request, RequestExt, RequestMeta, UriExt};
 use crate::{Error, Result};
 
 /// A request waiting in the frontier.
@@ -56,6 +56,21 @@ impl Seed {
             priority: 0,
             attempt: Attempt::FIRST,
         })
+    }
+
+    /// Reconstructs an outgoing transfer for scope admission, preserving
+    /// request metadata and runtime extensions without queueing it.
+    pub(crate) fn from_request(request: &Request) -> Result<Self> {
+        let mut seed = Self::new(request.method().clone(), request.uri().clone())?;
+        seed.tag = request.tag().cloned();
+        seed.depth = request.depth();
+        seed.attempt = request.attempt();
+        let extras = seed.extras_mut();
+        extras.headers = request.headers().clone();
+        extras.body = request.body().clone();
+        extras.identity = request.identity().map(|identity| identity.name().into());
+        extras.extensions = request.extensions().clone();
+        Ok(seed)
     }
 
     /// Creates a `GET` seed.

@@ -6,8 +6,9 @@ use spire_core::http::{Request, Response};
 use spire_core::identity::Identity;
 use spire_core::{Error, ErrorKind, Result};
 
-use crate::clients::Clients;
-use crate::conversion::{head_from_reqwest, request_to_reqwest};
+use crate::ClientConfig;
+use crate::clients::{Client, Clients};
+use crate::conversion::head_from_reqwest;
 
 /// An HTTP [`Backend`] built on [`reqwest::Client`].
 ///
@@ -22,18 +23,24 @@ use crate::conversion::{head_from_reqwest, request_to_reqwest};
 /// with the identity's proxy and, with the `cookies` feature, a cookie store
 /// of its own. An identity's client is dropped once the identity is gone.
 ///
+/// Spire resolves redirects itself, checking crawl admission before every
+/// target. Builder redirect policies are replaced with `Policy::none()`.
+/// With `cookies`, each client uses a backend-owned jar. `as_reqwest()` shares
+/// that transport client and jar, but bypasses Spire's redirect resolution,
+/// total timeout and default headers.
+///
 /// # Examples
 ///
 /// ```
 /// use std::time::Duration;
 ///
 /// use spire_core::backend::StatusPolicy;
-/// use spire_reqwest::ReqwestBackend;
+/// use spire_reqwest::{ClientConfig, ReqwestBackend};
 ///
 /// let backend = ReqwestBackend::from_builder(|| {
-///     reqwest::Client::builder()
+///     ClientConfig::new()
 ///         .timeout(Duration::from_secs(30))
-///         .user_agent("MyBot/1.0")
+///         .transport(|builder| builder.user_agent("MyBot/1.0"))
 /// })?
 /// .with_status_policy(StatusPolicy::Accept);
 /// # Ok::<_, spire_core::Error>(())
@@ -51,16 +58,16 @@ impl ReqwestBackend {
         Self::default()
     }
 
-    /// Creates a client from the configuration `builder` makes, which
+    /// Creates a client from the [`ClientConfig`] `builder` makes, which
     /// identities' clients are built from too.
     ///
     /// ```
     /// use std::time::Duration;
     ///
-    /// use spire_reqwest::ReqwestBackend;
+    /// use spire_reqwest::{ClientConfig, ReqwestBackend};
     ///
     /// let backend = ReqwestBackend::from_builder(|| {
-    ///     reqwest::Client::builder().timeout(Duration::from_secs(30))
+    ///     ClientConfig::new().timeout(Duration::from_secs(30))
     /// })?;
     /// # Ok::<_, spire_core::Error>(())
     /// ```
@@ -71,7 +78,7 @@ impl ReqwestBackend {
     /// build the client, e.g. when TLS fails to initialize.
     pub fn from_builder<F>(builder: F) -> Result<Self>
     where
-        F: Fn() -> reqwest::ClientBuilder + Send + Sync + 'static,
+        F: Fn() -> ClientConfig + Send + Sync + 'static,
     {
         Ok(Self {
             clients: Clients::new(Arc::new(builder))?,
@@ -86,9 +93,10 @@ impl ReqwestBackend {
         self
     }
 
-    /// Returns the [`reqwest::Client`] requests without an identity use.
+    /// Returns the transport [`reqwest::Client`] used without an identity.
+    /// Spire's redirects, total timeout and default headers are bypassed.
     #[must_use]
-    pub const fn as_reqwest(&self) -> &reqwest::Client {
+    pub fn as_reqwest(&self) -> &reqwest::Client {
         self.clients.direct()
     }
 
@@ -117,7 +125,7 @@ impl Backend for ReqwestBackend {
 }
 
 impl ReqwestBackend {
-    fn session(&self, client: reqwest::Client) -> ReqwestSession {
+    fn session(&self, client: Client) -> ReqwestSession {
         ReqwestSession {
             http: self.clone(),
             client,
@@ -131,7 +139,7 @@ impl ReqwestBackend {
 pub struct ReqwestSession {
     http: ReqwestBackend,
     /// The reqwest client it sends with: the crawl's, or its identity's.
-    client: reqwest::Client,
+    pub(crate) client: Client,
 }
 
 impl ReqwestSession {
@@ -144,14 +152,25 @@ impl ReqwestSession {
 
 impl Session for ReqwestSession {
     async fn fetch(&self, request: &Request) -> Result<Response> {
-        let uri = request.uri().clone();
-        let failed = |error: Error| error.with_uri(uri.clone());
-        let converted = request_to_reqwest(request).map_err(failed)?;
-        let response = self
-            .client
-            .execute(converted)
-            .await
-            .map_err(|error| failed(classify(error)))?;
+        let fetch = self.fetch_complete(request);
+        if let Some(timeout) = self.client.timeout {
+            tokio::time::timeout(timeout, fetch)
+                .await
+                .map_err(|error| {
+                    Error::new(ErrorKind::Timeout)
+                        .with_uri(request.uri().clone())
+                        .with_source(error)
+                })?
+        } else {
+            fetch.await
+        }
+    }
+}
+
+impl ReqwestSession {
+    async fn fetch_complete(&self, request: &Request) -> Result<Response> {
+        let failed = |error: Error| error.with_uri(request.uri().clone());
+        let (response, _transfer) = self.send(request).await?;
 
         // An error status is rejected before its body is downloaded.
         let head = self
@@ -168,7 +187,7 @@ impl Session for ReqwestSession {
 
 /// Classifies a failed transfer, so the crawler only retries what may
 /// succeed on another attempt.
-fn classify(error: reqwest::Error) -> Error {
+pub(crate) fn classify(error: reqwest::Error) -> Error {
     let kind = if error.is_timeout() {
         ErrorKind::Timeout
     } else if error.is_builder() {

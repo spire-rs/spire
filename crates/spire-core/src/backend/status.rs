@@ -13,8 +13,9 @@ pub enum StatusPolicy {
     /// `4xx` and `5xx` responses become errors, so the crawler retries or
     /// fails them without a handler having to check:
     ///
-    /// - `408`, `429` and `5xx` are retryable [`Http`] errors; `429` and `503`
-    ///   honour `Retry-After` by pausing the request's host.
+    /// - `408`, `429` and `5xx` are retryable [`Http`] errors. A valid
+    ///   `Retry-After` on any of them pauses the request's host. Delays beyond
+    ///   the scheduler's clock range are ignored when scheduling.
     /// - Other `4xx` are [`Rejected`] errors, which are not retried.
     ///
     /// [`Http`]: ErrorKind::Http
@@ -59,11 +60,7 @@ impl StatusPolicy {
             error = error.with_uri(uri.clone());
         }
 
-        let honours_retry_after = matches!(
-            status,
-            StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE
-        );
-        if honours_retry_after && let Some(delay) = retry_after(response.headers()) {
+        if retryable && let Some(delay) = retry_after(response.headers()) {
             error = error.with_retry_after(delay);
         }
         Err(error)
@@ -136,8 +133,20 @@ mod tests {
         let past = classify(503, Some("Wed, 21 Oct 2015 07:28:00 GMT"));
         assert_eq!(past.retry_after(), Some(Duration::ZERO));
 
-        // Only rate limiting and unavailability carry a pause.
-        assert_eq!(classify(500, Some("120")).retry_after(), None);
+        for status in [408, 429, 500, 502, 503, 504, 599] {
+            let error = classify(status, Some("120"));
+            assert!(error.is_retryable());
+            assert_eq!(error.retry_after(), Some(Duration::from_mins(2)));
+            let oversized = classify(status, Some("18446744073709551615"));
+            assert!(oversized.is_retryable());
+            assert_eq!(oversized.retry_after(), Some(Duration::from_secs(u64::MAX)));
+        }
+        // A header does not make a permanent failure retryable.
+        for status in [400, 401, 403, 404] {
+            let error = classify(status, Some("120"));
+            assert!(!error.is_retryable());
+            assert_eq!(error.retry_after(), None);
+        }
         assert_eq!(classify(429, Some("soon")).retry_after(), None);
     }
 

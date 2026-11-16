@@ -9,15 +9,16 @@ use robotxt::Robots as Rules;
 use tokio::time::Instant;
 
 use crate::crawler::Robots;
+use crate::crawler::admission::Pending;
 use crate::frontier::seed::Seed;
 use crate::{Result, TRACING_TARGET};
 
 /// Whether robots.txt lets a seed be crawled.
 pub(crate) enum Verdict {
     /// It may be crawled.
-    Allow(Seed),
+    Allow(Pending),
     /// It is disallowed, and must be skipped.
-    Disallow(Seed),
+    Disallow(Pending),
     /// It waits for its origin's robots.txt.
     Parked,
 }
@@ -39,14 +40,14 @@ enum State {
 
 struct Origin {
     state: State,
-    parked: VecDeque<Seed>,
+    parked: VecDeque<Pending>,
 }
 
 /// What a fetched robots.txt changes.
 #[derive(Debug, Default)]
 pub(crate) struct Fetched {
     /// Seeds that waited for the rules, to admit now.
-    pub(crate) released: Vec<Seed>,
+    pub(crate) released: Vec<Pending>,
     /// The origin's `Crawl-delay`.
     pub(crate) delay: Option<Duration>,
     /// Sitemaps the rules list, to queue, see [`Robots::with_sitemaps`].
@@ -94,7 +95,7 @@ impl RobotsCache {
         }
     }
 
-    fn decide(rules: &Rules, seed: Seed) -> Verdict {
+    fn decide(rules: &Rules, seed: Pending) -> Verdict {
         let path = seed
             .uri()
             .path_and_query()
@@ -108,7 +109,8 @@ impl RobotsCache {
 
     /// Decides whether `seed` may be crawled, parking it while its origin's
     /// robots.txt is fetched or unreachable.
-    pub(crate) fn admit(&mut self, seed: Seed, now: Instant) -> Verdict {
+    pub(crate) fn admit(&mut self, seed: impl Into<Pending>, now: Instant) -> Verdict {
+        let seed = seed.into();
         let key = origin(&seed);
         let max_age = self.config.max_age;
         let entry = self.origins.entry(key.clone()).or_insert_with(|| {
@@ -190,7 +192,7 @@ impl RobotsCache {
             rules,
             fetched_at: now,
         };
-        let released: Vec<Seed> = entry.parked.drain(..).collect();
+        let released: Vec<Pending> = entry.parked.drain(..).collect();
         self.parked -= released.len();
         Fetched {
             released,
@@ -235,8 +237,29 @@ impl RobotsCache {
         self.parked
     }
 
+    /// Removes abandoned redirect waits.
+    pub(crate) fn retain(&mut self, accepts: impl Fn(&Pending) -> bool) -> Vec<String> {
+        let mut removed = Vec::new();
+        self.parked = 0;
+        self.origins.retain(|origin, entry| {
+            let before = entry.parked.len();
+            entry.parked.retain(&accepts);
+            self.parked += entry.parked.len();
+            // A fetch or retry required only by a cancelled redirect is no
+            // longer work that should keep the crawl alive.
+            let keep = before == entry.parked.len() || !entry.parked.is_empty();
+            if !keep {
+                removed.push(origin.clone());
+            }
+            keep
+        });
+        self.fetches
+            .retain(|(origin, _)| self.origins.contains_key(origin));
+        removed
+    }
+
     /// Takes every parked seed, e.g. when the run stops.
-    pub(crate) fn drain(&mut self) -> Vec<Seed> {
+    pub(crate) fn drain(&mut self) -> Vec<Pending> {
         self.parked = 0;
         self.origins
             .values_mut()

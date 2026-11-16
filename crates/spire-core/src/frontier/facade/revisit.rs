@@ -7,7 +7,7 @@ use tokio::time::Instant;
 use crate::Result;
 use crate::crawler::Revisit;
 use crate::frontier::seed::Seed;
-use crate::frontier::{Ack, Admission, Frontier, NextSeed, Report, Schedule};
+use crate::frontier::{Ack, Admission, Frontier, NextSeed, PopMode, Report, Schedule};
 
 /// Crawls pages again on a schedule, see
 /// [`FrontierExt::revisit`](crate::frontier::FrontierExt::revisit).
@@ -55,9 +55,13 @@ impl<F: Schedule, T: Revisit> Frontier for Revisits<F, T> {
         self.inner.push(seed)
     }
 
-    async fn pop(&self) -> Result<NextSeed> {
-        let next = self.inner.pop().await?;
-        if matches!(next, NextSeed::Ready(_)) {
+    fn permits(&self, seed: &Seed) -> bool {
+        self.inner.permits(seed)
+    }
+
+    async fn pop_with(&self, mode: PopMode) -> Result<NextSeed> {
+        let next = self.inner.pop_with(mode).await?;
+        if mode == PopMode::Queued || matches!(next, NextSeed::Ready(_)) {
             return Ok(next);
         }
         let due = self.inner.next_due().await?;
@@ -137,6 +141,32 @@ mod tests {
                 Self::About => None,
             }
         }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn queued_mode_keeps_due_revisits_for_the_next_wave_but_releases_retries() {
+        let storage = std::sync::Arc::new(InMemFrontier::fifo());
+        storage
+            .schedule(seed("revisit"), Instant::now())
+            .await
+            .unwrap();
+        storage
+            .report(Report::Requeue {
+                seed: seed("retry"),
+                due: Instant::now(),
+            })
+            .await
+            .unwrap();
+        let frontier = storage.revisit::<Page>().retry(3).dedup();
+        let NextSeed::Ready(retry) = frontier.pop_with(PopMode::Queued).await.unwrap() else {
+            panic!("expected retry");
+        };
+        assert_eq!(retry.uri().path(), "/retry");
+        assert!(matches!(
+            frontier.pop_with(PopMode::Queued).await.unwrap(),
+            NextSeed::Empty
+        ));
+        assert_eq!(pop_path(&frontier).await.as_deref(), Some("revisit"));
     }
 
     #[tokio::test(start_paused = true)]

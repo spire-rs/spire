@@ -1,6 +1,6 @@
 # Installation
 
-Spire needs Rust 1.95 or later, and runs on tokio. Add it with the features
+Spire needs Rust 1.99 or later, and runs on tokio. Add it with the features
 you need, and tokio to run it:
 
 ```toml

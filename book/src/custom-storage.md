@@ -6,7 +6,7 @@ database, a queue service, or memory shared with something else.
 | Trait | Keeps | Built in |
 |---|---|---|
 | `Frontier` | Seeds waiting to be crawled, and what to do when one ends | `InMemFrontier`, `RedbFrontier`, `SqliteFrontier` |
-| `FrontierLayer` | A facade wrapping a frontier with behavior | `dedup`, `filter`, `max_depth`, `retry`, `tag_backoff`, `revisit` |
+| `FrontierLayer` | A facade wrapping a frontier with behavior | `dedup`, `filter`, `max_depth`, `retry`, `revisit` |
 | `SeenSet` | Fingerprints of seeds seen before | `InMemSeen`, `BloomSeen`, `RedbSeen`, `SqliteSeen` |
 | `Schedule` | Seeds held back until a time, for revisits | `InMemFrontier`, `RedbFrontier`, `SqliteFrontier` |
 | `Dataset<T>` | Scraped items | `InMemDataset`, `JsonlDataset`, `CsvDataset`, `RedbDataset`, `SqliteDataset` |
@@ -50,7 +50,7 @@ use std::future::Future;
 
 use spire::Result;
 use spire::frontier::seed::Seed;
-use spire::frontier::{Ack, Admission, Frontier, FrontierExt, FrontierLayer, InMemFrontier, NextSeed, Report};
+use spire::frontier::{Ack, Admission, Frontier, FrontierExt, FrontierLayer, InMemFrontier, NextSeed, PopMode, Report};
 
 /// Logs every seed handed out for crawling.
 struct Logged<F>(F);
@@ -60,8 +60,12 @@ impl<F: Frontier> Frontier for Logged<F> {
         self.0.push(seed)
     }
 
-    async fn pop(&self) -> Result<NextSeed> {
-        let next = self.0.pop().await?;
+    fn permits(&self, seed: &Seed) -> bool {
+        self.0.permits(seed)
+    }
+
+    async fn pop_with(&self, mode: PopMode) -> Result<NextSeed> {
+        let next = self.0.pop_with(mode).await?;
         if let NextSeed::Ready(seed) = &next {
             println!("crawling {}", seed.uri());
         }
@@ -94,7 +98,8 @@ impl<F: Frontier> FrontierLayer<F> for Logging {
 let frontier = InMemFrontier::fifo().dedup().layer(Logging);
 ```
 
-A facade passes on what it does not handle: `report`, `size_hint` and
+A facade forwards `permits` and the dequeue mode to keep scope checks and
+discovery behavior. It also passes on what it does not handle: `report`, `size_hint` and
 `snapshot` have defaults that refuse retries and hide the queue, so forward
 them to the inner frontier, as above.
 
@@ -105,7 +110,10 @@ to the default refuses it, so a retried seed fails.
 
 ## Frontiers
 
-A storage frontier implements `push`, `pop` and `report`. `pop` returns
+A storage frontier implements `push`, `pop_with` and `report`. The convenience
+method `pop()` calls `pop_with(PopMode::All)`. `PopMode::Queued` leaves scheduled
+revisits untouched, even when due, while still releasing retries; discovery uses
+this mode to finish its initial wave. `pop_with` returns
 `NextSeed::Ready` with a seed, `NextSeed::Wait` until a time when none is ready yet,
 or `NextSeed::Empty`, which ends the crawl once nothing is in flight. `report`
 tells it how a popped seed ended: a persistent frontier keeps a seed
